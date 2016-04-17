@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Summary: Show the current Go version and its origin
+#
+# Shows the currently selected Go version and how it was
+# selected. To obtain only the version string, use `goenv
+# version-name'.
+
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+exitcode=0
+OLDIFS="$IFS"
+IFS=: GOENV_VERSION_NAMES=($(goenv-version-name)) || exitcode=$?
+IFS="$OLDIFS"
+
+for GOENV_VERSION_NAME in "${GOENV_VERSION_NAMES[@]}"; do
+  echo "$GOENV_VERSION_NAME (set by $(goenv-version-origin))"
+done
+
+exit $exitcode

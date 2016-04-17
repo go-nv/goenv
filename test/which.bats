@@ -5,7 +5,7 @@ load test_helper
 create_executable() {
   local bin
   if [[ $1 == */* ]]; then bin="$1"
-  else bin="${PYENV_ROOT}/versions/${1}/bin"
+  else bin="${GOENV_ROOT}/versions/${1}/bin"
   fi
   mkdir -p "$bin"
   touch "${bin}/$2"
@@ -16,84 +16,84 @@ create_executable() {
   create_executable "2.7" "python"
   create_executable "3.4" "py.test"
 
-  PYENV_VERSION=2.7 run pyenv-which python
-  assert_success "${PYENV_ROOT}/versions/2.7/bin/python"
+  GOENV_VERSION=2.7 run goenv-which python
+  assert_success "${GOENV_ROOT}/versions/2.7/bin/python"
 
-  PYENV_VERSION=3.4 run pyenv-which py.test
-  assert_success "${PYENV_ROOT}/versions/3.4/bin/py.test"
+  GOENV_VERSION=3.4 run goenv-which py.test
+  assert_success "${GOENV_ROOT}/versions/3.4/bin/py.test"
 
-  PYENV_VERSION=3.4:2.7 run pyenv-which py.test
-  assert_success "${PYENV_ROOT}/versions/3.4/bin/py.test"
+  GOENV_VERSION=3.4:2.7 run goenv-which py.test
+  assert_success "${GOENV_ROOT}/versions/3.4/bin/py.test"
 }
 
 @test "searches PATH for system version" {
-  create_executable "${PYENV_TEST_DIR}/bin" "kill-all-humans"
-  create_executable "${PYENV_ROOT}/shims" "kill-all-humans"
+  create_executable "${GOENV_TEST_DIR}/bin" "kill-all-humans"
+  create_executable "${GOENV_ROOT}/shims" "kill-all-humans"
 
-  PYENV_VERSION=system run pyenv-which kill-all-humans
-  assert_success "${PYENV_TEST_DIR}/bin/kill-all-humans"
+  GOENV_VERSION=system run goenv-which kill-all-humans
+  assert_success "${GOENV_TEST_DIR}/bin/kill-all-humans"
 }
 
 @test "searches PATH for system version (shims prepended)" {
-  create_executable "${PYENV_TEST_DIR}/bin" "kill-all-humans"
-  create_executable "${PYENV_ROOT}/shims" "kill-all-humans"
+  create_executable "${GOENV_TEST_DIR}/bin" "kill-all-humans"
+  create_executable "${GOENV_ROOT}/shims" "kill-all-humans"
 
-  PATH="${PYENV_ROOT}/shims:$PATH" PYENV_VERSION=system run pyenv-which kill-all-humans
-  assert_success "${PYENV_TEST_DIR}/bin/kill-all-humans"
+  PATH="${GOENV_ROOT}/shims:$PATH" GOENV_VERSION=system run goenv-which kill-all-humans
+  assert_success "${GOENV_TEST_DIR}/bin/kill-all-humans"
 }
 
 @test "searches PATH for system version (shims appended)" {
-  create_executable "${PYENV_TEST_DIR}/bin" "kill-all-humans"
-  create_executable "${PYENV_ROOT}/shims" "kill-all-humans"
+  create_executable "${GOENV_TEST_DIR}/bin" "kill-all-humans"
+  create_executable "${GOENV_ROOT}/shims" "kill-all-humans"
 
-  PATH="$PATH:${PYENV_ROOT}/shims" PYENV_VERSION=system run pyenv-which kill-all-humans
-  assert_success "${PYENV_TEST_DIR}/bin/kill-all-humans"
+  PATH="$PATH:${GOENV_ROOT}/shims" GOENV_VERSION=system run goenv-which kill-all-humans
+  assert_success "${GOENV_TEST_DIR}/bin/kill-all-humans"
 }
 
 @test "searches PATH for system version (shims spread)" {
-  create_executable "${PYENV_TEST_DIR}/bin" "kill-all-humans"
-  create_executable "${PYENV_ROOT}/shims" "kill-all-humans"
+  create_executable "${GOENV_TEST_DIR}/bin" "kill-all-humans"
+  create_executable "${GOENV_ROOT}/shims" "kill-all-humans"
 
-  PATH="${PYENV_ROOT}/shims:${PYENV_ROOT}/shims:/tmp/non-existent:$PATH:${PYENV_ROOT}/shims" \
-    PYENV_VERSION=system run pyenv-which kill-all-humans
-  assert_success "${PYENV_TEST_DIR}/bin/kill-all-humans"
+  PATH="${GOENV_ROOT}/shims:${GOENV_ROOT}/shims:/tmp/non-existent:$PATH:${GOENV_ROOT}/shims" \
+    GOENV_VERSION=system run goenv-which kill-all-humans
+  assert_success "${GOENV_TEST_DIR}/bin/kill-all-humans"
 }
 
 @test "doesn't include current directory in PATH search" {
   export PATH="$(path_without "kill-all-humans")"
-  mkdir -p "$PYENV_TEST_DIR"
-  cd "$PYENV_TEST_DIR"
+  mkdir -p "$GOENV_TEST_DIR"
+  cd "$GOENV_TEST_DIR"
   touch kill-all-humans
   chmod +x kill-all-humans
-  PYENV_VERSION=system run pyenv-which kill-all-humans
-  assert_failure "pyenv: kill-all-humans: command not found"
+  GOENV_VERSION=system run goenv-which kill-all-humans
+  assert_failure "goenv: kill-all-humans: command not found"
 }
 
 @test "version not installed" {
   create_executable "3.4" "py.test"
-  PYENV_VERSION=3.3 run pyenv-which py.test
-  assert_failure "pyenv: version \`3.3' is not installed (set by PYENV_VERSION environment variable)"
+  GOENV_VERSION=3.3 run goenv-which py.test
+  assert_failure "goenv: version \`3.3' is not installed (set by GOENV_VERSION environment variable)"
 }
 
 @test "versions not installed" {
   create_executable "3.4" "py.test"
-  PYENV_VERSION=2.7:3.3 run pyenv-which py.test
+  GOENV_VERSION=2.7:3.3 run goenv-which py.test
   assert_failure <<OUT
-pyenv: version \`2.7' is not installed (set by PYENV_VERSION environment variable)
-pyenv: version \`3.3' is not installed (set by PYENV_VERSION environment variable)
+goenv: version \`2.7' is not installed (set by GOENV_VERSION environment variable)
+goenv: version \`3.3' is not installed (set by GOENV_VERSION environment variable)
 OUT
 }
 
 @test "no executable found" {
   create_executable "2.7" "py.test"
-  PYENV_VERSION=2.7 run pyenv-which fab
-  assert_failure "pyenv: fab: command not found"
+  GOENV_VERSION=2.7 run goenv-which fab
+  assert_failure "goenv: fab: command not found"
 }
 
 @test "no executable found for system version" {
   export PATH="$(path_without "py.test")"
-  PYENV_VERSION=system run pyenv-which py.test
-  assert_failure "pyenv: py.test: command not found"
+  GOENV_VERSION=system run goenv-which py.test
+  assert_failure "goenv: py.test: command not found"
 }
 
 @test "executable found in other versions" {
@@ -101,12 +101,12 @@ OUT
   create_executable "3.3" "py.test"
   create_executable "3.4" "py.test"
 
-  PYENV_VERSION=2.7 run pyenv-which py.test
+  GOENV_VERSION=2.7 run goenv-which py.test
   assert_failure
   assert_output <<OUT
-pyenv: py.test: command not found
+goenv: py.test: command not found
 
-The \`py.test' command exists in these Python versions:
+The \`py.test' command exists in these Go versions:
   3.3
   3.4
 OUT
@@ -119,19 +119,19 @@ echo HELLO="\$(printf ":%s" "\${hellos[@]}")"
 exit
 SH
 
-  IFS=$' \t\n' PYENV_VERSION=system run pyenv-which anything
+  IFS=$' \t\n' GOENV_VERSION=system run goenv-which anything
   assert_success
   assert_output "HELLO=:hello:ugly:world:again"
 }
 
-@test "discovers version from pyenv-version-name" {
-  mkdir -p "$PYENV_ROOT"
-  cat > "${PYENV_ROOT}/version" <<<"3.4"
-  create_executable "3.4" "python"
+@test "discovers version from goenv-version-name" {
+  mkdir -p "$GOENV_ROOT"
+  cat > "${GOENV_ROOT}/version" <<<"1.6.1"
+  create_executable "1.6.1" "go"
 
-  mkdir -p "$PYENV_TEST_DIR"
-  cd "$PYENV_TEST_DIR"
+  mkdir -p "$GOENV_TEST_DIR"
+  cd "$GOENV_TEST_DIR"
 
-  PYENV_VERSION= run pyenv-which python
-  assert_success "${PYENV_ROOT}/versions/3.4/bin/python"
+  GOENV_VERSION= run goenv-which go
+  assert_success "${GOENV_ROOT}/versions/1.6.1/bin/go"
 }

@@ -3,57 +3,57 @@
 load test_helper
 
 setup() {
-  mkdir -p "${PYENV_TEST_DIR}/myproject"
-  cd "${PYENV_TEST_DIR}/myproject"
+  mkdir -p "${GOENV_TEST_DIR}/myproject"
+  cd "${GOENV_TEST_DIR}/myproject"
 }
 
 @test "no version" {
-  assert [ ! -e "${PWD}/.python-version" ]
-  run pyenv-local
-  assert_failure "pyenv: no local version configured for this directory"
+  assert [ ! -e "${PWD}/.go-version" ]
+  run goenv-local
+  assert_failure "goenv: no local version configured for this directory"
 }
 
 @test "local version" {
-  echo "1.2.3" > .python-version
-  run pyenv-local
+  echo "1.2.3" > .go-version
+  run goenv-local
   assert_success "1.2.3"
 }
 
 @test "discovers version file in parent directory" {
-  echo "1.2.3" > .python-version
+  echo "1.2.3" > .go-version
   mkdir -p "subdir" && cd "subdir"
-  run pyenv-local
+  run goenv-local
   assert_success "1.2.3"
 }
 
-@test "ignores PYENV_DIR" {
-  echo "1.2.3" > .python-version
+@test "ignores GOENV_DIR" {
+  echo "1.2.3" > .go-version
   mkdir -p "$HOME"
-  echo "3.4-home" > "${HOME}/.python-version"
-  PYENV_DIR="$HOME" run pyenv-local
+  echo "3.4-home" > "${HOME}/.go-version"
+  GOENV_DIR="$HOME" run goenv-local
   assert_success "1.2.3"
 }
 
 @test "sets local version" {
-  mkdir -p "${PYENV_ROOT}/versions/1.2.3"
-  run pyenv-local 1.2.3
+  mkdir -p "${GOENV_ROOT}/versions/1.2.3"
+  run goenv-local 1.2.3
   assert_success ""
-  assert [ "$(cat .python-version)" = "1.2.3" ]
+  assert [ "$(cat .go-version)" = "1.2.3" ]
 }
 
 @test "changes local version" {
-  echo "1.0-pre" > .python-version
-  mkdir -p "${PYENV_ROOT}/versions/1.2.3"
-  run pyenv-local
+  echo "1.0-pre" > .go-version
+  mkdir -p "${GOENV_ROOT}/versions/1.2.3"
+  run goenv-local
   assert_success "1.0-pre"
-  run pyenv-local 1.2.3
+  run goenv-local 1.2.3
   assert_success ""
-  assert [ "$(cat .python-version)" = "1.2.3" ]
+  assert [ "$(cat .go-version)" = "1.2.3" ]
 }
 
 @test "unsets local version" {
-  touch .python-version
-  run pyenv-local --unset
+  touch .go-version
+  run goenv-local --unset
   assert_success ""
-  assert [ ! -e .python-version ]
+  assert [ ! -e .go-version ]
 }

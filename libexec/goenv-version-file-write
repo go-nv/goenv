@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Usage: goenv version-file-write <file> <version>
+
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+GOENV_VERSION_FILE="$1"
+shift || true
+versions=("$@")
+
+if [ -z "$versions" ] || [ -z "$GOENV_VERSION_FILE" ]; then
+  goenv-help --usage version-file-write >&2
+  exit 1
+fi
+
+# Make sure the specified version is installed.
+goenv-prefix "${versions[@]}" >/dev/null
+
+# Write the version out to disk.
+# Create an empty file. Using "rm" might cause a permission error.
+> "$GOENV_VERSION_FILE"
+for version in "${versions[@]}"; do
+  echo "$version" >> "$GOENV_VERSION_FILE"
+done

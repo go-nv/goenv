@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+#
+# Summary: Display the full path to an executable
+#
+# Usage: goenv which <command>
+#
+# Displays the full path to the executable that goenv will invoke when
+# you run the given command.
+
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+# Provide goenv completions
+if [ "$1" = "--complete" ]; then
+  exec goenv-shims --short
+fi
+
+remove_from_path() {
+  local path_to_remove="$1"
+  local path_before
+  local result=":$PATH:"
+  while [ "$path_before" != "$result" ]; do
+    path_before="$result"
+    result="${result//:$path_to_remove:/:}"
+  done
+  result="${result%:}"
+  echo "${result#:}"
+}
+
+GOENV_COMMAND="$1"
+
+if [ -z "$GOENV_COMMAND" ]; then
+  goenv-help --usage which >&2
+  exit 1
+fi
+
+OLDIFS="$IFS"
+IFS=: versions=(${GOENV_VERSION:-$(goenv-version-name)})
+IFS="$OLDIFS"
+
+for version in "${versions[@]}"; do
+  if [ "$version" = "system" ]; then
+    PATH="$(remove_from_path "${GOENV_ROOT}/shims")"
+    GOENV_COMMAND_PATH="$(command -v "$GOENV_COMMAND" || true)"
+  else
+    GOENV_COMMAND_PATH="${GOENV_ROOT}/versions/${version}/bin/${GOENV_COMMAND}"
+  fi
+  if [ -x "$GOENV_COMMAND_PATH" ]; then
+    break
+  fi
+done
+
+OLDIFS="$IFS"
+IFS=$'\n' scripts=(`goenv-hooks which`)
+IFS="$OLDIFS"
+for script in "${scripts[@]}"; do
+  source "$script"
+done
+
+if [ -x "$GOENV_COMMAND_PATH" ]; then
+  echo "$GOENV_COMMAND_PATH"
+elif [ "$GOENV_VERSION" != "system" ] && [ ! -d "${GOENV_ROOT}/versions/${GOENV_VERSION}" ]; then
+  echo "goenv: version \`$GOENV_VERSION' is not installed (set by $(goenv-version-origin))" >&2
+  exit 1
+else
+  any_not_installed=0
+  for version in "${versions[@]}"; do
+    if [ "$version" = "system" ]; then
+      continue
+    fi
+    if ! [ -d "${GOENV_ROOT}/versions/${version}" ]; then
+      echo "goenv: version \`$version' is not installed" >&2
+      any_not_installed=1
+    fi
+  done
+  if [ "$any_not_installed" = 1 ]; then
+    exit 1
+  fi
+
+  echo "goenv: $GOENV_COMMAND: command not found" >&2
+
+  versions="$(goenv-whence "$GOENV_COMMAND" || true)"
+  if [ -n "$versions" ]; then
+    { echo
+      echo "The \`$1' command exists in these Go versions:"
+      echo "$versions" | sed 's/^/  /g'
+      echo
+    } >&2
+  fi
+
+  exit 127
+fi

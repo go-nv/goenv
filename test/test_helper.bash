@@ -1,29 +1,29 @@
-unset PYENV_VERSION
-unset PYENV_DIR
+unset GOENV_VERSION
+unset GOENV_DIR
 
 # guard against executing this block twice due to bats internals
-if [ -z "$PYENV_TEST_DIR" ]; then
-  PYENV_TEST_DIR="${BATS_TMPDIR}/pyenv"
-  export PYENV_TEST_DIR="$(mktemp -d "${PYENV_TEST_DIR}.XXX" 2>/dev/null || echo "$PYENV_TEST_DIR")"
+if [ -z "$GOENV_TEST_DIR" ]; then
+  GOENV_TEST_DIR="${BATS_TMPDIR}/goenv"
+  export GOENV_TEST_DIR="$(mktemp -d "${GOENV_TEST_DIR}.XXX" 2>/dev/null || echo "$GOENV_TEST_DIR")"
 
-  if enable -f "${BATS_TEST_DIRNAME}"/../libexec/pyenv-realpath.dylib realpath 2>/dev/null; then
-    export PYENV_TEST_DIR="$(realpath "$PYENV_TEST_DIR")"
+  if enable -f "${BATS_TEST_DIRNAME}"/../libexec/goenv-realpath.dylib realpath 2>/dev/null; then
+    export GOENV_TEST_DIR="$(realpath "$GOENV_TEST_DIR")"
   else
-    if [ -n "$PYENV_NATIVE_EXT" ]; then
-      echo "pyenv: failed to load \`realpath' builtin" >&2
+    if [ -n "$GOENV_NATIVE_EXT" ]; then
+      echo "goenv: failed to load \`realpath' builtin" >&2
       exit 1
     fi
   fi
 
-  export PYENV_ROOT="${PYENV_TEST_DIR}/root"
-  export HOME="${PYENV_TEST_DIR}/home"
-  export PYENV_HOOK_PATH="${PYENV_ROOT}/pyenv.d"
+  export GOENV_ROOT="${GOENV_TEST_DIR}/root"
+  export HOME="${GOENV_TEST_DIR}/home"
+  export GOENV_HOOK_PATH="${GOENV_ROOT}/goenv.d"
 
   PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin
-  PATH="${PYENV_TEST_DIR}/bin:$PATH"
+  PATH="${GOENV_TEST_DIR}/bin:$PATH"
   PATH="${BATS_TEST_DIRNAME}/../libexec:$PATH"
   PATH="${BATS_TEST_DIRNAME}/libexec:$PATH"
-  PATH="${PYENV_ROOT}/shims:$PATH"
+  PATH="${GOENV_ROOT}/shims:$PATH"
   export PATH
 
   for xdg_var in `env 2>/dev/null | grep ^XDG_ | cut -d= -f1`; do unset "$xdg_var"; done
@@ -31,14 +31,14 @@ if [ -z "$PYENV_TEST_DIR" ]; then
 fi
 
 teardown() {
-  rm -rf "$PYENV_TEST_DIR"
+  rm -rf "$GOENV_TEST_DIR"
 }
 
 flunk() {
   { if [ "$#" -eq 0 ]; then cat -
     else echo "$@"
     fi
-  } | sed "s:${PYENV_TEST_DIR}:TEST_DIR:g" >&2
+  } | sed "s:${GOENV_TEST_DIR}:TEST_DIR:g" >&2
   return 1
 }
 
@@ -109,15 +109,15 @@ assert() {
 }
 
 # Output a modified PATH that ensures that the given executable is not present,
-# but in which system utils necessary for pyenv operation are still available.
+# but in which system utils necessary for goenv operation are still available.
 path_without() {
   local exe="$1"
   local path=":${PATH}:"
   local found alt util
   for found in $(which -a "$exe"); do
     found="${found%/*}"
-    if [ "$found" != "${PYENV_ROOT}/shims" ]; then
-      alt="${PYENV_TEST_DIR}/$(echo "${found#/}" | tr '/' '-')"
+    if [ "$found" != "${GOENV_ROOT}/shims" ]; then
+      alt="${GOENV_TEST_DIR}/$(echo "${found#/}" | tr '/' '-')"
       mkdir -p "$alt"
       for util in bash head cut readlink greadlink; do
         if [ -x "${found}/$util" ]; then
@@ -132,9 +132,9 @@ path_without() {
 }
 
 create_hook() {
-  mkdir -p "${PYENV_HOOK_PATH}/$1"
-  touch "${PYENV_HOOK_PATH}/$1/$2"
+  mkdir -p "${GOENV_HOOK_PATH}/$1"
+  touch "${GOENV_HOOK_PATH}/$1/$2"
   if [ ! -t 0 ]; then
-    cat > "${PYENV_HOOK_PATH}/$1/$2"
+    cat > "${GOENV_HOOK_PATH}/$1/$2"
   fi
 }

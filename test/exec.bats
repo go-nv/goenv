@@ -5,7 +5,7 @@ load test_helper
 create_executable() {
   name="${1?}"
   shift 1
-  bin="${PYENV_ROOT}/versions/${PYENV_VERSION}/bin"
+  bin="${GOENV_ROOT}/versions/${GOENV_VERSION}/bin"
   mkdir -p "$bin"
   { if [ $# -eq 0 ]; then cat -
     else echo "$@"
@@ -15,31 +15,29 @@ create_executable() {
 }
 
 @test "fails with invalid version" {
-  export PYENV_VERSION="3.4"
-  run pyenv-exec python -V
-  assert_failure "pyenv: version \`3.4' is not installed (set by PYENV_VERSION environment variable)"
+  export GOENV_VERSION="1.6.1"
+  run goenv-exec go version
+  assert_failure "goenv: version \`1.6.1' is not installed (set by GOENV_VERSION environment variable)"
 }
 
 @test "fails with invalid version set from file" {
-  mkdir -p "$PYENV_TEST_DIR"
-  cd "$PYENV_TEST_DIR"
-  echo 2.7 > .python-version
-  run pyenv-exec rspec
-  assert_failure "pyenv: version \`2.7' is not installed (set by $PWD/.python-version)"
+  mkdir -p "$GOENV_TEST_DIR"
+  cd "$GOENV_TEST_DIR"
+  echo 1.6.1 > .go-version
+  run goenv-exec go build
+  assert_failure "goenv: version \`1.6.1' is not installed (set by $PWD/.go-version)"
 }
 
 @test "completes with names of executables" {
-  export PYENV_VERSION="3.4"
-  create_executable "fab" "#!/bin/sh"
-  create_executable "python" "#!/bin/sh"
+  export GOENV_VERSION="1.6.1"
+  create_executable "go" "#!/bin/sh"
 
-  pyenv-rehash
-  run pyenv-completions exec
+  goenv-rehash
+  run goenv-completions exec
   assert_success
   assert_output <<OUT
 --help
-fab
-python
+go
 OUT
 }
 
@@ -49,15 +47,15 @@ hellos=(\$(printf "hello\\tugly world\\nagain"))
 echo HELLO="\$(printf ":%s" "\${hellos[@]}")"
 SH
 
-  export PYENV_VERSION=system
-  IFS=$' \t\n' run pyenv-exec env
+  export GOENV_VERSION=system
+  IFS=$' \t\n' run goenv-exec env
   assert_success
   assert_line "HELLO=:hello:ugly:world:again"
 }
 
 @test "forwards all arguments" {
-  export PYENV_VERSION="3.4"
-  create_executable "python" <<SH
+  export GOENV_VERSION="1.6.1"
+  create_executable "go" <<SH
 #!$BASH
 echo \$0
 for arg; do
@@ -66,44 +64,14 @@ for arg; do
 done
 SH
 
-  run pyenv-exec python -w "/path to/python script.rb" -- extra args
+  run goenv-exec go run "/path to/go script.go" -- extra args
   assert_success
   assert_output <<OUT
-${PYENV_ROOT}/versions/3.4/bin/python
-  -w
-  /path to/python script.rb
+${GOENV_ROOT}/versions/1.6.1/bin/go
+  run
+  /path to/go script.go
   --
   extra
   args
 OUT
-}
-
-@test "supports python -S <cmd>" {
-  export PYENV_VERSION="3.4"
-
-  # emulate `python -S' behavior
-  create_executable "python" <<SH
-#!$BASH
-if [[ \$1 == "-S"* ]]; then
-  found="\$(PATH="\${PYTHONPATH:-\$PATH}" which \$2)"
-  # assert that the found executable has python for shebang
-  if head -1 "\$found" | grep python >/dev/null; then
-    \$BASH "\$found"
-  else
-    echo "python: no Python script found in input (LoadError)" >&2
-    exit 1
-  fi
-else
-  echo 'python 3.4 (pyenv test)'
-fi
-SH
-
-  create_executable "fab" <<SH
-#!/usr/bin/env python
-echo hello fab
-SH
-
-  pyenv-rehash
-  run python -S fab
-  assert_success "hello fab"
 }

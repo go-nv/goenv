@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Summary: List all Go versions that contain the given executable
+# Usage: goenv whence [--path] <command>
+
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+# Provide goenv completions
+if [ "$1" = "--complete" ]; then
+  echo --path
+  exec goenv-shims --short
+fi
+
+if [ "$1" = "--path" ]; then
+  print_paths="1"
+  shift
+else
+  print_paths=""
+fi
+
+whence() {
+  local command="$1"
+  goenv-versions --bare | while read version; do
+    path="$(goenv-prefix "$version")/bin/${command}"
+    if [ -x "$path" ]; then
+      [ "$print_paths" ] && echo "$path" || echo "$version"
+    fi
+  done
+}
+
+GOENV_COMMAND="$1"
+if [ -z "$GOENV_COMMAND" ]; then
+  goenv-help --usage whence >&2
+  exit 1
+fi
+
+result="$(whence "$GOENV_COMMAND")"
+[ -n "$result" ] && echo "$result"

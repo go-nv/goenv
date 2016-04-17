@@ -1,287 +1,248 @@
 # Command Reference
 
-Like `git`, the `pyenv` command delegates to subcommands based on its
+Like `git`, the `goenv` command delegates to subcommands based on its
 first argument. 
 
 The most common subcommands are:
 
-* [`pyenv commands`](#pyenv-commands)
-* [`pyenv local`](#pyenv-local)
-* [`pyenv global`](#pyenv-global)
-* [`pyenv shell`](#pyenv-shell)
-* [`pyenv install`](#pyenv-install)
-* [`pyenv uninstall`](#pyenv-uninstall)
-* [`pyenv rehash`](#pyenv-rehash)
-* [`pyenv version`](#pyenv-version)
-* [`pyenv versions`](#pyenv-versions)
-* [`pyenv which`](#pyenv-which)
-* [`pyenv whence`](#pyenv-whence)
+* [`goenv commands`](#goenv-commands)
+* [`goenv local`](#goenv-local)
+* [`goenv global`](#goenv-global)
+* [`goenv shell`](#goenv-shell)
+* [`goenv install`](#goenv-install)
+* [`goenv uninstall`](#goenv-uninstall)
+* [`goenv rehash`](#goenv-rehash)
+* [`goenv version`](#goenv-version)
+* [`goenv versions`](#goenv-versions)
+* [`goenv which`](#goenv-which)
+* [`goenv whence`](#goenv-whence)
 
 
-## `pyenv commands`
+## `goenv commands`
 
-Lists all available pyenv commands.
+Lists all available goenv commands.
 
 
-## `pyenv local`
+## `goenv local`
 
-Sets a local application-specific Python version by writing the version
-name to a `.python-version` file in the current directory. This version
+Sets a local application-specific Go version by writing the version
+name to a `.go-version` file in the current directory. This version
 overrides the global version, and can be overridden itself by setting
-the `PYENV_VERSION` environment variable or with the `pyenv shell`
+the `GOENV_VERSION` environment variable or with the `goenv shell`
 command.
 
-    $ pyenv local 2.7.6
+    $ goenv local 1.6.1
 
-When run without a version number, `pyenv local` reports the currently
+When run without a version number, `goenv local` reports the currently
 configured local version. You can also unset the local version:
 
-    $ pyenv local --unset
+    $ goenv local --unset
 
-Previous versions of pyenv stored local version specifications in a
-file named `.pyenv-version`. For backwards compatibility, pyenv will
-read a local version specified in an `.pyenv-version` file, but a
-`.python-version` file in the same directory will take precedence.
+Previous versions of goenv stored local version specifications in a
+file named `.goenv-version`. For backwards compatibility, goenv will
+read a local version specified in an `.goenv-version` file, but a
+`.go-version` file in the same directory will take precedence.
 
 
-### `pyenv local` (advanced)
+### `goenv local` (advanced)
 
-You can specify multiple versions as local Python at once.
+You can specify local Go version. 
 
-Let's say if you have two versions of 2.7.6 and 3.3.3. If you prefer 2.7.6 over 3.3.3,
-
-    $ pyenv local 2.7.6 3.3.3
-    $ pyenv versions
+    $ goenv local 1.5.4
+    $ goenv versions
       system
-    * 2.7.6 (set by /Users/yyuu/path/to/project/.python-version)
-    * 3.3.3 (set by /Users/yyuu/path/to/project/.python-version)
-    $ python --version
-    Python 2.7.6
-    $ python2.7 --version
-    Python 2.7.6
-    $ python3.3 --version
-    Python 3.3.3
+    * 1.5.4 (set by /Users/syndbg/path/to/project/.go-version)
+    $ go version
+    1.5.4
 
-or, if you prefer 3.3.3 over 2.7.6,
+## `goenv global`
 
-    $ pyenv local 3.3.3 2.7.6
-    $ pyenv versions
-      system
-    * 2.7.6 (set by /Users/yyuu/path/to/project/.python-version)
-    * 3.3.3 (set by /Users/yyuu/path/to/project/.python-version)
-      venv27
-    $ python --version
-    Python 3.3.3
-    $ python2.7 --version
-    Python 2.7.6
-    $ python3.3 --version
-    Python 3.3.3
+Sets the global version of Go to be used in all shells by writing
+the version name to the `~/.goenv/version` file. This version can be
+overridden by an application-specific `.go-version` file, or by
+setting the `GOENV_VERSION` environment variable.
 
+    $ goenv global 1.5.4
 
-## `pyenv global`
-
-Sets the global version of Python to be used in all shells by writing
-the version name to the `~/.pyenv/version` file. This version can be
-overridden by an application-specific `.python-version` file, or by
-setting the `PYENV_VERSION` environment variable.
-
-    $ pyenv global 2.7.6
-
-The special version name `system` tells pyenv to use the system Python
+The special version name `system` tells goenv to use the system Go
 (detected by searching your `$PATH`).
 
-When run without a version number, `pyenv global` reports the
+When run without a version number, `goenv global` reports the
 currently configured global version.
 
 
-### `pyenv global` (advanced)
+### `goenv global` (advanced)
 
-You can specify multiple versions as global Python at once.
+You can specify multiple versions as global Go at once.
 
 Let's say if you have two versions of 2.7.6 and 3.3.3. If you prefer 2.7.6 over 3.3.3,
 
-    $ pyenv global 2.7.6 3.3.3
-    $ pyenv versions
+    $ goenv global 2.7.6 3.3.3
+    $ goenv versions
       system
-    * 2.7.6 (set by /Users/yyuu/.pyenv/version)
-    * 3.3.3 (set by /Users/yyuu/.pyenv/version)
-    $ python --version
-    Python 2.7.6
-    $ python2.7 --version
-    Python 2.7.6
-    $ python3.3 --version
-    Python 3.3.3
+    * 2.7.6 (set by /Users/yyuu/.goenv/version)
+    * 3.3.3 (set by /Users/yyuu/.goenv/version)
+    $ go --version
+    Go 2.7.6
+    $ go2.7 --version
+    Go 2.7.6
+    $ go3.3 --version
+    Go 3.3.3
 
 or, if you prefer 3.3.3 over 2.7.6,
 
-    $ pyenv global 3.3.3 2.7.6
-    $ pyenv versions
+    $ goenv global 3.3.3 2.7.6
+    $ goenv versions
       system
-    * 2.7.6 (set by /Users/yyuu/.pyenv/version)
-    * 3.3.3 (set by /Users/yyuu/.pyenv/version)
+    * 2.7.6 (set by /Users/yyuu/.goenv/version)
+    * 3.3.3 (set by /Users/yyuu/.goenv/version)
       venv27
-    $ python --version
-    Python 3.3.3
-    $ python2.7 --version
-    Python 2.7.6
-    $ python3.3 --version
-    Python 3.3.3
+    $ go --version
+    Go 3.3.3
+    $ go2.7 --version
+    Go 2.7.6
+    $ go3.3 --version
+    Go 3.3.3
 
 
-## `pyenv shell`
+## `goenv shell`
 
-Sets a shell-specific Python version by setting the `PYENV_VERSION`
+Sets a shell-specific Go version by setting the `GOENV_VERSION`
 environment variable in your shell. This version overrides
 application-specific versions and the global version.
 
-    $ pyenv shell pypy-2.2.1
+    $ goenv shell pypy-2.2.1
 
-When run without a version number, `pyenv shell` reports the current
-value of `PYENV_VERSION`. You can also unset the shell version:
+When run without a version number, `goenv shell` reports the current
+value of `GOENV_VERSION`. You can also unset the shell version:
 
-    $ pyenv shell --unset
+    $ goenv shell --unset
 
-Note that you'll need pyenv's shell integration enabled (step 3 of
+Note that you'll need goenv's shell integration enabled (step 3 of
 the installation instructions) in order to use this command. If you
 prefer not to use shell integration, you may simply set the
-`PYENV_VERSION` variable yourself:
+`GOENV_VERSION` variable yourself:
 
-    $ export PYENV_VERSION=pypy-2.2.1
+    $ export GOENV_VERSION=pypy-2.2.1
 
 
-### `pyenv shell` (advanced)
+### `goenv shell` (advanced)
 
-You can specify multiple versions via `PYENV_VERSION` at once.
+You can specify multiple versions via `GOENV_VERSION` at once.
 
 Let's say if you have two versions of 2.7.6 and 3.3.3. If you prefer 2.7.6 over 3.3.3,
 
-    $ pyenv shell 2.7.6 3.3.3
-    $ pyenv versions
+    $ goenv shell 2.7.6 3.3.3
+    $ goenv versions
       system
-    * 2.7.6 (set by PYENV_VERSION environment variable)
-    * 3.3.3 (set by PYENV_VERSION environment variable)
-    $ python --version
-    Python 2.7.6
-    $ python2.7 --version
-    Python 2.7.6
-    $ python3.3 --version
-    Python 3.3.3
+    * 2.7.6 (set by GOENV_VERSION environment variable)
+    * 3.3.3 (set by GOENV_VERSION environment variable)
+    $ go --version
+    Go 2.7.6
+    $ go2.7 --version
+    Go 2.7.6
+    $ go3.3 --version
+    Go 3.3.3
 
 or, if you prefer 3.3.3 over 2.7.6,
 
-    $ pyenv shell 3.3.3 2.7.6
-    $ pyenv versions
+    $ goenv shell 3.3.3 2.7.6
+    $ goenv versions
       system
-    * 2.7.6 (set by PYENV_VERSION environment variable)
-    * 3.3.3 (set by PYENV_VERSION environment variable)
+    * 2.7.6 (set by GOENV_VERSION environment variable)
+    * 3.3.3 (set by GOENV_VERSION environment variable)
       venv27
-    $ python --version
-    Python 3.3.3
-    $ python2.7 --version
-    Python 2.7.6
-    $ python3.3 --version
-    Python 3.3.3
+    $ go version
+    Go
 
 
-## `pyenv install`
+## `goenv install`
 
-Install a Python version (using `python-build`).
+Install a Go version (using `go-build`).
 
-    Usage: pyenv install [-f] [-kvp] <version>
-           pyenv install [-f] [-kvp] <definition-file>
-           pyenv install -l|--list
+    Usage: goenv install [-f] [-kvp] <version>
+           goenv install [-f] [-kvp] <definition-file>
+           goenv install -l|--list
 
       -l/--list             List all available versions
       -f/--force            Install even if the version appears to be installed already
       -s/--skip-existing    Skip the installation if the version appears to be installed already
 
-      python-build options:
+      go-build options:
 
-      -k/--keep        Keep source tree in $PYENV_BUILD_ROOT after installation
-                       (defaults to $PYENV_ROOT/sources)
+      -k/--keep        Keep source tree in $GOENV_BUILD_ROOT after installation
+                       (defaults to $GOENV_ROOT/sources)
       -v/--verbose     Verbose mode: print compilation status to stdout
       -p/--patch       Apply a patch from stdin before building
       -g/--debug       Build a debug version
 
 
-## `pyenv uninstall`
+## `goenv uninstall`
 
-Uninstall a specific Python version.
+Uninstall a specific Go version.
 
-    Usage: pyenv uninstall [-f|--force] <version>
+    Usage: goenv uninstall [-f|--force] <version>
 
        -f  Attempt to remove the specified version without prompting
            for confirmation. If the version does not exist, do not
            display an error message.
 
 
-## `pyenv rehash`
+## `goenv rehash`
 
-Installs shims for all Python binaries known to pyenv (i.e.,
-`~/.pyenv/versions/*/bin/*`). Run this command after you install a new
-version of Python, or install a package that provides binaries.
+Installs shims for all Go binaries known to goenv (i.e.,
+`~/.goenv/versions/*/bin/*`).
+Run this command after you install a new
+version of Go, or install a package that provides binaries.
 
-    $ pyenv rehash
+    $ goenv rehash
 
 
-## `pyenv version`
+## `goenv version`
 
-Displays the currently active Python version, along with information on
+Displays the currently active Go version, along with information on
 how it was set.
 
-    $ pyenv version
-    2.7.6 (set by /home/yyuu/.pyenv/version)
+    $ goenv version
+    1.6.1 (set by /home/yyuu/.goenv/version)
 
 
-## `pyenv versions`
+## `goenv versions`
 
-Lists all Python versions known to pyenv, and shows an asterisk next to
+Lists all Go versions known to goenv, and shows an asterisk next to
 the currently active version.
 
-    $ pyenv versions
-      2.5.6
-      2.6.8
-    * 2.7.6 (set by /home/yyuu/.pyenv/version)
-      3.3.3
-      jython-2.5.3
-      pypy-2.2.1
+    $ goenv versions
+    * 1.6.1 (set by /Users/syndbg/.goenv/version)
 
 
-## `pyenv which`
+## `goenv which`
 
-Displays the full path to the executable that pyenv will invoke when
+Displays the full path to the executable that goenv will invoke when
 you run the given command.
 
-    $ pyenv which python3.3
-    /home/yyuu/.pyenv/versions/3.3.3/bin/python3.3
+    $ goenv which gofmt
+    /home/syndbg/.goenv/versions/1.6.1/bin/gofmt
 
 
-## `pyenv whence`
+## `goenv whence`
 
-Lists all Python versions with the given command installed.
+Lists all Go versions with the given command installed.
 
-    $ pyenv whence 2to3
-    2.6.8
-    2.7.6
-    3.3.3
+    $ goenv whence go
+    1.6.1
 
 
-## `pyenv install`
+## `goenv install`
 
-Part of [Python-build](https://github.com/yyuu/pyenv/tree/master/plugins/python-build), this installs versions of python
+Part of [Go-build](https://github.com/syndbg/goenv/tree/master/plugins/go-build), this installs versions of Go
 
-    $ pyenv install 2.7.6
-    $ pyenv install 2.6.8
-    $ pyenv versions
-      system
-      2.6.8
-    * 2.7.6 (set by /home/yyuu/.pyenv/version)
+    $ goenv install 1.6.1
+    $ goenv versions
+    * 1.6.1 (set by /Users/syndbg/.goenv/version)
 
+## `goenv install --list`
 
-## `pyenv install --list`
+List available remote versions of Go
 
-List available remote versions of Python, including Anaconda, Jython, pypy, and stackless
-
-    $ pyenv install --list
-
-
+    $ goenv install --list

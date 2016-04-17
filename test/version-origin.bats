@@ -3,38 +3,38 @@
 load test_helper
 
 setup() {
-  mkdir -p "$PYENV_TEST_DIR"
-  cd "$PYENV_TEST_DIR"
+  mkdir -p "$GOENV_TEST_DIR"
+  cd "$GOENV_TEST_DIR"
 }
 
 @test "reports global file even if it doesn't exist" {
-  assert [ ! -e "${PYENV_ROOT}/version" ]
-  run pyenv-version-origin
-  assert_success "${PYENV_ROOT}/version"
+  assert [ ! -e "${GOENV_ROOT}/version" ]
+  run goenv-version-origin
+  assert_success "${GOENV_ROOT}/version"
 }
 
 @test "detects global file" {
-  mkdir -p "$PYENV_ROOT"
-  touch "${PYENV_ROOT}/version"
-  run pyenv-version-origin
-  assert_success "${PYENV_ROOT}/version"
+  mkdir -p "$GOENV_ROOT"
+  touch "${GOENV_ROOT}/version"
+  run goenv-version-origin
+  assert_success "${GOENV_ROOT}/version"
 }
 
-@test "detects PYENV_VERSION" {
-  PYENV_VERSION=1 run pyenv-version-origin
-  assert_success "PYENV_VERSION environment variable"
+@test "detects GOENV_VERSION" {
+  GOENV_VERSION=1 run goenv-version-origin
+  assert_success "GOENV_VERSION environment variable"
 }
 
 @test "detects local file" {
-  touch .python-version
-  run pyenv-version-origin
-  assert_success "${PWD}/.python-version"
+  touch .go-version
+  run goenv-version-origin
+  assert_success "${PWD}/.go-version"
 }
 
 @test "reports from hook" {
-  create_hook version-origin test.bash <<<"PYENV_VERSION_ORIGIN=plugin"
+  create_hook version-origin test.bash <<<"GOENV_VERSION_ORIGIN=plugin"
 
-  PYENV_VERSION=1 run pyenv-version-origin
+  GOENV_VERSION=1 run goenv-version-origin
   assert_success "plugin"
 }
 
@@ -44,13 +44,13 @@ hellos=(\$(printf "hello\\tugly world\\nagain"))
 echo HELLO="\$(printf ":%s" "\${hellos[@]}")"
 SH
 
-  export PYENV_VERSION=system
-  IFS=$' \t\n' run pyenv-version-origin env
+  export GOENV_VERSION=system
+  IFS=$' \t\n' run goenv-version-origin env
   assert_success
   assert_line "HELLO=:hello:ugly:world:again"
 }
 
-@test "doesn't inherit PYENV_VERSION_ORIGIN from environment" {
-  PYENV_VERSION_ORIGIN=ignored run pyenv-version-origin
-  assert_success "${PYENV_ROOT}/version"
+@test "doesn't inherit GOENV_VERSION_ORIGIN from environment" {
+  GOENV_VERSION_ORIGIN=ignored run goenv-version-origin
+  assert_success "${GOENV_ROOT}/version"
 }

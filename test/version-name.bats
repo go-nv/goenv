@@ -3,31 +3,31 @@
 load test_helper
 
 create_version() {
-  mkdir -p "${PYENV_ROOT}/versions/$1"
+  mkdir -p "${GOENV_ROOT}/versions/$1"
 }
 
 setup() {
-  mkdir -p "$PYENV_TEST_DIR"
-  cd "$PYENV_TEST_DIR"
+  mkdir -p "$GOENV_TEST_DIR"
+  cd "$GOENV_TEST_DIR"
 }
 
 @test "no version selected" {
-  assert [ ! -d "${PYENV_ROOT}/versions" ]
-  run pyenv-version-name
+  assert [ ! -d "${GOENV_ROOT}/versions" ]
+  run goenv-version-name
   assert_success "system"
 }
 
 @test "system version is not checked for existance" {
-  PYENV_VERSION=system run pyenv-version-name
+  GOENV_VERSION=system run goenv-version-name
   assert_success "system"
 }
 
-@test "PYENV_VERSION can be overridden by hook" {
+@test "GOENV_VERSION can be overridden by hook" {
   create_version "2.7.11"
   create_version "3.5.1"
-  create_hook version-name test.bash <<<"PYENV_VERSION=3.5.1"
+  create_hook version-name test.bash <<<"GOENV_VERSION=3.5.1"
 
-  PYENV_VERSION=2.7.11 run pyenv-version-name
+  GOENV_VERSION=2.7.11 run goenv-version-name
   assert_success "3.5.1"
 }
 
@@ -37,21 +37,21 @@ hellos=(\$(printf "hello\\tugly world\\nagain"))
 echo HELLO="\$(printf ":%s" "\${hellos[@]}")"
 SH
 
-  export PYENV_VERSION=system
-  IFS=$' \t\n' run pyenv-version-name env
+  export GOENV_VERSION=system
+  IFS=$' \t\n' run goenv-version-name env
   assert_success
   assert_line "HELLO=:hello:ugly:world:again"
 }
 
-@test "PYENV_VERSION has precedence over local" {
+@test "GOENV_VERSION has precedence over local" {
   create_version "2.7.11"
   create_version "3.5.1"
 
-  cat > ".python-version" <<<"2.7.11"
-  run pyenv-version-name
+  cat > ".go-version" <<<"2.7.11"
+  run goenv-version-name
   assert_success "2.7.11"
 
-  PYENV_VERSION=3.5.1 run pyenv-version-name
+  GOENV_VERSION=3.5.1 run goenv-version-name
   assert_success "3.5.1"
 }
 
@@ -59,47 +59,47 @@ SH
   create_version "2.7.11"
   create_version "3.5.1"
 
-  cat > "${PYENV_ROOT}/version" <<<"2.7.11"
-  run pyenv-version-name
+  cat > "${GOENV_ROOT}/version" <<<"2.7.11"
+  run goenv-version-name
   assert_success "2.7.11"
 
-  cat > ".python-version" <<<"3.5.1"
-  run pyenv-version-name
+  cat > ".go-version" <<<"3.5.1"
+  run goenv-version-name
   assert_success "3.5.1"
 }
 
 @test "missing version" {
-  PYENV_VERSION=1.2 run pyenv-version-name
-  assert_failure "pyenv: version \`1.2' is not installed (set by PYENV_VERSION environment variable)"
+  GOENV_VERSION=1.2 run goenv-version-name
+  assert_failure "goenv: version \`1.2' is not installed (set by GOENV_VERSION environment variable)"
 }
 
 @test "one missing version (second missing)" {
   create_version "3.5.1"
-  PYENV_VERSION="3.5.1:1.2" run pyenv-version-name
+  GOENV_VERSION="3.5.1:1.2" run goenv-version-name
   assert_failure
   assert_output <<OUT
-pyenv: version \`1.2' is not installed (set by PYENV_VERSION environment variable)
+goenv: version \`1.2' is not installed (set by GOENV_VERSION environment variable)
 3.5.1
 OUT
 }
 
 @test "one missing version (first missing)" {
   create_version "3.5.1"
-  PYENV_VERSION="1.2:3.5.1" run pyenv-version-name
+  GOENV_VERSION="1.2:3.5.1" run goenv-version-name
   assert_failure
   assert_output <<OUT
-pyenv: version \`1.2' is not installed (set by PYENV_VERSION environment variable)
+goenv: version \`1.2' is not installed (set by GOENV_VERSION environment variable)
 3.5.1
 OUT
 }
 
-pyenv-version-name-without-stderr() {
-  pyenv-version-name 2>/dev/null
+goenv-version-name-without-stderr() {
+  goenv-version-name 2>/dev/null
 }
 
 @test "one missing version (without stderr)" {
   create_version "3.5.1"
-  PYENV_VERSION="1.2:3.5.1" run pyenv-version-name-without-stderr
+  GOENV_VERSION="1.2:3.5.1" run goenv-version-name-without-stderr
   assert_failure
   assert_output <<OUT
 3.5.1
@@ -108,8 +108,8 @@ OUT
 
 @test "version with prefix in name" {
   create_version "2.7.11"
-  cat > ".python-version" <<<"python-2.7.11"
-  run pyenv-version-name
+  cat > ".go-version" <<<"go-2.7.11"
+  run goenv-version-name
   assert_success
   assert_output "2.7.11"
 }

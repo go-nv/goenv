@@ -3,85 +3,75 @@
 load test_helper
 
 create_executable() {
-  local bin="${PYENV_ROOT}/versions/${1}/bin"
+  local bin="${GOENV_ROOT}/versions/${1}/bin"
   mkdir -p "$bin"
   touch "${bin}/$2"
   chmod +x "${bin}/$2"
 }
 
 @test "empty rehash" {
-  assert [ ! -d "${PYENV_ROOT}/shims" ]
-  run pyenv-rehash
+  assert [ ! -d "${GOENV_ROOT}/shims" ]
+  run goenv-rehash
   assert_success ""
-  assert [ -d "${PYENV_ROOT}/shims" ]
-  rmdir "${PYENV_ROOT}/shims"
+  assert [ -d "${GOENV_ROOT}/shims" ]
+  rmdir "${GOENV_ROOT}/shims"
 }
 
 @test "non-writable shims directory" {
-  mkdir -p "${PYENV_ROOT}/shims"
-  chmod -w "${PYENV_ROOT}/shims"
-  run pyenv-rehash
-  assert_failure "pyenv: cannot rehash: ${PYENV_ROOT}/shims isn't writable"
+  mkdir -p "${GOENV_ROOT}/shims"
+  chmod -w "${GOENV_ROOT}/shims"
+  run goenv-rehash
+  assert_failure "goenv: cannot rehash: ${GOENV_ROOT}/shims isn't writable"
 }
 
 @test "rehash in progress" {
-  mkdir -p "${PYENV_ROOT}/shims"
-  touch "${PYENV_ROOT}/shims/.pyenv-shim"
-  run pyenv-rehash
-  assert_failure "pyenv: cannot rehash: ${PYENV_ROOT}/shims/.pyenv-shim exists"
+  mkdir -p "${GOENV_ROOT}/shims"
+  touch "${GOENV_ROOT}/shims/.goenv-shim"
+  run goenv-rehash
+  assert_failure "goenv: cannot rehash: ${GOENV_ROOT}/shims/.goenv-shim exists"
 }
 
 @test "creates shims" {
-  create_executable "2.7" "python"
-  create_executable "2.7" "fab"
-  create_executable "3.4" "python"
-  create_executable "3.4" "py.test"
+  create_executable "2.7" "go"
+  create_executable "3.4" "go"
 
-  assert [ ! -e "${PYENV_ROOT}/shims/fab" ]
-  assert [ ! -e "${PYENV_ROOT}/shims/python" ]
-  assert [ ! -e "${PYENV_ROOT}/shims/py.test" ]
+  assert [ ! -e "${GOENV_ROOT}/shims/go" ]
 
-  run pyenv-rehash
+  run goenv-rehash
   assert_success ""
 
-  run ls "${PYENV_ROOT}/shims"
+  run ls "${GOENV_ROOT}/shims"
   assert_success
   assert_output <<OUT
-fab
-py.test
-python
+go
 OUT
 }
 
 @test "removes stale shims" {
-  mkdir -p "${PYENV_ROOT}/shims"
-  touch "${PYENV_ROOT}/shims/oldshim1"
-  chmod +x "${PYENV_ROOT}/shims/oldshim1"
+  mkdir -p "${GOENV_ROOT}/shims"
+  touch "${GOENV_ROOT}/shims/oldshim1"
+  chmod +x "${GOENV_ROOT}/shims/oldshim1"
 
-  create_executable "3.4" "fab"
-  create_executable "3.4" "python"
+  create_executable "3.4" "go"
 
-  run pyenv-rehash
+  run goenv-rehash
   assert_success ""
 
-  assert [ ! -e "${PYENV_ROOT}/shims/oldshim1" ]
+  assert [ ! -e "${GOENV_ROOT}/shims/oldshim1" ]
 }
 
 @test "binary install locations containing spaces" {
-  create_executable "dirname1 p247" "python"
-  create_executable "dirname2 preview1" "py.test"
+  create_executable "dirname1 p247" "go"
 
-  assert [ ! -e "${PYENV_ROOT}/shims/python" ]
-  assert [ ! -e "${PYENV_ROOT}/shims/py.test" ]
+  assert [ ! -e "${GOENV_ROOT}/shims/go" ]
 
-  run pyenv-rehash
+  run goenv-rehash
   assert_success ""
 
-  run ls "${PYENV_ROOT}/shims"
+  run ls "${GOENV_ROOT}/shims"
   assert_success
   assert_output <<OUT
-py.test
-python
+go
 OUT
 }
 
@@ -92,21 +82,21 @@ echo HELLO="\$(printf ":%s" "\${hellos[@]}")"
 exit
 SH
 
-  IFS=$' \t\n' run pyenv-rehash
+  IFS=$' \t\n' run goenv-rehash
   assert_success
   assert_output "HELLO=:hello:ugly:world:again"
 }
 
 @test "sh-rehash in bash" {
-  create_executable "3.4" "python"
-  PYENV_SHELL=bash run pyenv-sh-rehash
+  create_executable "3.4" "go"
+  GOENV_SHELL=bash run goenv-sh-rehash
   assert_success "hash -r 2>/dev/null || true"
-  assert [ -x "${PYENV_ROOT}/shims/python" ]
+  assert [ -x "${GOENV_ROOT}/shims/go" ]
 }
 
 @test "sh-rehash in fish" {
-  create_executable "3.4" "python"
-  PYENV_SHELL=fish run pyenv-sh-rehash
+  create_executable "3.4" "go"
+  GOENV_SHELL=fish run goenv-sh-rehash
   assert_success ""
-  assert [ -x "${PYENV_ROOT}/shims/python" ]
+  assert [ -x "${GOENV_ROOT}/shims/go" ]
 }

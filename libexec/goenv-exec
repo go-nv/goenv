@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# Summary: Run an executable with the selected Go version
+#
+# Usage: goenv exec <command> [arg1 arg2...]
+#
+# Runs an executable by first preparing PATH so that the selected
+# Go version's `bin' directory is at the front.
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+# Provide goenv completions
+if [ "$1" = "--complete" ]; then
+  exec goenv-shims --short
+fi
+
+GOENV_VERSION="$(goenv-version-name)"
+GOENV_COMMAND="$1"
+
+if [ -z "$GOENV_COMMAND" ]; then
+  goenv-help --usage exec >&2
+  exit 1
+fi
+
+export GOENV_VERSION
+GOENV_COMMAND_PATH="$(goenv-which "$GOENV_COMMAND")"
+GOENV_BIN_PATH="${GOENV_COMMAND_PATH%/*}"
+
+OLDIFS="$IFS"
+IFS=$'\n' scripts=(`goenv-hooks exec`)
+IFS="$OLDIFS"
+for script in "${scripts[@]}"; do
+  source "$script"
+done
+
+shift 1
+# Go needs a GOROOT
+export GOROOT="$(goenv-prefix)/"
+export PATH="${GOENV_BIN_PATH}:${GOROOT}/bin:${PATH}"
+exec -a "$GOENV_COMMAND" "$GOENV_COMMAND_PATH" "$@"

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+# Provide goenv completions
+if [ "$1" = "--complete" ]; then
+  exec goenv-rehash --complete
+fi
+
+shell="$(basename "${GOENV_SHELL:-$SHELL}")"
+
+# When goenv shell integration is enabled,
+# delegate to goenv-rehash,
+# then tell the shell to empty its command lookup cache.
+goenv-rehash
+
+case "$shell" in
+fish )
+  # no rehash support
+  ;;
+* )
+  echo "hash -r 2>/dev/null || true"
+  ;;
+esac

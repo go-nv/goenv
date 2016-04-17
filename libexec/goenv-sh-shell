@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+#
+# Summary: Set or show the shell-specific Go version
+#
+# Usage: goenv shell <version>
+#        goenv shell --unset
+#
+# Sets a shell-specific Go version by setting the `GOENV_VERSION'
+# environment variable in your shell. This version overrides local
+# application-specific versions and the global version.
+#
+# <version> should be a string matching a Go version known to goenv.
+# The special version string `system' will use your default system Go.
+# Run `goenv versions' for a list of available Go versions.
+
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+# Provide goenv completions
+if [ "$1" = "--complete" ]; then
+  echo --unset
+  echo system
+  exec goenv-versions --bare
+fi
+
+versions=("$@")
+shell="$(basename "${GOENV_SHELL:-$SHELL}")"
+
+if [ -z "$versions" ]; then
+  if [ -z "$GOENV_VERSION" ]; then
+    echo "goenv: no shell-specific version configured" >&2
+    exit 1
+  else
+    echo "echo \"\$GOENV_VERSION\""
+    exit
+  fi
+fi
+
+if [ "$versions" = "--unset" ]; then
+  case "$shell" in
+  fish )
+    echo "set -e GOENV_VERSION"
+    ;;
+  * )
+    echo "unset GOENV_VERSION"
+    ;;
+  esac
+  exit
+fi
+
+# Make sure the specified version is installed.
+if goenv-prefix "${versions[@]}" >/dev/null; then
+  OLDIFS="$IFS"
+  IFS=: version="${versions[*]}"
+  IFS="$OLDIFS"
+  case "$shell" in
+  fish )
+    echo "setenv GOENV_VERSION \"${version}\""
+    ;;
+  * )
+    echo "export GOENV_VERSION=\"${version}\""
+    ;;
+  esac
+else
+  echo "false"
+  exit 1
+fi

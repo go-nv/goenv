@@ -1,7 +1,0 @@
-sudo: false
-install: git clone --depth 1 https://github.com/sstephenson/bats.git
-script: make test
-language: c
-env:
-  - PYENV_NATIVE_EXT=
-  - PYENV_NATIVE_EXT=1

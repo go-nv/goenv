@@ -1,1 +1,0 @@
-source "${BASH_SOURCE%/*}/anaconda2-2.4.0"

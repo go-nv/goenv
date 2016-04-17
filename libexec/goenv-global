@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Summary: Set or show the global Go version
+#
+# Usage: goenv global <version>
+#
+# Sets the global Go version. You can override the global version at
+# any time by setting a directory-specific version with `goenv local'
+# or by setting the `GOENV_VERSION' environment variable.
+#
+# <version> should be a string matching a Go version known to goenv.
+# The special version string `system' will use your default system Go.
+# Run `goenv versions' for a list of available Go versions.
+
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+# Provide goenv completions
+if [ "$1" = "--complete" ]; then
+  echo system
+  exec goenv-versions --bare
+fi
+
+versions=("$@")
+GOENV_VERSION_FILE="${GOENV_ROOT}/version"
+
+if [ -n "$versions" ]; then
+  goenv-version-file-write "$GOENV_VERSION_FILE" "${versions[@]}"
+else
+  OLDIFS="$IFS"
+  IFS=: versions=($(
+    goenv-version-file-read "$GOENV_VERSION_FILE" ||
+    goenv-version-file-read "${GOENV_ROOT}/global" ||
+    goenv-version-file-read "${GOENV_ROOT}/default" ||
+    echo system
+  ))
+  IFS="$OLDIFS"
+  for version in "${versions[@]}"; do
+    echo "$version"
+  done
+fi

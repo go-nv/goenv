@@ -3,8 +3,8 @@
 load test_helper
 
 setup() {
-  mkdir -p "$PYENV_TEST_DIR"
-  cd "$PYENV_TEST_DIR"
+  mkdir -p "$GOENV_TEST_DIR"
+  cd "$GOENV_TEST_DIR"
 }
 
 create_file() {
@@ -13,63 +13,63 @@ create_file() {
 }
 
 @test "detects global 'version' file" {
-  create_file "${PYENV_ROOT}/version"
-  run pyenv-version-file
-  assert_success "${PYENV_ROOT}/version"
+  create_file "${GOENV_ROOT}/version"
+  run goenv-version-file
+  assert_success "${GOENV_ROOT}/version"
 }
 
 @test "prints global file if no version files exist" {
-  assert [ ! -e "${PYENV_ROOT}/version" ]
-  assert [ ! -e ".python-version" ]
-  run pyenv-version-file
-  assert_success "${PYENV_ROOT}/version"
+  assert [ ! -e "${GOENV_ROOT}/version" ]
+  assert [ ! -e ".go-version" ]
+  run goenv-version-file
+  assert_success "${GOENV_ROOT}/version"
 }
 
 @test "in current directory" {
-  create_file ".python-version"
-  run pyenv-version-file
-  assert_success "${PYENV_TEST_DIR}/.python-version"
+  create_file ".go-version"
+  run goenv-version-file
+  assert_success "${GOENV_TEST_DIR}/.go-version"
 }
 
 @test "in parent directory" {
-  create_file ".python-version"
+  create_file ".go-version"
   mkdir -p project
   cd project
-  run pyenv-version-file
-  assert_success "${PYENV_TEST_DIR}/.python-version"
+  run goenv-version-file
+  assert_success "${GOENV_TEST_DIR}/.go-version"
 }
 
 @test "topmost file has precedence" {
-  create_file ".python-version"
-  create_file "project/.python-version"
+  create_file ".go-version"
+  create_file "project/.go-version"
   cd project
-  run pyenv-version-file
-  assert_success "${PYENV_TEST_DIR}/project/.python-version"
+  run goenv-version-file
+  assert_success "${GOENV_TEST_DIR}/project/.go-version"
 }
 
-@test "PYENV_DIR has precedence over PWD" {
-  create_file "widget/.python-version"
-  create_file "project/.python-version"
+@test "GOENV_DIR has precedence over PWD" {
+  create_file "widget/.go-version"
+  create_file "project/.go-version"
   cd project
-  PYENV_DIR="${PYENV_TEST_DIR}/widget" run pyenv-version-file
-  assert_success "${PYENV_TEST_DIR}/widget/.python-version"
+  GOENV_DIR="${GOENV_TEST_DIR}/widget" run goenv-version-file
+  assert_success "${GOENV_TEST_DIR}/widget/.go-version"
 }
 
-@test "PWD is searched if PYENV_DIR yields no results" {
+@test "PWD is searched if GOENV_DIR yields no results" {
   mkdir -p "widget/blank"
-  create_file "project/.python-version"
+  create_file "project/.go-version"
   cd project
-  PYENV_DIR="${PYENV_TEST_DIR}/widget/blank" run pyenv-version-file
-  assert_success "${PYENV_TEST_DIR}/project/.python-version"
+  GOENV_DIR="${GOENV_TEST_DIR}/widget/blank" run goenv-version-file
+  assert_success "${GOENV_TEST_DIR}/project/.go-version"
 }
 
 @test "finds version file in target directory" {
-  create_file "project/.python-version"
-  run pyenv-version-file "${PWD}/project"
-  assert_success "${PYENV_TEST_DIR}/project/.python-version"
+  create_file "project/.go-version"
+  run goenv-version-file "${PWD}/project"
+  assert_success "${GOENV_TEST_DIR}/project/.go-version"
 }
 
 @test "fails when no version file in target directory" {
-  run pyenv-version-file "$PWD"
+  run goenv-version-file "$PWD"
   assert_failure ""
 }

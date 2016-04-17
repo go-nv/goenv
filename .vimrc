@@ -1,1 +1,0 @@
-set wildignore+=versions/*,cache/*

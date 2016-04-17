@@ -67,9 +67,7 @@ members of the project's leadership.
 
 ## Project Maintainers
 
-* Sam Stephenson <<sstephenson@gmail.com>>
-* Mislav Marohnić <<mislav.marohnic@gmail.com>>
-* Erik Michaels-Ober <<sferik@gmail.com>>
+* Anton Antonov <<anton.synd.antonov@gmail.com>>
 
 ## Attribution
 

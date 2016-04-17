@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -e
+export -n CDPATH
+
+if [ "$1" = "--debug" ]; then
+  export GOENV_DEBUG=1
+  shift
+fi
+
+if [ -n "$GOENV_DEBUG" ]; then
+  export PS4='+ [${BASH_SOURCE##*/}:${LINENO}] '
+  set -x
+fi
+
+abort() {
+  { if [ "$#" -eq 0 ]; then cat -
+    else echo "goenv: $*"
+    fi
+  } >&2
+  exit 1
+}
+
+if enable -f "${BASH_SOURCE%/*}"/../libexec/goenv-realpath.dylib realpath 2>/dev/null; then
+  abs_dirname() {
+    local path="$(realpath "$1")"
+    echo "${path%/*}"
+  }
+else
+  [ -z "$GOENV_NATIVE_EXT" ] || abort "failed to load \`realpath' builtin"
+
+  READLINK=$(type -p greadlink readlink | head -1)
+  [ -n "$READLINK" ] || abort "cannot find readlink - are you missing GNU coreutils?"
+
+  resolve_link() {
+    $READLINK "$1"
+  }
+
+  abs_dirname() {
+    local cwd="$PWD"
+    local path="$1"
+
+    while [ -n "$path" ]; do
+      cd "${path%/*}"
+      local name="${path##*/}"
+      path="$(resolve_link "$name" || true)"
+    done
+
+    pwd
+    cd "$cwd"
+  }
+fi
+
+if [ -z "${GOENV_ROOT}" ]; then
+  GOENV_ROOT="${HOME}/.goenv"
+else
+  GOENV_ROOT="${GOENV_ROOT%/}"
+fi
+export GOENV_ROOT
+
+# Pass ENV_FILE_ARG from shims to GOENV_DIR.
+if [ -z "${GOENV_DIR}" ]; then
+  if [ -n "${GOENV_FILE_ARG}" ]; then
+    if [ -L "${GOENV_FILE_ARG}" ]; then
+      GOENV_DIR="$(abs_dirname "${GOENV_FILE_ARG}")"
+    else
+      GOENV_DIR="${GOENV_FILE_ARG%/*}"
+    fi
+    export GOENV_DIR
+    unset GOENV_FILE_ARG
+  fi
+fi
+
+if [ -z "${GOENV_DIR}" ]; then
+  GOENV_DIR="$PWD"
+else
+  cd "$GOENV_DIR" 2>/dev/null || abort "cannot change working directory to \`$GOENV_DIR'"
+  GOENV_DIR="$PWD"
+  cd "$OLDPWD"
+fi
+export GOENV_DIR
+
+
+shopt -s nullglob
+
+bin_path="$(abs_dirname "$0")"
+for plugin_bin in "${GOENV_ROOT}/plugins/"*/bin; do
+  PATH="${plugin_bin}:${PATH}"
+done
+export PATH="${bin_path}:${PATH}"
+
+GOENV_HOOK_PATH="${GOENV_HOOK_PATH}:${GOENV_ROOT}/goenv.d"
+if [ "${bin_path%/*}" != "$GOENV_ROOT" ]; then
+  # Add goenv's own `goenv.d` unless goenv was cloned to GOENV_ROOT
+  GOENV_HOOK_PATH="${GOENV_HOOK_PATH}:${bin_path%/*}/goenv.d"
+fi
+GOENV_HOOK_PATH="${GOENV_HOOK_PATH}:/usr/local/etc/goenv.d:/etc/goenv.d:/usr/lib/goenv/hooks"
+for plugin_hook in "${GOENV_ROOT}/plugins/"*/etc/goenv.d; do
+  GOENV_HOOK_PATH="${GOENV_HOOK_PATH}:${plugin_hook}"
+done
+GOENV_HOOK_PATH="${GOENV_HOOK_PATH#:}"
+export GOENV_HOOK_PATH
+
+shopt -u nullglob
+
+
+command="$1"
+case "$command" in
+"" )
+  { goenv---version
+    goenv-help
+  } | abort
+  ;;
+-v | --version )
+  exec goenv---version
+  ;;
+-h | --help )
+  exec goenv-help
+  ;;
+* )
+  command_path="$(command -v "goenv-$command" || true)"
+  [ -n "$command_path" ] || abort "no such command \`$command'"
+
+  shift 1
+  if [ "$1" = --help ]; then
+    exec goenv-help "$command"
+  else
+    exec "$command_path" "$@"
+  fi
+  ;;
+esac
