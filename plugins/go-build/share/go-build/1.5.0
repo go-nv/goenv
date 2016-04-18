@@ -1,0 +1,7 @@
+install_darwin_64bit "Go Darwin 64bit 1.5.0" "https://storage.googleapis.com/golang/go1.5.darwin-amd64.tar.gz#b269242c39739ffcf05b8d969fb9787799f48c48"
+
+install_bsd_64bit "Go FreeBSD 64bit 1.5.0" "https://storage.googleapis.com/golang/go1.5.freebsd-amd64.tar.gz#ea81cc0c2c499a54cd44e0eea81c98a1673a6dae"
+
+install_linux_32bit "Go Linux 32bit 1.5.0" "https://storage.googleapis.com/golang/go1.5.linux-386.tar.gz#bbb21e32d2f8fe97696d2bb5b29f7ff5ecd5edda"
+
+install_linux_64bit "Go Linux 64bit 1.5.0" "https://storage.googleapis.com/golang/go1.5.linux-amd64.tar.gz#5817fa4b2252afdb02e11e8b9dc1d9173ef3bd5a"
