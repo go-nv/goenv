@@ -262,6 +262,23 @@ compute_sha2() {
   fi
 }
 
+compute_sha1() {
+    local output
+    if type shasum &>/dev/null; then
+        output="$(shasum -a 1 -b)" || return 1
+        echo "${output% *}"
+    elif type openssl &>/dev/null; then
+        local openssl="$(command -v "$(brew --prefix openssl 2>/dev/null || true)"/bin/openssl openssl | head -1)"
+        output="$("$openssl" dgst -sha1 2>/dev/null)" || return 1
+        echo "${output##* }"
+    elif type sha1sum &>/dev/null; then
+        output="$(sha1sum --quiet)" || return 1
+        echo "${output% *}"
+    else
+        return 1
+    fi
+}
+
 compute_md5() {
   local output
   if type md5 &>/dev/null; then
@@ -298,11 +315,12 @@ verify_checksum() {
   case "${#expected_checksum}" in
   0) return 0 ;; # empty checksum; return success
   32) checksum_command="compute_md5" ;;
+  40) checksum_command="compute_sha1" ;;
   64) checksum_command="compute_sha2" ;;
   *)
     { echo
       echo "unexpected checksum length: ${#expected_checksum} (${expected_checksum})"
-      echo "expected 0 (no checksum), 32 (MD5), or 64 (SHA2-256)"
+      echo "expected 0 (no checksum), 32 (MD5), 40 (SHA1) or 64 (SHA2-256)"
       echo
     } >&4
     return 1 ;;
