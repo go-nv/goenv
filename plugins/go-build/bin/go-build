@@ -109,14 +109,19 @@ is_mac() {
   [ $# -eq 0 ] || [ "$(osx_version)" "$@" ]
 }
 
-#  9.1  -> 901
-# 10.9  -> 1009
-# 10.10 -> 1010
+# NOTE: Converts OSX version to compareable
+# int
+#  0.9.1  -> 901
+# 0.10.9  -> 1009
+# 0.10.10 -> 1010
 osx_version() {
   local -a ver
-  IFS=. ver=( `sw_vers -productVersion` )
-  IFS="$OLDIFS"
-  echo $(( ${ver[0]}*100 + ${ver[1]} ))
+
+  OLDIFS=$IFS
+  IFS=.
+  ver=( `sw_vers -productVersion` )
+  IFS=$OLDIFS
+  OSX_VER=$(( ${ver[1]} * 100 + ${ver[2]} ))
 }
 
 build_failed() {
@@ -174,6 +179,63 @@ install_darwin_64bit() {
         fi
     fi
 }
+
+install_darwin_106_64bit() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        local arch="$(uname -m)"
+
+        if [ $arch = "x86_64" ]; then
+            osx_version
+
+            if [ $(echo $OSX_VER | bc) -ge 1060 ] && [ $(echo $OSX_VER | bc) -lt 1080 ]; then
+                install_package_using "tarball" 1 "$@"
+            fi
+        fi
+    fi
+}
+
+install_darwin_106_32bit() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        local arch="$(uname -m)"
+
+        if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
+            osx_version
+
+            if [ $(echo $OSX_VER | bc) -ge 1060 ] && [ $(echo $OSX_VER | bc) -lt 1080 ]; then
+                install_package_using "tarball" 1 "$@"
+            fi
+        fi
+    fi
+}
+
+install_darwin_108_64bit() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        local arch="$(uname -m)"
+
+        if [ $arch = "x86_64" ]; then
+            osx_version
+
+            if [ $(echo $OSX_VER | bc) -ge 1080 ]; then
+                install_package_using "tarball" 1 "$@"
+            fi
+        fi
+    fi
+}
+
+install_darwin_108_32bit() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        local arch="$(uname -m)"
+
+        if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
+            osx_version
+
+            if [ $(echo $OSX_VER | bc) -ge 1080 ]; then
+                install_package_using "tarball" 1 "$@"
+            fi
+        fi
+    fi
+}
+
 
 install_linux_64bit() {
     if [ "$(uname -s)" = "Linux" ]; then
@@ -578,185 +640,6 @@ fix_directory_permissions() {
   find "$PREFIX_PATH" -type d \( -perm -020 -o -perm -002 \) -exec chmod go-w {} \;
 }
 
-require_gcc() {
-  local gcc="$(locate_gcc || true)"
-
-  if [ -z "$gcc" ]; then
-    { echo
-      colorize 1 "ERROR"
-      echo ": This package must be compiled with GCC, but go-build couldn't"
-      echo "find a suitable \`gcc\` executable on your system. Please install GCC"
-      echo "and try again."
-      echo
-
-      if is_mac; then
-        colorize 1 "DETAILS"
-        echo ": Apple no longer includes the official GCC compiler with Xcode"
-        echo "as of version 4.2. Instead, the \`gcc\` executable is a symlink to"
-        echo "\`llvm-gcc\`, a modified version of GCC which outputs LLVM bytecode."
-        echo
-        echo "For most programs the \`llvm-gcc\` compiler works fine. However,"
-        echo "versions of CGo newer than 3.3.0 are incompatible with"
-        echo "\`llvm-gcc\`. To build newer versions of CGo you must have the official"
-        echo "GCC compiler installed on your system."
-        echo
-
-        colorize 1 "TO FIX THE PROBLEM"
-        if type brew &>/dev/null; then
-          echo ": Install Homebrew's apple-gcc42 package with this"
-          echo -n "command: "
-          colorize 4 "brew tap homebrew/dupes ; brew install apple-gcc42"
-        else
-          echo ": Install the official GCC compiler using these"
-          echo -n "packages: "
-          colorize 4 "https://github.com/kennethreitz/osx-gcc-installer/downloads"
-        fi
-
-        echo
-        echo
-        echo "You will need to install the official GCC compiler to build newer"
-        echo "versions of CGo even if you have installed Apple's Command Line Tools"
-        echo "for Xcode package. The Command Line Tools for Xcode package only"
-        echo "includes \`llvm-gcc\`."
-      fi
-    } >&3
-    return 1
-  fi
-
-  export CC="$gcc"
-  if is_mac -ge 1010; then
-    export MACOSX_DEPLOYMENT_TARGET=10.9
-  fi
-}
-
-locate_gcc() {
-  local gcc gccs
-  IFS=: gccs=($(gccs_in_path))
-  IFS="$OLDIFS"
-
-  verify_gcc "$CC" ||
-  verify_gcc "$(command -v gcc || true)" || {
-    for gcc in "${gccs[@]}"; do
-      verify_gcc "$gcc" && break || true
-    done
-  }
-
-  return 1
-}
-
-gccs_in_path() {
-  local gcc path paths
-  local gccs=()
-  IFS=: paths=($PATH)
-  IFS="$OLDIFS"
-
-  shopt -s nullglob
-  for path in "${paths[@]}"; do
-    for gcc in "$path"/gcc-*; do
-      gccs["${#gccs[@]}"]="$gcc"
-    done
-  done
-  shopt -u nullglob
-
-  printf :%s "${gccs[@]}"
-}
-
-verify_gcc() {
-  local gcc="$1"
-  if [ -z "$gcc" ]; then
-    return 1
-  fi
-
-  local version="$("$gcc" --version 2>/dev/null || true)"
-  if [ -z "$version" ]; then
-    return 1
-  fi
-
-  if echo "$version" | grep LLVM >/dev/null; then
-    return 1
-  fi
-
-  echo "$gcc"
-}
-
-require_llvm() {
-  local llvm_version="$1"
-  if is_mac -ge 1010; then
-    if [[ "$GO_CONFIGURE_OPTS" != *--llvm-* ]]; then
-      case "$llvm_version" in
-      3.2 )
-        package_option go configure --prebuilt-name="llvm-3.2-x86_64-apple-darwin13.tar.bz2"
-        ;;
-      3.5 )
-        local llvm_config="$(locate_llvm "$llvm_version")"
-        if [ -n "$llvm_config" ]; then
-          package_option go configure --llvm-config="$llvm_config"
-        else
-          { echo
-            colorize 1 "ERROR"
-            echo ": Rubinius will not be able to compile using Apple's LLVM-based "
-            echo "build tools on OS X. You will need to install LLVM 3.5 first."
-            echo
-            colorize 1 "TO FIX THE PROBLEM"
-            echo ": Install Homebrew's llvm package with this"
-            echo -n "command: "
-            colorize 4 "brew tap homebrew/versions ; brew install llvm35"
-            echo
-          } >&3
-          return 1
-        fi
-        ;;
-      esac
-    fi
-  fi
-}
-
-locate_llvm() {
-  local llvm_version="$1"
-  local package llvm_config
-  shopt -s nullglob
-  for package in `brew list 2>/dev/null | grep "^llvm"`; do
-    llvm_config="$(echo "$(brew --prefix "$package")/bin/llvm-config"*)"
-    if [ -n "$llvm_config" ] && [[ "$("$llvm_config" --version)" = "$llvm_version"* ]]; then
-      echo "$llvm_config"
-      break
-    fi
-  done
-  shopt -u nullglob
-}
-
-require_java() {
-  local java="$(command -v java || true)"
-
-  if [ -z "$java" ]; then
-    { echo
-      colorize 1 "ERROR"
-      echo ": This package must be installed with java, but go-build couldn't"
-      echo "find a suitable \`java\` executable on your system. Please install Java"
-      echo "and try again."
-      echo
-    } >&3
-    return 1
-  fi
-
-  export JAVA="$java"
-}
-
-require_distro() {
-  for arg; do
-    if [[ "$(cat /etc/issue 2>/dev/null || true)" == "$arg"* ]]; then
-      return 0
-    fi
-  done
-  { echo
-    colorize 1 "WARNING"
-    echo ": This binary distribution is built for the following distro(s): $@."
-    echo "installed binary may not run expectedly on other platforms."
-    echo
-  } >&2
-  return 1
-}
-
 configured_with_package_dir() {
   local package_var_name="$(capitalize "$1")"
   shift 1
@@ -793,142 +676,6 @@ use_homebrew_yaml() {
   else
     return 1
   fi
-}
-
-has_broken_mac_readline() {
-  # Mac OS X 10.4 has broken readline.
-  # https://github.com/yyuu/pyenv/issues/23
-  is_mac &&
-  ! configured_with_package_dir "go" "readline/rlconf.h" &&
-  ! use_homebrew_readline
-}
-
-use_homebrew_readline() {
-  if ! configured_with_package_dir "go" "readline/rlconf.h"; then
-    local libdir="$(brew --prefix readline 2>/dev/null || true)"
-    if [ -d "$libdir" ]; then
-      export CPPFLAGS="-I$libdir/include ${CPPFLAGS}"
-      export LDFLAGS="-L$libdir/lib ${LDFLAGS}"
-    else
-      return 1
-    fi
-  fi
-}
-
-has_broken_mac_openssl() {
-  is_mac &&
-  [[ "$(/usr/bin/openssl version 2>/dev/null || true)" = "OpenSSL 0.9.8"?* ]] &&
-  ! use_homebrew_openssl
-}
-
-use_homebrew_openssl() {
-  local ssldir="$(brew --prefix openssl 2>/dev/null || true)"
-  if [ -d "$ssldir" ]; then
-    export CPPFLAGS="-I$ssldir/include ${CPPFLAGS}"
-    export LDFLAGS="-L$ssldir/lib ${LDFLAGS}"
-  else
-    return 1
-  fi
-}
-
-build_package_mac_openssl() {
-  # Install to a subdirectory since we don't want shims for bin/openssl.
-  OPENSSL_PREFIX_PATH="${PREFIX_PATH}/openssl"
-
-  # Put openssl.conf, certs, etc in ~/.goenv/versions/*/openssl/ssl
-  OPENSSLDIR="${OPENSSLDIR:-$OPENSSL_PREFIX_PATH/ssl}"
-
-  # Tell Go to use this openssl for its extension.
-  export CPPFLAGS="-I${OPENSSL_PREFIX_PATH}/include ${CPPFLAGS}"
-  export LDFLAGS="-L${OPENSSL_PREFIX_PATH}/lib ${LDFLAGS}"
-
-  # Hint OpenSSL that we prefer a 64-bit build.
-  export KERNEL_BITS="64"
-  OPENSSL_CONFIGURE="${OPENSSL_CONFIGURE:-./config}"
-
-  # Compile a shared lib with zlib dynamically linked, no kerberos.
-  package_option openssl configure --openssldir="$OPENSSLDIR" zlib-dynamic no-ssl2 no-ssl3 no-krb5 shared
-
-  # Default MAKE_OPTS are -j 2 which can confuse the build. Thankfully, make
-  # gives precedence to the last -j option, so we can override that.
-  package_option openssl make -j 1
-
-  build_package_standard "$@"
-
-  # Extract root certs from the system keychain in .pem format and rehash.
-  local pem_file="$OPENSSLDIR/cert.pem"
-  security find-certificate -a -p /Library/Keychains/System.keychain > "$pem_file"
-  security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain >> "$pem_file"
-}
-
-# Post-install check that the openssl extension was built.
-build_package_verify_openssl() {
-  "$RUBY_BIN" -e 'begin
-    require "openssl"
-  rescue LoadError
-    $stderr.puts "The Ruby openssl extension was not compiled. Missing the OpenSSL lib?"
-    $stderr.puts "Configure options used:"
-    require "rbconfig"; require "shellwords"
-    RbConfig::CONFIG.fetch("configure_args").shellsplit.each { |arg| $stderr.puts "  #{arg}" }
-    exit 1
-  end' >&4 2>&1
-}
-
-# Ensure that directories listed in LDFLAGS exist
-build_package_ldflags_dirs() {
-  local arg dir
-  set - $LDFLAGS
-  while [ $# -gt 0 ]; do
-    dir=""
-    case "$1" in
-    -L  ) dir="$2" ;;
-    -L* ) dir="${1#-L}" ;;
-    esac
-    [ -z "$dir" ] || mkdir -p "$dir"
-    shift 1
-  done
-}
-
-build_package_auto_tcltk() {
-  if is_mac && [ ! -d /usr/include/X11 ]; then
-    if [ -d /opt/X11/include ]; then
-      if [[ "$CPPFLAGS" != *-I/opt/X11/include* ]]; then
-        export CPPFLAGS="-I/opt/X11/include $CPPFLAGS"
-      fi
-    else
-      package_option go configure --without-tk
-    fi
-  fi
-}
-
-rake() {
-  if [ -e "./Gemfile" ]; then
-    bundle exec rake "$@"
-  else
-    isolated_gem_dependency "rake --version" rake -v '~> 10.1.0'
-    command rake "$@"
-  fi
-}
-
-bundle() {
-  isolated_gem_dependency "bundle --version" bundler -v '~> 1.3.5'
-  command bundle "$@"
-}
-
-isolated_gem_dependency() {
-  set +E
-  ( command $1 &>/dev/null ) || {
-    set -E
-    shift 1
-    isolated_gem_install "$@"
-  }
-  set -E
-}
-
-isolated_gem_install() {
-  export GEM_HOME="${PWD}/.gem"
-  export PATH="${GEM_HOME}/bin:${PATH}"
-  gem install "$@"
 }
 
 verify_go() {
@@ -1163,68 +910,15 @@ fi
 # go-build: Specify `--libdir` on configure to fix build on openSUSE (#36)
 package_option go configure --libdir="${PREFIX_PATH}/lib"
 
-# go-build: Set `RPATH` if `--enable-shared` was given (#65, #66, #82)
-if [[ "$CONFIGURE_OPTS" == *"--enable-shared"* ]] || [[ "$GO_CONFIGURE_OPTS" == *"--enable-shared"* ]]; then
-  # The ld on Darwin embeds the full paths to each dylib by default
-  if [[ "$LDFLAGS" != *"-rpath="* ]] && ! is_mac; then
-    export LDFLAGS="-Wl,-rpath=${PREFIX_PATH}/lib ${LDFLAGS}"
-  fi
-fi
-
 # go-build: Set `RPATH` if --shared` was given for PyPy (#244)
 if [[ "$PYPY_OPTS" == *"--shared"* ]]; then
   export LDFLAGS="-Wl,-rpath=${PREFIX_PATH}/lib ${LDFLAGS}"
-fi
-
-# Add support for framework installation (`--enable-framework`) of CGo (#55, #99)
-if [[ "$GO_CONFIGURE_OPTS" == *"--enable-framework"* ]]; then
-  if ! is_mac; then
-    echo "go-build: framework installation is not supported." >&2
-    exit 1
-  fi
-  create_framework_dirs() {
-    local version="$(echo "$1" | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+).*$/\1/')"
-    mkdir -p "${PREFIX_PATH}/Go.framework/Versions/${version}"
-    ( cd "${PREFIX_PATH}/Go.framework/Versions" && ln -fs "${version}" "Current")
-    local path
-    for path in include lib share; do
-      mkdir -p "${PREFIX_PATH}/Go.framework/Versions/Current/${path}"
-      ln -fs "${PREFIX_PATH}/Go.framework/Versions/Current/${path}" "${PREFIX_PATH}/${path}"
-    done
-  }
-  create_framework_dirs "${DEFINITION_PATH##*/}"
-  package_option go configure --enable-framework="${PREFIX_PATH}"
-fi
-
-# Build against universal SDK (#219, #220)
-if [[ "$GO_CONFIGURE_OPTS" == *"--enable-universalsdk"* ]]; then
-  if ! is_mac; then
-    echo "go-build: universal installation is not supported." >&2
-    exit 1
-  fi
-  package_option go configure --enable-universalsdk=/ --with-universal-archs=intel
-fi
-
-# Compile with `--enable-unicode=ucs4` by default (#257)
-if [[ "$GO_CONFIGURE_OPTS" != *"--enable-unicode="* ]]; then
-  package_option go configure --enable-unicode=ucs4
 fi
 
 # SSL Certificate error with older wget that does not support Server Name Indication (#60)
 if ! command -v curl 1>/dev/null 2>&1 && [[ "$(wget --version 2>/dev/null || true)" = "GNU Wget 1.1"[0-3]* ]]; then
   echo "go-build: wget (< 1.14) doesn't support Server Name Indication. Please install curl (>= 7.18.1) and try again" >&2
   exit 1
-fi
-
-# Set MACOSX_DEPLOYMENT_TARGET from the product version of OS X (#219, #220)
-if is_mac; then
-  if [ -z "${MACOSX_DEPLOYMENT_TARGET}" ]; then
-    MACOS_VERSION="$(sw_vers -productVersion 2>/dev/null || true)"
-    MACOS_VERSION_ARRAY=(${MACOS_VERSION//\./ })
-    if [ "${#MACOS_VERSION_ARRAY[@]}" -ge 2 ]; then
-      export MACOSX_DEPLOYMENT_TARGET="${MACOS_VERSION_ARRAY[0]}.${MACOS_VERSION_ARRAY[1]}"
-    fi
-  fi
 fi
 
 go_bin_suffix() {
