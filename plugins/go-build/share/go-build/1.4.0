@@ -1,0 +1,15 @@
+install_darwin_106_32bit "Go Darwin 10.6 32bit 1.4.0" "https://storage.googleapis.com/golang/go1.4.darwin-386-osx10.6.tar.gz#ee31cd0e26245d0e48f11667e4298e2e7f54f9b6"
+
+install_darwin_106_64bit "Go Darwin 10.6 64bit 1.4.0" "https://storage.googleapis.com/golang/go1.4.darwin-amd64-osx10.6.tar.gz#09621b9226abe12c2179778b015a33c1787b29d6"
+
+install_darwin_108_32bit "Go Darwin 10.8 32bit 1.4" "https://storage.googleapis.com/golang/go1.4.darwin-386-osx10.8.tar.gz#4d2ae2f5c0216c44e432c6044b1e1f0aea99f712"
+
+install_darwin_108_64bit "Go Darwin 10.8 64bit 1.4" "https://storage.googleapis.com/golang/go1.4.darwin-amd64-osx10.8.tar.gz#28b2b731f86ada85246969e8ffc77d50542cdcb5"
+
+install_bsd_64bit "Go FreeBSD 64bit 1.4" "https://storage.googleapis.com/golang/go1.4.freebsd-amd64.tar.gz#9441745b9c61002feedee8f0016c082b56319e44"
+
+install_bsd_32bit "Go FreeBSD 32bit 1.4" "https://storage.googleapis.com/golang/go1.4.freebsd-386.tar.gz#36c5cc2ebef4b4404b12f2b5f2dfd23d73ecdbcc"
+
+install_linux_32bit "Go Linux 32bit 1.4" "https://storage.googleapis.com/golang/go1.4.linux-386.tar.gz#cb18d8122bfd3bbba20fa1a19b8f7566dcff795d"
+
+install_linux_64bit "Go Linux 64bit 1.4" "https://storage.googleapis.com/golang/go1.4.linux-amd64.tar.gz#cd82abcb0734f82f7cf2d576c9528cebdafac4c6"
