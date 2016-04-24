@@ -20,7 +20,7 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
 
 * https://github.com/pwoolcoc/goenv depends on Python,
 * https://github.com/crsmithdev/goenv depends on Go,
-* https://github.com/syndbg/goenv depends on Bash only
+* https://github.com/moovweb/gvm is a different approach of the problem that's modeled after `nvm`. `goenv` is more simplified.
 
 
 ----
