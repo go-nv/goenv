@@ -12,7 +12,7 @@
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
 
-version="20160417"
+version="20160424"
 git_revision=""
 
 if cd "${BASH_SOURCE%/*}" 2>/dev/null && git remote -v 2>/dev/null | grep -q pyenv; then
