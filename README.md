@@ -121,32 +121,20 @@ Once goenv has determined which version of Go your application has
 specified, it passes the command along to the corresponding Go
 installation.
 
-Each Python version is installed into its own directory under
+Each Go version is installed into its own directory under
 `~/.goenv/versions`.
 
 For example, you might have these versions installed:
 
-* `~/.goenv/versions/2.7.8/`
-* `~/.goenv/versions/3.4.2/`
-* `~/.goenv/versions/pypy-2.4.0/`
+* `~/.goenv/versions/1.6.1/`
+* `~/.goenv/versions/1.6.2/`
 
 As far as goenv is concerned, version names are simply the directories in
 `~/.goenv/versions`.
 
-
-----
-
-
 ## Installation
 
 If you're on Mac OS X, consider [installing with Homebrew](#homebrew-on-mac-os-x).
-
-
-### The automatic installer
-
-Visit my other project:
-https://github.com/yyuu/goenv-installer
-
 
 ### Basic GitHub Checkout
 
@@ -156,7 +144,7 @@ easy to fork and contribute any changes back upstream.
 1. **Check out goenv where you want it installed.**
    A good place to choose is `$HOME/.goenv` (but you can install it somewhere else).
 
-        $ git clone https://github.com/yyuu/goenv.git ~/.goenv
+        $ git clone https://github.com/syndbg/goenv.git ~/.goenv
 
 
 2. **Define environment variable `GOENV_ROOT`** to point to the path where
@@ -182,28 +170,19 @@ easy to fork and contribute any changes back upstream.
     to point to `.bashrc`. On such systems you should almost certainly put the abovementioned line
     `eval "$(goenv init -)` into `.bash_profile`, and **not** into `.bashrc`. Otherwise you
     may observe strange behaviour, such as `goenv` getting into an infinite loop.
-    See [#264](https://github.com/yyuu/goenv/issues/264) for details.
+    See pyenv's issue [#264](https://github.com/yyuu/pyenv/issues/264) for details.
 
 4. **Restart your shell so the path changes take effect.**
    You can now begin using goenv.
 
         $ exec $SHELL
 
-5. **Install Python versions into `$GOENV_ROOT/versions`.**
-   For example, to download and install Python 2.7.8, run:
+5. **Install Go versions into `$GOENV_ROOT/versions`.**
+   For example, to download and install Go 1.6.2, run:
 
-        $ goenv install 2.7.8
+        $ goenv install 1.6.2
 
-   **NOTE:** If you need to pass configure option to build, please use
-   ```CONFIGURE_OPTS``` environment variable.
-   
-   **NOTE:** If you want to use proxy to download, please use `http_proxy` and `https_proxy`
-   environment variable.
-
-   **NOTE:** If you are having trouble installing a python version,
-   please visit the wiki page about
-   [Common Build Problems](https://github.com/yyuu/goenv/wiki/Common-build-problems)
-
+   **NOTE:** It downloads and places the prebuilt Go binaries provided by Google.
 
 #### Upgrading
 
@@ -220,24 +199,24 @@ To upgrade to a specific release of goenv, check out the corresponding tag:
     $ cd ~/.goenv
     $ git fetch
     $ git tag
-    v0.1.0
-    $ git checkout v0.1.0
+    v20160417
+    $ git checkout v20160417
 
 ### Uninstalling goenv
 
 The simplicity of goenv makes it easy to temporarily disable it, or
 uninstall from the system.
 
-1. To **disable** goenv managing your Python versions, simply remove the
+1. To **disable** goenv managing your Go versions, simply remove the
   `goenv init` line from your shell startup configuration. This will
   remove goenv shims directory from PATH, and future invocations like
-  `python` will execute the system Python version, as before goenv.
+  `goenv` will execute the system Go version, as before goenv.
 
-  `goenv` will still be accessible on the command line, but your Python
+  `goenv` will still be accessible on the command line, but your Go
   apps won't be affected by version switching.
 
 2. To completely **uninstall** goenv, perform step (1) and then remove
-   its root directory. This will **delete all Python versions** that were
+   its root directory. This will **delete all Go versions** that were
    installed under `` `goenv root`/versions/ `` directory:
 
         rm -rf `goenv root`
@@ -296,17 +275,17 @@ opposed to this idea. Here's what `goenv init` actually does:
 To see exactly what happens under the hood for yourself, run `goenv init -`.
 
 
-### Uninstalling Python Versions
+### Uninstalling Go Versions
 
-As time goes on, you will accumulate Python versions in your
+As time goes on, you will accumulate Go versions in your
 `~/.goenv/versions` directory.
 
-To remove old Python versions, `goenv uninstall` command to automate
+To remove old Go versions, `goenv uninstall` command to automate
 the removal process.
 
 Alternatively, simply `rm -rf` the directory of the version you want
-to remove. You can find the directory of a particular Python version
-with the `goenv prefix` command, e.g. `goenv prefix 2.6.8`.
+to remove. You can find the directory of a particular Go version
+with the `goenv prefix` command, e.g. `goenv prefix 1.6.2`.
 
 
 ----
@@ -325,17 +304,17 @@ You can affect how goenv operates with the following settings:
 
 name | default | description
 -----|---------|------------
-`GOENV_VERSION` | | Specifies the Python version to be used.<br>Also see [`goenv shell`](#goenv-shell)
-`GOENV_ROOT` | `~/.goenv` | Defines the directory under which Python versions and shims reside.<br>Also see `goenv root`
+`GOENV_VERSION` | | Specifies the Go version to be used.<br>Also see [`goenv shell`](#goenv-shell)
+`GOENV_ROOT` | `~/.goenv` | Defines the directory under which Go versions and shims reside.<br>Also see `goenv root`
 `GOENV_DEBUG` | | Outputs debug information.<br>Also as: `goenv --debug <subcommand>`
-`GOENV_HOOK_PATH` | [_see wiki_][hooks] | Colon-separated list of paths searched for goenv hooks.
-`GOENV_DIR` | `$PWD` | Directory to start searching for `.python-version` files.
+`GOENV_HOOK_PATH` | Colon-separated list of paths searched for goenv hooks.
+`GOENV_DIR` | `$PWD` | Directory to start searching for `.go-version` files.
 
 ## Development
 
 The goenv source code is [hosted on
 GitHub](https://github.com/syndbg/goenv).  It's clean, modular,
-and easy to understand, even if you're not a shell hacker.
+and easy to understand, even if you're not a shell hacker. (I hope)
 
 Tests are executed using [Bats](https://github.com/sstephenson/bats):
 
@@ -343,6 +322,4 @@ Tests are executed using [Bats](https://github.com/sstephenson/bats):
     $ bats/test/<file>.bats
 
 Please feel free to submit pull requests and file bugs on the [issue
-tracker](https://github.com/yyuu/goenv/issues).
-
-
+tracker](https://github.com/syndbg/goenv/issues).
