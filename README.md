@@ -233,6 +233,7 @@ uninstall from the system.
 You can also install goenv using the [Homebrew](http://brew.sh)
 package manager for Mac OS X.
 
+    $ brew tap hakamadare/goenv
     $ brew update
     $ brew install goenv
 
