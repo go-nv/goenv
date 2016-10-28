@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: pyenv echo [-F<char>] VAR
+# Usage: goenv echo [-F<char>] VAR
 
 if [[ $1 == -F* ]]; then
   sep="${1:2}"
