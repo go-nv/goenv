@@ -233,21 +233,3 @@ Lists all Go versions with the given command installed.
 1.6.1
 1.6.2
 ```
-
-## `goenv install`
-
-Part of [Go-build](https://github.com/syndbg/goenv/tree/master/plugins/go-build), this installs versions of Go
-
-```shell
-> goenv install 1.6.1
-> goenv versions
-* 1.6.1 (set by /Users/syndbg/.goenv/version)
-```
-
-## `goenv install --list`
-
-List available remote versions of Go
-
-```shell
-> goenv install --list
-```
