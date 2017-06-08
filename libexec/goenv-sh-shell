@@ -55,7 +55,7 @@ if goenv-prefix "${versions[@]}" >/dev/null; then
   IFS="$OLDIFS"
   case "$shell" in
   fish )
-    echo "setenv GOENV_VERSION \"${version}\""
+    echo "set -gx GOENV_VERSION \"${version}\""
     ;;
   * )
     echo "export GOENV_VERSION=\"${version}\""

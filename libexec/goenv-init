@@ -86,9 +86,9 @@ mkdir -p "${GOENV_ROOT}/"{shims,versions}
 
 case "$shell" in
 fish )
-  echo "setenv PATH '${GOENV_ROOT}/shims' \$PATH"
-  echo "setenv GOENV_SHELL $shell"
-  echo "setenv GOROOT (goenv prefix)"
+  echo "set -gx PATH '${GOENV_ROOT}/shims' \$PATH"
+  echo "set -gx GOENV_SHELL $shell"
+  echo "set -gx GOROOT (goenv prefix)"
 ;;
 * )
   echo 'export PATH="'${GOENV_ROOT}'/shims:${PATH}"'
