@@ -48,5 +48,5 @@ SH
 @test "shell change version (fish)" {
   mkdir -p "${GOENV_ROOT}/versions/1.2.3"
   GOENV_SHELL=fish run goenv-sh-shell 1.2.3
-  assert_success 'setenv GOENV_VERSION "1.2.3"'
+  assert_success 'set -gx GOENV_VERSION "1.2.3"'
 }
