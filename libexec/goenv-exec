@@ -34,7 +34,9 @@ for script in "${scripts[@]}"; do
 done
 
 shift 1
-# Go needs a GOROOT
-export GOROOT="$(goenv-prefix)/"
+# Go needs a GOROOT without system's Go
+if [[ $GOENV_VERSION != "system" ]]; then
+  export GOROOT="$(goenv-prefix)/"
+fi
 export PATH="${GOENV_BIN_PATH}:${GOROOT}/bin:${PATH}"
 exec -a "$GOENV_COMMAND" "$GOENV_COMMAND_PATH" "$@"

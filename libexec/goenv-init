@@ -88,12 +88,10 @@ case "$shell" in
 fish )
   echo "set -gx PATH '${GOENV_ROOT}/shims' \$PATH"
   echo "set -gx GOENV_SHELL $shell"
-  echo "set -gx GOROOT (goenv prefix)"
 ;;
 * )
   echo 'export PATH="'${GOENV_ROOT}'/shims:${PATH}"'
   echo "export GOENV_SHELL=$shell"
-  echo 'export GOROOT="$(goenv prefix)"'
 ;;
 esac
 
