@@ -261,7 +261,7 @@ install_bsd_64bit() {
     if [ "$(uname -s)" = "FreeBSD" ]; then
         local arch="$(uname -m)"
 
-        if [ $arch = "x86_64" ]; then
+        if [ $arch = "x86_64" ] || [ $arch = 'amd64' ]; then
             install_package_using "tarball" 1 "$@"
         fi
     fi
@@ -271,7 +271,7 @@ install_bsd_32bit() {
     if [ "$(uname -s)" = "FreeBSD" ]; then
         local arch="$(uname -m)"
 
-        if [ $arch = "i386" ] || [ $arch = 'i686']; then
+        if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
             install_package_using "tarball" 1 "$@"
         fi
     fi
