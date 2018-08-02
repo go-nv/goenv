@@ -7,3 +7,5 @@ install_bsd_64bit "Go Freebsd 64bit 1.10rc2" "https://dl.google.com/go/go1.10rc2
 install_linux_32bit "Go Linux 32bit 1.10rc2" "https://dl.google.com/go/go1.10rc2.linux-386.tar.gz#18832b97cdc2f21783ac60fc0136f25c19d39b7cc43459f5114dd62c0a212fe4"
 
 install_linux_64bit "Go Linux 64bit 1.10rc2" "https://dl.google.com/go/go1.10rc2.linux-amd64.tar.gz#6a6a4c0654bc603bcfee4d6ac34a479c260ac61b3edcc8d6773384eb0bda512e"
+
+install_linux_arm "Go Linux arm 1.10rc2" "https://dl.google.com/go/go1.10rc2.linux-armv6l.tar.gz#aa145c2a9736cbcb39b9340182c319f7fc0ab3d0f2156d7dfd722572f4da519b"
