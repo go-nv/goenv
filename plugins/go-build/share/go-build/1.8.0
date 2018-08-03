@@ -7,3 +7,5 @@ install_bsd_64bit "Go Freebsd 64bit 1.8.0" "https://storage.googleapis.com/golan
 install_linux_32bit "Go Linux 32bit 1.8.0" "https://storage.googleapis.com/golang/go1.8.linux-386.tar.gz#8f618dc8b01c2e53e639a38d780645b8424e671e292c7b518248022205d6a448"
 
 install_linux_64bit "Go Linux 64bit 1.8.0" "https://storage.googleapis.com/golang/go1.8.linux-amd64.tar.gz#53ab94104ee3923e228a2cb2116e5e462ad3ebaeea06ff04463479d7f12d27ca"
+
+install_linux_arm "Go Linux arm 1.8.0" "https://dl.google.com/go/go1.8.linux-armv6l.tar.gz#32553dbb342f74a821ed5069cb72ec7e135c031102e7d01c6bc4da8ad6df5202"

@@ -257,6 +257,16 @@ install_linux_32bit() {
     fi
 }
 
+install_linux_arm() {
+    if [ "$(uname -s)" = "Linux" ]; then
+        local arch="$(uname -m)"
+
+        if [ $arch = "armv6l" ] || [ $arch = "armv7l" ]; then
+            install_package_using "tarball" 1 "$@"
+        fi
+    fi
+}
+
 install_bsd_64bit() {
     if [ "$(uname -s)" = "FreeBSD" ]; then
         local arch="$(uname -m)"
