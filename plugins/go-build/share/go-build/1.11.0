@@ -1,4 +1,4 @@
-install_darwin_64bit "Go Darwin 64bit 1.11.0" "https://dl.google.com/go/go1.11.darwin-amd64.tar.gz#12ef48702dc38ce3545152a7eb060c4ac47796212cc10c67f36c4116f96beae4"
+install_darwin_64bit "Go Darwin 64bit 1.11.0" "https://dl.google.com/go/go1.11.darwin-amd64.tar.gz#9749e6cb9c6d05cf10445a7c9899b58e72325c54fee9783ed1ac679be8e1e073"
 
 install_bsd_32bit "Go Freebsd 32bit 1.11.0" "https://dl.google.com/go/go1.11.freebsd-386.tar.gz#e4c2a9bd43932cb8f3226e866737e4a0f8cdda93db9d82754a0ffea04af1a259"
 
