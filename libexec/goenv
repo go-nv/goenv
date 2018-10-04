@@ -117,6 +117,24 @@ case "$command" in
 -h | --help )
   exec goenv-help
   ;;
+shell )
+  if [ -z "${GOENV_SHELL}" ]; then
+    echo 'eval "$(goenv init -)" has not been executed'
+    echo "please read the installation instructions in the README"
+    echo "also read COMMANDS.md about the shell command"
+  else
+    command_path="$(command -v "goenv-$command" || true)"
+    [ -n "$command_path" ] || abort "no such command \`$command'"
+
+    shift 1
+    if [ "$1" = --help ]; then
+      exec goenv-help "$command"
+    else
+      exec "$command_path" "$@"
+    fi
+  fi
+  ;;
+
 * )
   command_path="$(command -v "goenv-$command" || true)"
   [ -n "$command_path" ] || abort "no such command '$command'"
