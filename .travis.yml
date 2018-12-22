@@ -1,7 +1,7 @@
 sudo: false
-install: git clone --depth 1 https://github.com/sstephenson/bats.git
-script: make test
 language: c
+install: git clone --depth 1 https://github.com/bats-core/bats-core.git
+script: make test
 env:
   - GOENV_NATIVE_EXT=
   - GOENV_NATIVE_EXT=1

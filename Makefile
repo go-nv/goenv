@@ -4,7 +4,7 @@
 unexport GOGCCFLAGS
 
 test: bats
-	PATH="./bats/bin:$$PATH" test/run
+	PATH="./bats-core/bin:$$PATH" test/run
 	cd plugins/go-build && $(PWD)/bats-core/bin/bats $${CI:+--tap} test
 
 bats:
