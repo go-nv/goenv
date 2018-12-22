@@ -8,3 +8,5 @@
 /src/Makefile
 /src/*.o
 /bats/
+/bats-core/
+.idea
