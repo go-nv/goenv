@@ -68,9 +68,12 @@ assert_equal() {
 
 assert_output() {
   local expected
-  if [ $# -eq 0 ]; then expected="$(cat -)"
-  else expected="$1"
+  if [ $# -eq 0 ]; then
+    expected="$(cat -)"
+  else
+    expected="$1"
   fi
+
   assert_equal "$expected" "$output"
 }
 

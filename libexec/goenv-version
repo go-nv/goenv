@@ -2,8 +2,7 @@
 # Summary: Show the current Go version and its origin
 #
 # Shows the currently selected Go version and how it was
-# selected. To obtain only the version string, use `goenv
-# version-name'.
+# selected. To obtain only the version string, use `goenv version-name'.
 
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
