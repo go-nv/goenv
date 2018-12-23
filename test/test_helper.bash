@@ -153,3 +153,23 @@ create_hook() {
     cat > "${GOENV_HOOK_PATH}/$1/$2"
   fi
 }
+
+create_executable() {
+  goenv_version="${1?}"
+  name="${2?}"
+  shift 1
+  shift 1
+
+  bin="${GOENV_ROOT}/versions/${goenv_version}/bin"
+
+  mkdir -p "$bin"
+  {
+    if [ $# -eq 0 ]; then
+      cat -
+    else
+      echo "$@"
+    fi
+  } | sed -Ee '1s/^ +//' > "${bin}/$name"
+  chmod +x "${bin}/$name"
+}
+
