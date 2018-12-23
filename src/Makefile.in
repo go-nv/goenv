@@ -18,7 +18,7 @@ SHOBJ_STATUS = @SHOBJ_STATUS@
 .c.o:
 	$(SHOBJ_CC) $(SHOBJ_CFLAGS) $(CCFLAGS) -c -o $@ $<
 
-../libexec/pyenv-realpath.dylib: realpath.o
+../libexec/goenv-realpath.dylib: realpath.o
 	$(SHOBJ_LD) $(SHOBJ_LDFLAGS) $(SHOBJ_XLDFLAGS) -o $@ realpath.o $(SHOBJ_LIBS)
 
 clean:
