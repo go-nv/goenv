@@ -6,4 +6,6 @@ if [ -n "$GOENV_NATIVE_EXT" ]; then
   make -C src
 fi
 
-exec bats ${CI:+--tap} test
+TEST_TARGET=${1:-test}
+
+exec bats ${CI:+--tap} ${TEST_TARGET}
