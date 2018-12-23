@@ -8,7 +8,7 @@ test-goenv: bats
 
 	PATH="./bats-core/bin:$$PATH"
 
-	if [ -n "$GOENV_NATIVE_EXT" ]; then
+	if [ -n "$$GOENV_NATIVE_EXT" ]; then
 	  src/configure
 	  make -C src
 	fi
