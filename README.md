@@ -22,9 +22,7 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
 * https://github.com/crsmithdev/goenv depends on Go,
 * https://github.com/moovweb/gvm is a different approach of the problem that's modeled after `nvm`. `goenv` is more simplified.
 
-
 ----
-
 
 ## Table of Contents
 
@@ -42,7 +40,6 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
 * **[Development](#development)**
   * [Version History](#version-history)
   * [License](#license)
-
 
 ----
 
@@ -273,7 +270,6 @@ opposed to this idea. Here's what `goenv init` actually does:
 
 To see exactly what happens under the hood for yourself, run `goenv init -`.
 
-
 ### Uninstalling Go Versions
 
 As time goes on, you will accumulate Go versions in your
@@ -286,14 +282,11 @@ Alternatively, simply `rm -rf` the directory of the version you want
 to remove. You can find the directory of a particular Go version
 with the `goenv prefix` command, e.g. `goenv prefix 1.6.2`.
 
-
 ----
-
 
 ## Command Reference
 
 See [COMMANDS.md](COMMANDS.md).
-
 
 ----
 
@@ -315,10 +308,11 @@ The goenv source code is [hosted on
 GitHub](https://github.com/syndbg/goenv).  It's clean, modular,
 and easy to understand, even if you're not a shell hacker. (I hope)
 
-Tests are executed using [Bats](https://github.com/sstephenson/bats):
+Tests are executed using [Bats](https://github.com/bats-core/bats-core):
 
-    $ bats test
-    $ bats/test/<file>.bats
+```
+$ make test
+```
 
 Please feel free to submit pull requests and file bugs on the [issue
 tracker](https://github.com/syndbg/goenv/issues).

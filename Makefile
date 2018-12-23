@@ -1,8 +1,31 @@
-.PHONY: test
+.PHONY: test test-goenv test-goenv-go-build
 
-test: bats
-	PATH="./bats-core/bin:$$PATH" test/run
-	cd plugins/go-build && $(PWD)/bats-core/bin/bats $${CI:+--tap} test
+test: test-goenv test-goenv-go-build
+
+.ONESHELL:
+test-goenv: bats
+	set -e
+
+	PATH="./bats-core/bin:$$PATH"
+
+	if [ -n "$GOENV_NATIVE_EXT" ]; then
+	  src/configure
+	  make -C src
+	fi
+
+	test_target=$${test_target:-test}
+
+	exec bats $${CI:+--tap} $$test_target
+
+.ONESHELL:
+test-goenv-go-build: bats
+	set -e
+
+	PATH="$$(pwd)/bats-core/bin:$$PATH"
+	test_target=$${test_target:-test}
+
+	cd plugins/go-build
+	exec bats $${CI:+--tap} $$test_target
 
 bats:
 	if [ -d "$(PWD)/bats-core" ]; then \
