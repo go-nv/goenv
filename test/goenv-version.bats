@@ -11,7 +11,7 @@ setup() {
   cd "$GOENV_TEST_DIR"
 }
 
-@test "no version selected" {
+@test "no version selected uses system one" {
   assert [ ! -d "${GOENV_ROOT}/versions" ]
   run goenv-version
   assert_success "system (set by ${GOENV_ROOT}/version)"
@@ -69,4 +69,10 @@ goenv-version-without-stderr() {
   assert_output <<OUT
 3.3.3 (set by GOENV_VERSION environment variable)
 OUT
+}
+
+@test "it has a usage section" {
+  run goenv-help --usage version
+
+  assert_success "Usage: goenv version"
 }

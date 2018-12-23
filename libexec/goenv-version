@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Summary: Show the current Go version and its origin
 #
+# Usage: goenv version
+#
 # Shows the currently selected Go version and how it was
 # selected. To obtain only the version string, use `goenv version-name'.
 
