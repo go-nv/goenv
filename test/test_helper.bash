@@ -26,7 +26,9 @@ if [ -z "$GOENV_TEST_DIR" ]; then
   PATH="${GOENV_ROOT}/shims:$PATH"
   export PATH
 
-  for xdg_var in `env 2>/dev/null | grep ^XDG_ | cut -d= -f1`; do unset "$xdg_var"; done
+  for xdg_var in `env 2>/dev/null | grep ^XDG_ | cut -d= -f1`;
+    do unset "$xdg_var";
+  done
   unset xdg_var
 fi
 
@@ -35,8 +37,9 @@ teardown() {
 }
 
 flunk() {
-  { if [ "$#" -eq 0 ]; then cat -
-    else echo "$@"
+  {
+    if [ "$#" -eq 0 ]; then cat -
+      else echo "$@"
     fi
   } | sed "s:${GOENV_TEST_DIR}:TEST_DIR:g" >&2
   return 1
@@ -60,13 +63,20 @@ assert_failure() {
 
 assert_equal() {
   if [ "$1" != "$2" ]; then
-    { echo "expected: $1"
+    {
+      echo "expected: $1"
       echo "actual:   $2"
     } | flunk
   fi
 }
 
 assert_output() {
+  if [ -n "$GOENV_DEBUG" ]; then
+    echo "actual: $output"
+    echo "'GOENV_DEBUG=1' detected. Test assertion with 'assert_output' will always fail. Re-run test without 'GOENV_DEBUG'"
+    exit 1
+  fi
+
   local expected
   if [ $# -eq 0 ]; then
     expected="$(cat -)"
@@ -83,7 +93,9 @@ assert_line() {
   else
     local line
     for line in "${lines[@]}"; do
-      if [ "$line" = "$1" ]; then return 0; fi
+      if [ "$line" = "$1" ]; then
+        return 0;
+      fi
     done
     flunk "expected line \`$1'"
   fi
