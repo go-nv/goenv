@@ -70,6 +70,15 @@ assert_equal() {
   fi
 }
 
+assert_contains() {
+  if [ "$1" == *"$2"* ]; then
+    {
+      echo "expected to contain: $1"
+      echo "actual: $2"
+    } | flunk
+  fi
+}
+
 assert_output() {
   if [ -n "$GOENV_DEBUG" ]; then
     echo "actual: $output"
@@ -165,11 +174,11 @@ create_executable() {
   mkdir -p "$bin"
   {
     if [ $# -eq 0 ]; then
-      cat -
+      echo ''
     else
       echo "$@"
     fi
-  } | sed -Ee '1s/^ +//' > "${bin}/$name"
-  chmod +x "${bin}/$name"
-}
+  } | sed -Ee '1s/^ +//' > "${bin}/${name}"
 
+  chmod +x "${bin}/${name}"
+}

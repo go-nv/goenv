@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Summary: Rehash goenv shims (run this after installing executables)
+# Usage: goenv rehash
 
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
@@ -15,10 +16,12 @@ mkdir -p "$SHIM_PATH"
 # the prototype shim file. If the file already exists, print a warning
 # to stderr and exit with a non-zero status.
 set -o noclobber
-{ echo > "$PROTOTYPE_SHIM_PATH"
+{
+  echo > "$PROTOTYPE_SHIM_PATH"
 } 2>/dev/null ||
-{ if [ -w "$SHIM_PATH" ]; then
-    echo "goenv: cannot rehash: $PROTOTYPE_SHIM_PATH exists"
+{
+  if [ -w "$SHIM_PATH" ]; then
+    echo "goenv: cannot rehash: $PROTOTYPE_SHIM_PATH exists (rehash in progress or interrupted via SIGKILL)"
   else
     echo "goenv: cannot rehash: $SHIM_PATH isn't writable"
   fi
@@ -26,8 +29,10 @@ set -o noclobber
 } >&2
 set +o noclobber
 
-# If we were able to obtain a lock, register a trap to clean up the
+# NOTE: If we were able to obtain a lock,
+# register a trap to clean up the
 # prototype shim when the process exits.
+# Obviously this does not apply for SIGKILL.
 trap remove_prototype_shim EXIT
 
 remove_prototype_shim() {
