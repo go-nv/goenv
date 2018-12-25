@@ -299,7 +299,7 @@ name | default | description
 `GOENV_VERSION` | | Specifies the Go version to be used.<br>Also see [`goenv shell`](#goenv-shell)
 `GOENV_ROOT` | `~/.goenv` | Defines the directory under which Go versions and shims reside.<br>Also see `goenv root`
 `GOENV_DEBUG` | | Outputs debug information.<br>Also as: `goenv --debug <subcommand>`
-`GOENV_HOOK_PATH` | Colon-separated list of paths searched for goenv hooks.
+`GOENV_HOOK_PATH` | | Colon-separated list of paths searched for goenv hooks.
 `GOENV_DIR` | `$PWD` | Directory to start searching for `.go-version` files.
 
 ## Development
