@@ -17,7 +17,8 @@ fi
 
 if [ -n "$1" ]; then
   OLDIFS="$IFS"
-  { IFS=:
+  {
+    IFS=:
     export GOENV_VERSION="$*"
   }
   IFS="$OLDIFS"
@@ -27,7 +28,8 @@ fi
 
 GOENV_PREFIX_PATHS=()
 OLDIFS="$IFS"
-{ IFS=:
+{
+  IFS=:
   for version in ${GOENV_VERSION}; do
     if [ "$version" = "system" ]; then
       if GO_PATH="$(GOENV_VERSION="${version}" goenv-which go 2>/dev/null)"; then
@@ -42,7 +44,7 @@ OLDIFS="$IFS"
     if [ -d "$GOENV_PREFIX_PATH" ]; then
       GOENV_PREFIX_PATHS=("${GOENV_PREFIX_PATHS[@]}" "$GOENV_PREFIX_PATH")
     else
-      echo "goenv: version \`${version}' not installed" >&2
+      echo "goenv: version '${version}' not installed" >&2
       exit 1
     fi
   done
@@ -50,7 +52,8 @@ OLDIFS="$IFS"
 IFS="$OLDIFS"
 
 OLDIFS="$IFS"
-{ IFS=:
+{
+  IFS=:
   echo "${GOENV_PREFIX_PATHS[*]}"
 }
 IFS="$OLDIFS"
