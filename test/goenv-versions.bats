@@ -2,10 +2,6 @@
 
 load test_helper
 
-create_version() {
-  mkdir -p "${GOENV_ROOT}/versions/$1"
-}
-
 setup() {
   mkdir -p "$GOENV_TEST_DIR"
   cd "$GOENV_TEST_DIR"

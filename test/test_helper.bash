@@ -182,3 +182,8 @@ create_executable() {
 
   chmod +x "${bin}/${name}"
 }
+
+create_version() {
+  mkdir -p "${GOENV_ROOT}/versions/$1"
+}
+
