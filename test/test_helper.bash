@@ -187,3 +187,8 @@ create_version() {
   mkdir -p "${GOENV_ROOT}/versions/$1"
 }
 
+create_file() {
+  mkdir -p "$(dirname "$1")"
+  touch "$1"
+}
+
