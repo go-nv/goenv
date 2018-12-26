@@ -9,15 +9,19 @@ set -e
 
 unset bare
 unset skip_aliases
-# Provide goenv completions
 for arg; do
   case "$arg" in
+  # NOTE: Provide goenv completions
   --complete )
     echo --bare
     echo --skip-aliases
     exit ;;
-  --bare ) bare=1 ;;
-  --skip-aliases ) skip_aliases=1 ;;
+  --bare )
+    bare=1
+    ;;
+  --skip-aliases )
+    skip_aliases=1
+    ;;
   * )
     goenv-help --usage versions >&2
     exit 1
@@ -29,7 +33,7 @@ versions_dir="${GOENV_ROOT}/versions"
 
 if ! enable -f "${BASH_SOURCE%/*}"/goenv-realpath.dylib realpath 2>/dev/null; then
   if [ -n "$GOENV_NATIVE_EXT" ]; then
-    echo "goenv: failed to load \`realpath' builtin" >&2
+    echo "goenv: failed to load 'realpath' builtin" >&2
     exit 1
   fi
 
@@ -110,16 +114,12 @@ for path in "$versions_dir"/*; do
   if [ -d "$path" ]; then
     if [ -n "$skip_aliases" ] && [ -L "$path" ]; then
       target="$(realpath "$path")"
-      [ "${target%/*}" != "$versions_dir" ] || continue
-      [ "${target%/*/envs/*}" != "$versions_dir" ] || continue
+
+      if [ "${target%/*}" == "$versions_dir" ]; then
+        continue
+      fi
     fi
     print_version "${path##*/}"
-    # virtual environments created by anaconda/miniconda
-    for env_path in "${path}/envs/"*; do
-      if [ -d "${env_path}" ]; then
-        print_version "${env_path#${GOENV_ROOT}/versions/}"
-      fi
-    done
   fi
 done
 shopt -u nullglob

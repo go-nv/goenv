@@ -10,7 +10,7 @@ if [ -z "$GOENV_TEST_DIR" ]; then
     export GOENV_TEST_DIR="$(realpath "$GOENV_TEST_DIR")"
   else
     if [ -n "$GOENV_NATIVE_EXT" ]; then
-      echo "goenv: failed to load \`realpath' builtin" >&2
+      echo "goenv: failed to load 'realpath' builtin" >&2
       exit 1
     fi
   fi
