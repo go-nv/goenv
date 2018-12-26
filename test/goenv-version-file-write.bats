@@ -7,24 +7,37 @@ setup() {
   cd "$GOENV_TEST_DIR"
 }
 
-@test "invocation without 2 arguments prints usage" {
+@test "has usage instructions" {
+  run goenv-help --usage version-file-write
+  assert_success <<'OUT'
+Usage: goenv version-file-write <file> <version>
+OUT
+}
+
+@test "prints usage instructions when 2 arguments aren't specified" {
   run goenv-version-file-write
+
   assert_failure "Usage: goenv version-file-write <file> <version>"
-  run goenv-version-file-write "one" ""
-  assert_failure
+
+  run goenv-version-file-write "one"
+  assert_failure "Usage: goenv version-file-write <file> <version>"
 }
 
-@test "setting nonexistent version fails" {
+@test "fails when 2 arguments are specified, but version is non-existent" {
   assert [ ! -e ".go-version" ]
-  run goenv-version-file-write ".go-version" "2.7.6"
-  assert_failure "goenv: version \`2.7.6' not installed"
+
+  run goenv-version-file-write ".go-version" "1.11.1"
+  assert_failure "goenv: version '1.11.1' not installed"
+
   assert [ ! -e ".go-version" ]
 }
 
-@test "writes value to arbitrary file" {
-  mkdir -p "${GOENV_ROOT}/versions/2.7.6"
+@test "writes version to file when 2 arguments are specified and version is existent" {
+  mkdir -p "${GOENV_ROOT}/versions/1.11.1"
   assert [ ! -e "my-version" ]
-  run goenv-version-file-write "${PWD}/my-version" "2.7.6"
+
+  run goenv-version-file-write "${PWD}/my-version" "1.11.1"
+
   assert_success ""
-  assert [ "$(cat my-version)" = "2.7.6" ]
+  assert [ "$(cat my-version)" = "1.11.1" ]
 }
