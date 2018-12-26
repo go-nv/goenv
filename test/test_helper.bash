@@ -169,12 +169,19 @@ create_executable() {
   shift 1
   shift 1
 
-  bin="${GOENV_ROOT}/versions/${goenv_version}/bin"
+  if [[ $goenv_version == */* ]]; then
+    bin="$goenv_version"
+  else
+    bin="${GOENV_ROOT}/versions/${goenv_version}/bin"
+  fi
 
   mkdir -p "$bin"
   {
     if [ $# -eq 0 ]; then
-      echo ''
+      # HACK: Make `read` work for stdin stream being empty
+      while IFS='$\n' read -t 0.1 -r line; do
+        echo -e "$line\n"
+      done
     else
       echo "$@"
     fi

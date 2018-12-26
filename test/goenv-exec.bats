@@ -77,7 +77,7 @@ SH
   assert_line "HELLO=:hello:ugly:world:again"
 }
 
-@test "forwards all arguments for command that's specified by GOENV_VERSION environment varaible" {
+@test "forwards all arguments for command that's specified by GOENV_VERSION environment variable" {
   export GOENV_VERSION="1.6.1"
   create_executable "1.6.1" "go" <<SH
 #!$BASH
