@@ -11,27 +11,35 @@ setup() {
   cd "$GOENV_TEST_DIR"
 }
 
-@test "no version selected" {
+@test "has usage instructions" {
+  run goenv-help --usage version-name
+  assert_success <<'OUT'
+Usage: goenv version-name
+OUT
+}
+
+@test "prints 'system' when no version is present in GOENV_ROOT/versions" {
   assert [ ! -d "${GOENV_ROOT}/versions" ]
+
   run goenv-version-name
   assert_success "system"
 }
 
-@test "system version is not checked for existance" {
+@test "prints 'system' when 'GOENV_VERSION' environment variable is 'system' and does not check for existence" {
   GOENV_VERSION=system run goenv-version-name
   assert_success "system"
 }
 
-@test "GOENV_VERSION can be overridden by hook" {
-  create_version "2.7.11"
-  create_version "3.5.1"
-  create_hook version-name test.bash <<<"GOENV_VERSION=3.5.1"
+@test "hooks can override version of specified 'GOENV_VERSION' environment variable if versions exist" {
+  create_version "1.11.1"
+  create_version "1.10.3"
+  create_hook version-name test.bash <<< "GOENV_VERSION=1.10.3"
 
-  GOENV_VERSION=2.7.11 run goenv-version-name
-  assert_success "3.5.1"
+  GOENV_VERSION=1.11.1 run goenv-version-name
+  assert_success "1.10.3"
 }
 
-@test "carries original IFS within hooks" {
+@test "carries original IFS within hooks when version exists or is 'system'" {
   create_hook version-name hello.bash <<SH
 hellos=(\$(printf "hello\\tugly world\\nagain"))
 echo HELLO="\$(printf ":%s" "\${hellos[@]}")"
@@ -43,73 +51,80 @@ SH
   assert_line "HELLO=:hello:ugly:world:again"
 }
 
-@test "GOENV_VERSION has precedence over local" {
-  create_version "2.7.11"
-  create_version "3.5.1"
+@test "carries original IFS within hooks when version does not exist or is not 'system'" {
+  create_hook version-name hello.bash <<SH
+hellos=(\$(printf "hello\\tugly world\\nagain"))
+echo HELLO="\$(printf ":%s" "\${hellos[@]}")"
+SH
 
-  cat > ".go-version" <<<"2.7.11"
-  run goenv-version-name
-  assert_success "2.7.11"
-
-  GOENV_VERSION=3.5.1 run goenv-version-name
-  assert_success "3.5.1"
+  export GOENV_VERSION=1.11.1
+  IFS=$' \t\n' run goenv-version-name env
+  assert_failure
+  assert_line "HELLO=:hello:ugly:world:again"
 }
 
-@test "local file has precedence over global" {
-  create_version "2.7.11"
-  create_version "3.5.1"
+@test "prints 'GOENV_VERSION' environment variable which has precedence over local '.go-version' file when versions exist" {
+  create_version "1.10.3"
+  create_version "1.11.1"
 
-  cat > "${GOENV_ROOT}/version" <<<"2.7.11"
+  echo "1.10.3" > '.go-version'
   run goenv-version-name
-  assert_success "2.7.11"
 
-  cat > ".go-version" <<<"3.5.1"
-  run goenv-version-name
-  assert_success "3.5.1"
+  # NOTE: Verify it's chosen when there's only a local '.go-version' file
+  assert_success "1.10.3"
+
+  GOENV_VERSION=1.11.1 run goenv-version-name
+  assert_success "1.11.1"
 }
 
-@test "missing version" {
+@test "local '.go-version' file has precedence over 'GOENV_ROOT/version' file when versions exist" {
+  create_version "1.10.3"
+  create_version "1.11.1"
+
+  echo "1.10.3" > "${GOENV_ROOT}/version"
+
+  # NOTE: Verify it's chosen when there's only a global '.go-version' file
+  run goenv-version-name
+  assert_success "1.10.3"
+
+  echo "1.11.1" > "${GOENV_ROOT}/version"
+
+  run goenv-version-name
+  assert_success "1.11.1"
+}
+
+@test "fails when version specified by 'GOENV_VERSION' environment variable is not existent" {
   GOENV_VERSION=1.2 run goenv-version-name
-  assert_failure "goenv: version \`1.2' is not installed (set by GOENV_VERSION environment variable)"
+  assert_failure "goenv: version '1.2' is not installed (set by GOENV_VERSION environment variable)"
 }
 
-@test "one missing version (second missing)" {
-  create_version "3.5.1"
-  GOENV_VERSION="3.5.1:1.2" run goenv-version-name
+@test "fails when one of the versions separated by ':' and specified by 'GOENV_VERSION' environment variable is not existing" {
+  create_version "1.11.1"
+
+  # NOTE: Test with last version specified is missing
+  GOENV_VERSION="1.11.1:1.10.3" run goenv-version-name
+
   assert_failure
   assert_output <<OUT
-goenv: version \`1.2' is not installed (set by GOENV_VERSION environment variable)
-3.5.1
+goenv: version '1.10.3' is not installed (set by GOENV_VERSION environment variable)
+1.11.1
+OUT
+
+  # NOTE: Test with first version specified is missing
+  GOENV_VERSION="1.10.3:1.11.1" run goenv-version-name
+
+  assert_failure
+  assert_output <<OUT
+goenv: version '1.10.3' is not installed (set by GOENV_VERSION environment variable)
+1.11.1
 OUT
 }
 
-@test "one missing version (first missing)" {
-  create_version "3.5.1"
-  GOENV_VERSION="1.2:3.5.1" run goenv-version-name
-  assert_failure
-  assert_output <<OUT
-goenv: version \`1.2' is not installed (set by GOENV_VERSION environment variable)
-3.5.1
-OUT
-}
-
-goenv-version-name-without-stderr() {
-  goenv-version-name 2>/dev/null
-}
-
-@test "one missing version (without stderr)" {
-  create_version "3.5.1"
-  GOENV_VERSION="1.2:3.5.1" run goenv-version-name-without-stderr
-  assert_failure
-  assert_output <<OUT
-3.5.1
-OUT
-}
-
-@test "version with prefix in name" {
-  create_version "2.7.11"
-  cat > ".go-version" <<<"go-2.7.11"
+@test "prints version only while removing 'go' prefix in name when version exists" {
+  create_version "1.10.3"
+  echo "1.10.3" > '.go-version'
   run goenv-version-name
+
   assert_success
-  assert_output "2.7.11"
+  assert_output "1.10.3"
 }
