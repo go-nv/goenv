@@ -1,11 +1,11 @@
+.ONESHELL:
 .PHONY: test test-goenv test-goenv-go-build
 
-test: test-goenv test-goenv-go-build
+test: test-goenv
+#test: test-goenv test-goenv-go-build
 
-.ONESHELL:
 test-goenv: bats
 	set -e
-
 	PATH="./bats-core/bin:$$PATH"
 
 	if [ -n "$$GOENV_NATIVE_EXT" ]; then
@@ -14,10 +14,8 @@ test-goenv: bats
 	fi
 
 	test_target=$${test_target:-test}
-
 	exec bats $${CI:+--tap} $$test_target
 
-.ONESHELL:
 test-goenv-go-build: bats
 	set -e
 
@@ -28,8 +26,10 @@ test-goenv-go-build: bats
 	exec bats $${CI:+--tap} $$test_target
 
 bats:
-	if [ -d "$(PWD)/bats-core" ]; then \
-		echo "bats-core already exists. Nothing to do"; \
-	else \
-		git clone --depth 1 https://github.com/bats-core/bats-core.git; \
+	set -e
+
+	if [ -d "$(PWD)/bats-core" ]; then
+		echo "bats-core already exists. Nothing to do" ;
+	else
+		git clone --depth 1 https://github.com/bats-core/bats-core.git ;
 	fi

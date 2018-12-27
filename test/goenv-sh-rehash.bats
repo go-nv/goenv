@@ -2,7 +2,7 @@
 
 load test_helper
 
-@test "has usage instructions" {
+@test "has usage instructions for goenv-sh-rehash" {
   run goenv-help --usage sh-rehash
   assert_success <<'OUT'
 Usage: goenv sh-rehash
@@ -50,7 +50,7 @@ OUT
 }
 
 # NOTE: Re-use from goenv-rehash.bats
-@test "has usage instructions" {
+@test "has usage instructions for goenv-rehash" {
   run goenv-help --usage rehash
   assert_success <<'OUT'
 Usage: goenv rehash

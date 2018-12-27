@@ -1,5 +1,9 @@
 sudo: false
 language: c
+os: linux
+# NOTE: Use `xenial` and/or newer since `make`
+# bundled there is new enough version to support `.ONESHELL` in `Makefile`.
+dist: xenial
 install: git clone --depth 1 https://github.com/bats-core/bats-core.git
 script: make test
 env:
