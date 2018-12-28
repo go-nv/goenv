@@ -185,54 +185,10 @@ if [ -z "${GO_BUILD_CACHE_PATH}" ] && [ -d "${GOENV_ROOT}/cache" ]; then
   export GO_BUILD_CACHE_PATH="${GOENV_ROOT}/cache"
 fi
 
-if [ -z "${GOENV_BOOTSTRAP_VERSION}" ]; then
-  case "${VERSION_NAME}" in
-  [23]"."* )
-    # Default GOENV_VERSION to the friendly Go version. (The
-    # CGo installer requires an existing Go installation to run. An
-    # unsatisfied local .go-version file can cause the installer to
-    # fail.)
-    for version_info in "${VERSION_NAME%-dev}" "${VERSION_NAME%.*}" "${VERSION_NAME%%.*}"; do
-      # Anaconda's `curl` doesn't work on platfrom where `/etc/pki/tls/certs/ca-bundle.crt` isn't available (e.g. Debian)
-      for version in $(goenv-whence "go${version_info}" 2>/dev/null || true); do
-        if [[ "${version}" != "anaconda"* ]] && [[ "${version}" != "miniconda"* ]]; then
-          GOENV_BOOTSTRAP_VERSION="${version}"
-          break 2
-        fi
-      done
-    done
-    ;;
-  "pypy-dev" | "pypy-"*"-src" | "pypy3-"*"-src" )
-    # PyPy/PyPy3 requires existing Go 2.7 to build
-    if [ -n "${GOENV_RGO_VERSION}" ]; then
-      GOENV_BOOTSTRAP_VERSION="${GOENV_RGO_VERSION}"
-    else
-      for version in $(goenv-versions --bare | sort -r); do
-        if [[ "${version}" == "2.7"* ]]; then
-          GOENV_BOOTSTRAP_VERSION="$version"
-          break
-        fi
-      done
-    fi
-    if [ -n "$GOENV_BOOTSTRAP_VERSION" ]; then
-      if ! GOENV_VERSION="$GOENV_BOOTSTRAP_VERSION" goenv-exec go -c 'import curses' 1>/dev/null 2>&1; then
-        echo "goenv-install: $VERSION_NAME: PyPy requires \`curses' in $GOENV_BOOTSTRAP_VERSION to build from source." >&2
-        exit 1
-      fi
-    else
-      echo "goenv-install: $VERSION_NAME: PyPy requires Go 2.7 to build from source." >&2
-      exit 1
-    fi
-    ;;
-  esac
-fi
-
-if [ -n "${GOENV_BOOTSTRAP_VERSION}" ]; then
-  export GOENV_VERSION="${GOENV_BOOTSTRAP_VERSION}"
-fi
-
 # Execute `before_install` hooks.
-for hook in "${before_hooks[@]}"; do eval "$hook"; done
+for hook in "${before_hooks[@]}"; do
+  eval "$hook";
+done
 
 # Plan cleanup on unsuccessful installation.
 cleanup() {
@@ -252,11 +208,11 @@ if [ "$STATUS" == "2" ]; then
     here="$(dirname "${0%/*}")/../.."
     if [ -n "$candidates" ]; then
       echo
-      echo "The following versions contain \`$DEFINITION' in the name:"
+      echo "The following versions contain '$DEFINITION' in the name:"
       echo "$candidates" | indent
     fi
     echo
-    echo "See all available versions with \`goenv install --list'."
+    echo "See all available versions with 'goenv install --list'."
     echo
     echo -n "If the version you need is missing, try upgrading goenv"
     if [ "$here" != "${here#$(brew --prefix 2>/dev/null)}" ]; then
@@ -272,7 +228,9 @@ if [ "$STATUS" == "2" ]; then
 fi
 
 # Execute `after_install` hooks.
-for hook in "${after_hooks[@]}"; do eval "$hook"; done
+for hook in "${after_hooks[@]}";
+  do eval "$hook";
+done
 
 # Run `goenv-rehash` after a successful installation.
 if [ "$STATUS" == "0" ]; then

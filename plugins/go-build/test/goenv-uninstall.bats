@@ -1,8 +1,7 @@
 #!/usr/bin/env bats
 
 project_root="${PWD%plugins/go-build}"
-load "${project_root}test/test_helper.bash"
-load test_helper_ext
+load test_helper
 
 export PATH="${project_root}libexec:$PATH"
 

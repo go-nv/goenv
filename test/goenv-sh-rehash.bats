@@ -16,7 +16,8 @@ OUT
 }
 
 @test "resets the binary locations cache when shell is 'bash'" {
-  SHELL=bash run goenv-sh-rehash
+  export GOENV_SHELL=bash
+  run goenv-sh-rehash
   assert_output <<OUT
 hash -r 2>/dev/null || true
 OUT
@@ -25,7 +26,8 @@ OUT
 }
 
 @test "resets the binary locations cache when shell is 'zsh'" {
-  SHELL=zsh run goenv-sh-rehash
+  export GOENV_SHELL=zsh
+  run goenv-sh-rehash
   assert_output <<OUT
 hash -r 2>/dev/null || true
 OUT
@@ -34,7 +36,8 @@ OUT
 }
 
 @test "resets the binary locations cache when shell is 'ksh'" {
-  SHELL=ksh run goenv-sh-rehash
+  export GOENV_SHELL=ksh
+  run goenv-sh-rehash
   assert_output <<OUT
 hash -r 2>/dev/null || true
 OUT
@@ -44,7 +47,8 @@ OUT
 
 
 @test "does not reset the binary locations cache when shell is 'fish'" {
-  SHELL=fish run goenv-sh-rehash
+  export GOENV_SHELL=fish
+  run goenv-sh-rehash
   assert_output ''
   assert_success
 }

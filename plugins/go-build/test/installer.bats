@@ -13,8 +13,8 @@ load test_helper
   assert [ -x bin/goenv-install ]
   assert [ -x bin/goenv-uninstall ]
 
-  assert [ -e share/go-build/2.7.2 ]
-  assert [ -e share/go-build/pypy-2.0 ]
+  assert [ -e share/go-build/1.8.4 ]
+  assert [ -e share/go-build/1.11.1 ]
 }
 
 @test "build definitions don't have the executable bit" {
@@ -33,13 +33,13 @@ OUT
   cd "$TMP"
   mkdir -p bin share/go-build
   touch bin/go-build
-  touch share/go-build/2.7.2
+  touch share/go-build/1.2.2
 
   PREFIX="$PWD" run "${BATS_TEST_DIRNAME}/../install.sh"
   assert_success ""
 
   assert [ -x bin/go-build ]
-  run grep "install_package" share/go-build/2.7.2
+  run grep "install_linux_64bit" share/go-build/1.2.2
   assert_success
 }
 

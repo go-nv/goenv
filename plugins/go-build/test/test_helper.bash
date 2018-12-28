@@ -1,4 +1,7 @@
 load ./test_assert_helpers
+load ./test_assert_helpers_ext
+
+export TMP="$BATS_TEST_DIRNAME/tmp"
 
 unset GOENV_VERSION
 unset GOENV_DIR
@@ -8,18 +11,10 @@ if [ -z "$GOENV_TEST_DIR" ]; then
   GOENV_TEST_DIR="${BATS_TMPDIR}/goenv"
   export GOENV_TEST_DIR="$(mktemp -d "${GOENV_TEST_DIR}.XXX" 2>/dev/null || echo "$GOENV_TEST_DIR")"
 
-  if enable -f "${BATS_TEST_DIRNAME}"/../libexec/goenv-realpath.dylib realpath 2>/dev/null; then
-    export GOENV_TEST_DIR="$(realpath "$GOENV_TEST_DIR")"
-  else
-    if [ -n "$GOENV_NATIVE_EXT" ]; then
-      echo "goenv: failed to load 'realpath' builtin" >&2
-      exit 1
-    fi
-  fi
-
   export GOENV_ROOT="${GOENV_TEST_DIR}/root"
   export HOME="${GOENV_TEST_DIR}/home"
   export GOENV_HOOK_PATH="${GOENV_ROOT}/goenv.d"
+
 
   PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin
   PATH="${GOENV_TEST_DIR}/bin:$PATH"
@@ -34,7 +29,16 @@ if [ -z "$GOENV_TEST_DIR" ]; then
   unset xdg_var
 fi
 
+if [ "$FIXTURE_ROOT" != "$BATS_TEST_DIRNAME/fixtures" ]; then
+  export FIXTURE_ROOT="$BATS_TEST_DIRNAME/fixtures"
+  export INSTALL_ROOT="$TMP/install"
+  PATH="$BATS_TEST_DIRNAME/../bin:$PATH"
+  PATH="$TMP/bin:$PATH"
+  export PATH
+fi
+
 teardown() {
   rm -rf "$GOENV_TEST_DIR"
+  rm -fr "${TMP:?}"/*
 }
 
