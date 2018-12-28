@@ -2,19 +2,19 @@
 
 load test_helper
 
-@test "installs python-build into PREFIX" {
+@test "installs go-build into PREFIX" {
   cd "$TMP"
   PREFIX="${PWD}/usr" run "${BATS_TEST_DIRNAME}/../install.sh"
   assert_success ""
 
   cd usr
 
-  assert [ -x bin/python-build ]
-  assert [ -x bin/pyenv-install ]
-  assert [ -x bin/pyenv-uninstall ]
+  assert [ -x bin/go-build ]
+  assert [ -x bin/goenv-install ]
+  assert [ -x bin/goenv-uninstall ]
 
-  assert [ -e share/python-build/2.7.2 ]
-  assert [ -e share/python-build/pypy-2.0 ]
+  assert [ -e share/go-build/2.7.2 ]
+  assert [ -e share/go-build/pypy-2.0 ]
 }
 
 @test "build definitions don't have the executable bit" {
@@ -22,7 +22,7 @@ load test_helper
   PREFIX="${PWD}/usr" run "${BATS_TEST_DIRNAME}/../install.sh"
   assert_success ""
 
-  run $BASH -c 'ls -l usr/share/python-build | tail -2 | cut -c1-10'
+  run $BASH -c 'ls -l usr/share/go-build | tail -2 | cut -c1-10'
   assert_output <<OUT
 -rw-r--r--
 -rw-r--r--
@@ -31,15 +31,15 @@ OUT
 
 @test "overwrites old installation" {
   cd "$TMP"
-  mkdir -p bin share/python-build
-  touch bin/python-build
-  touch share/python-build/2.7.2
+  mkdir -p bin share/go-build
+  touch bin/go-build
+  touch share/go-build/2.7.2
 
   PREFIX="$PWD" run "${BATS_TEST_DIRNAME}/../install.sh"
   assert_success ""
 
-  assert [ -x bin/python-build ]
-  run grep "install_package" share/python-build/2.7.2
+  assert [ -x bin/go-build ]
+  run grep "install_package" share/go-build/2.7.2
   assert_success
 }
 

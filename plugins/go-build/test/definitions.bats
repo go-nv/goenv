@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
 
 load test_helper
-NUM_DEFINITIONS="$(find "$BATS_TEST_DIRNAME"/../share/python-build -maxdepth 1 -type f | wc -l)"
+NUM_DEFINITIONS="$(find "$BATS_TEST_DIRNAME"/../share/go-build -maxdepth 1 -type f | wc -l)"
 
 @test "list built-in definitions" {
-  run python-build --definitions
+  run go-build --definitions
   assert_success
   assert_output_contains "2.7.8"
   assert_output_contains "jython-2.5.3"
@@ -13,16 +13,16 @@ NUM_DEFINITIONS="$(find "$BATS_TEST_DIRNAME"/../share/python-build -maxdepth 1 -
 
 @test "custom PYTHON_BUILD_ROOT: nonexistent" {
   export PYTHON_BUILD_ROOT="$TMP"
-  refute [ -e "${PYTHON_BUILD_ROOT}/share/python-build" ]
-  run python-build --definitions
+  refute [ -e "${PYTHON_BUILD_ROOT}/share/go-build" ]
+  run go-build --definitions
   assert_success ""
 }
 
 @test "custom PYTHON_BUILD_ROOT: single definition" {
   export PYTHON_BUILD_ROOT="$TMP"
-  mkdir -p "${PYTHON_BUILD_ROOT}/share/python-build"
-  touch "${PYTHON_BUILD_ROOT}/share/python-build/2.7.8-test"
-  run python-build --definitions
+  mkdir -p "${PYTHON_BUILD_ROOT}/share/go-build"
+  touch "${PYTHON_BUILD_ROOT}/share/go-build/2.7.8-test"
+  run go-build --definitions
   assert_success "2.7.8-test"
 }
 
@@ -30,7 +30,7 @@ NUM_DEFINITIONS="$(find "$BATS_TEST_DIRNAME"/../share/python-build -maxdepth 1 -
   export PYTHON_BUILD_DEFINITIONS="${TMP}/definitions"
   mkdir -p "$PYTHON_BUILD_DEFINITIONS"
   touch "${PYTHON_BUILD_DEFINITIONS}/2.7.8-test"
-  run python-build --definitions
+  run go-build --definitions
   assert_success
   assert_output_contains "2.7.8-test"
   assert [ "${#lines[*]}" -eq "$((NUM_DEFINITIONS + 1))" ]
@@ -42,7 +42,7 @@ NUM_DEFINITIONS="$(find "$BATS_TEST_DIRNAME"/../share/python-build -maxdepth 1 -
   touch "${TMP}/definitions/2.7.8-test"
   mkdir -p "${TMP}/other"
   touch "${TMP}/other/3.4.2-test"
-  run python-build --definitions
+  run go-build --definitions
   assert_success
   assert_output_contains "2.7.8-test"
   assert_output_contains "3.4.2-test"
@@ -55,19 +55,19 @@ NUM_DEFINITIONS="$(find "$BATS_TEST_DIRNAME"/../share/python-build -maxdepth 1 -
   echo true > "${TMP}/definitions/2.7.8-test"
   mkdir -p "${TMP}/other"
   echo false > "${TMP}/other/2.7.8-test"
-  run bin/python-build "2.7.8-test" "${TMP}/install"
+  run bin/go-build "2.7.8-test" "${TMP}/install"
   assert_success ""
 }
 
 @test "installing nonexistent definition" {
-  run python-build "nonexistent" "${TMP}/install"
+  run go-build "nonexistent" "${TMP}/install"
   assert [ "$status" -eq 2 ]
-  assert_output "python-build: definition not found: nonexistent"
+  assert_output "go-build: definition not found: nonexistent"
 }
 
 @test "sorting Python versions" {
   export PYTHON_BUILD_ROOT="$TMP"
-  mkdir -p "${PYTHON_BUILD_ROOT}/share/python-build"
+  mkdir -p "${PYTHON_BUILD_ROOT}/share/go-build"
   expected="2.7-dev
 2.7
 2.7.1
@@ -88,20 +88,20 @@ jython-2.7-beta1
 jython-2.7-beta2
 jython-2.7-beta3"
   for ver in "$expected"; do
-    touch "${PYTHON_BUILD_ROOT}/share/python-build/$ver"
+    touch "${PYTHON_BUILD_ROOT}/share/go-build/$ver"
   done
-  run python-build --definitions
+  run go-build --definitions
   assert_success "$expected"
 }
 
 @test "removing duplicate Python versions" {
   export PYTHON_BUILD_ROOT="$TMP"
-  export PYTHON_BUILD_DEFINITIONS="${PYTHON_BUILD_ROOT}/share/python-build"
+  export PYTHON_BUILD_DEFINITIONS="${PYTHON_BUILD_ROOT}/share/go-build"
   mkdir -p "$PYTHON_BUILD_DEFINITIONS"
   touch "${PYTHON_BUILD_DEFINITIONS}/2.7.8"
   touch "${PYTHON_BUILD_DEFINITIONS}/3.4.2"
 
-  run python-build --definitions
+  run go-build --definitions
   assert_success
   assert_output <<OUT
 2.7.8

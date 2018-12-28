@@ -84,7 +84,7 @@ install_tmp_fixture() {
   mkdir -p "${TMP_FIXTURES}/${name%/*}"
   cp "${FIXTURE_ROOT}/${name}" "${TMP_FIXTURES}/${name}"
 
-  run python-build $args "$TMP_FIXTURES/$name" "$destination"
+  run go-build $args "$TMP_FIXTURES/$name" "$destination"
 }
 
 resolve_link() {

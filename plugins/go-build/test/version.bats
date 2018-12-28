@@ -2,22 +2,22 @@
 
 load test_helper
 
-bats_bin="${BATS_TEST_DIRNAME}/../bin/python-build"
+bats_bin="${BATS_TEST_DIRNAME}/../bin/go-build"
 static_version="$(grep VERSION "$bats_bin" | head -1 | cut -d'"' -f 2)"
 
-@test "python-build static version" {
+@test "go-build static version" {
   stub git 'echo "ASPLODE" >&2; exit 1'
-  run python-build --version
-  assert_success "python-build ${static_version}"
+  run go-build --version
+  assert_success "go-build ${static_version}"
   unstub git
 }
 
-@test "python-build git version" {
+@test "go-build git version" {
   stub git \
     'remote -v : echo origin https://github.com/yyuu/pyenv.git' \
     "describe --tags HEAD : echo v1984-12-gSHA"
-  run python-build --version
-  assert_success "python-build 1984-12-gSHA"
+  run go-build --version
+  assert_success "go-build 1984-12-gSHA"
   unstub git
 }
 
@@ -25,8 +25,8 @@ static_version="$(grep VERSION "$bats_bin" | head -1 | cut -d'"' -f 2)"
   stub git \
     'remote -v : echo origin https://github.com/yyuu/pyenv.git' \
     "describe --tags HEAD : echo ASPLODE >&2; exit 1"
-  run python-build --version
-  assert_success "python-build ${static_version}"
+  run go-build --version
+  assert_success "go-build ${static_version}"
   unstub git
 }
 
@@ -34,6 +34,6 @@ static_version="$(grep VERSION "$bats_bin" | head -1 | cut -d'"' -f 2)"
   stub git \
     'remote -v : echo origin https://github.com/Homebrew/homebrew.git' \
     "describe --tags HEAD : echo v1984-12-gSHA"
-  run python-build --version
-  assert_success "python-build ${static_version}"
+  run go-build --version
+  assert_success "go-build ${static_version}"
 }

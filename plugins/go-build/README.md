@@ -193,10 +193,6 @@ variable when using `--keep` with `go-build`.
 
 ## Getting Help
 
-Please see the [goenv wiki](https://github.com/syndbg/goenv/wiki) for solutions to common problems.
-
-[wiki]: https://github.com/syndbg/goenv/wiki
-
-If you can't find an answer on the wiki, open an issue on the [issue
+If you can't find an answer on the, open an issue on the [issue
 tracker](https://github.com/syndbg/goenv/issues). Be sure to include
 the full build log for build failures.

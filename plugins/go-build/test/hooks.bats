@@ -29,28 +29,3 @@ rehashed
 OUT
 }
 
-@test "goenv-uninstall hooks" {
-  cat > "${HOOK_PATH}/uninstall.bash" <<OUT
-before_uninstall 'echo before: \$PREFIX'
-after_uninstall 'echo after.'
-rm() {
-  echo "rm \$@"
-  command rm "\$@"
-}
-OUT
-  stub goenv-hooks "uninstall : echo '$HOOK_PATH'/uninstall.bash"
-  stub goenv-rehash "echo rehashed"
-
-  mkdir -p "${GOENV_ROOT}/versions/3.2.1"
-  run goenv-uninstall -f 3.2.1
-
-  assert_success
-  assert_output <<-OUT
-before: ${GOENV_ROOT}/versions/3.2.1
-rm -rf ${GOENV_ROOT}/versions/3.2.1
-rehashed
-after.
-OUT
-
-  refute [ -d "${GOENV_ROOT}/versions/3.2.1" ]
-}

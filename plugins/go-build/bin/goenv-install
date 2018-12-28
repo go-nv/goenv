@@ -22,7 +22,7 @@
 #
 # For detailed information on installing Go versions with
 # go-build, including a list of environment variables for adjusting
-# compilation, see: https://github.com/yyuu/goenv#readme
+# compilation, see: https://github.com/syndbg/goenv#readme
 #
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
@@ -141,7 +141,9 @@ after_install() {
 OLDIFS="$IFS"
 IFS=$'\n' scripts=(`goenv-hooks install`)
 IFS="$OLDIFS"
-for script in "${scripts[@]}"; do source "$script"; done
+for script in "${scripts[@]}"; do
+  source "$script";
+done
 
 
 # Set VERSION_NAME from $DEFINITION, if it is not already set. Then
@@ -245,7 +247,8 @@ go-build $KEEP $VERBOSE $HAS_PATCH $DEBUG "$DEFINITION" "$PREFIX" || STATUS="$?"
 
 # Display a more helpful message if the definition wasn't found.
 if [ "$STATUS" == "2" ]; then
-  { candidates="$(definitions "$DEFINITION")"
+  {
+    candidates="$(definitions "$DEFINITION")"
     here="$(dirname "${0%/*}")/../.."
     if [ -n "$candidates" ]; then
       echo

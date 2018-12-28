@@ -5,12 +5,12 @@
 # Usage: goenv uninstall [-f|--force] <version>
 #
 #    -f  Attempt to remove the specified version without prompting
-#        for confirmation. If the version does not exist, do not
-#        display an error message.
+#        for confirmation. Still displays error message if version does not exist.
 #
 # See `goenv versions` for a complete list of installed versions.
 #
 set -e
+[ -n "$GOENV_DEBUG" ] && set -x
 
 # Provide goenv completions
 if [ "$1" = "--complete" ]; then
@@ -33,7 +33,9 @@ if [ "$1" = "-f" ] || [ "$1" = "--force" ]; then
   shift
 fi
 
-[ "$#" -eq 1 ] || usage 1 >&2
+if [ ! "$#" -eq 1 ]; then
+  usage 1 >&2
+fi
 
 DEFINITION="$1"
 case "$DEFINITION" in
@@ -57,18 +59,19 @@ after_uninstall() {
 OLDIFS="$IFS"
 IFS=$'\n' scripts=(`goenv-hooks uninstall`)
 IFS="$OLDIFS"
-for script in "${scripts[@]}"; do source "$script"; done
-
+for script in "${scripts[@]}"; do
+  source "$script";
+done
 
 VERSION_NAME="${DEFINITION##*/}"
 PREFIX="${GOENV_ROOT}/versions/${VERSION_NAME}"
 
-if [ -z "$FORCE" ]; then
-  if [ ! -d "$PREFIX" ]; then
-    echo "goenv: version \`$VERSION_NAME' not installed" >&2
-    exit 1
-  fi
+if [ ! -d "$PREFIX" ]; then
+  echo "goenv: version '$VERSION_NAME' not installed" >&2
+  exit 1
+fi
 
+if [ -z "$FORCE" ]; then
   read -p "goenv: remove $PREFIX? "
   case "$REPLY" in
   y* | Y* ) ;;
@@ -76,11 +79,15 @@ if [ -z "$FORCE" ]; then
   esac
 fi
 
-for hook in "${before_hooks[@]}"; do eval "$hook"; done
+for hook in "${before_hooks[@]}"; do
+  eval "$hook";
+done
 
 if [ -d "$PREFIX" ]; then
   rm -rf "$PREFIX"
   goenv-rehash
 fi
 
-for hook in "${after_hooks[@]}"; do eval "$hook"; done
+for hook in "${after_hooks[@]}"; do
+  eval "$hook";
+done

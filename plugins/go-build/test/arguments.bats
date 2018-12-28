@@ -7,7 +7,7 @@ load test_helper
   local definition="${TMP}/build-definition"
   echo '' > "$definition"
 
-  run python-build "$definition"
+  run go-build "$definition"
   assert_failure
   assert_output_contains 'Usage: go-build'
 }
@@ -17,7 +17,7 @@ load test_helper
   local definition="${TMP}/build-definition"
   echo '' > "$definition"
 
-  run python-build "$definition" "${TMP}/install" ""
+  run go-build "$definition" "${TMP}/install" ""
   assert_failure
   assert_output_contains 'Usage: go-build'
 }

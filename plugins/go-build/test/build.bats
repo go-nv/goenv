@@ -190,7 +190,6 @@ OUT
 @test "readline is not linked from Homebrew when explicitly defined" {
   cached_tarball "Python-3.2.1"
 
-  # python-build
   readline_libdir="$TMP/custom"
   mkdir -p "$readline_libdir/include/readline"
   touch "$readline_libdir/include/readline/rlconf.h"
@@ -476,8 +475,8 @@ OUT
   chmod -w "$TMPDIR"
 
   touch "${TMP}/build-definition"
-  run python-build "${TMP}/build-definition" "$INSTALL_ROOT"
-  assert_failure "python-build: TMPDIR=$TMPDIR is set to a non-accessible location"
+  run go-build "${TMP}/build-definition" "$INSTALL_ROOT"
+  assert_failure "go-build: TMPDIR=$TMPDIR is set to a non-accessible location"
 }
 
 @test "non-executable TMPDIR aborts build" {
@@ -486,8 +485,8 @@ OUT
   chmod -x "$TMPDIR"
 
   touch "${TMP}/build-definition"
-  run python-build "${TMP}/build-definition" "$INSTALL_ROOT"
-  assert_failure "python-build: TMPDIR=$TMPDIR is set to a non-accessible location"
+  run go-build "${TMP}/build-definition" "$INSTALL_ROOT"
+  assert_failure "go-build: TMPDIR=$TMPDIR is set to a non-accessible location"
 }
 
 @test "initializes LDFLAGS directories" {

@@ -64,8 +64,10 @@ assert_failure() {
 assert_equal() {
   if [ "$1" != "$2" ]; then
     {
-      echo "expected: $1"
-      echo "actual: $2"
+      echo "expected: (newline not part of expected output)"
+      echo "$1"
+      echo "actual: (newline not actual output)"
+      echo "$2"
     } | flunk
   fi
 }
@@ -161,6 +163,10 @@ create_hook() {
   if [ ! -t 0 ]; then
     cat > "${GOENV_HOOK_PATH}/$1/$2"
   fi
+}
+
+remove_hook() {
+  rm "${GOENV_HOOK_PATH}/$1/$2"
 }
 
 create_executable() {
