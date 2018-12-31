@@ -118,6 +118,8 @@ Introducing breaking changes under a feature flag can be ok in some cases where 
 ; Ref: https://github.com/syndbg/goenv/pull/62
 * Changed `goenv uninstall <version>`'s to fail regardless whether `--force` or `-f` is used when version is not installed. This also means that `before_uninstall` hooks won't be triggered.
 ; Ref: https://github.com/syndbg/goenv/pull/62
+* Changed the `README.md` to be easier to navigate and read by extracting "how it works" to HOW_IT_WORKS.md, "advanced config" to ADVANCED_CONFIGURATION.md, "installation" to INSTALL.md, move Homebrew installation instructions from "advanced config" to INSTALL.md.
+; Ref: https://github.com/syndbg/goenv/pull/62
 
 ### Removed
 
