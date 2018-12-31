@@ -76,7 +76,7 @@ if [ "$any_not_installed" = 1 ]; then
   exit 1
 fi
 
-echo "goenv: $GOENV_COMMAND: command not found" >&2
+echo "goenv: '$GOENV_COMMAND' command not found" >&2
 
 versions="$(goenv-whence "$GOENV_COMMAND" || true)"
 if [ -n "$versions" ]; then
