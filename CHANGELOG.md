@@ -47,6 +47,106 @@ Introducing breaking changes under a feature flag can be ok in some cases where 
 
 ## Unreleased (master)
 
+### Added
+
+* `make test-goenv-go-build` to test the `go-build` plugin.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* For tests, fake Python-based HTTP file server to download definitions.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `make test=<target_test_suite_path>.bats test-goenv{-go-build,}` functionality to execute a single test suite
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Usage instructions for `goenv rehash` via `goenv help --usage rehash`
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Usage instructions for `goenv root` via `goenv help --usage root`
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Usage instructions for `goenv sh-rehash` via `goenv help --usage sh-rehash`
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Usage instructions for `goenv version` via `goenv help --usage version`
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Summary for `goenv version-file-read` via `goenv help version-file-read`
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Usage instructions for `goenv version-name` via `goenv help --usage version-name`
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Usage instructions for `goenv version-origin` via `goenv help --usage version-origin`
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Debugging support via `GOENV_DEBUG=1` for `goenv uninstall`
+; Ref: https://github.com/syndbg/goenv/pull/62
+
+### Changed
+
+* Re-enabled, greatly refactored and made the test suite pass again.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Travis CI test suite to run against `xenial` Ubuntu.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Use https://github.com/bats-core/bats-core instead of https://github.com/sstephenson/bats for test suite runner and replace links.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Backfilled the CHANGELOG.md
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv` error message when `GOENV_NATIVE_EXT=1`, but native extension is not present, to quote `realpath` with single quotes. It's now `failed to load 'realpath' builtin`
+* `goenv` error message when `GOENV_DIR` (e.g `/home/syndbg/.goenv`), but it's not writable, to quote `$GOENV_DIR` with single quotes. It's now `cannot change working directory to '$GOENV_DIR'`.
+* `goenv` error message when unknown command is given (e.g `goenv potato`), to quote `$command` with single quotes. It's now `no such command '$command'`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv` and `goenv help` is called to quote `goenv help <command>` with single quotes. It's now `'goenv help <command>'`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv init` and `goenv init <shell>` are more explicit now that the given shell is unknown. E.g `profile="<unknown shell: <shell>, replace with your profile path>"`
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv init` and `goenv init <shell>` now return exit status 0.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv prefix <version>` error message when not installed version is given, to quote `$version` with single quotes. It's now `goenv: version '${version}' not installed`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv version-name <version>` error message when not installed version is given, to quote `$version` with single quotes. It's now `goenv: version '${version}' is not installed (set by $(goenv-version-origin))`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv versions` error message when `GOENV_NATIVE_EXT=1`, but native extension is not present, to quote `realpath` with single quotes. It's now `goenv: failed to load 'realpath' builtin`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv which <command>` error message when current version (specified by `GOENV_VERSION` env var or `.go-version` file) is not installed, to quote now with single quotes. It's now `goenv: version '$version' is not installed (set by $(goenv-version-origin))`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv which <command>` error message when `$command` is not a binary executable present in current version, but it's found in other versions, to quote `$command` in single quotes. It's now `The '$command' command exists in these Go versions:`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv which <command>` error message when `$command` is not a binary executable present in $PATH, to quote `$command` in single quotes. It's now `goenv: '$GOENV_COMMAND' command not found`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Changed `go-build` and `goenv install`'s error message when no `curl` or `wget` are present to now quote using single quotes. It's now `error: please install 'curl' or 'wget' and try again`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Changed mentions of `pyenv` to `goenv` when no `go` executable is found after installation of definition.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `goenv --version` now returns only goenv version. Previous format of `goenv <version>-<num_commits>-<git_sha>`, now just `<version>`. E.g `goenv 1.23.3`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `go-build --version` now returns only go-build version. Previous format of `go-build <version>-<num_commits>-<git_sha>`, now just `<version>`. E.g `go-build 1.23.3`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Changed `goenv install <version>`'s error message when `version` is not a known installable definition, but other similar ones are found to be quoted with single quotes. It's now `The following versions contain '$DEFINITION' in the name:` and `See all available versions with 'goenv install --list'.`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Changed `goenv uninstall <version>`'s error message when `version` is not installed to be quoted using single quotes. It's now `goenv: version '$VERSION_NAME' not installed`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Changed `goenv uninstall <version>`'s to fail regardless whether `--force` or `-f` is used when version is not installed. This also means that `before_uninstall` hooks won't be triggered.
+; Ref: https://github.com/syndbg/goenv/pull/62
+
+### Removed
+
+* `goenv versions` does not look for versions in `{GOENV_ROOT}/versions/*/envs/*` anymore. This was legacy from pyenv.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Removed `--enable-shared` support in `go-build`. This was legacy from pyenv.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Removed mentions of default golang download mirrors in README.md. This was legacy from pyenv.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Removed default golang download mirrors in `go-build`. This was legacy from pyenv.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Removed `make_args` from `go-build`. This was legacy from pyenv.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Removed installation definition functions `configured_with_package_dir`, `needs_yaml`, `try_go_module`, `verify_go_module` and `use_homebrew_yaml`. This was legacy from pyenv and it's not useful since we're not compiling.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Removed logic to determine `go` suffix after installation of definition. It's legacy from pyenv. It's always `go`.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Removed `unset`-ing of `GOHOME` environment variable after installation. It's not used nowadays in Go.
+; Ref: https://github.com/syndbg/goenv/pull/62
+* Removed `GOENV_BOOTSTRAP_VERSION` support in `goenv install`. Legacy from pyenv and not useful in Go.
+; Ref: https://github.com/syndbg/goenv/pull/62
+
+### Fixed
+
+* Bad table formatting in the README.md
+; Ref: https://github.com/syndbg/goenv/pull/62
+* `make bats` failing when `bats` already exists locally
+; Ref: https://github.com/syndbg/goenv/pull/62
+
 ## 1.23.3
 
 ### Added
