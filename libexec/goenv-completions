@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Usage: goenv completions <command> [arg1 arg2...]
+# Summary: Provides auto-completion for itself and other commands by calling them with `--complete`.
 
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x

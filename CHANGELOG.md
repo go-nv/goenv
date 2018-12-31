@@ -65,6 +65,8 @@ Introducing breaking changes under a feature flag can be ok in some cases where 
 ; Ref: https://github.com/syndbg/goenv/pull/62
 * Summary for `goenv version-file-read` via `goenv help version-file-read`
 ; Ref: https://github.com/syndbg/goenv/pull/62
+* Summary for `goenv completions` via `goenv help completions`
+; Ref: https://github.com/syndbg/goenv/pull/62
 * Usage instructions for `goenv version-name` via `goenv help --usage version-name`
 ; Ref: https://github.com/syndbg/goenv/pull/62
 * Usage instructions for `goenv version-origin` via `goenv help --usage version-origin`
