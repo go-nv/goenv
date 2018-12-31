@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Summary:Writes specified version(s) to the specified file if the version(s) exist
+# Summary: Writes specified version(s) to the specified file if the version(s) exist
 # Usage: goenv version-file-write <file> <version>
 
 set -e
