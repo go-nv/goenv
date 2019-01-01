@@ -15,6 +15,17 @@ if [ "$1" = "--complete" ]; then
   exec goenv-shims --short
 fi
 
+GOENV_COMMAND="$1"
+
+if [ -z "$GOENV_COMMAND" ]; then
+  goenv-help --usage which >&2
+  exit 1
+fi
+
+OLDIFS="$IFS"
+IFS=: versions=(${GOENV_VERSION:-$(goenv-version-name)})
+IFS="$OLDIFS"
+
 remove_from_path() {
   local path_to_remove="$1"
   local path_before
@@ -26,17 +37,6 @@ remove_from_path() {
   result="${result%:}"
   echo "${result#:}"
 }
-
-GOENV_COMMAND="$1"
-
-if [ -z "$GOENV_COMMAND" ]; then
-  goenv-help --usage which >&2
-  exit 1
-fi
-
-OLDIFS="$IFS"
-IFS=: versions=(${GOENV_VERSION:-$(goenv-version-name)})
-IFS="$OLDIFS"
 
 for version in "${versions[@]}"; do
   if [ "$version" = "system" ]; then
@@ -59,34 +59,33 @@ done
 
 if [ -x "$GOENV_COMMAND_PATH" ]; then
   echo "$GOENV_COMMAND_PATH"
-elif [ "$GOENV_VERSION" != "system" ] && [ ! -d "${GOENV_ROOT}/versions/${GOENV_VERSION}" ]; then
-  echo "goenv: version \`$GOENV_VERSION' is not installed (set by $(goenv-version-origin))" >&2
-  exit 1
-else
-  any_not_installed=0
-  for version in "${versions[@]}"; do
-    if [ "$version" = "system" ]; then
-      continue
-    fi
-    if ! [ -d "${GOENV_ROOT}/versions/${version}" ]; then
-      echo "goenv: version \`$version' is not installed" >&2
-      any_not_installed=1
-    fi
-  done
-  if [ "$any_not_installed" = 1 ]; then
-    exit 1
-  fi
-
-  echo "goenv: $GOENV_COMMAND: command not found" >&2
-
-  versions="$(goenv-whence "$GOENV_COMMAND" || true)"
-  if [ -n "$versions" ]; then
-    { echo
-      echo "The \`$1' command exists in these Go versions:"
-      echo "$versions" | sed 's/^/  /g'
-      echo
-    } >&2
-  fi
-
-  exit 127
+  exit 0
 fi
+
+any_not_installed=0
+for version in "${versions[@]}"; do
+  if [ "$version" = "system" ]; then
+    continue
+  fi
+  if ! [ -d "${GOENV_ROOT}/versions/${version}" ]; then
+    echo "goenv: version '$version' is not installed (set by $(goenv-version-origin))" >&2
+    any_not_installed=1
+  fi
+done
+if [ "$any_not_installed" = 1 ]; then
+  exit 1
+fi
+
+echo "goenv: '$GOENV_COMMAND' command not found" >&2
+
+versions="$(goenv-whence "$GOENV_COMMAND" || true)"
+if [ -n "$versions" ]; then
+  {
+    echo
+    echo "The '$1' command exists in these Go versions:"
+    echo "$versions" | sed 's/^/  /g'
+    echo
+  } >&2
+fi
+
+exit 127

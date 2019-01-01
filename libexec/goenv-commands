@@ -24,7 +24,8 @@ IFS=: paths=($PATH)
 
 shopt -s nullglob
 
-{ for path in "${paths[@]}"; do
+{
+  for path in "${paths[@]}"; do
     for command in "${path}/goenv-"*; do
       command="${command##*goenv-}"
       if [ -n "$sh" ]; then

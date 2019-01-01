@@ -48,7 +48,7 @@ if [ "$versions" = "--unset" ]; then
   exit
 fi
 
-# Make sure the specified version is installed.
+# NOTE: Make sure the specified version is installed.
 if goenv-prefix "${versions[@]}" >/dev/null; then
   OLDIFS="$IFS"
   IFS=: version="${versions[*]}"
@@ -62,6 +62,7 @@ if goenv-prefix "${versions[@]}" >/dev/null; then
     ;;
   esac
 else
+  # NOTE: Do nothing, but unsuccessfully.
   echo "false"
   exit 1
 fi

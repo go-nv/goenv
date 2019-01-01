@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Summary: Calls `goenv-rehash` to rehash shims and also rehashes shell executable if shell is not 'fish'.
+# Usage: goenv sh-rehash
+
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
 
@@ -16,7 +19,7 @@ goenv-rehash
 
 case "$shell" in
 fish )
-  # no rehash support
+  # NOTE: No rehash support
   ;;
 * )
   echo "hash -r 2>/dev/null || true"

@@ -8,3 +8,6 @@
 /src/Makefile
 /src/*.o
 /bats/
+/bats-core/
+.idea
+plugins/go-build/test/tmp/

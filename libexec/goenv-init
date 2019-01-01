@@ -61,11 +61,12 @@ if [ -z "$print" ]; then
     profile='~/.config/fish/config.fish'
     ;;
   * )
-    profile='your profile'
+    profile="<unknown shell: $shell, replace with your profile path>"
     ;;
   esac
 
-  { echo "# Load goenv automatically by appending"
+  {
+    echo "# Load goenv automatically by appending"
     echo "# the following to ${profile}:"
     echo
     case "$shell" in
@@ -79,7 +80,7 @@ if [ -z "$print" ]; then
     echo
   } >&2
 
-  exit 1
+  exit 0
 fi
 
 mkdir -p "${GOENV_ROOT}/"{shims,versions}

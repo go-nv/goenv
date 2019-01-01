@@ -13,7 +13,11 @@ find_local_version_file() {
       echo "${root}/.go-version"
       return 0
     fi
-    [ -n "$root" ] || break
+
+    if [ -z "$root" ]; then
+      break
+    fi
+
     root="${root%/*}"
   done
   return 1

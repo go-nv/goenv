@@ -100,7 +100,8 @@ else
   fi
 
   # Write out the run information.
-  { echo "${_STUB_INDEX}=$((${!_STUB_INDEX} + 1))"
+  {
+    echo "${_STUB_INDEX}=$((${!_STUB_INDEX} + 1))"
     echo "${_STUB_RESULT}=${!_STUB_RESULT}"
   } > "${!_STUB_RUN}"
 

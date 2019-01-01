@@ -1,7 +1,10 @@
 sudo: false
-install: git clone --depth 1 https://github.com/sstephenson/bats.git
-script: make test
 language: c
+os: linux
+# NOTE: Use `xenial` and/or newer since `make`
+# bundled there is new enough version to support `.ONESHELL` in `Makefile`.
+dist: xenial
+script: make test
 env:
   - GOENV_NATIVE_EXT=
   - GOENV_NATIVE_EXT=1

@@ -13,7 +13,7 @@
 #   -g/--debug       Build a debug version
 #
 
-GO_BUILD_VERSION="20160417"
+GO_BUILD_VERSION="2.0.0beta1"
 
 OLDIFS="$IFS"
 
@@ -21,9 +21,7 @@ set -E
 exec 3<&2 # preserve original stderr at fd 3
 
 # Verbose output in debug mode
-[ -n "$GOENV_DEBUG" ] && {
-    set -x
-}
+[ -n "$GOENV_DEBUG" ] && set -x
 
 lib() {
   parse_options() {
@@ -85,8 +83,10 @@ sanitize() {
 }
 
 colorize() {
-  if [ -t 1 ]; then printf "\e[%sm%s\e[m" "$1" "$2"
-  else echo -n "$2"
+  if [ -t 1 ]; then
+    printf "\e[%sm%s\e[m" "$1" "$2"
+  else
+    echo -n "$2"
   fi
 }
 
@@ -125,7 +125,8 @@ osx_version() {
 }
 
 build_failed() {
-  { echo
+  {
+    echo
     colorize 1 "BUILD FAILED"
     echo " ($(os_information) using $(version))"
     echo
@@ -294,7 +295,6 @@ install_package_using() {
   shift 3
 
   local fetch_args=( "$package_name" "${@:1:$package_type_nargs}" )
-  local make_args=( "$package_name" )
   local arg last_arg
 
   pushd "$BUILD_PATH" >&4
@@ -302,7 +302,8 @@ install_package_using() {
   make_package "$package_name"
   popd >&4
 
-  { echo "Installed ${package_name} to ${PREFIX_PATH}"
+  {
+    echo "Installed ${package_name} to ${PREFIX_PATH}"
     echo
   } >&2
 }
@@ -390,7 +391,8 @@ verify_checksum() {
   40) checksum_command="compute_sha1" ;;
   64) checksum_command="compute_sha2" ;;
   *)
-    { echo
+    {
+      echo
       echo "unexpected checksum length: ${#expected_checksum} (${expected_checksum})"
       echo "expected 0 (no checksum), 32 (MD5), 40 (SHA1) or 64 (SHA2-256)"
       echo
@@ -406,7 +408,8 @@ verify_checksum() {
   [ -n "$computed_checksum" ] || return 1
 
   if [ "$expected_checksum" != "$computed_checksum" ]; then
-    { echo
+    {
+      echo
       echo "checksum mismatch: ${filename} (file is corrupt)"
       echo "expected $expected_checksum, got $computed_checksum"
       echo
@@ -426,7 +429,7 @@ http() {
   elif type wget &>/dev/null; then
     "http_${method}_wget" "$url" "$file"
   else
-    echo "error: please install \`curl\` or \`wget\` and try again" >&2
+    echo "error: please install 'curl' or 'wget' and try again" >&2
     exit 1
   fi
 }
@@ -503,7 +506,8 @@ fetch_tarball() {
     download_tarball "$package_url" "$package_filename" "$checksum"
   fi
 
-  { if tar $tar_args "$package_filename"; then
+  {
+    if tar $tar_args "$package_filename"; then
       if [ -z "$KEEP_BUILD_PATH" ]; then
         rm -f "$package_filename"
       else
@@ -549,7 +553,8 @@ download_tarball() {
 
   if [ -n "$GO_BUILD_CACHE_PATH" ]; then
     local cached_package_filename="${GO_BUILD_CACHE_PATH}/$package_filename"
-    { mv "$package_filename" "$cached_package_filename"
+    {
+      mv "$package_filename" "$cached_package_filename"
       ln -s "$cached_package_filename" "$package_filename"
     } >&4 2>&1 || return 1
   fi
@@ -567,7 +572,8 @@ fetch_git() {
       pushd "$GO_BUILD_CACHE_PATH" >&4
       local clone_name="$(sanitize "$git_url")"
       if [ -e "${clone_name}" ]; then
-        { cd "${clone_name}"
+        {
+          cd "${clone_name}"
           git fetch --force "$git_url" "+${git_ref}:${git_ref}"
         } >&4 2>&1
       else
@@ -615,7 +621,8 @@ fetch_zip() {
     download_tarball "$package_url" "$package_filename" "$checksum"
   fi
 
-  { if unzip "$package_filename"; then
+  {
+    if unzip "$package_filename"; then
       if [ -z "$KEEP_BUILD_PATH" ]; then
         rm -f "$package_filename"
       else
@@ -648,44 +655,6 @@ build_package_copy() {
 fix_directory_permissions() {
   # Ensure installed directories are not world-writable to avoid Bundler warnings
   find "$PREFIX_PATH" -type d \( -perm -020 -o -perm -002 \) -exec chmod go-w {} \;
-}
-
-configured_with_package_dir() {
-  local package_var_name="$(capitalize "$1")"
-  shift 1
-  local PACKAGE_CONFIGURE_OPTS="${package_var_name}_CONFIGURE_OPTS"
-  local PACKAGE_CONFIGURE_OPTS_ARRAY="${package_var_name}_MAKE_OPTS_ARRAY[@]"
-  local arg flag
-  for arg in ${CONFIGURE_OPTS} ${!PACKAGE_CONFIGURE_OPTS} "${!PACKAGE_CONFIGURE_OPTS_ARRAY}"; do
-    if [[ "$arg" == "CPPFLAGS="* ]]; then
-      for flag in ${CPPFLAGS} ${arg##CPPFLAGS=}; do
-        if [[ "$flag" == "-I"* ]]; then
-          local header
-          for header in "$@"; do
-            if [ -e "${flag##-I}/${header#/}" ]; then
-              return 0
-            fi
-          done
-        fi
-      done
-    fi
-  done
-  return 1
-}
-
-needs_yaml() {
-  ! configured_with_package_dir "go" "yaml.h" &&
-  ! use_homebrew_yaml
-}
-
-use_homebrew_yaml() {
-  local libdir="$(brew --prefix libyaml 2>/dev/null || true)"
-  if [ -d "$libdir" ]; then
-    export CPPFLAGS="-I$libdir/include ${CPPFLAGS}"
-    export LDFLAGS="-L$libdir/lib ${LDFLAGS}"
-  else
-    return 1
-  fi
 }
 
 verify_go() {
@@ -722,47 +691,20 @@ verify_go() {
   fi
 
   if [ ! -x "${GO_BIN}" ]; then
-    { colorize 1 "ERROR"
+    {
+      colorize 1 "ERROR"
       echo ": invalid Go executable: ${GO_BIN}"
       echo
       echo "The go-build could not find proper executable of Go after successful build."
       echo "Please open an issue for future improvements."
-      echo "https://github.com/yyuu/goenv/issues"
-      return 1
-    } >&3
-  fi
-}
-
-try_go_module() {
-  if ! "$GO_BIN" -c "import $1" 1>/dev/null 2>&1; then
-    { colorize 1 "WARNING"
-      echo ": The Go $1 extension was not compiled. Missing the ${2:-$1}?"
-      return 0
-    } >&3
-  fi
-}
-
-verify_go_module() {
-  if ! "$GO_BIN" -c "import $1" 1>/dev/null 2>&1; then
-    { colorize 1 "ERROR"
-      echo ": The Go $1 extension was not compiled. Missing the ${2:-$1}?"
-      echo
-      echo "Please consult to the Wiki page to fix the problem."
-      echo "https://github.com/yyuu/goenv/wiki/Common-build-problems"
-      echo
+      echo "https://github.com/syndbg/goenv/issues"
       return 1
     } >&3
   fi
 }
 
 version() {
-  local git_revision
-  # Read the revision from git if the remote points to "go-build" repository
-  if GIT_DIR="$GO_BUILD_INSTALL_PREFIX/../../.git" git remote -v 2>/dev/null | grep -q /goenv; then
-    git_revision="$(GIT_DIR="$GO_BUILD_INSTALL_PREFIX/../../.git" git describe --tags HEAD 2>/dev/null || true)"
-    git_revision="${git_revision#v}"
-  fi
-  echo "go-build ${git_revision:-$GO_BUILD_VERSION}"
+  echo "go-build ${GO_BUILD_VERSION}"
 }
 
 usage() {
@@ -771,7 +713,8 @@ usage() {
 }
 
 list_definitions() {
-  { for DEFINITION_DIR in "${GO_BUILD_DEFINITIONS[@]}"; do
+  {
+    for DEFINITION_DIR in "${GO_BUILD_DEFINITIONS[@]}"; do
       [ -d "$DEFINITION_DIR" ] && find "$DEFINITION_DIR" -maxdepth 1 -type f -print0 | xargs -0 -n 1 basename 2>/dev/null
     done
   } | sort_versions | uniq
@@ -881,34 +824,13 @@ if [ -n "$noexec" ]; then
   exit 1
 fi
 
-# Work around warnings building Ruby 2.0 on Clang 2.x:
-# pass -Wno-error=shorten-64-to-32 if the compiler accepts it.
-#
-# When we set CFLAGS, Ruby won't apply its default flags, though. Since clang
-# builds 1.9.x and 2.x only, where -O3 is default, we can safely set that flag.
-# Ensure it's the first flag since later flags take precedence.
-#if "${CC:-cc}" -x c /dev/null -E -Wno-error=shorten-64-to-32 &>/dev/null; then
-#  GO_CFLAGS="-O3 -Wno-error=shorten-64-to-32 $GO_CFLAGS"
-#fi
-
-if [ -z "$MAKE" ]; then
-  if [ "FreeBSD" = "$(uname -s)" ] && [ "$(uname -r | sed 's/[^[:digit:]].*//')" -lt 10 ]; then
-    export MAKE="gmake"
-  else
-    export MAKE="make"
-  fi
-fi
-
 if [ -n "$GO_BUILD_CACHE_PATH" ] && [ -d "$GO_BUILD_CACHE_PATH" ]; then
   GO_BUILD_CACHE_PATH="${GO_BUILD_CACHE_PATH%/}"
 else
   unset GO_BUILD_CACHE_PATH
 fi
 
-if [ -z "$GO_BUILD_MIRROR_URL" ]; then
-  GO_BUILD_MIRROR_URL="https://yyuu.github.io/gos"
-  GO_BUILD_DEFAULT_MIRROR=1
-else
+if [ -n "$GO_BUILD_MIRROR_URL" ]; then
   GO_BUILD_MIRROR_URL="${GO_BUILD_MIRROR_URL%/}"
   GO_BUILD_DEFAULT_MIRROR=
 fi
@@ -917,45 +839,15 @@ if [ -n "$GO_BUILD_SKIP_MIRROR" ] || ! has_checksum_support compute_sha2; then
   unset GO_BUILD_MIRROR_URL
 fi
 
-# go-build: Specify `--libdir` on configure to fix build on openSUSE (#36)
-package_option go configure --libdir="${PREFIX_PATH}/lib"
-
-# go-build: Set `RPATH` if --shared` was given for PyPy (#244)
-if [[ "$PYPY_OPTS" == *"--shared"* ]]; then
-  export LDFLAGS="-Wl,-rpath=${PREFIX_PATH}/lib ${LDFLAGS}"
-fi
-
 # SSL Certificate error with older wget that does not support Server Name Indication (#60)
 if ! command -v curl 1>/dev/null 2>&1 && [[ "$(wget --version 2>/dev/null || true)" = "GNU Wget 1.1"[0-3]* ]]; then
   echo "go-build: wget (< 1.14) doesn't support Server Name Indication. Please install curl (>= 7.18.1) and try again" >&2
   exit 1
 fi
 
-go_bin_suffix() {
-  local version_name version_info
-  case "$1" in
-  2.* | 3.* )
-    version_name="$1"
-    version_name="${version_name%-dev}"
-    version_name="${version_name%-rc*}"
-    version_name="${version_name%rc*}"
-    version_info=(${version_name//./ })
-    echo "${version_info[0]}.${version_info[1]}"
-    ;;
-  stackless-2.* | stackless-3.* )
-    version_name="${1#stackless-}"
-    version_name="${version_name%-dev}"
-    version_name="${version_name%-rc*}"
-    version_name="${version_name%rc*}"
-    version_info=(${version_name//./ })
-    echo "${version_info[0]}.${version_info[1]}"
-    ;;
-  esac
-}
-
 SEED="$(date "+%Y%m%d%H%M%S").$$"
 LOG_PATH="${TMP}/go-build.${SEED}.log"
-GO_BIN="${PREFIX_PATH}/bin/go$(go_bin_suffix "${DEFINITION_PATH##*/}")"
+GO_BIN="${PREFIX_PATH}/bin/go)"
 CWD="$(pwd)"
 
 if [ -z "$GO_BUILD_BUILD_PATH" ]; then
@@ -971,7 +863,6 @@ if [ -n "$VERBOSE" ]; then
   trap "kill $TAIL_PID" SIGINT SIGTERM EXIT
 fi
 
-unset GOHOME
 unset GOPATH
 
 trap build_failed ERR

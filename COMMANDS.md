@@ -3,23 +3,132 @@
 Like `git`, the `goenv` command delegates to subcommands based on its
 first argument. 
 
-The most common subcommands are:
+All subcommands are:
 
 * [`goenv commands`](#goenv-commands)
-* [`goenv local`](#goenv-local)
+* [`goenv completions`](#goenv-completions)
+* [`goenv exec`](#goenv-exec)
 * [`goenv global`](#goenv-global)
-* [`goenv shell`](#goenv-shell)
+* [`goenv help`](#goenv-help)
+* [`goenv hooks`](#goenv-hooks)
+* [`goenv init`](#goenv-init)
 * [`goenv install`](#goenv-install)
-* [`goenv uninstall`](#goenv-uninstall)
+* [`goenv local`](#goenv-local)
+* [`goenv prefix`](#goenv-prefix)
 * [`goenv rehash`](#goenv-rehash)
+* [`goenv root`](#goenv-root)
+* [`goenv shell`](#goenv-shell)
+* [`goenv shims`](#goenv-shims)
+* [`goenv uninstall`](#goenv-uninstall)
 * [`goenv version`](#goenv-version)
+* [`goenv --version`](#goenv---version)
+* [`goenv version-file`](#goenv-version-file)
+* [`goenv version-file-read`](#goenv-version-file-read)
+* [`goenv version-file-write`](#goenv-version-file-write)
+* [`goenv version-name`](#goenv-version-name)
+* [`goenv version-origin`](#goenv-version-origin)
 * [`goenv versions`](#goenv-versions)
-* [`goenv which`](#goenv-which)
 * [`goenv whence`](#goenv-whence)
+* [`goenv which`](#goenv-which)
 
 ## `goenv commands`
 
 Lists all available goenv commands.
+
+## `goenv completions`
+
+Provides auto-completion for itself and other commands by calling them with `--complete`.
+
+## `goenv exec`
+
+Run an executable with the selected Go version.
+
+Assuming there's an already installed golang by e.g `goenv install 1.11.1` and 
+  selected by e.g `goenv global 1.11.1`,
+
+```shell
+> goenv exec go run main.go
+```
+
+## `goenv global`
+
+Sets the global version of Go to be used in all shells by writing
+the version name to the `~/.goenv/version` file. This version can be
+overridden by an application-specific `.go-version` file, or by
+setting the `GOENV_VERSION` environment variable.
+
+```shell
+> goenv global 1.5.4
+
+# Showcase
+> goenv versions
+  system
+  * 1.5.4 (set by /Users/syndbg/.goenv/version)
+
+> goenv version
+1.5.4 (set by /Users/syndbg/.goenv/version)
+
+> go version
+go version go1.5.4 darwin/amd64
+```
+
+The special version name `system` tells goenv to use the system Go
+(detected by searching your `$PATH`).
+
+When run without a version number, `goenv global` reports the
+currently configured global version.
+
+## `goenv help`
+
+Parses and displays help contents from a command's source file.
+
+A command is considered documented if it starts with a comment block
+that has a `Summary:` or `Usage:` section. Usage instructions can
+span multiple lines as long as subsequent lines are indented.
+The remainder of the comment block is displayed as extended
+documentation.
+
+
+```shell
+> goenv help help
+```
+
+```shell
+> goenv help install
+```
+
+## `goenv hooks`
+
+List hook scripts for a given goenv command
+
+```shell
+> goenv hooks uninstall
+```
+
+## `goenv init`
+
+Configure the shell environment for goenv. Must have if you want to integrate `goenv` with your shell.
+
+The following displays how to integrate `goenv` with your user's shell:
+
+```shell
+> goenv init
+```
+
+Usually it boils down to adding to your `.bashrc` or `.zshrc` the following:
+
+```
+eval "$(goenv init -)"
+```
+
+## `goenv install`
+
+Install a Go version (using `go-build`). It's required that the version is a known installable definition by `go-build`.
+
+```shell
+> goenv install 1.11.1
+
+```
 
 ## `goenv local`
 
@@ -66,33 +175,36 @@ You can specify local Go version.
 go version go1.5.4 darwin/amd64
 ```
 
-## `goenv global`
+## `goenv prefix`
 
-Sets the global version of Go to be used in all shells by writing
-the version name to the `~/.goenv/version` file. This version can be
-overridden by an application-specific `.go-version` file, or by
-setting the `GOENV_VERSION` environment variable.
+Displays the directory where a Go version is installed. If no
+version is given, `goenv prefix' displays the location of the
+currently selected version.
 
 ```shell
-> goenv global 1.5.4
-
-# Showcase
-> goenv versions
-  system
-  * 1.5.4 (set by /Users/syndbg/.goenv/version)
-
-> goenv version
-1.5.4 (set by /Users/syndbg/.goenv/version)
-
-> go version
-go version go1.5.4 darwin/amd64
+> goenv prefix
+/home/syndbg/.goenv/versions/1.11.1
 ```
 
-The special version name `system` tells goenv to use the system Go
-(detected by searching your `$PATH`).
+## `goenv rehash`
 
-When run without a version number, `goenv global` reports the
-currently configured global version.
+Installs shims for all Go binaries known to goenv (i.e.,
+`~/.goenv/versions/*/bin/*`).
+Run this command after you install a new
+version of Go, or install a package that provides binaries.
+
+```shell
+> goenv rehash
+```
+
+## `goenv root`
+
+Display the root directory where versions and shims are kept
+
+```shell
+> goenv root
+/home/syndbg/.goenv
+```
 
 ## `goenv shell`
 
@@ -111,62 +223,31 @@ value of `GOENV_VERSION`. You can also unset the shell version:
 > goenv shell --unset
 ```
 
-Note that you'll need goenv's shell integration enabled (step 3 of
-the installation instructions) in order to use this command. If you
+Note that you'll need goenv's shell integration enabled (refer to [Installation](./INSTALL.md]) in order to use this command. If you
 prefer not to use shell integration, you may simply set the
 `GOENV_VERSION` variable yourself:
 
 ```shell
 > export GOENV_VERSION=1.5.4
-
 ```
 
-## `goenv install`
+## `goenv shims`
 
-Install a Go version (using `go-build`).
+List existing goenv shims
 
 ```shell
-> goenv install
-
-Usage: goenv install [-f] [-kvp] <version>
-        goenv install [-f] [-kvp] <definition-file>
-        goenv install -l|--list
-
-  -l/--list             List all available versions
-  -f/--force            Install even if the version appears to be installed already
-  -s/--skip-existing    Skip the installation if the version appears to be installed already
-
-  go-build options:
-
-  -k/--keep        Keep source tree in $GOENV_BUILD_ROOT after installation
-                    (defaults to $GOENV_ROOT/sources)
-  -v/--verbose     Verbose mode: print compilation status to stdout
-  -p/--patch       Apply a patch from stdin before building
-  -g/--debug       Build a debug version
+> goenv shims
+/home/syndbg/.goenv/shims/go
+/home/syndbg/.goenv/shims/godoc
+/home/syndbg/.goenv/shims/gofmt
 ```
 
 ## `goenv uninstall`
 
-Uninstall a specific Go version.
+Uninstalls the specified version if it exists, otherwise - error.
 
 ```shell
-> goenv uninstall
-Usage: goenv uninstall [-f|--force] <version>
-
-    -f  Attempt to remove the specified version without prompting
-        for confirmation. If the version does not exist, do not
-        display an error message.
-```
-
-## `goenv rehash`
-
-Installs shims for all Go binaries known to goenv (i.e.,
-`~/.goenv/versions/*/bin/*`).
-Run this command after you install a new
-version of Go, or install a package that provides binaries.
-
-```shell
-> goenv rehash
+> goenv uninstall 1.6.3
 ```
 
 ## `goenv version`
@@ -176,7 +257,56 @@ how it was set.
 
 ```shell
 > goenv version
-1.5.4 (set by /Users/syndbg/.goenv/version)
+1.11.1 (set by /home/syndbg/work/syndbg/goenv/.go-version)
+```
+
+## `goenv --version`
+
+Show version of `goenv` in format of `goenv <version>`.
+
+## `goenv version-file`
+
+Detect the file that sets the current goenv version
+
+
+```shell
+> goenv version-file
+/home/syndbg/work/syndbg/goenv/.go-version
+```
+
+## `goenv version-file-read`
+
+Reads specified version file if it exists
+
+```shell
+> goenv version-file-read ./go-version 
+1.11.1
+```
+
+## `goenv version-file-write`
+
+Writes specified version(s) to the specified file if the version(s) exist
+
+```shell
+> goenv version-file-write ./go-version 1.11.1
+```
+
+## `goenv version-name`
+
+Shows the current Go version
+
+```shell
+> goenv version-name
+1.11.1
+```
+
+## `goenv version-origin`
+
+Explain how the current Go version is set.
+
+```shell
+> goenv version-origin
+/home/syndbg/.goenv/version)
 ```
 
 ## `goenv versions`
@@ -196,18 +326,8 @@ the currently active version.
   1.5.3
   1.5.4
   1.6.0
-* 1.6.1 (set by /Users/syndbg/.goenv/version)
+* 1.6.1 (set by /home/syndbg/.goenv/version)
   1.6.2
-```
-
-## `goenv which`
-
-Displays the full path to the executable that goenv will invoke when
-you run the given command.
-
-```shell
-> goenv which gofmt
-/home/syndbg/.goenv/versions/1.6.1/bin/gofmt
 ```
 
 ## `goenv whence`
@@ -232,4 +352,14 @@ Lists all Go versions with the given command installed.
 1.6.0
 1.6.1
 1.6.2
+```
+
+## `goenv which`
+
+Displays the full path to the executable that goenv will invoke when
+you run the given command.
+
+```shell
+> goenv which gofmt
+/home/syndbg/.goenv/versions/1.6.1/bin/gofmt
 ```

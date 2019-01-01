@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Summary: Show the current Go version
+# Usage: goenv version-name
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
 
@@ -27,7 +28,8 @@ version_exists() {
 
 versions=()
 OLDIFS="$IFS"
-{ IFS=:
+{
+  IFS=:
   any_not_installed=0
   for version in ${GOENV_VERSION}; do
     if version_exists "$version" || [ "$version" = "system" ]; then
@@ -35,7 +37,7 @@ OLDIFS="$IFS"
     elif version_exists "${version#go-}"; then
       versions=("${versions[@]}" "${version#go-}")
     else
-      echo "goenv: version \`$version' is not installed (set by $(goenv-version-origin))" >&2
+      echo "goenv: version '$version' is not installed (set by $(goenv-version-origin))" >&2
       any_not_installed=1
     fi
   done
@@ -43,7 +45,8 @@ OLDIFS="$IFS"
 IFS="$OLDIFS"
 
 OLDIFS="$IFS"
-{ IFS=:
+{
+  IFS=:
   echo "${versions[*]}"
 }
 IFS="$OLDIFS"

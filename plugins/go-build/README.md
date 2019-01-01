@@ -61,7 +61,7 @@ system dependencies for compiling the wanted Go Version (see our [recommendation
 To install a Go version for use with goenv, run `goenv install` with
 exact name of the version you want to install. For example,
 
-    goenv install 2.7.4
+    goenv install 1.11.1
 
 Golang versions will be installed into a directory of the same name under
 `~/.goenv/versions`.
@@ -136,28 +136,13 @@ Example usage:
 
 ```sh
 # applying a single patch
-$ goenv install --patch 2.7.10 < /path/to/golang.patch
+$ goenv install --patch 1.11.1 < /path/to/golang.patch
 
 # applying a patch from HTTP
-$ goenv install --patch 2.7.10 < <(curl -sSL http://git.io/golang.patch)
+$ goenv install --patch 1.11.1 < <(curl -sSL http://git.io/golang.patch)
 
 # applying multiple patches
-$ cat fix1.patch fix2.patch | goenv install --patch 2.7.10
-```
-
-
-### Building with `--enable-shared`
-
-You can build CPython with `--enable-shared` to install a version with
-shared object.
-
-If `--enabled-shared` was found in `GO_CONFIGURE_OPTS` or `CONFIGURE_OPTS`,
-`go-build` will automatically set `RPATH` to the goenv's prefix directory.
-This means you don't have to set `LD_LIBRARY_PATH` or `DYLD_LIBRARY_PATH` for
-the version(s) installed with `--enable-shared`.
-
-```sh
-$ env GO_CONFIGURE_OPTS="--enable-shared` goenv install 2.7.9
+$ cat fix1.patch fix2.patch | goenv install --patch 1.11.1
 ```
 
 ### Checksum verification
@@ -185,9 +170,6 @@ If you don't have an SHA2 program installed, go-build will skip the download
 mirror and use official URLs instead. You can force go-build to bypass the
 mirror by setting the `GO_BUILD_SKIP_MIRROR` environment variable.
 
-The official go-build download mirror is provided by
-[GitHub Pages](http://syndbg.github.io/golangs/).
-
 ### Package download caching
 
 You can instruct go-build to keep a local cache of downloaded package files
@@ -209,13 +191,8 @@ using `--keep` with the `goenv install` command. You should specify the
 location of the source code with the `GOLANG_BUILD_BUILD_PATH` environment
 variable when using `--keep` with `go-build`.
 
-
 ## Getting Help
 
-Please see the [goenv wiki](https://github.com/syndbg/goenv/wiki) for solutions to common problems.
-
-[wiki]: https://github.com/syndbg/goenv/wiki
-
-If you can't find an answer on the wiki, open an issue on the [issue
+If you can't find an answer on the, open an issue on the [issue
 tracker](https://github.com/syndbg/goenv/issues). Be sure to include
 the full build log for build failures.
