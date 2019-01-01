@@ -96,3 +96,15 @@ OUT
   run goenv echo "GOENV_HOOK_PATH"
   assert_success "${GOENV_ROOT}/goenv.d:${BATS_TEST_DIRNAME%/*}/goenv.d:/usr/local/etc/goenv.d:/etc/goenv.d:/usr/lib/goenv/hooks"
 }
+
+@test "prints error when called with 'shell' subcommand, but `GOENV_SHELL` environment variable is not present" {
+  unset GOENV_SHELL
+  run goenv shell
+  assert_output <<'OUT'
+eval "$(goenv init -)" has not been executed.
+Please read the installation instructions in the README.md at github.com/syndbg/goenv
+or run 'goenv help init' for more information
+OUT
+
+  assert_failure
+}
