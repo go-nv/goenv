@@ -47,6 +47,8 @@ Introducing breaking changes under a feature flag can be ok in some cases where 
 
 ## Unreleased (master)
 
+## 2.0.0beta1
+
 ### Added
 
 * `make test-goenv-go-build` to test the `go-build` plugin.
