@@ -1,5 +1,7 @@
 # Go Version Management: goenv
 
+[![Build Status](https://travis-ci.org/syndbg/goenv.svg?branch=master)](https://travis-ci.org/syndbg/goenv)
+
 goenv aims to be as simple as possible and follow the already established
 successful version management model of [pyenv](https://github.com/yyuu/pyenv) and [rbenv](https://github.com/rbenv/rbenv).
 
