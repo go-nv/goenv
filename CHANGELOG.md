@@ -78,6 +78,9 @@ Introducing breaking changes under a feature flag can be ok in some cases where 
 
 ### Changed
 
+* `goenv shell` now fails and prints more helpful instructions when the former command is run without proper shell setup via `eval $(goenv init -)`.
+; Ref: https://github.com/syndbg/goenv/pull/56
+https://github.com/syndbg/goenv/pull/63
 * Re-enabled, greatly refactored and made the test suite pass again.
 ; Ref: https://github.com/syndbg/goenv/pull/62
 * Travis CI test suite to run against `xenial` Ubuntu.
