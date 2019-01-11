@@ -1,0 +1,11 @@
+install_darwin_64bit "Go Darwin 64bit 1.12beta2" "https://dl.google.com/go/go1.12beta2.darwin-amd64.tar.gz#502c0933bbd54f94ac438fc96a367b8aa14e4b77e6656b66ddfa2bf7da3a31cf"
+
+install_bsd_32bit "Go Freebsd 32bit 1.12beta2" "https://dl.google.com/go/go1.12beta2.freebsd-386.tar.gz#6439d29a510365f0c36565724135c6b2a9e640e2fa898489d609553e181ceeaa"
+
+install_bsd_64bit "Go Freebsd 64bit 1.12beta2" "https://dl.google.com/go/go1.12beta2.freebsd-amd64.tar.gz#ed083d6525c98b666f19f78a24a0cfc4410162f28b54da0f3904c3a4b199ebe7"
+
+install_linux_32bit "Go Linux 32bit 1.12beta2" "https://dl.google.com/go/go1.12beta2.linux-386.tar.gz#ffe0d1c92473b2fd653e399c1ddb11535b9666f22b6ae5653bd1fb4f84534c46"
+
+install_linux_64bit "Go Linux 64bit 1.12beta2" "https://dl.google.com/go/go1.12beta2.linux-amd64.tar.gz#9e4884b46a72e0558187a8af6e8733e039432df1b755f14b361f18b63fa5a63e"
+
+install_linux_arm "Go Linux arm 1.12beta2" "https://dl.google.com/go/go1.12beta2.linux-armv6l.tar.gz#d41674dda2e33a539929a980c7ba8d68c90c8aabcb138b65a2dc36704af02ace"
