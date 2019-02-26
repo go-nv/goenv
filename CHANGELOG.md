@@ -47,6 +47,13 @@ Introducing breaking changes under a feature flag can be ok in some cases where 
 
 ## Unreleased (master)
 
+## 2.0.0beta4
+
+### Added
+
+* Add installation definitions for Golang 1.12rc1.
+; Ref: https://github.com/syndbg/goenv/pull/66
+
 ## 2.0.0beta3
 
 ### Added
