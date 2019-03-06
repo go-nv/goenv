@@ -7,7 +7,7 @@ successful version management model of [pyenv](https://github.com/yyuu/pyenv) an
 
 This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified for Go.
 
-[![asciicast](https://asciinema.org/a/ci4otj2507p1w7h91c0s8bjcu.png)](https://asciinema.org/a/ci4otj2507p1w7h91c0s8bjcu)
+[![asciicast](https://asciinema.org/a/17IT3YiQ56hiJsb2iHpGHlJqj.svg)](https://asciinema.org/a/17IT3YiQ56hiJsb2iHpGHlJqj)
 
 ### goenv _does..._
 
