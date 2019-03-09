@@ -28,7 +28,6 @@ OUT
   assert_success
 }
 
-
 @test 'detects parent shell from script when '-' argument is given only' {
   mkdir -p "$GOENV_TEST_DIR"
   cd "$GOENV_TEST_DIR"

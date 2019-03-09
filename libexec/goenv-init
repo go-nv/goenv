@@ -153,3 +153,8 @@ cat <<EOS
 }
 EOS
 fi
+
+# NOTE: Rehash again, but only to export managed paths
+cat <<EOS
+goenv rehash --only-manage-paths
+EOS

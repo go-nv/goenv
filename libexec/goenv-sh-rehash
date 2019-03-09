@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Summary: Calls `goenv-rehash` to rehash shims and also rehashes shell executable if shell is not 'fish'.
-# Usage: goenv sh-rehash
+# Summary: Calls `goenv-rehash` to rehash shims, manages GO{PATH,ROOT} and rehashes shell executable if shell is not 'fish'.
+# Usage: goenv sh-rehash [--only-manage-paths]
 
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
@@ -12,16 +12,46 @@ fi
 
 shell="$(basename "${GOENV_SHELL:-$SHELL}")"
 
-# When goenv shell integration is enabled,
-# delegate to goenv-rehash,
-# then tell the shell to empty its command lookup cache.
-goenv-rehash
+# NOTE: When goenv shell integration is enabled, delegate rehashing of `goenv` shims to goenv-rehash.
+# However to speed up `goenv init` and not do rehashing of shims twice,
+# allow `only-manage-paths` to skip rehashing of shims.
+if [ "$1" != "--only-manage-paths" ]; then
+  goenv-rehash
+fi
 
-case "$shell" in
-fish )
-  # NOTE: No rehash support
-  ;;
-* )
-  echo "hash -r 2>/dev/null || true"
-  ;;
-esac
+currentVersionName=$(goenv-version-name)
+
+if [ "${currentVersionName}" != "system" ]; then
+  case "$shell" in
+  fish )
+    if [ "${GOENV_DISABLE_GOROOT}" != "1" ]; then
+      echo "set -gx GOROOT \"$(goenv-prefix)\""
+    fi
+
+    if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
+      if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
+        echo "set -gx GOPATH \"${HOME}/go/${currentVersionName}\""
+       else
+        echo "set -gx GOPATH \"${GOENV_GOPATH_PREFIX}/${currentVersionName}\""
+      fi
+    fi
+
+    # NOTE: No rehash support
+    ;;
+  * )
+    if [ "${GOENV_DISABLE_GOROOT}" != "1" ]; then
+      echo "export GOROOT=\"$(goenv-prefix)\""
+    fi
+
+    if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
+      if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
+        echo "export GOPATH=\"${HOME}/go/${currentVersionName}\""
+      else
+        echo "export GOPATH=\"${GOENV_GOPATH_PREFIX}/${currentVersionName}\""
+      fi
+    fi
+
+    echo "hash -r 2>/dev/null || true"
+    ;;
+  esac
+fi

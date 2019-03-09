@@ -47,6 +47,35 @@ Introducing breaking changes under a feature flag can be ok in some cases where 
 
 ## Unreleased (master)
 
+## 2.0.0beta6
+
+### Added
+
+* Add management of env variable `GOROOT` that can be disabled with env var `GOENV_DISABLE_GOROOT=1`,
+when calling `goenv-sh-rehash` (`goenv rehash` when `eval $(goenv init -)` was previously executed).
+It does not attempt to manage when version is `system`.
+; Ref: https://github.com/syndbg/goenv/pull/70
+* Add management of env variable `GOPATH` that can be disabled with env var `GOENV_DISABLE_GOPATH=1`,
+when calling `goenv-sh-rehash` (`goenv rehash` when `eval $(goenv init -)` was previously executed).
+It does not attempt to manage when version is `system`.
+; Ref: https://github.com/syndbg/goenv/pull/70
+* Add configurable managed `GOPATH` prefix for `goenv-sh-rehash` 
+(`goenv rehash` when `eval $(goenv init -)` was previously executed). 
+Configured via `GOENV_GOPATH_PREFIX=<your prefix>`. 
+E.g `GOENV_GOPATH_PREFIX=/tmp`.
+; Ref: https://github.com/syndbg/goenv/pull/70
+* Add `--only-manage-paths` option to `goenv-sh-rehash` (`goenv rehash` when `eval $(goenv init -)` was previously executed) to skip calling `goenv-rehash` and update shims. 
+Instead it only updates managed `GOPATH` and `GOROOT` env variables.
+It does not attempt to manage when version is `system`.
+; Ref: https://github.com/syndbg/goenv/pull/70
+
+### Changed
+
+* Changed `goenv`'s bootstrap (`eval $(goenv init -)`) now to call `goenv-sh-rehash --only-manage-paths`.
+This means that it'll export and manage `GOROOT` and `GOPATH` env vars. 
+It does not attempt to manage when version is `system`.
+; Ref: https://github.com/syndbg/goenv/pull/70
+
 ## 2.0.0beta5
 
 ### Added
