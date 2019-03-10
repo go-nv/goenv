@@ -34,9 +34,39 @@ for script in "${scripts[@]}"; do
 done
 
 shift 1
-# Go needs a GOROOT without system's Go
-if [[ $GOENV_VERSION != "system" ]]; then
-  export GOROOT="$(goenv-prefix)/"
+
+if [ "${GOENV_VERSION}" != "system" ]; then
+    case "$shell" in
+    fish )
+      if [ "${GOENV_DISABLE_GOROOT}" != "1" ]; then
+        set -gx GOROOT "$(goenv-prefix)"
+      fi
+
+      if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
+        if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
+          set -gx GOPATH "${HOME}/go/${GOENV_VERSION}"
+         else
+          set -gx GOPATH "${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}"
+        fi
+      fi
+
+      ;;
+    * )
+      if [ "${GOENV_DISABLE_GOROOT}" != "1" ]; then
+        export GOROOT="$(goenv-prefix)"
+      fi
+
+      if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
+        if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
+          export GOPATH="${HOME}/go/${GOENV_VERSION}"
+        else
+          export GOPATH="${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}"
+        fi
+      fi
+
+      ;;
+    esac
 fi
+
 export PATH="${GOENV_BIN_PATH}:${GOROOT}/bin:${PATH}"
 exec -a "$GOENV_COMMAND" "$GOENV_COMMAND_PATH" "$@"

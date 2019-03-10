@@ -18,6 +18,7 @@ if [ -z "$GOENV_TEST_DIR" ]; then
   fi
 
   export GOENV_ROOT="${GOENV_TEST_DIR}/root"
+  export ORIGINAL_HOME="${HOME}"
   export HOME="${GOENV_TEST_DIR}/home"
   export GOENV_HOOK_PATH="${GOENV_ROOT}/goenv.d"
 

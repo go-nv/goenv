@@ -18,8 +18,12 @@ OUT
 }
 
 @test "fails when shims directory at 'GOENV_ROOT/shims' is not writable" {
+  if [ "$(whoami)" = "root" ]; then
+      skip "running as root. permissions won't matter."
+  fi
+
   mkdir -p "${GOENV_ROOT}/shims"
-  chmod -w "${GOENV_ROOT}/shims"
+  chmod 0444 "${GOENV_ROOT}/shims"
 
   run goenv-rehash
   assert_failure "goenv: cannot rehash: ${GOENV_ROOT}/shims isn't writable"

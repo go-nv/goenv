@@ -10,7 +10,6 @@ easy to fork and contribute any changes back upstream.
 
         $ git clone https://github.com/syndbg/goenv.git ~/.goenv
 
-
 2. **Define environment variable `GOENV_ROOT`** to point to the path where
    goenv repo is cloned and add `$GOENV_ROOT/bin` to your `$PATH` for access
    to the `goenv` command-line utility.
@@ -21,13 +20,13 @@ easy to fork and contribute any changes back upstream.
     **Zsh note**: Modify your `~/.zshenv` file instead of `~/.bash_profile`.
     **Ubuntu note**: Modify your `~/.bashrc` file instead of `~/.bash_profile`.
 
-3. **Add `goenv init` to your shell** to enable shims and autocompletion.
+3. **Add `goenv init` to your shell** to enable shims, management of `GOPATH` and `GOROOT` and auto-completion.
    Please make sure `eval "$(goenv init -)"` is placed toward the end of the shell
    configuration file since it manipulates `PATH` during the initialization.
 
         $ echo 'eval "$(goenv init -)"' >> ~/.bash_profile
 
-    **Zsh note**: Modify your `~/.zshenv` file instead of `~/.bash_profile`.
+    **Zsh note**: Modify your `~/.zshenv` or `~/.zshrc` file instead of `~/.bash_profile`.
     **Ubuntu note**: Modify your `~/.bashrc` file instead of `~/.bash_profile`.
     
     **General warning**: There are some systems where the `BASH_ENV` variable is configured
@@ -35,18 +34,43 @@ easy to fork and contribute any changes back upstream.
     `eval "$(goenv init -)` into `.bash_profile`, and **not** into `.bashrc`. Otherwise you
     may observe strange behaviour, such as `goenv` getting into an infinite loop.
     See pyenv's issue [#264](https://github.com/yyuu/pyenv/issues/264) for details.
+    
+4. **If you want  `goenv` to manage `GOPATH` and `GOROOT` (recommended)**, 
+  add `GOPATH` and `GOROOT` to your shell **after `eval "$(goenv init -)"`**.
+  
+        $ echo 'export PATH="$GOROOT/bin:$PATH"' >> ~/.bash_profile
+        $ echo 'export PATH="$GOPATH/bin:$PATH"' >> ~/.bash_profile
+        
+    **Zsh note**: Modify your `~/.zshenv` or `~/.zshrc` file instead of `~/.bash_profile`.
+    **Ubuntu note**: Modify your `~/.bashrc` file instead of `~/.bash_profile`.
+    **General warning**: There are some systems where the `BASH_ENV` variable is configured
+    to point to `.bashrc`. On such systems you should almost certainly put the abovementioned line
+    `eval "$(goenv init -)` into `.bash_profile`, and **not** into `.bashrc`. Otherwise you
+    may observe strange behaviour, such as `goenv` getting into an infinite loop.
+    See pyenv's issue [#264](https://github.com/yyuu/pyenv/issues/264) for details.
+  
 
-4. **Restart your shell so the path changes take effect.**
+5. **Restart your shell so the path changes take effect.**
    You can now begin using goenv.
 
         $ exec $SHELL
 
-5. **Install Go versions into `$GOENV_ROOT/versions`.**
-   For example, to download and install Go 1.6.2, run:
+6. **Install Go versions into `$GOENV_ROOT/versions`.**
+   For example, to download and install Go 1.12.0, run:
 
-        $ goenv install 1.6.2
+        $ goenv install 1.12.0
 
    **NOTE:** It downloads and places the prebuilt Go binaries provided by Google.
+   
+An example `.zshrc` that is properly configured may look like
+
+```shell
+export GOENV_ROOT="$HOME/.goenv"
+export PATH="$GOENV_ROOT/bin:$PATH"
+eval "$(goenv init -)"
+export PATH="$GOROOT/bin:$PATH"
+export PATH="$GOPATH/bin:$PATH"
+```
    
 ## Homebrew on Mac OS X
 
