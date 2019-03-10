@@ -63,6 +63,7 @@ It does not attempt to manage when version is `system`.
 (`goenv rehash` when `eval $(goenv init -)` was previously executed). 
 Configured via `GOENV_GOPATH_PREFIX=<your prefix>`. 
 E.g `GOENV_GOPATH_PREFIX=/tmp`.
+Default managed `GOPATH` is `$HOME/go`.
 ; Ref: https://github.com/syndbg/goenv/pull/70
 * Add `--only-manage-paths` option to `goenv-sh-rehash` (`goenv rehash` when `eval $(goenv init -)` was previously executed) to skip calling `goenv-rehash` and update shims. 
 Instead it only updates managed `GOPATH` and `GOROOT` env variables.
@@ -74,6 +75,11 @@ It does not attempt to manage when version is `system`.
 * Changed `goenv`'s bootstrap (`eval $(goenv init -)`) now to call `goenv-sh-rehash --only-manage-paths`.
 This means that it'll export and manage `GOROOT` and `GOPATH` env vars. 
 It does not attempt to manage when version is `system`.
+; Ref: https://github.com/syndbg/goenv/pull/70
+* Changed `goenv-exec` now to set `GOPATH` and `GOROOT` environment variables before 
+executing specified cmd and args. Can be disable via `GOENV_DISABLE_GOPATH=1` and `GOENV_DISABLE_GOROOT=1`.
+`GOPATH` can be configured with `GOENV_GOPATH_PREFIX`. E.g `GOENV_GOPATH_PREFIX=/tmp/goenv`.
+Default managed `GOPATH` is `$HOME/go`.
 ; Ref: https://github.com/syndbg/goenv/pull/70
 
 ## 2.0.0beta5
