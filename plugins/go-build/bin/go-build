@@ -775,6 +775,14 @@ done
 [ "${#ARGUMENTS[@]}" -eq 2 ] || usage 1 >&2
 
 DEFINITION_PATH="${ARGUMENTS[0]}"
+
+# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version.
+# A patch version of 0 will be added, e.g they'll be changed to `1.11.0`.
+if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<< ${DEFINITION_PATH}; then
+  DEFINITION_PATH="${DEFINITION_PATH}.0"
+  echo "Adding patch version 0 to ${DEFINITION_PATH}"
+fi
+
 if [ -z "$DEFINITION_PATH" ]; then
   usage 1 >&2
 elif [ ! -f "$DEFINITION_PATH" ]; then

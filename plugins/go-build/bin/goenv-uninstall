@@ -64,6 +64,13 @@ for script in "${scripts[@]}"; do
 done
 
 VERSION_NAME="${DEFINITION##*/}"
+# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version.
+# A patch version of 0 will be added, e.g they'll be changed to `1.11.0`.
+if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<< ${VERSION_NAME}; then
+  echo "Adding patch version 0 to ${VERSION_NAME}"
+  VERSION_NAME="${VERSION_NAME}.0"
+fi
+
 PREFIX="${GOENV_ROOT}/versions/${VERSION_NAME}"
 
 if [ ! -d "$PREFIX" ]; then

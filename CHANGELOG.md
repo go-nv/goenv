@@ -53,6 +53,10 @@ Change line format:
 
 ## Unreleased (master)
 
+### Fixed
+
+* Golang releases without patch version not being installed ; Ref: https://github.com/syndbg/goenv/pull/75
+
 ## 2.0.0beta8
 
 ### Added
