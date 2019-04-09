@@ -45,11 +45,28 @@ Introducing breaking changes under a feature flag can be ok in some cases where 
 
 ## Changelog
 
+Change line format:
+
+```
+* <Change title/PR title/content> ; Ref: <pr link>
+```
+
 ## Unreleased (master)
+
+## 2.0.0beta8
+
+### Added
+
+* Add golang installations of 1.12.2, 1.12.3, 1.11.7 and 1.11.8 ; Ref: https://github.com/syndbg/goenv/pull/73
+
+### Fixed
+
+* Lack of environment variables configuration documentation after https://github.com/syndbg/goenv/pull/70.
+  Also fixed lack of Contributing guidelines ; Ref https://github.com/syndbg/goenv/pull/74
 
 ## 2.0.0beta7
 
-#### Added
+### Added
 
 * Add golang installations of 1.12.1. and 1.11.6 ; Ref: https://github.com/syndbg/goenv/pull/71
 

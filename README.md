@@ -21,7 +21,8 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
 
 * https://github.com/pwoolcoc/goenv depends on Python,
 * https://github.com/crsmithdev/goenv depends on Go,
-* https://github.com/moovweb/gvm is a different approach of the problem that's modeled after `nvm`. `goenv` is more simplified.
+* https://github.com/moovweb/gvm is a different approach to the problem that's modeled after `nvm`.
+ `goenv` is more simplified.
 
 ----
 
@@ -30,34 +31,7 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
 * **[How It Works](./HOW_IT_WORKS.md)**
 * **[Installation](./INSTALL.md)**
 * **[Command Reference](./COMMANDS.md)**
-* **[Environment variables](#environment-variables)**
-* **[Development](#development)**
+* **[Environment variables](./ENVIRONMENT_VARIABLES.md)**
+* **[Contributing](./CONTRIBUTING.md)**
+* **[Code-of-Conduct](./CODE_OF_CONDUCT.md)**
 
-----
-
-## Environment variables
-
-You can affect how goenv operates with the following settings:
-
-name | default | description
------|---------|------------
-`GOENV_VERSION` | | Specifies the Go version to be used.<br>Also see `goenv help shell`.
-`GOENV_ROOT` | `~/.goenv` | Defines the directory under which Go versions and shims reside.<br> Current value shown by `goenv root`.
-`GOENV_DEBUG` | | Outputs debug information.<br>Also as: `goenv --debug <subcommand>`
-`GOENV_HOOK_PATH` | | Colon-separated list of paths searched for goenv hooks.
-`GOENV_DIR` | `$PWD` | Directory to start searching for `.go-version` files.
-
-## Development
-
-The goenv source code is [hosted on
-GitHub](https://github.com/syndbg/goenv).  It's clean, modular,
-and easy to understand, even if you're not a shell hacker. (I hope)
-
-Tests are executed using [Bats](https://github.com/bats-core/bats-core):
-
-```
-$ make test
-```
-
-Please feel free to submit pull requests and file bugs on the [issue
-tracker](https://github.com/syndbg/goenv/issues).
