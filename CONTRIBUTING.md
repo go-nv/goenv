@@ -57,3 +57,7 @@ what did you expect to happen, what actually happened.
 1. Make sure to clarify if the PR is ready for review or work-in-progress.
  A simple `[WIP]` (in any form) is a good indicator whether the PR is still being actively developed.
 1. Collaborate with the codeowners/reviewers to merge this in `master`.
+
+### Release process
+
+Described in details at [RELEASE_PROCESS](./RELEASE_PROCESS.md).
