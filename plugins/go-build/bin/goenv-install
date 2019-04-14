@@ -120,6 +120,14 @@ unset VERSION_NAME
 # version is specified by goenv. Show usage instructions if a local
 # version is not specified.
 DEFINITION="${ARGUMENTS[0]}"
+
+# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version.
+# A patch version of 0 will be added, e.g they'll be changed to `1.11.0`.
+if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<< ${DEFINITION}; then
+  echo "Adding patch version 0 to ${DEFINITION}"
+  DEFINITION="${DEFINITION}.0"
+fi
+
 [ -n "$DEFINITION" ] || DEFINITION="$(goenv-local 2>/dev/null || true)"
 [ -n "$DEFINITION" ] || usage 1 >&2
 

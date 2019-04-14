@@ -216,6 +216,18 @@ goenv: version '1.2.3' not installed
 OUT
 }
 
+@test "adds patch version '0' to definition when version argument is already installed version and gets uninstalled" {
+  assert [ ! -e "${GOENV_ROOT}/shims/gofmt" ]
+  create_executable "1.2.0" "gofmt"
+
+  run goenv-uninstall -f 1.2
+
+  assert_output <<-OUT
+Adding patch version 0 to 1.2
+OUT
+  assert_success
+}
+
 @test "shims get rehashed and version uninstalled when version argument is already installed version" {
   assert [ ! -e "${GOENV_ROOT}/shims/gofmt" ]
   create_executable "1.10.3" "gofmt"
@@ -234,4 +246,3 @@ OUT
   assert [ ! -d "${GOENV_ROOT}/versions/1.2.3" ]
   assert [ ! -e "${GOENV_ROOT}/shims/gofmt" ]
 }
-
