@@ -53,6 +53,12 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.0.0beta11
+
+### Added
+
+* Add golang installations of 1.12.6 and 1.11.11 ; Ref: https://github.com/syndbg/goenv/pull/84
+
 ## 2.0.0beta10
 
 ### Added
