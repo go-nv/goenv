@@ -430,7 +430,7 @@ http() {
     "http_${method}_wget" "$url" "$file"
   else
     echo "error: please install 'curl' or 'wget' and try again" >&2
-    exit 1
+    return 1
   fi
 }
 
