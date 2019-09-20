@@ -73,7 +73,7 @@ properly configured.
 ### Using `go-build` standalone
 
 If you have installed go-build as a standalone program, you can use the
-`gp-build` command to compile and install Golang versions into specific
+`go-build` command to compile and install Golang versions into specific
 locations.
 
 Run the `go-build` command with the exact name of the version you want to
