@@ -18,6 +18,7 @@ easy to fork and contribute any changes back upstream.
         $ echo 'export PATH="$GOENV_ROOT/bin:$PATH"' >> ~/.bash_profile
 
     **Zsh note**: Modify your `~/.zshenv` file instead of `~/.bash_profile`.
+
     **Ubuntu note**: Modify your `~/.bashrc` file instead of `~/.bash_profile`.
 
 3. **Add `goenv init` to your shell** to enable shims, management of `GOPATH` and `GOROOT` and auto-completion.
@@ -27,6 +28,7 @@ easy to fork and contribute any changes back upstream.
         $ echo 'eval "$(goenv init -)"' >> ~/.bash_profile
 
     **Zsh note**: Modify your `~/.zshenv` or `~/.zshrc` file instead of `~/.bash_profile`.
+    
     **Ubuntu note**: Modify your `~/.bashrc` file instead of `~/.bash_profile`.
     
     **General warning**: There are some systems where the `BASH_ENV` variable is configured
@@ -39,15 +41,22 @@ easy to fork and contribute any changes back upstream.
   add `GOPATH` and `GOROOT` to your shell **after `eval "$(goenv init -)"`**.
   
         $ echo 'export PATH="$GOROOT/bin:$PATH"' >> ~/.bash_profile
-        $ echo 'export PATH="$GOPATH/bin:$PATH"' >> ~/.bash_profile
+        $ echo 'export PATH="$PATH:$GOPATH/bin"' >> ~/.bash_profile
         
     **Zsh note**: Modify your `~/.zshenv` or `~/.zshrc` file instead of `~/.bash_profile`.
+    
     **Ubuntu note**: Modify your `~/.bashrc` file instead of `~/.bash_profile`.
+
     **General warning**: There are some systems where the `BASH_ENV` variable is configured
     to point to `.bashrc`. On such systems you should almost certainly put the abovementioned line
     `eval "$(goenv init -)` into `.bash_profile`, and **not** into `.bashrc`. Otherwise you
     may observe strange behaviour, such as `goenv` getting into an infinite loop.
     See pyenv's issue [#264](https://github.com/yyuu/pyenv/issues/264) for details.
+
+    **Security warning**: You likely want to keep $GOPATH/bin at the end
+    of your $PATH as shown above, rather than at the beginning.  See
+    [#99](https://github.com/syndbg/goenv/issues/99) for details and
+    discussion.
   
 
 5. **Restart your shell so the path changes take effect.**
@@ -69,7 +78,7 @@ export GOENV_ROOT="$HOME/.goenv"
 export PATH="$GOENV_ROOT/bin:$PATH"
 eval "$(goenv init -)"
 export PATH="$GOROOT/bin:$PATH"
-export PATH="$GOPATH/bin:$PATH"
+export PATH="$PATH:$GOPATH/bin"
 ```
    
 ## Homebrew on Mac OS X
