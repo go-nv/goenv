@@ -112,6 +112,7 @@ OUT
 1.13rc1
 1.13rc2
 1.13.1
+1.13.2
 OUT
 }
 
@@ -451,6 +452,7 @@ Available versions:
   1.13rc1
   1.13rc2
   1.13.1
+  1.13.2
 OUT
 }
 
@@ -547,6 +549,7 @@ Available versions:
   1.13rc1
   1.13rc2
   1.13.1
+  1.13.2
 OUT
 }
 
