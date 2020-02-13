@@ -12,7 +12,7 @@ addons:
 script: make test
 env:
   global:
-    - PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
+    - PATH="/usr/local/opt/make/libexec/gnubin:/usr/local/opt/coreutils/libexec/gnubin:$PATH"
   jobs:
     - GOENV_NATIVE_EXT=
     - GOENV_NATIVE_EXT=1
