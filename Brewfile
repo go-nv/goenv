@@ -1,2 +1,1 @@
 brew 'make'
-brew 'go'
