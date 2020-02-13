@@ -1,2 +1,2 @@
 brew 'make'
-brew 'bats-core'
+brew 'go'
