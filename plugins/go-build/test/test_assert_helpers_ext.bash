@@ -66,7 +66,7 @@ assert_output_contains() {
     expected="$1"
   fi
 
-  if ! [[ $output  =~ "$expected" ]]; then
+  if ! [[ $output  =~ $expected ]]; then
     {
       echo "expected to contain: $expected"
       echo "actual: $output"
