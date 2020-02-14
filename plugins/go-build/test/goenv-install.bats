@@ -627,8 +627,8 @@ SH
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Linux 64bit 1.2.2...
-Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go [Linux|Darwin] 64bit 1.2.2...
+Installed Go [Linux|Darwin] 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 after: 0
 REHASHED
@@ -663,8 +663,8 @@ SH
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Linux 64bit 1.2.2...
-Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go [Linux|Darwin] 64bit 1.2.2...
+Installed Go [Linux|Darwin] 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 after: 0
 REHASHED
@@ -685,8 +685,8 @@ OUT
   assert_output <<-OUT
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Linux 64bit 1.2.2...
-Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go [Linux|Darwin] 64bit 1.2.2...
+Installed Go [Linux|Darwin] 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 OUT
   assert_success
@@ -738,8 +738,8 @@ OUT
 Adding patch version 0 to 1.2
 Downloading 1.2.0.tar.gz...
 -> http://localhost:8090/1.2.0/1.2.0.tar.gz
-Installing Go Linux 64bit 1.2.0...
-Installed Go Linux 64bit 1.2.0 to ${GOENV_ROOT}/versions/1.2.0
+Installing Go [Linux|Darwin] 64bit 1.2.0...
+Installed Go [Linux|Darwin] 64bit 1.2.0 to ${GOENV_ROOT}/versions/1.2.0
 
 OUT
   assert_success
