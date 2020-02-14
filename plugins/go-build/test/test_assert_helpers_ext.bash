@@ -66,10 +66,10 @@ assert_output_contains() {
     expected="$1"
   fi
 
-  if [ "$1" == *"$output"* ]; then
+  if [ "$output" == *"$expected"* ]; then
     {
-      echo "expected to contain: $1"
-      echo "actual: $2"
+      echo "expected to contain: $expected"
+      echo "actual: $output"
     } | flunk
   fi
 }
