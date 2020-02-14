@@ -623,7 +623,7 @@ SH
 
   rm -rf $GOENV_ROOT
 
-  assert_output <<-OUT
+  assert_output_contains <<-OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
@@ -659,7 +659,7 @@ SH
 
   rm -rf $GOENV_ROOT
 
-  assert_output <<-OUT
+  assert_output_contains <<-OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
@@ -682,7 +682,7 @@ OUT
 
   run goenv-install -f 1.2.2
 
-  assert_output <<-OUT
+  assert_output_contains <<-OUT
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
 Installing Go [Linux|Darwin] 64bit 1.2.2...
@@ -734,7 +734,7 @@ OUT
 
   run goenv-install -f 1.2
 
-  assert_output <<-OUT
+  assert_output_contains <<-OUT
 Adding patch version 0 to 1.2
 Downloading 1.2.0.tar.gz...
 -> http://localhost:8090/1.2.0/1.2.0.tar.gz
