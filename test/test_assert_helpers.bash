@@ -166,25 +166,3 @@ create_file() {
   mkdir -p "$(dirname "$1")"
   touch "$1"
 }
-
-assert_output_contains() {
-  if [ -n "$GOENV_DEBUG" ]; then
-    echo "actual: $output"
-    echo "'GOENV_DEBUG=1' detected. Test assertion with 'assert_output' will always fail. Re-run test without 'GOENV_DEBUG'"
-    exit 1
-  fi
-
-  local expected
-  if [ $# -eq 0 ]; then
-    expected="$(cat -)"
-  else
-    expected="$1"
-  fi
-  
-  if [ "$1" == *"$output"* ]; then
-    {
-      echo "expected to contain: $1"
-      echo "actual: $2"
-    } | flunk
-  fi
-}
