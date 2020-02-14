@@ -66,7 +66,7 @@ assert_output_contains() {
     expected="$1"
   fi
 
-  echo "$output" | $(type -p ggrep grep | head -1) -F "$expected" >/dev/null || {
+  if ! [[ $output  =~ "$expected" ]] {
     {
       echo "expected to contain: $expected"
       echo "actual: $output"
