@@ -624,11 +624,11 @@ SH
   rm -rf $GOENV_ROOT
 
   assert_output_contains <<-OUT
-before: ${GOENV_ROOT}/versions/1.2.2
+before: .*\/versions\/1.2.2
 Downloading 1.2.2.tar.gz...
--> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go [Linux|arwin] 64bit 1.2.2...
-Installed Go [Linux|Darwin] 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+-> http:\/\/localhost:8090\/1.2.2\/1.2.2.tar.gz
+Installing Go [Linux|Darwin] 64bit 1.2.2...
+Installed Go [Linux|Darwin] 64bit 1.2.2 to .*\/versions\/1.2.2
 
 after: 0
 REHASHED
