@@ -724,26 +724,18 @@ OUT
   case "${unameOut}" in
       Linux*)
         assert_output <<-OUT
-before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
 Installing Go Linux 64bit 1.2.2...
-Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
-
-after: 0
-REHASHED
+Installed Go Linux 64bit 1.2.2 to TEST_DIR/root/versions/1.2.2
 OUT
 ;;
       Darwin*)
         assert_output <<-OUT
-before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
 Installing Go Darwin 64bit 1.2.2...
-Installed Go Darwin 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
-
-after: 0
-REHASHED
+Installed Go Darwin 64bit 1.2.2 to TEST_DIR/root/versions/1.2.2
 OUT
 ;;
       *)          machine="UNKNOWN:${unameOut}"
@@ -799,26 +791,20 @@ OUT
   case "${unameOut}" in
       Linux*)
         assert_output <<-OUT
-before: ${GOENV_ROOT}/versions/1.2.2
-Downloading 1.2.2.tar.gz...
--> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Linux 64bit 1.2.2...
-Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
-
-after: 0
-REHASHED
+Adding patch version 0 to 1.2
+Downloading 1.2.0.tar.gz...
+-> http://localhost:8090/1.2.0/1.2.0.tar.gz
+Installing Go Linux 64bit 1.2.0...
+Installed Go Linux 64bit 1.2.0 to TEST_DIR/root/versions/1.2.0
 OUT
 ;;
       Darwin*)
         assert_output <<-OUT
-before: ${GOENV_ROOT}/versions/1.2.2
-Downloading 1.2.2.tar.gz...
--> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Darwin 64bit 1.2.2...
-Installed Go Darwin 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
-
-after: 0
-REHASHED
+Adding patch version 0 to 1.2
+Downloading 1.2.0.tar.gz...
+-> http://localhost:8090/1.2.0/1.2.0.tar.gz
+Installing Go Darwin 64bit 1.2.0...
+Installed Go Darwin 64bit 1.2.0 to TEST_DIR/root/versions/1.2.0
 OUT
 ;;
       *)          machine="UNKNOWN:${unameOut}"
