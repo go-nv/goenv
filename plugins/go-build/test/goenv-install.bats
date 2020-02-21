@@ -637,7 +637,18 @@ after: 0
 REHASHED
 OUT
 ;;
-      Darwin*)    machine=Mac;;
+      Darwin*)
+        assert_output <<-OUT
+before: ${GOENV_ROOT}/versions/1.2.2
+Downloading 1.2.2.tar.gz...
+-> http://localhost:8090/1.2.2/1.2.2.tar.gz
+Installing Go Darwin 64bit 1.2.2...
+Installed Go Darwin 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+
+after: 0
+REHASHED
+OUT
+;;
       *)          machine="UNKNOWN:${unameOut}"
   esac
   echo ${machine}
@@ -667,16 +678,35 @@ SH
 
   rm -rf $GOENV_ROOT
 
-  assert_output_contains <<-OUT
+  unameOut="$(uname -s)"
+  case "${unameOut}" in
+      Linux*)
+        assert_output <<-OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go [Linux|Darwin] 64bit 1.2.2...
-Installed Go [Linux|Darwin] 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go Linux 64bit 1.2.2...
+Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 after: 0
 REHASHED
 OUT
+;;
+      Darwin*)
+        assert_output <<-OUT
+before: ${GOENV_ROOT}/versions/1.2.2
+Downloading 1.2.2.tar.gz...
+-> http://localhost:8090/1.2.2/1.2.2.tar.gz
+Installing Go Darwin 64bit 1.2.2...
+Installed Go Darwin 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+
+after: 0
+REHASHED
+OUT
+;;
+      *)          machine="UNKNOWN:${unameOut}"
+  esac
+  echo ${machine}
 
   assert_success
 }
@@ -690,13 +720,36 @@ OUT
 
   run goenv-install -f 1.2.2
 
-  assert_output_contains <<-OUT
+  unameOut="$(uname -s)"
+  case "${unameOut}" in
+      Linux*)
+        assert_output <<-OUT
+before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go [Linux|Darwin] 64bit 1.2.2...
-Installed Go [Linux|Darwin] 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go Linux 64bit 1.2.2...
+Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
+after: 0
+REHASHED
 OUT
+;;
+      Darwin*)
+        assert_output <<-OUT
+before: ${GOENV_ROOT}/versions/1.2.2
+Downloading 1.2.2.tar.gz...
+-> http://localhost:8090/1.2.2/1.2.2.tar.gz
+Installing Go Darwin 64bit 1.2.2...
+Installed Go Darwin 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+
+after: 0
+REHASHED
+OUT
+;;
+      *)          machine="UNKNOWN:${unameOut}"
+  esac
+  echo ${machine}
+
   assert_success
 
   assert [ -f "${GOENV_ROOT}/versions/1.2.2/bin/go" ]
@@ -742,14 +795,36 @@ OUT
 
   run goenv-install -f 1.2
 
-  assert_output_contains <<-OUT
-Adding patch version 0 to 1.2
-Downloading 1.2.0.tar.gz...
--> http://localhost:8090/1.2.0/1.2.0.tar.gz
-Installing Go [Linux|Darwin] 64bit 1.2.0...
-Installed Go [Linux|Darwin] 64bit 1.2.0 to ${GOENV_ROOT}/versions/1.2.0
+  unameOut="$(uname -s)"
+  case "${unameOut}" in
+      Linux*)
+        assert_output <<-OUT
+before: ${GOENV_ROOT}/versions/1.2.2
+Downloading 1.2.2.tar.gz...
+-> http://localhost:8090/1.2.2/1.2.2.tar.gz
+Installing Go Linux 64bit 1.2.2...
+Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
+after: 0
+REHASHED
 OUT
+;;
+      Darwin*)
+        assert_output <<-OUT
+before: ${GOENV_ROOT}/versions/1.2.2
+Downloading 1.2.2.tar.gz...
+-> http://localhost:8090/1.2.2/1.2.2.tar.gz
+Installing Go Darwin 64bit 1.2.2...
+Installed Go Darwin 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+
+after: 0
+REHASHED
+OUT
+;;
+      *)          machine="UNKNOWN:${unameOut}"
+  esac
+  echo ${machine}
+
   assert_success
 
   assert [ -f "${GOENV_ROOT}/versions/1.2.0/bin/go" ]
