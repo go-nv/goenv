@@ -632,6 +632,7 @@ Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
 Installing Go Linux 64bit 1.2.2...
 Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+
 after: 0
 REHASHED
 OUT
