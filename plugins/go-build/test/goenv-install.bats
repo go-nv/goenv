@@ -625,7 +625,7 @@ SH
 
   unameOut="$(uname -s)"
   case "${unameOut}" in
-      Linux*)     machine=Linux;;
+      Linux*)
         assert_output <<-OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
@@ -634,7 +634,7 @@ Installing Go Linux 64bit 1.2.2...
 Installed Go Linux 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 after: 0
 REHASHED
-OUT
+OUT;;
       Darwin*)    machine=Mac;;
       *)          machine="UNKNOWN:${unameOut}"
   esac
