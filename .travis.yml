@@ -8,6 +8,7 @@ dist: xenial
 addons:
   homebrew:
     brewfile: true
+    update: true
 script: make test
 env:
   global:
