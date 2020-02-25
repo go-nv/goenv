@@ -1,10 +1,18 @@
-sudo: false
 language: c
-os: linux
+os:
+  - linux
+  - osx
 # NOTE: Use `xenial` and/or newer since `make`
 # bundled there is new enough version to support `.ONESHELL` in `Makefile`.
 dist: xenial
+addons:
+  homebrew:
+    brewfile: true
+    update: true
 script: make test
 env:
-  - GOENV_NATIVE_EXT=
-  - GOENV_NATIVE_EXT=1
+  global:
+    - PATH="/usr/local/opt/make/libexec/gnubin:/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+  jobs:
+    - GOENV_NATIVE_EXT=
+    - GOENV_NATIVE_EXT=1

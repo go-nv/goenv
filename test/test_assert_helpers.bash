@@ -147,7 +147,7 @@ create_executable() {
   {
     if [ $# -eq 0 ]; then
       # HACK: Make `read` work for stdin stream being empty
-      while IFS='$\n' read -t 0.1 -r line; do
+      while IFS='$\n' read -t 1 -r line; do
         echo -e "$line\n"
       done
     else
@@ -166,4 +166,3 @@ create_file() {
   mkdir -p "$(dirname "$1")"
   touch "$1"
 }
-
