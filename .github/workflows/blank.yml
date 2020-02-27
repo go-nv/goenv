@@ -17,8 +17,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
-    - run: sudo apt install -y build-essential
     - run: make test
       env:
-        PATH: "/usr/local/opt/make/libexec/gnubin:/usr/local/opt/coreutils/libexec/gnubin:$PATH"
         GOENV_NATIVE_EXT: ${{ matrix.goenv_native_ext }}
