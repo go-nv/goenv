@@ -29,7 +29,18 @@ whence() {
   goenv-versions --bare | while read version; do
     path="$(goenv-prefix "$version")/bin/${command}"
     if [ ! -x "$path" ]; then
-      continue
+      if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
+        local gopath="${HOME}/go/${version}"
+        if [ -n "${GOENV_GOPATH_PREFIX}" ]; then
+          gopath="${GOENV_GOPATH_PREFIX}/${version}"
+        fi
+        path="${gopath}/bin/${command}"
+        if [ ! -x "$path" ]; then
+          continue
+        fi
+      else
+        continue
+      fi
     fi
 
     [ "$print_paths" ] && echo "$path" || echo "$version"
