@@ -81,6 +81,18 @@ export PATH="$GOROOT/bin:$PATH"
 export PATH="$PATH:$GOPATH/bin"
 ```
    
+## via ZPlug plugin manager for Zsh
+
+Add the following line to your `.zshrc`:
+
+```zplug "RiverGlide/zsh-goenv", from:gitlab```
+Then install the plugin
+~~~ zsh
+  $ source ~/.zshrc
+  $ zplug install
+~~~
+The ZPlug plugin will install and initialise `goenv` and add `goenv` and `goenv-install` to your `PATH`
+   
 ## Homebrew on Mac OS X
 
 You can also install goenv using the [Homebrew](http://brew.sh)
