@@ -137,6 +137,7 @@ OUT
 1.14.2
 1.14.3
 1.14.4
+1.15beta1
 OUT
 }
 
@@ -501,6 +502,7 @@ Available versions:
   1.14.2
   1.14.3
   1.14.4
+  1.15beta1
 OUT
 }
 
@@ -622,6 +624,7 @@ Available versions:
   1.14.2
   1.14.3
   1.14.4
+  1.15beta1
 OUT
 }
 
