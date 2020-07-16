@@ -54,5 +54,5 @@ bats:
 	if [ -d "$(PWD)/bats-core" ]; then
 		echo "bats-core already exists. Nothing to do" ;
 	else
-		git clone --depth 1 https://github.com/bats-core/bats-core.git ;
+		git clone --depth 1 --single-branch --branch=v1.1.0 https://github.com/bats-core/bats-core.git ;
 	fi
