@@ -75,14 +75,3 @@ OUT
 OUT
 }
 
-@test "fails when given filename argument is present but not executable in GOENV_ROOT/versions/<version>/bin/<binary>" {
-  create_executable "1.6.1" "go"
-
-  chmod -x "${GOENV_ROOT}/versions/1.6.1/bin/go"
-
-  run goenv-whence go
-  assert_failure
-  assert_output <<OUT
-OUT
-}
-
