@@ -639,6 +639,7 @@ Available versions:
   1.14.5
   1.14.6
   1.15beta1
+  1.15rc2
 OUT
 }
 
