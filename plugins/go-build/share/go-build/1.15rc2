@@ -1,0 +1,11 @@
+install_darwin_64bit "Go Darwin 64bit 1.15rc2" "https://golang.org/dl/go1.15rc2.darwin-amd64.tar.gz#b07775d30e023c1570b1ba74892fc792834436c790fbb0dbb19ebaae9c155105"
+
+install_bsd_32bit "Go Freebsd 32bit 1.15rc2" "https://golang.org/dl/go1.15rc2.freebsd-386.tar.gz#7d0fafd526c161242265103d674e4b77ec5dae95fe3a8853e45454633bed5022"
+
+install_bsd_64bit "Go Freebsd 64bit 1.15rc2" "https://golang.org/dl/go1.15rc2.freebsd-amd64.tar.gz#1f021399526442de11034a8db1bb9ede793078217d3d104775cfe65940122f0e"
+
+install_linux_32bit "Go Linux 32bit 1.15rc2" "https://golang.org/dl/go1.15rc2.linux-386.tar.gz#9c1f1ed42bd5f776f3585e39e3ba165a9b8ac8fde45dafbb6e41e04bae44bb3d"
+
+install_linux_64bit "Go Linux 64bit 1.15rc2" "https://golang.org/dl/go1.15rc2.linux-amd64.tar.gz#f41a08f630f018bc5d9fd100bd9899516e4965356c78165157eb0eda9a17ac09"
+
+install_linux_arm "Go Linux arm 1.15rc2" "https://golang.org/dl/go1.15rc2.linux-armv6l.tar.gz#60d4d7723ef55d49bbf8326f37011f967048ae9167ef462ee4b9af311c4f3244"
