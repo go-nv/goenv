@@ -1,4 +1,4 @@
-install_darwin_64bit "Go Darwin 64bit 1.13.15" "https://golang.org/dl/go1.13.15.darwin-amd64.tar.gz#83ff4f92ff0bc900d8980871ef3f7593a5768ae8826c46e68ade6b0da25b67ed"
+install_darwin_64bit "Go Darwin 64bit 1.13.15" "https://golang.org/dl/go1.13.15.darwin-amd64.tar.gz#63180e32e9b7bfcd0c1c056e7c215299f662a1098a30316599c7b3e2e2fa28e7"
 
 install_bsd_32bit "Go Freebsd 32bit 1.13.15" "https://golang.org/dl/go1.13.15.freebsd-386.tar.gz#335a4ce5eb8569afcc42aafb6b43677bd8a49f8861eac8c64e2ba0f0638c764f"
 
