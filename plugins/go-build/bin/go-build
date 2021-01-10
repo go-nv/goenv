@@ -268,6 +268,16 @@ install_linux_32bit() {
     fi
 }
 
+install_linux_arm_64bit() {
+    if [ "$(uname -s)" = "Linux" ]; then
+        local arch="$(uname -m)"
+
+        if [ $arch = "aarch64" ]; then
+            install_package_using "tarball" 1 "$@"
+        fi
+    fi
+}
+
 install_linux_arm() {
     if [ "$(uname -s)" = "Linux" ]; then
         local arch="$(uname -m)"
