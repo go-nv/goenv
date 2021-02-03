@@ -24,7 +24,7 @@ OUT
 @test 'detects parent shell when '-' argument is given only' {
   SHELL=/bin/false run goenv-init -
 
-  assert_line 1 "export GOENV_SHELL=bash"
+  assert_line 0 "export GOENV_SHELL=bash"
   assert_success
 }
 
@@ -138,22 +138,26 @@ OUT
 @test "prints bootstrap script with auto-completion when '-' and 'bash' are specified" {
   run goenv-init - bash
 
-  assert_line 1  'export GOENV_SHELL=bash'
-  assert_line 2  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.bash'"
-  assert_line 3  'command goenv rehash 2>/dev/null'
-  assert_line 4  'goenv() {'
-  assert_line 5  '  local command'
-  assert_line 6  '  command="$1"'
-  assert_line 7  '  if [ "$#" -gt 0 ]; then'
-  assert_line 8  '    shift'
-  assert_line 9  '  fi'
-  assert_line 10 '  case "$command" in'
-  assert_line 11 '  rehash|shell)'
-  assert_line 12 '    eval "$(goenv "sh-$command" "$@")";;'
-  assert_line 13 '  *)'
-  assert_line 14 '    command goenv "$command" "$@";;'
-  assert_line 15 '  esac'
-  assert_line 16 '}'
+  assert_line 0  'export GOENV_SHELL=bash'
+  assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
+  assert_line 2  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
+  assert_line 3  '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  assert_line 4  'fi'
+  assert_line 5  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.bash'"
+  assert_line 6  'command goenv rehash 2>/dev/null'
+  assert_line 7  'goenv() {'
+  assert_line 8  '  local command'
+  assert_line 9  '  command="$1"'
+  assert_line 10 '  if [ "$#" -gt 0 ]; then'
+  assert_line 11 '    shift'
+  assert_line 12 '  fi'
+  assert_line 13 '  case "$command" in'
+  assert_line 14 '  rehash|shell)'
+  assert_line 15 '    eval "$(goenv "sh-$command" "$@")";;'
+  assert_line 16 '  *)'
+  assert_line 17 '    command goenv "$command" "$@";;'
+  assert_line 18 '  esac'
+  assert_line 19 '}'
 
   assert_success
 }
@@ -161,22 +165,26 @@ OUT
 @test "prints bootstrap script with auto-completion when '-' and 'zsh' are specified" {
   run goenv-init - zsh
 
-  assert_line 1  'export GOENV_SHELL=zsh'
-  assert_line 2  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.zsh'"
-  assert_line 3  'command goenv rehash 2>/dev/null'
-  assert_line 4  'goenv() {'
-  assert_line 5  '  local command'
-  assert_line 6  '  command="$1"'
-  assert_line 7  '  if [ "$#" -gt 0 ]; then'
-  assert_line 8  '    shift'
-  assert_line 9  '  fi'
-  assert_line 10 '  case "$command" in'
-  assert_line 11 '  rehash|shell)'
-  assert_line 12 '    eval "$(goenv "sh-$command" "$@")";;'
-  assert_line 13 '  *)'
-  assert_line 14 '    command goenv "$command" "$@";;'
-  assert_line 15 '  esac'
-  assert_line 16 '}'
+  assert_line 0  'export GOENV_SHELL=zsh'
+  assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
+  assert_line 2  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
+  assert_line 3  '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  assert_line 4  'fi'
+  assert_line 5  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.zsh'"
+  assert_line 6  'command goenv rehash 2>/dev/null'
+  assert_line 7  'goenv() {'
+  assert_line 8  '  local command'
+  assert_line 9  '  command="$1"'
+  assert_line 10 '  if [ "$#" -gt 0 ]; then'
+  assert_line 11 '    shift'
+  assert_line 12 '  fi'
+  assert_line 13 '  case "$command" in'
+  assert_line 14 '  rehash|shell)'
+  assert_line 15 '    eval "$(goenv "sh-$command" "$@")";;'
+  assert_line 16 '  *)'
+  assert_line 17 '    command goenv "$command" "$@";;'
+  assert_line 18 '  esac'
+  assert_line 19 '}'
 
   assert_success
 }
@@ -184,19 +192,23 @@ OUT
 @test "prints bootstrap script with auto-completion when '-' and 'fish' are specified" {
   run goenv-init - fish
 
-  assert_line 1  'set -gx GOENV_SHELL fish'
-  assert_line 2  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.fish'"
-  assert_line 3  'command goenv rehash 2>/dev/null'
-  assert_line 4  'function goenv'
-  assert_line 5  '  set command $argv[1]'
-  assert_line 6  '  set -e argv[1]'
-  assert_line 7  '  switch "$command"'
-  assert_line 8  '  case rehash shell'
-  assert_line 9  '    source (goenv "sh-$command" $argv|psub)'
-  assert_line 10 "  case '*'"
-  assert_line 11 '    command goenv "$command" $argv'
-  assert_line 12 '  end'
-  assert_line 13 'end'
+  assert_line 0  'set -gx GOENV_SHELL fish'
+  assert_line 1  "set -gx GOENV_ROOT $GOENV_ROOT"
+  assert_line 2  'if not contains $GOENV_ROOT/shims $PATH'
+  assert_line 3  '  set -gx PATH $GOENV_ROOT/shims $PATH'
+  assert_line 4  'end'
+  assert_line 5  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.fish'"
+  assert_line 6  'command goenv rehash 2>/dev/null'
+  assert_line 7  'function goenv'
+  assert_line 8  '  set command $argv[1]'
+  assert_line 9  '  set -e argv[1]'
+  assert_line 10 '  switch "$command"'
+  assert_line 11 '  case rehash shell'
+  assert_line 12 '    source (goenv "sh-$command" $argv|psub)'
+  assert_line 13 "  case '*'"
+  assert_line 14 '    command goenv "$command" $argv'
+  assert_line 15 '  end'
+  assert_line 16 'end'
 
   assert_success
 }
@@ -204,20 +216,24 @@ OUT
 @test "prints bootstrap script without auto-completion when '-' and 'ksh' are specified" {
   run goenv-init - ksh
 
-  assert_line 1  'export GOENV_SHELL=ksh'
-  assert_line 2  'command goenv rehash 2>/dev/null'
-  assert_line 3  'function goenv {'
-  assert_line 4  '  typeset command'
-  assert_line 5  '  command="$1"'
-  assert_line 6  '  if [ "$#" -gt 0 ]; then'
-  assert_line 7  '    shift'
-  assert_line 8  '  fi'
-  assert_line 9  '  case "$command" in'
-  assert_line 10 '  rehash|shell)'
-  assert_line 11 '    eval "$(goenv "sh-$command" "$@")";;'
-  assert_line 12 '  *)'
-  assert_line 13 '    command goenv "$command" "$@";;'
-  assert_line 14 '  esac'
+  assert_line 0  'export GOENV_SHELL=ksh'
+  assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
+  assert_line 2  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
+  assert_line 3  '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  assert_line 4  'fi'
+  assert_line 5  'command goenv rehash 2>/dev/null'
+  assert_line 6  'function goenv {'
+  assert_line 7  '  typeset command'
+  assert_line 8  '  command="$1"'
+  assert_line 9  '  if [ "$#" -gt 0 ]; then'
+  assert_line 10 '    shift'
+  assert_line 11 '  fi'
+  assert_line 12 '  case "$command" in'
+  assert_line 13 '  rehash|shell)'
+  assert_line 14 '    eval "$(goenv "sh-$command" "$@")";;'
+  assert_line 15 '  *)'
+  assert_line 16 '    command goenv "$command" "$@";;'
+  assert_line 17 '  esac'
 
   assert_success
 }
@@ -226,21 +242,25 @@ OUT
   run goenv-init - magicshell
 
   # NOTE: This is very likely to be invalid for your specific shell
-  assert_line 1  'export GOENV_SHELL=magicshell'
-  assert_line 2  'command goenv rehash 2>/dev/null'
-  assert_line 3  'goenv() {'
-  assert_line 4  '  local command'
-  assert_line 5  '  command="$1"'
-  assert_line 6  '  if [ "$#" -gt 0 ]; then'
-  assert_line 7  '    shift'
-  assert_line 8  '  fi'
-  assert_line 9  '  case "$command" in'
-  assert_line 10 '  rehash|shell)'
-  assert_line 11 '    eval "$(goenv "sh-$command" "$@")";;'
-  assert_line 12 '  *)'
-  assert_line 13 '    command goenv "$command" "$@";;'
-  assert_line 14 '  esac'
-  assert_line 15 '}'
+  assert_line 0  'export GOENV_SHELL=magicshell'
+  assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
+  assert_line 2  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
+  assert_line 3  '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  assert_line 4  'fi'
+  assert_line 5  'command goenv rehash 2>/dev/null'
+  assert_line 6  'goenv() {'
+  assert_line 7  '  local command'
+  assert_line 8  '  command="$1"'
+  assert_line 9  '  if [ "$#" -gt 0 ]; then'
+  assert_line 10 '    shift'
+  assert_line 11 '  fi'
+  assert_line 12 '  case "$command" in'
+  assert_line 13 '  rehash|shell)'
+  assert_line 14 '    eval "$(goenv "sh-$command" "$@")";;'
+  assert_line 15 '  *)'
+  assert_line 16 '    command goenv "$command" "$@";;'
+  assert_line 17 '  esac'
+  assert_line 18 '}'
 
   assert_success
 }
