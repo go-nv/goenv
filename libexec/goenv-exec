@@ -36,36 +36,60 @@ done
 shift 1
 
 if [ "${GOENV_VERSION}" != "system" ]; then
-    case "$shell" in
-    fish )
-      if [ "${GOENV_DISABLE_GOROOT}" != "1" ]; then
-        set -gx GOROOT "$(goenv-prefix)"
-      fi
+  case "$shell" in
+  fish)
+    if [ "${GOENV_DISABLE_GOROOT}" != "1" ]; then
+      set -gx GOROOT "$(goenv-prefix)"
+    fi
 
-      if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
-        if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
+    if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
+      if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
+        if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
+          set -gx GOPATH "${HOME}/go/${GOENV_VERSION}:${GOPATH}"
+        elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
+          set -gx GOPATH "${GOPATH}:${HOME}/go/${GOENV_VERSION}"
+        else
           set -gx GOPATH "${HOME}/go/${GOENV_VERSION}"
-         else
+        fi
+      else
+        if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
+          set -gx GOPATH "${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}:${GOPATH}"
+        elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
+          set -gx GOPATH "${GOPATH}:${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}"
+        else
           set -gx GOPATH "${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}"
         fi
       fi
+    fi
 
-      ;;
-    * )
-      if [ "${GOENV_DISABLE_GOROOT}" != "1" ]; then
-        export GOROOT="$(goenv-prefix)"
-      fi
+    ;;
+  *)
+    if [ "${GOENV_DISABLE_GOROOT}" != "1" ]; then
+      export GOROOT="$(goenv-prefix)"
+    fi
 
-      if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
-        if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
+    if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
+      if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
+        if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
+          export GOPATH="${HOME}/go/${GOENV_VERSION}:${GOPATH}"
+        elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
+          export GOPATH="${GOPATH}:${HOME}/go/${GOENV_VERSION}"
+        else
           export GOPATH="${HOME}/go/${GOENV_VERSION}"
+        fi
+      else
+        if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
+          export GOPATH="${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}:${GOPATH}"
+        elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
+          export GOPATH="${GOPATH}:${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}"
         else
           export GOPATH="${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}"
         fi
       fi
+    fi
 
-      ;;
-    esac
+    ;;
+  esac
 fi
 
 export PATH="${GOENV_BIN_PATH}:${GOROOT}/bin:${PATH}"

@@ -30,9 +30,21 @@ if [ "${currentVersionName}" != "system" ]; then
 
     if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
       if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
-        echo "set -gx GOPATH \"${HOME}/go/${currentVersionName}\""
-       else
-        echo "set -gx GOPATH \"${GOENV_GOPATH_PREFIX}/${currentVersionName}\""
+        if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
+          echo "set -gx GOPATH \"${HOME}/go/${currentVersionName}:${GOPATH}\""
+        elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
+          echo "set -gx GOPATH \"${GOPATH}:${HOME}/go/${currentVersionName}\""
+        else
+          echo "set -gx GOPATH \"${HOME}/go/${currentVersionName}\""
+        fi
+      else
+        if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
+          echo "set -gx GOPATH \"${GOENV_GOPATH_PREFIX}/${currentVersionName}:${GOPATH}\""
+        elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
+          echo "set -gx GOPATH \"${GOPATH}:${GOENV_GOPATH_PREFIX}/${currentVersionName}\""
+        else
+          echo "set -gx GOPATH \"${GOENV_GOPATH_PREFIX}/${currentVersionName}\""
+        fi
       fi
     fi
 
@@ -45,9 +57,21 @@ if [ "${currentVersionName}" != "system" ]; then
 
     if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
       if [ -z "${GOENV_GOPATH_PREFIX}" ]; then
-        echo "export GOPATH=\"${HOME}/go/${currentVersionName}\""
+        if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
+          echo "export GOPATH=\"${HOME}/go/${currentVersionName}:${GOPATH}\""
+        elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
+          echo "export GOPATH=\"${GOPATH}:${HOME}/go/${currentVersionName}\""
+        else
+          echo "export GOPATH=\"${HOME}/go/${currentVersionName}\""
+        fi
       else
-        echo "export GOPATH=\"${GOENV_GOPATH_PREFIX}/${currentVersionName}\""
+        if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
+          echo "export GOPATH=\"${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}:${GOPATH}\""
+        elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
+          echo "export GOPATH=\"${GOPATH}:${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}\""
+        else
+          echo "export GOPATH=\"${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}\""
+        fi
       fi
     fi
 
