@@ -494,7 +494,7 @@ fetch_tarball() {
 
     if [ -n "$GO_BUILD_MIRROR_URL" ]; then
       if [[ -z "$GO_BUILD_DEFAULT_MIRROR" || $package_url != */www.golang.org/* ]]; then
-        mirror_url="${GO_BUILD_MIRROR_URL}/$checksum"
+        mirror_url="${GO_BUILD_MIRROR_URL}/$(basename $package_url)"
       fi
     fi
   fi
@@ -628,7 +628,7 @@ fetch_zip() {
     package_url="${package_url%%#*}"
 
     if [ -n "$GO_BUILD_MIRROR_URL" ]; then
-      mirror_url="${GO_BUILD_MIRROR_URL}/$checksum"
+      mirror_url="${GO_BUILD_MIRROR_URL}/$(basename $package_url)"
     fi
   fi
 
