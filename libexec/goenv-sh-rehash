@@ -66,11 +66,11 @@ if [ "${currentVersionName}" != "system" ]; then
         fi
       else
         if [ -n "${GOPATH}" ] && [ "${GOENV_APPEND_GOPATH}" = "1" ]; then
-          echo "export GOPATH=\"${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}:${GOPATH}\""
+          echo "export GOPATH=\"${GOENV_GOPATH_PREFIX}/${currentVersionName}:${GOPATH}\""
         elif [ -n "${GOPATH}" ] && [ "${GOENV_PREPEND_GOPATH}" = "1" ]; then
-          echo "export GOPATH=\"${GOPATH}:${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}\""
+          echo "export GOPATH=\"${GOPATH}:${GOENV_GOPATH_PREFIX}/${currentVersionName}\""
         else
-          echo "export GOPATH=\"${GOENV_GOPATH_PREFIX}/${GOENV_VERSION}\""
+          echo "export GOPATH=\"${GOENV_GOPATH_PREFIX}/${currentVersionName}\""
         fi
       fi
     fi
