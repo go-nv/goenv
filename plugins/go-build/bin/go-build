@@ -462,10 +462,10 @@ http_head_curl() {
 }
 
 http_get_curl() {
-  options=""
+  options="--progress-bar"
   [ -n "${IPV4}" ] && options="--ipv4"
   [ -n "${IPV6}" ] && options="--ipv6"
-  curl -q -o "${2:--}" -sSLf ${options} "$1"
+  curl -q -o "${2:--}" -SLf ${options} "$1"
 }
 
 http_head_wget() {
@@ -476,10 +476,10 @@ http_head_wget() {
 }
 
 http_get_wget() {
-  options=""
+  options="--show-progress"
   [ -n "${IPV4}" ] && options="--inet4-only"
   [ -n "${IPV6}" ] && options="--inet6-only"
-  wget -nv ${options} -O "${2:--}" "$1"
+  wget -qnv ${options} -O "${2:--}" "$1"
 }
 
 fetch_tarball() {
@@ -564,7 +564,7 @@ download_tarball() {
 
   echo "-> $package_url" >&2
 
-  if http get "$package_url" "$package_filename" >&4 2>&1; then
+  if http get "$package_url" "$package_filename" >&4; then
     verify_checksum "$package_filename" "$checksum" >&4 2>&1 || return 1
   else
     echo "error: failed to download $package_filename" >&2
