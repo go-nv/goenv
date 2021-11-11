@@ -102,7 +102,7 @@ path_without() {
   local exe="$1"
   local path=":${PATH}:"
   local found alt util
-  for found in $(which -a "$exe"); do
+  for found in $(type -aP "$exe"); do
     found="${found%/*}"
     if [ "$found" != "${GOENV_ROOT}/shims" ]; then
       alt="${GOENV_TEST_DIR}/$(echo "${found#/}" | tr '/' '-')"
