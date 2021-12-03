@@ -1,0 +1,15 @@
+install_darwin_64bit "Go Darwin 64bit 1.16.11" "https://go.dev/dl/go1.16.11.darwin-amd64.tar.gz#3803f11f2680e446b44a44c1d452514706f917796f81d5270228ca955205dcc6"
+
+install_darwin_arm "Go Darwin arm 1.16.11" "https://go.dev/dl/go1.16.11.darwin-arm64.tar.gz#c6066c2cbfaf93c90684c3b0ceccbfed7d46a1f91ddf7eb2e9cb95faf9cd072e"
+
+install_bsd_32bit "Go Freebsd 32bit 1.16.11" "https://go.dev/dl/go1.16.11.freebsd-386.tar.gz#0154afe9774276da36033f059b81f1f1a4e133babcbe3ccb3fdaf5291eab82ac"
+
+install_bsd_64bit "Go Freebsd 64bit 1.16.11" "https://go.dev/dl/go1.16.11.freebsd-amd64.tar.gz#048bdeada746170a00e5d5336f3485b494cfc48196adefbba9269cf40fb24052"
+
+install_linux_32bit "Go Linux 32bit 1.16.11" "https://go.dev/dl/go1.16.11.linux-386.tar.gz#6ed245b1760ed7a44da807a8291532e4c88029f3e9918d149970f7450e74dc6b"
+
+install_linux_64bit "Go Linux 64bit 1.16.11" "https://go.dev/dl/go1.16.11.linux-amd64.tar.gz#aa22d0e2be68c0a7027a64e76cbb2869332fbc42ce14e3d10b69007b51030775"
+
+install_linux_arm "Go Linux arm 1.16.11" "https://go.dev/dl/go1.16.11.linux-armv6l.tar.gz#27e99705bf2bec5990ece1a0f9fc90d715012b148edac5113041cb86a0b28fc7"
+
+install_linux_arm_64bit "Go Linux arm 64bit 1.16.11" "https://go.dev/dl/go1.16.11.linux-arm64.tar.gz#64c91efd14304174c6e796e84543b896b2ae855aaf2ce0237efd32f2079cdcb8"
