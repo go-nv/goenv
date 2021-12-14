@@ -192,6 +192,7 @@ OUT
 1.17.3
 1.17.4
 1.17.5
+1.18beta1
 OUT
 }
 
@@ -611,6 +612,7 @@ Available versions:
   1.17.3
   1.17.4
   1.17.5
+  1.18beta1
 OUT
 }
 
@@ -787,6 +789,7 @@ Available versions:
   1.17.3
   1.17.4
   1.17.5
+  1.18beta1
 OUT
 }
 
