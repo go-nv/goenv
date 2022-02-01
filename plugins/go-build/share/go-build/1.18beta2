@@ -1,0 +1,15 @@
+install_darwin_64bit "Go Darwin 64bit 1.18beta2" "https://go.dev/dl/go1.18beta2.darwin-amd64.tar.gz#83fa94b3101d1a00dc5685645e4b49809a5dad18ce19ab449392806a85c05125"
+
+install_darwin_arm "Go Darwin arm 1.18beta2" "https://golang.org/dl/go1.18beta2.darwin-arm64.tar.gz#b442585cbd50759bd11d7a9971e02ec3b2e8cfc1ff1094fa23afadc9e3889689"
+
+install_bsd_32bit "Go Freebsd 32bit 1.18beta2" "https://golang.org/dl/go1.18beta2.freebsd-386.tar.gz#f45899dcc440c9943b3af11a2856959e1ffd9fb11d0dbdbe6398615a96715751"
+
+install_bsd_64bit "Go Freebsd 64bit 1.18beta2" "https://golang.org/dl/go1.18beta2.freebsd-amd64.tar.gz#f5688d21a0e02991445b7992f01fc5fda459c84a1812b3b08c2ada4a98e74b5e"
+
+install_linux_32bit "Go Linux 32bit 1.18beta2" "https://golang.org/dl/go1.18beta2.linux-386.tar.gz#74ac524d7d17df606cc74059bf30efce35bb6930f950110dd79cc58ba057f186"
+
+install_linux_64bit "Go Linux 64bit 1.18beta2" "https://golang.org/dl/go1.18beta2.linux-amd64.tar.gz#b5dacafa59737cfb0d657902b70c2ad1b6bb4ed15e85ea2806f72ce3d4824688"
+
+install_linux_arm "Go Linux arm 1.18beta2" "https://golang.org/dl/go1.18beta2.linux-armv6l.tar.gz#bc958a63b51c44762ec026ab587b0261e94cf6337613bfbbcfbd0414fb95f7b6"
+
+install_linux_arm_64bit "Go Linux arm 64bit 1.18beta2" "https://golang.org/dl/go1.18beta2.linux-arm64.tar.gz#21e4248594401568c2e8704b9d26c6185a61f46b4f17e1a628bf1b5d9a010503"
