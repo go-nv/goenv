@@ -175,7 +175,7 @@ install_darwin_64bit() {
     if [ "$(uname -s)" = "Darwin" ]; then
         local arch="$(uname -m)"
 
-        if [ $arch = "x86_64" ]; then
+        if [ $arch = "x86_64" ] && [ -z "$FORCE_DARWIN_ARCH" ] || [ "$FORCE_DARWIN_ARCH" = "x86_64" ]; then
             install_package_using "tarball" 1 "$@"
         fi
     fi
@@ -185,7 +185,7 @@ install_darwin_arm() {
     if [ "$(uname -s)" = "Darwin" ]; then
         local arch="$(uname -m)"
 
-        if [ $arch = "arm64" ]; then
+        if [ $arch = "arm64" ] && [ -z "$FORCE_DARWIN_ARCH" ] || [ "$FORCE_DARWIN_ARCH" = "arm64" ]; then
             install_package_using "tarball" 1 "$@"
         fi
     fi
