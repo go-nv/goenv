@@ -8,14 +8,14 @@ easy to fork and contribute any changes back upstream.
 1. **Check out goenv where you want it installed.**
    A good place to choose is `$HOME/.goenv` (but you can install it somewhere else).
 
-        $ git clone https://github.com/syndbg/goenv.git ~/.goenv
+       git clone https://github.com/syndbg/goenv.git ~/.goenv
 
 2. **Define environment variable `GOENV_ROOT`** to point to the path where
    goenv repo is cloned and add `$GOENV_ROOT/bin` to your `$PATH` for access
    to the `goenv` command-line utility.
 
-        $ echo 'export GOENV_ROOT="$HOME/.goenv"' >> ~/.bash_profile
-        $ echo 'export PATH="$GOENV_ROOT/bin:$PATH"' >> ~/.bash_profile
+       echo 'export GOENV_ROOT="$HOME/.goenv"' >> ~/.bash_profile
+       echo 'export PATH="$GOENV_ROOT/bin:$PATH"' >> ~/.bash_profile
 
     **Zsh note**: Modify your `~/.zshenv` file instead of `~/.bash_profile`.
 
@@ -25,7 +25,7 @@ easy to fork and contribute any changes back upstream.
    Please make sure `eval "$(goenv init -)"` is placed toward the end of the shell
    configuration file since it manipulates `PATH` during the initialization.
 
-        $ echo 'eval "$(goenv init -)"' >> ~/.bash_profile
+       echo 'eval "$(goenv init -)"' >> ~/.bash_profile
 
     **Zsh note**: Modify your `~/.zshenv` or `~/.zshrc` file instead of `~/.bash_profile`.
     
@@ -40,8 +40,8 @@ easy to fork and contribute any changes back upstream.
 4. **If you want  `goenv` to manage `GOPATH` and `GOROOT` (recommended)**, 
   add `GOPATH` and `GOROOT` to your shell **after `eval "$(goenv init -)"`**.
   
-        $ echo 'export PATH="$GOROOT/bin:$PATH"' >> ~/.bash_profile
-        $ echo 'export PATH="$PATH:$GOPATH/bin"' >> ~/.bash_profile
+       echo 'export PATH="$GOROOT/bin:$PATH"' >> ~/.bash_profile
+       echo 'export PATH="$PATH:$GOPATH/bin"' >> ~/.bash_profile
         
     **Zsh note**: Modify your `~/.zshenv` or `~/.zshrc` file instead of `~/.bash_profile`.
     
@@ -62,12 +62,12 @@ easy to fork and contribute any changes back upstream.
 5. **Restart your shell so the path changes take effect.**
    You can now begin using goenv.
 
-        $ exec $SHELL
+       exec $SHELL
 
 6. **Install Go versions into `$GOENV_ROOT/versions`.**
    For example, to download and install Go 1.12.0, run:
 
-        $ goenv install 1.12.0
+       goenv install 1.12.0
 
    **NOTE:** It downloads and places the prebuilt Go binaries provided by Google.
    
@@ -88,8 +88,8 @@ Add the following line to your `.zshrc`:
 ```zplug "RiverGlide/zsh-goenv", from:gitlab```
 Then install the plugin
 ~~~ zsh
-  $ source ~/.zshrc
-  $ zplug install
+  source ~/.zshrc
+  zplug install
 ~~~
 The ZPlug plugin will install and initialise `goenv` and add `goenv` and `goenv-install` to your `PATH`
    
@@ -98,8 +98,8 @@ The ZPlug plugin will install and initialise `goenv` and add `goenv` and `goenv-
 You can also install goenv using the [Homebrew](http://brew.sh)
 package manager for Mac OS X.
 
-    $ brew update
-    $ brew install goenv
+    brew update
+    brew install goenv
 
 To upgrade goenv in the future, use `upgrade` instead of `install`.
 
@@ -114,16 +114,16 @@ upgrade your installation at any time using git.
 
 To upgrade to the latest development version of goenv, use `git pull`:
 
-    $ cd ~/.goenv
-    $ git pull
+    cd ~/.goenv
+    git pull
 
 To upgrade to a specific release of goenv, check out the corresponding tag:
 
-    $ cd ~/.goenv
-    $ git fetch
-    $ git tag
+    cd ~/.goenv
+    git fetch
+    git tag
     v20160417
-    $ git checkout v20160417
+    git checkout v20160417
 
 ## Uninstalling goenv
 
