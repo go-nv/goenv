@@ -114,13 +114,12 @@ upgrade your installation at any time using git.
 
 To upgrade to the latest development version of goenv, use `git pull`:
 
-    cd ~/.goenv
-    git pull
+    cd ~/.goenv && git fetch --all && git pull
 
 To upgrade to a specific release of goenv, check out the corresponding tag:
 
     cd ~/.goenv
-    git fetch
+    git fetch --all
     git tag
     v20160417
     git checkout v20160417
