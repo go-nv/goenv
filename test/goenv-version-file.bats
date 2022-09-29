@@ -30,6 +30,15 @@ OUT
   assert_success "${GOENV_ROOT}/version"
 }
 
+@test "prints current file when no arguments are given and if 'go.mod' exists and GOENV_GOMOD_VERSION_ENABLE = 1" {
+  create_file "go.mod"
+  export GOENV_GOMOD_VERSION_ENABLE=1
+
+  run goenv-version-file
+
+  assert_success "${GOENV_TEST_DIR}/go.mod"
+}
+
 @test "prints current file when no arguments are given and if '.go-version' file exists in current directory" {
   create_file ".go-version"
 
