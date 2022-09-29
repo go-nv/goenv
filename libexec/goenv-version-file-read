@@ -11,7 +11,7 @@ if [ ! -f "$VERSION_FILE" ]; then
 fi
 
 if [[ "$(basename $VERSION_FILE)" == "go.mod" ]]; then
-  versions=("$(cat "$VERSION_FILE" | sed -En 's/^go[[:space:]]+([[:digit:].]+)$/\1/p')")
+  versions=($(cat $VERSION_FILE | grep -E "go \\d\\.\\d{1,2}(beta|rc)?" | sed 's/go //'))
 else
   # NOTE: Read the first non-whitespace word from the specified version file.
   # Be careful not to load it whole in case there's something crazy in it.
