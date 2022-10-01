@@ -14,3 +14,4 @@ name | default | description
 `GOENV_GOPATH_PREFIX` | `$HOME/go` | `GOPATH` prefix that's exported when `GOENV_DISABLE_GOPATH` is not `1`.<br> E.g in practice it can be `$HOME/go/1.12.0` if you currently use `1.12.0` version of go.
 `GOENV_APPEND_GOPATH` | | If `GOPATH` is set, it will be appended to the computed `GOPATH`.
 `GOENV_PREPEND_GOPATH` | | If `GOPATH` is set, it will be prepended to the computed `GOPATH`.
+`GOENV_GOMOD_VERSION_ENABLE` | | if `GOENV_GOMOD_VERSION_ENABLE` is set to 1, it will try to use the project's `go.mod` file to get the version.
