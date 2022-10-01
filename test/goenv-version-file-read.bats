@@ -27,28 +27,45 @@ OUT
 }
 
 @test "fails for file specified in arguments that exists but is blank" {
-  echo > my-version
+  echo >my-version
 
   run goenv-version-file-read my-version
   assert_failure ""
 }
 
+@test "reads go.mod file specified in arguments that exists and is not blank" {
+  cat >go.mod <<IN
+
+module github.com/syndbg/goenv
+
+go 1.11
+
+require (
+	github.com/foo/bar v0.0.0-20220101000000-0123456789abcdef // indirect
+)
+
+IN
+
+  run goenv-version-file-read go.mod
+  assert_success "1.11"
+}
+
 @test "reads version file specified in arguments that exists and is not blank" {
-  echo "1.11.1" > my-version
+  echo "1.11.1" >my-version
 
   run goenv-version-file-read my-version
   assert_success "1.11.1"
 }
 
 @test "reads version file without leading and trailing spaces, specified in arguments that exists and is not blank" {
-  echo "         1.11.1   " > my-version
+  echo "         1.11.1   " >my-version
 
   run goenv-version-file-read my-version
   assert_success "1.11.1"
 }
 
 @test "reads version file without additional newlines, specified in arguments that exists and is not blank" {
-  cat > my-version <<IN
+  cat >my-version <<IN
 
 1.11.1
 
@@ -61,14 +78,14 @@ IN
 }
 
 @test "reads version file that's not ending with newline, specified in arguments that exists and is not blank" {
-  echo -n "1.11.1" > my-version
+  echo -n "1.11.1" >my-version
 
   run goenv-version-file-read my-version
   assert_success "1.11.1"
 }
 
 @test "reads version file that ends with carriage return, specified in arguments that exists and is not blank" {
-  echo $'1.11.1\r' > my-version
+  echo $'1.11.1\r' >my-version
 
   run goenv-version-file-read my-version
   assert_success "1.11.1"
