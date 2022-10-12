@@ -2,7 +2,7 @@
 #
 # Summary: Install a Go version using go-build
 #
-# Usage: goenv install [-f] [-kvp] <version>|latest
+# Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 #        goenv install [-f] [-kvp] <definition-file>
 #        goenv install -l|--list
 #        goenv install --version
@@ -63,7 +63,11 @@ definitions() {
 }
 
 latest_version() {
-  definitions | grep -oE "^$1\\.?([0-9]+|beta[0-9]+|rc[0-9]+)?" | tail -1
+  definitions | grep -oE "^$1\\.([0-9]+)?" | tail -1
+}
+
+latest_includes_unstable_version() {
+  definitions | grep -ioE "^$1\\.?([0-9]+|beta[0-9]+|rc[0-9]+)?" | tail -1
 }
 
 indent() {
@@ -125,12 +129,18 @@ unset VERSION_NAME
 # version is not specified.
 DEFINITION="${ARGUMENTS[0]}"
 
-# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version.
-# A patch version of 0 will be added, e.g they'll be changed to `1.11.0`.
+# If latest is supplied, install the latest available (stable) version
 if [[ ${DEFINITION} == "latest" ]]; then
   LATEST=$(latest_version "[0-9]\\.[0-9]+")
   echo "Installing latest version ${LATEST}..."
   DEFINITION=$LATEST
+# If unstable is supplied, install the latest available (including beta/rc) version
+elif [[ ${DEFINITION} == "unstable" ]]; then
+  LATEST=$(latest_includes_unstable_version "[0-9]\\.[0-9]+")
+  echo "Installing latest (including unstable) version ${LATEST}..."
+  DEFINITION=$LATEST
+# The latest patch version will be located, e.g if 1.11 is supplied they'll be changed to `1.11.x`.
+# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version and install latest patch.
 elif grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${DEFINITION}; then
   REGEX=$(echo $DEFINITION | sed s/\\./\\\\./)
   LATEST_PATCH=$(latest_version $REGEX)
