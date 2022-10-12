@@ -1,35 +1,35 @@
 # Command Reference
 
 Like `git`, the `goenv` command delegates to subcommands based on its
-first argument.
+first argument. 
 
 All subcommands are:
 
-- [`goenv commands`](#goenv-commands)
-- [`goenv completions`](#goenv-completions)
-- [`goenv exec`](#goenv-exec)
-- [`goenv global`](#goenv-global)
-- [`goenv help`](#goenv-help)
-- [`goenv hooks`](#goenv-hooks)
-- [`goenv init`](#goenv-init)
-- [`goenv install`](#goenv-install)
-- [`goenv local`](#goenv-local)
-- [`goenv prefix`](#goenv-prefix)
-- [`goenv rehash`](#goenv-rehash)
-- [`goenv root`](#goenv-root)
-- [`goenv shell`](#goenv-shell)
-- [`goenv shims`](#goenv-shims)
-- [`goenv uninstall`](#goenv-uninstall)
-- [`goenv version`](#goenv-version)
-- [`goenv --version`](#goenv---version)
-- [`goenv version-file`](#goenv-version-file)
-- [`goenv version-file-read`](#goenv-version-file-read)
-- [`goenv version-file-write`](#goenv-version-file-write)
-- [`goenv version-name`](#goenv-version-name)
-- [`goenv version-origin`](#goenv-version-origin)
-- [`goenv versions`](#goenv-versions)
-- [`goenv whence`](#goenv-whence)
-- [`goenv which`](#goenv-which)
+* [`goenv commands`](#goenv-commands)
+* [`goenv completions`](#goenv-completions)
+* [`goenv exec`](#goenv-exec)
+* [`goenv global`](#goenv-global)
+* [`goenv help`](#goenv-help)
+* [`goenv hooks`](#goenv-hooks)
+* [`goenv init`](#goenv-init)
+* [`goenv install`](#goenv-install)
+* [`goenv local`](#goenv-local)
+* [`goenv prefix`](#goenv-prefix)
+* [`goenv rehash`](#goenv-rehash)
+* [`goenv root`](#goenv-root)
+* [`goenv shell`](#goenv-shell)
+* [`goenv shims`](#goenv-shims)
+* [`goenv uninstall`](#goenv-uninstall)
+* [`goenv version`](#goenv-version)
+* [`goenv --version`](#goenv---version)
+* [`goenv version-file`](#goenv-version-file)
+* [`goenv version-file-read`](#goenv-version-file-read)
+* [`goenv version-file-write`](#goenv-version-file-write)
+* [`goenv version-name`](#goenv-version-name)
+* [`goenv version-origin`](#goenv-version-origin)
+* [`goenv versions`](#goenv-versions)
+* [`goenv whence`](#goenv-whence)
+* [`goenv which`](#goenv-which)
 
 ## `goenv commands`
 
@@ -43,8 +43,8 @@ Provides auto-completion for itself and other commands by calling them with `--c
 
 Run an executable with the selected Go version.
 
-Assuming there's an already installed golang by e.g `goenv install 1.11.1` and
-selected by e.g `goenv global 1.11.1`,
+Assuming there's an already installed golang by e.g `goenv install 1.11.1` and 
+  selected by e.g `goenv global 1.11.1`,
 
 ```shell
 > goenv exec go run main.go
@@ -88,6 +88,7 @@ span multiple lines as long as subsequent lines are indented.
 The remainder of the comment block is displayed as extended
 documentation.
 
+
 ```shell
 > goenv help help
 ```
@@ -122,7 +123,7 @@ eval "$(goenv init -)"
 
 ## `goenv install`
 
-Install a Go version (using `go-build`). It's required that the version is a known installable definition by `go-build`. Alternatively, supply `latest` as an argument to install the latest version available to goenv.
+Install a Go version (using `go-build`). It's required that the version is a known installable definition by `go-build`.
 
 ```shell
 > goenv install 1.11.1
@@ -144,6 +145,7 @@ command.
 When run without a version number, `goenv local` reports the currently
 configured local version. You can also unset the local version:
 
+
 ```shell
 > goenv local --unset
 ```
@@ -155,7 +157,7 @@ read a local version specified in an `.goenv-version` file, but a
 
 ### `goenv local` (advanced)
 
-You can specify local Go version.
+You can specify local Go version. 
 
 ```shell
 > goenv local 1.5.4
@@ -266,6 +268,7 @@ Show version of `goenv` in format of `goenv <version>`.
 
 Detect the file that sets the current goenv version
 
+
 ```shell
 > goenv version-file
 /home/syndbg/work/syndbg/goenv/.go-version
@@ -276,7 +279,7 @@ Detect the file that sets the current goenv version
 Reads specified version file if it exists
 
 ```shell
-> goenv version-file-read ./go-version
+> goenv version-file-read ./go-version 
 1.11.1
 ```
 
