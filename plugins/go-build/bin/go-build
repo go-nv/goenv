@@ -760,7 +760,13 @@ unset IPV6
 
 GO_BUILD_INSTALL_PREFIX="$(abs_dirname "$0")/.."
 
-IFS=: GO_BUILD_DEFINITIONS=($GO_BUILD_DEFINITIONS ${GO_BUILD_ROOT:-$GO_BUILD_INSTALL_PREFIX}/share/go-build)
+if [[ $USE_FAKE_DEFINITIONS == "true" ]]; then
+  DIR_SUFFIX=test/fixtures/definitions
+else
+  DIR_SUFFIX=share/go-build
+fi
+
+IFS=: GO_BUILD_DEFINITIONS=($GO_BUILD_DEFINITIONS ${GO_BUILD_ROOT:-$GO_BUILD_INSTALL_PREFIX/$DIR_SUFFIX})
 IFS="$OLDIFS"
 
 parse_options "$@"
