@@ -760,6 +760,7 @@ unset IPV6
 
 GO_BUILD_INSTALL_PREFIX="$(abs_dirname "$0")/.."
 
+# USE_FAKE_DEFINITIONS is used for tests to mock the definitions list to our available test fixtures
 if [[ $USE_FAKE_DEFINITIONS == "true" ]]; then
   DIR_SUFFIX=test/fixtures/definitions
 else
