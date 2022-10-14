@@ -42,7 +42,7 @@ extract_initial_comment_block() {
 }
 
 collect_documentation() {
-  $(type -p awk | head -1) '
+  $(type -p gawk | head -1) '
     /^Summary:/ {
       summary = substr($0, 10)
       next
