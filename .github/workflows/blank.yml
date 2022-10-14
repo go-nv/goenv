@@ -1,13 +1,13 @@
 name: CI
-on: 
+on:
   push:
     branches:
       - master
-    tags: 
-      - '*'
+    tags:
+      - "*"
   pull_request:
-    branches: 
-      - master
+    branches:
+      - "*"
 jobs:
   build:
     strategy:
@@ -16,7 +16,8 @@ jobs:
         goenv_native_ext: ["", "1"]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
-    - run: make test
-      env:
-        GOENV_NATIVE_EXT: ${{ matrix.goenv_native_ext }}
+      - uses: actions/checkout@v3
+      - name: Run Unit Tests
+        run: make test
+        env:
+          GOENV_NATIVE_EXT: ${{ matrix.goenv_native_ext }}
