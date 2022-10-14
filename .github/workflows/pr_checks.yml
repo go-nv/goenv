@@ -17,8 +17,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
-      - name: Get Bash Version
-        run: bash --version
+      - name: Check golang
+        run: go version
       - name: Run Unit Tests
         run: make test
         env:
