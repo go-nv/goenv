@@ -20,8 +20,6 @@ jobs:
       - name: Get Bash Version
         run: bash --version
       - name: Run Unit Tests
-        run: |
-          bash
-          make test
+        run: make test
         env:
           GOENV_NATIVE_EXT: ${{ matrix.goenv_native_ext }}
