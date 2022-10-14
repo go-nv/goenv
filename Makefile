@@ -1,4 +1,5 @@
 .ONESHELL:
+SHELL = /bin/bash
 .PHONY: test test-goenv test-goenv-go-build bats start-fake-go-build-http-server stop-fake-go-build-http-server run-goenv-go-build-tests
 
 default: test
