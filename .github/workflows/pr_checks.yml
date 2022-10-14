@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Remove golang
-        run: apt purge golang
+        run: sudo apt purge golang
       - name: Run Unit Tests
         run: make test
         env:
