@@ -23,6 +23,6 @@ jobs:
       - name: Remove golang
         run: sudo rm -rf $(which go)
       - name: Run Unit Tests
-        run: make test
+        run: make test-goenv-go-build
         env:
           GOENV_NATIVE_EXT: ${{ matrix.goenv_native_ext }}

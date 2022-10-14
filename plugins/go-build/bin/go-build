@@ -114,13 +114,7 @@ is_mac() {
 # 0.10.9  -> 1009
 # 0.10.10 -> 1010
 osx_version() {
-  local -a ver
-
-  OLDIFS=$IFS
-  IFS=.
-  macVer=$(sw_vers -productVersion)
-  read -a ver <<<$macVer
-  IFS=$OLDIFS
+  ver=($(sw_vers -productVersion | tr '.' ' '))
   OSX_VER=$((${ver[1]} * 100 + ${ver[2]}))
 }
 
