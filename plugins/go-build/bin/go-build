@@ -118,7 +118,8 @@ osx_version() {
 
   OLDIFS=$IFS
   IFS=.
-  ver=($(sw_vers -productVersion))
+  macVer=$(sw_vers -productVersion)
+  read -a ver <<<$macVer
   IFS=$OLDIFS
   OSX_VER=$((${ver[1]} * 100 + ${ver[2]}))
 }
