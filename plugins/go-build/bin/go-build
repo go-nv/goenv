@@ -115,7 +115,7 @@ is_mac() {
 # 0.10.10 -> 1010
 osx_version() {
   ver=($(sw_vers -productVersion | tr '.' ' '))
-  OSX_VER=$((${ver[1]} * 100 + ${ver[2]}))
+  OSX_VER=$((${ver[0]} * 100 + ${ver[1]})) # macOS uses zero-index array accessors for bash
 }
 
 build_failed() {
