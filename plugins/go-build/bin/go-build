@@ -114,13 +114,8 @@ is_mac() {
 # 0.10.9  -> 1009
 # 0.10.10 -> 1010
 osx_version() {
-  local -a ver
-
-  OLDIFS=$IFS
-  IFS=.
-  ver=($(sw_vers -productVersion))
-  IFS=$OLDIFS
-  OSX_VER=$((${ver[1]} * 100 + ${ver[2]}))
+  ver=($(sw_vers -productVersion | tr '.' ' '))
+  OSX_VER=$((${ver[0]} * 100 + ${ver[1]})) # macOS uses zero-index array accessors for bash
 }
 
 build_failed() {
