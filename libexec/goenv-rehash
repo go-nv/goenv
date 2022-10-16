@@ -92,6 +92,15 @@ list_executable_names() {
     for file in "${GOENV_ROOT}/versions/${version}/bin/"*; do
       echo "${file##*/}"
     done
+    if [ "${GOENV_DISABLE_GOPATH}" != "1" ]; then
+      local gopath="${HOME}/go/${version}"
+      if [ -n "${GOENV_GOPATH_PREFIX}" ]; then
+        gopath="${GOENV_GOPATH_PREFIX}/${version}"
+      fi
+      for file in "${gopath}/bin/"*; do
+        echo "${file##*/}"
+      done
+    fi
   done
 }
 

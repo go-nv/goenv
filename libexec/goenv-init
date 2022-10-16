@@ -87,13 +87,21 @@ mkdir -p "${GOENV_ROOT}/"{shims,versions}
 
 case "$shell" in
 fish )
-  echo "set -gx PATH '${GOENV_ROOT}/shims' \$PATH"
   echo "set -gx GOENV_SHELL $shell"
-;;
+  echo "set -gx GOENV_ROOT $GOENV_ROOT"
+
+  echo 'if not contains $GOENV_ROOT/shims $PATH'
+  echo '  set -gx PATH $GOENV_ROOT/shims $PATH'
+  echo 'end'
+  ;;
 * )
-  echo 'export PATH="'${GOENV_ROOT}'/shims:${PATH}"'
   echo "export GOENV_SHELL=$shell"
-;;
+  echo "export GOENV_ROOT=$GOENV_ROOT"
+
+  echo 'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
+  echo '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  echo 'fi'
+  ;;
 esac
 
 completion="${root}/completions/goenv.${shell}"

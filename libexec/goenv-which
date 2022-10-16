@@ -47,6 +47,15 @@ for version in "${versions[@]}"; do
   fi
   if [ -x "$GOENV_COMMAND_PATH" ]; then
     break
+  elif [[ "$version" != "system" && "${GOENV_DISABLE_GOPATH}" != "1" ]]; then
+    if [ -n "${GOENV_GOPATH_PREFIX}" ]; then
+      GOENV_COMMAND_PATH="${GOENV_GOPATH_PREFIX}/${version}/bin/${GOENV_COMMAND}"
+    else
+      GOENV_COMMAND_PATH="${HOME}/go/${version}/bin/${GOENV_COMMAND}"
+    fi
+    if [ -x "$GOENV_COMMAND_PATH" ]; then
+      break
+    fi
   fi
 done
 

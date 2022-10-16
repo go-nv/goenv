@@ -14,6 +14,11 @@ find_local_version_file() {
       return 0
     fi
 
+    if [ -e "${root}/go.mod" ] && [ "$GOENV_GOMOD_VERSION_ENABLE" == "1" ]; then
+      echo "${root}/go.mod"
+      return 0
+    fi
+
     if [ -z "$root" ]; then
       break
     fi

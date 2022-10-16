@@ -1,0 +1,13 @@
+install_darwin_64bit "Go Darwin 64bit 1.14.15" "https://golang.org/dl/go1.14.15.darwin-amd64.tar.gz#cc116e7522d1d1bcb606ce413555c4f2d5c86c0c8d5e5074a0d57b303d8edb50"
+
+install_bsd_32bit "Go Freebsd 32bit 1.14.15" "https://golang.org/dl/go1.14.15.freebsd-386.tar.gz#4d8eb68aa9bdc1d13cebe8884c6bf4f9cc0b8baea383620113ff6a2ac17c8d63"
+
+install_bsd_64bit "Go Freebsd 64bit 1.14.15" "https://golang.org/dl/go1.14.15.freebsd-amd64.tar.gz#06b355212b788e348369e1d09bb55aed73da4b3569af5a5f8801dd88182df99f"
+
+install_linux_32bit "Go Linux 32bit 1.14.15" "https://golang.org/dl/go1.14.15.linux-386.tar.gz#cab962eaf954378bbb5b24f703baf3b471e9690a109082dd688593fbb6f9008e"
+
+install_linux_64bit "Go Linux 64bit 1.14.15" "https://golang.org/dl/go1.14.15.linux-amd64.tar.gz#c64a57b374a81f7cf1408d2c410a28c6f142414f1ffa9d1062de1d653b0ae0d6"
+
+install_linux_arm "Go Linux arm 1.14.15" "https://golang.org/dl/go1.14.15.linux-armv6l.tar.gz#a63960d9b9c14954e299ffe060c0574ffb91ab810837da5941853b664d0652da"
+
+install_linux_arm_64bit "Go Linux arm 64bit 1.14.15" "https://golang.org/dl/go1.14.15.linux-arm64.tar.gz#4d964166a189c22032521c63935437c304bb7f01673b196898cff525897a1c27"

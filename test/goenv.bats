@@ -14,6 +14,8 @@ Some useful goenv commands are:
    local       Set or show the local application-specific Go version
    global      Set or show the global Go version
    shell       Set or show the shell-specific Go version
+   install     Install a Go version using go-build
+   uninstall   Uninstall a specific Go version
    rehash      Rehash goenv shims (run this after installing executables)
    version     Show the current Go version and its origin
    versions    List all Go versions available to goenv
@@ -69,7 +71,7 @@ OUT
 
 @test "adds its own 'GOENV_ROOT/libexec' to PATH" {
   run goenv echo "PATH"
-  assert_success "${BATS_TEST_DIRNAME%/*}/libexec:$PATH"
+  assert_success "${BATS_TEST_DIRNAME%/*}/libexec:${BATS_TEST_DIRNAME%/*}/plugins/go-build/bin:$PATH"
 }
 
 @test "adds plugin bin dirs 'GOENV_ROOT/{libexec,plugins}/<plugin>/<binary>' to PATH" {
@@ -81,6 +83,7 @@ OUT
   assert_line 0 "${BATS_TEST_DIRNAME%/*}/libexec"
   assert_line 1 "${GOENV_ROOT}/plugins/goenv-each/bin"
   assert_line 2 "${GOENV_ROOT}/plugins/go-build/bin"
+  assert_line 3 "${BATS_TEST_DIRNAME%/*}/plugins/go-build/bin"
 }
 
 @test "'GOENV_HOOK_PATH' uses already defined 'GOENV_HOOK_PATH' in environment variable" {

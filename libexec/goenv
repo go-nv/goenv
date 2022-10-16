@@ -83,6 +83,9 @@ export GOENV_DIR
 shopt -s nullglob
 
 bin_path="$(abs_dirname "$0")"
+for plugin_bin in "${bin_path%/*}/plugins/"*/bin; do
+  PATH="${plugin_bin}:${PATH}"
+done
 for plugin_bin in "${GOENV_ROOT}/plugins/"*/bin; do
   PATH="${plugin_bin}:${PATH}"
 done
