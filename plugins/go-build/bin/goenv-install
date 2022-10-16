@@ -2,7 +2,7 @@
 #
 # Summary: Install a Go version using go-build
 #
-# Usage: goenv install [-f] [-kvp] <version>
+# Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 #        goenv install [-f] [-kvp] <definition-file>
 #        goenv install -l|--list
 #        goenv install --version
@@ -62,6 +62,14 @@ definitions() {
   go-build --definitions | $(type -p ggrep grep | head -1) -F "$query" || true
 }
 
+latest_version() {
+  definitions | grep -oE "^$1\\.([0-9]+)?" | tail -1
+}
+
+latest_includes_unstable_version() {
+  definitions | grep -ioE "^$1\\.?([0-9]+|beta[0-9]+|rc[0-9]+)?" | tail -1
+}
+
 indent() {
   sed 's/^/  /'
 }
@@ -76,36 +84,36 @@ unset DEBUG
 parse_options "$@"
 for option in "${OPTIONS[@]}"; do
   case "$option" in
-  "h" | "help" )
+  "h" | "help")
     usage 0
     ;;
-  "l" | "list" )
+  "l" | "list")
     echo "Available versions:"
     definitions | indent
     exit
     ;;
-  "f" | "force" )
+  "f" | "force")
     FORCE=true
     ;;
-  "s" | "skip-existing" )
+  "s" | "skip-existing")
     SKIP_EXISTING=true
     ;;
-  "k" | "keep" )
+  "k" | "keep")
     [ -n "${GOENV_BUILD_ROOT}" ] || GOENV_BUILD_ROOT="${GOENV_ROOT}/sources"
     ;;
-  "v" | "verbose" )
+  "v" | "verbose")
     VERBOSE="-v"
     ;;
-  "p" | "patch" )
+  "p" | "patch")
     HAS_PATCH="-p"
     ;;
-  "g" | "debug" )
+  "g" | "debug")
     DEBUG="-g"
     ;;
-  "version" )
+  "version")
     exec go-build --version
     ;;
-  * )
+  *)
     usage 1 >&2
     ;;
   esac
@@ -121,11 +129,23 @@ unset VERSION_NAME
 # version is not specified.
 DEFINITION="${ARGUMENTS[0]}"
 
-# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version.
-# A patch version of 0 will be added, e.g they'll be changed to `1.11.0`.
-if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<< ${DEFINITION}; then
-  echo "Adding patch version 0 to ${DEFINITION}"
-  DEFINITION="${DEFINITION}.0"
+# If latest is supplied, install the latest available (stable) version
+if [[ ${DEFINITION} == "latest" ]]; then
+  LATEST=$(latest_version "[0-9]\\.[0-9]+")
+  echo "Installing latest version ${LATEST}..."
+  DEFINITION=$LATEST
+# If unstable is supplied, install the latest available (including beta/rc) version
+elif [[ ${DEFINITION} == "unstable" ]]; then
+  LATEST=$(latest_includes_unstable_version "[0-9]\\.[0-9]+")
+  echo "Installing latest (including unstable) version ${LATEST}..."
+  DEFINITION=$LATEST
+# The latest patch version will be located, e.g if 1.11 is supplied they'll be changed to `1.11.x`.
+# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version and install latest patch.
+elif grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${DEFINITION}; then
+  REGEX=$(echo $DEFINITION | sed s/\\./\\\\./)
+  LATEST_PATCH=$(latest_version $REGEX)
+  echo "Using latest patch version $LATEST_PATCH"
+  DEFINITION="$LATEST_PATCH"
 fi
 
 [ -n "$DEFINITION" ] || DEFINITION="$(goenv-local 2>/dev/null || true)"
@@ -147,12 +167,11 @@ after_install() {
 }
 
 OLDIFS="$IFS"
-IFS=$'\n' scripts=(`goenv-hooks install`)
+IFS=$'\n' scripts=($(goenv-hooks install))
 IFS="$OLDIFS"
 for script in "${scripts[@]}"; do
-  source "$script";
+  source "$script"
 done
-
 
 # Set VERSION_NAME from $DEFINITION, if it is not already set. Then
 # compute the installation prefix.
@@ -170,8 +189,8 @@ if [ -d "${PREFIX}/bin" ]; then
     read -p "continue with installation? (y/N) "
 
     case "$REPLY" in
-    y* | Y* ) ;;
-    * ) exit 1 ;;
+    y* | Y*) ;;
+    *) exit 1 ;;
     esac
   elif [ -n "$SKIP_EXISTING" ]; then
     # Since we know the go version is already installed, and are opting to
@@ -195,7 +214,7 @@ fi
 
 # Execute `before_install` hooks.
 for hook in "${before_hooks[@]}"; do
-  eval "$hook";
+  eval "$hook"
 done
 
 # Plan cleanup on unsuccessful installation.
@@ -236,8 +255,8 @@ if [ "$STATUS" == "2" ]; then
 fi
 
 # Execute `after_install` hooks.
-for hook in "${after_hooks[@]}";
-  do eval "$hook";
+for hook in "${after_hooks[@]}"; do
+  eval "$hook"
 done
 
 # Run `goenv-rehash` after a successful installation.

@@ -123,7 +123,7 @@ eval "$(goenv init -)"
 
 ## `goenv install`
 
-Install a Go version (using `go-build`). It's required that the version is a known installable definition by `go-build`.
+Install a Go version (using `go-build`). It's required that the version is a known installable definition by `go-build`. Alternatively, supply `latest` as an argument to install the latest version available to goenv.
 
 ```shell
 > goenv install 1.11.1
