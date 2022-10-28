@@ -1,13 +1,13 @@
-install_darwin_64bit "Go Darwin 64bit 1.14.0" "https://dl.google.com/go/go1.14.darwin-amd64.tar.gz#2472dcd681b761501fadb35ec361503efd27de2ba2270b2fe35cb6ece7362243"
+install_darwin_64bit "Go Darwin 64bit 1.14.0" "go1.14.darwin-amd64.tar.gz#2472dcd681b761501fadb35ec361503efd27de2ba2270b2fe35cb6ece7362243"
 
-install_bsd_32bit "Go Freebsd 32bit 1.14.0" "https://dl.google.com/go/go1.14.freebsd-386.tar.gz#9717901860aab759ff1e555b0e62d58669939f7b2a86fc45d4015db29c92614d"
+install_bsd_32bit "Go Freebsd 32bit 1.14.0" "go1.14.freebsd-386.tar.gz#9717901860aab759ff1e555b0e62d58669939f7b2a86fc45d4015db29c92614d"
 
-install_bsd_64bit "Go Freebsd 64bit 1.14.0" "https://dl.google.com/go/go1.14.freebsd-amd64.tar.gz#d86041687515ac3729807cdaa6787a1a10ee4cfdefd427043dcdb20544096fa1"
+install_bsd_64bit "Go Freebsd 64bit 1.14.0" "go1.14.freebsd-amd64.tar.gz#d86041687515ac3729807cdaa6787a1a10ee4cfdefd427043dcdb20544096fa1"
 
-install_linux_32bit "Go Linux 32bit 1.14.0" "https://dl.google.com/go/go1.14.linux-386.tar.gz#cdcdab6c8d1f2dcea3bbec793352ef84db167a2eb6c60ff69e5cf94dca575f9a"
+install_linux_32bit "Go Linux 32bit 1.14.0" "go1.14.linux-386.tar.gz#cdcdab6c8d1f2dcea3bbec793352ef84db167a2eb6c60ff69e5cf94dca575f9a"
 
-install_linux_64bit "Go Linux 64bit 1.14.0" "https://dl.google.com/go/go1.14.linux-amd64.tar.gz#08df79b46b0adf498ea9f320a0f23d6ec59e9003660b4c9c1ce8e5e2c6f823ca"
+install_linux_64bit "Go Linux 64bit 1.14.0" "go1.14.linux-amd64.tar.gz#08df79b46b0adf498ea9f320a0f23d6ec59e9003660b4c9c1ce8e5e2c6f823ca"
 
-install_linux_arm "Go Linux arm 1.14.0" "https://dl.google.com/go/go1.14.linux-armv6l.tar.gz#b5e682176d7ad3944404619a39b585453a740a2f82683e789f4279ec285b7ecd"
+install_linux_arm "Go Linux arm 1.14.0" "go1.14.linux-armv6l.tar.gz#b5e682176d7ad3944404619a39b585453a740a2f82683e789f4279ec285b7ecd"
 
-install_linux_arm_64bit "Go Linux arm 64bit 1.14.0" "https://dl.google.com/go/go1.14.linux-arm64.tar.gz#cd813387f770c07819912f8ff4b9796a4e317dee92548b7226a19e60ac79eb27"
+install_linux_arm_64bit "Go Linux arm 64bit 1.14.0" "go1.14.linux-arm64.tar.gz#cd813387f770c07819912f8ff4b9796a4e317dee92548b7226a19e60ac79eb27"

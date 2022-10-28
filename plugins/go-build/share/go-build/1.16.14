@@ -1,15 +1,15 @@
-install_darwin_64bit "Go Darwin 64bit 1.16.14" "https://go.dev/dl/go1.16.14.darwin-amd64.tar.gz#671fc0673394b16747cc9fd4fe7f33de6a62610fd8c13b2cfad190a7280ec7ab"
+install_darwin_64bit "Go Darwin 64bit 1.16.14" "go1.16.14.darwin-amd64.tar.gz#671fc0673394b16747cc9fd4fe7f33de6a62610fd8c13b2cfad190a7280ec7ab"
 
-install_darwin_arm "Go Darwin arm 1.16.14" "https://go.dev/dl/go1.16.14.darwin-arm64.tar.gz#c97f02a5c93dcda5f0e25bc49a31761b31e9cb30de1e30f94033f5ddb9138133"
+install_darwin_arm "Go Darwin arm 1.16.14" "go1.16.14.darwin-arm64.tar.gz#c97f02a5c93dcda5f0e25bc49a31761b31e9cb30de1e30f94033f5ddb9138133"
 
-install_bsd_32bit "Go Freebsd 32bit 1.16.14" "https://go.dev/dl/go1.16.14.freebsd-386.tar.gz#c3e50940f3b773191a144141f1c3b00e997bde6421e4ff7315bec351aaa73538"
+install_bsd_32bit "Go Freebsd 32bit 1.16.14" "go1.16.14.freebsd-386.tar.gz#c3e50940f3b773191a144141f1c3b00e997bde6421e4ff7315bec351aaa73538"
 
-install_bsd_64bit "Go Freebsd 64bit 1.16.14" "https://go.dev/dl/go1.16.14.freebsd-amd64.tar.gz#aa5bc52c8839b0979e1c2fe8f847efc44a8725e191e9b457c8ce80b99870007b"
+install_bsd_64bit "Go Freebsd 64bit 1.16.14" "go1.16.14.freebsd-amd64.tar.gz#aa5bc52c8839b0979e1c2fe8f847efc44a8725e191e9b457c8ce80b99870007b"
 
-install_linux_32bit "Go Linux 32bit 1.16.14" "https://go.dev/dl/go1.16.14.linux-386.tar.gz#b4cd4602267f60db851fc420b53524ab4449d4a4c52c33cdb87bb74abc870ebf"
+install_linux_32bit "Go Linux 32bit 1.16.14" "go1.16.14.linux-386.tar.gz#b4cd4602267f60db851fc420b53524ab4449d4a4c52c33cdb87bb74abc870ebf"
 
-install_linux_64bit "Go Linux 64bit 1.16.14" "https://go.dev/dl/go1.16.14.linux-amd64.tar.gz#f4f5f02eb6809ac5bf19b5ad517b23504fd5fc036f6487651968ad36aa7a20e0"
+install_linux_64bit "Go Linux 64bit 1.16.14" "go1.16.14.linux-amd64.tar.gz#f4f5f02eb6809ac5bf19b5ad517b23504fd5fc036f6487651968ad36aa7a20e0"
 
-install_linux_arm "Go Linux arm 1.16.14" "https://go.dev/dl/go1.16.14.linux-armv6l.tar.gz#ed313a1a79ecba23b0d12a12b05003bf3ad55dfa76e611804d0295f641d68ec9"
+install_linux_arm "Go Linux arm 1.16.14" "go1.16.14.linux-armv6l.tar.gz#ed313a1a79ecba23b0d12a12b05003bf3ad55dfa76e611804d0295f641d68ec9"
 
-install_linux_arm_64bit "Go Linux arm 64bit 1.16.14" "https://go.dev/dl/go1.16.14.linux-arm64.tar.gz#5e59056e36704acb25809bcdb27191f27593cb7aba4d716b523008135a1e764a"
+install_linux_arm_64bit "Go Linux arm 64bit 1.16.14" "go1.16.14.linux-arm64.tar.gz#5e59056e36704acb25809bcdb27191f27593cb7aba4d716b523008135a1e764a"

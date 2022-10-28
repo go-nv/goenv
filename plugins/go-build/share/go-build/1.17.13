@@ -1,15 +1,15 @@
-install_darwin_64bit "Go Darwin 64bit 1.17.13" "https://go.dev/dl/go1.17.13.darwin-amd64.tar.gz#c101beaa232e0f448fab692dc036cd6b4677091ff89c4889cc8754b1b29c6608"
+install_darwin_64bit "Go Darwin 64bit 1.17.13" "go1.17.13.darwin-amd64.tar.gz#c101beaa232e0f448fab692dc036cd6b4677091ff89c4889cc8754b1b29c6608"
 
-install_darwin_arm "Go Darwin arm 1.17.13" "https://go.dev/dl/go1.17.13.darwin-arm64.tar.gz#e4ccc9c082d91eaa0b866078b591fc97d24b91495f12deb3dd2d8eda4e55a6ea"
+install_darwin_arm "Go Darwin arm 1.17.13" "go1.17.13.darwin-arm64.tar.gz#e4ccc9c082d91eaa0b866078b591fc97d24b91495f12deb3dd2d8eda4e55a6ea"
 
-install_bsd_32bit "Go Freebsd 32bit 1.17.13" "https://go.dev/dl/go1.17.13.freebsd-386.tar.gz#e0a5cb2a82d99032354701c02d5432af07aa258cab3f7fb54eac35045dab8435"
+install_bsd_32bit "Go Freebsd 32bit 1.17.13" "go1.17.13.freebsd-386.tar.gz#e0a5cb2a82d99032354701c02d5432af07aa258cab3f7fb54eac35045dab8435"
 
-install_bsd_64bit "Go Freebsd 64bit 1.17.13" "https://go.dev/dl/go1.17.13.freebsd-amd64.tar.gz#7e6e62c7f3ac7ebdb04b5eff90d8400aee28636ab964fae508f25dd6daa16ab3"
+install_bsd_64bit "Go Freebsd 64bit 1.17.13" "go1.17.13.freebsd-amd64.tar.gz#7e6e62c7f3ac7ebdb04b5eff90d8400aee28636ab964fae508f25dd6daa16ab3"
 
-install_linux_32bit "Go Linux 32bit 1.17.13" "https://go.dev/dl/go1.17.13.linux-386.tar.gz#5e02f35aecc6b89679f631e0edf12c49922dd31c8140cf8dd725c5797a9f2425"
+install_linux_32bit "Go Linux 32bit 1.17.13" "go1.17.13.linux-386.tar.gz#5e02f35aecc6b89679f631e0edf12c49922dd31c8140cf8dd725c5797a9f2425"
 
-install_linux_64bit "Go Linux 64bit 1.17.13" "https://go.dev/dl/go1.17.13.linux-amd64.tar.gz#4cdd2bc664724dc7db94ad51b503512c5ae7220951cac568120f64f8e94399fc"
+install_linux_64bit "Go Linux 64bit 1.17.13" "go1.17.13.linux-amd64.tar.gz#4cdd2bc664724dc7db94ad51b503512c5ae7220951cac568120f64f8e94399fc"
 
-install_linux_arm "Go Linux arm 1.17.13" "https://go.dev/dl/go1.17.13.linux-armv6l.tar.gz#260431d7deeb8893c21e71fcbbb1fde3258616d8eba584c8d72060228ab42c86"
+install_linux_arm "Go Linux arm 1.17.13" "go1.17.13.linux-armv6l.tar.gz#260431d7deeb8893c21e71fcbbb1fde3258616d8eba584c8d72060228ab42c86"
 
-install_linux_arm_64bit "Go Linux arm 64bit 1.17.13" "https://go.dev/dl/go1.17.13.linux-arm64.tar.gz#914daad3f011cc2014dea799bb7490442677e4ad6de0b2ac3ded6cee7e3f493d"
+install_linux_arm_64bit "Go Linux arm 64bit 1.17.13" "go1.17.13.linux-arm64.tar.gz#914daad3f011cc2014dea799bb7490442677e4ad6de0b2ac3ded6cee7e3f493d"

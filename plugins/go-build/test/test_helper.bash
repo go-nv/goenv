@@ -3,6 +3,7 @@ load ./test_assert_helpers_ext
 
 export TMP="$BATS_TEST_DIRNAME/tmp"
 export DISABLE_PROGRESS_BAR=true
+export IS_TEST=true
 
 unset GOENV_VERSION
 unset GOENV_DIR

@@ -441,6 +441,10 @@ http() {
   local file="$3"
   [ -n "$url" ] || return 1
 
+  if [[ $IS_TEST != "true" ]]; then
+    url="https://go.dev/dl/${url}"
+  fi
+
   if type curl &>/dev/null; then
     "http_${method}_curl" "$url" "$file"
   elif type wget &>/dev/null; then
@@ -494,7 +498,7 @@ fetch_tarball() {
     package_url="${package_url%%#*}"
 
     if [ -n "$GO_BUILD_MIRROR_URL" ]; then
-      if [[ -z "$GO_BUILD_DEFAULT_MIRROR" || $package_url != */www.golang.org/* ]]; then
+      if [[ -z "$GO_BUILD_DEFAULT_MIRROR" || $package_url != */go.dev/* ]]; then
         mirror_url="${GO_BUILD_MIRROR_URL}/$checksum"
       fi
     fi

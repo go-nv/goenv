@@ -1,11 +1,11 @@
-install_darwin_64bit "Go Darwin 64bit 1.10rc1" "https://dl.google.com/go/go1.10rc1.darwin-amd64.tar.gz#6e8a585cee9cbcec8feed9eebbf310ebbde64b6bf57adab702922a03be69130c"
+install_darwin_64bit "Go Darwin 64bit 1.10rc1" "go1.10rc1.darwin-amd64.tar.gz#6e8a585cee9cbcec8feed9eebbf310ebbde64b6bf57adab702922a03be69130c"
 
-install_bsd_32bit "Go Freebsd 32bit 1.10rc1" "https://dl.google.com/go/go1.10rc1.freebsd-386.tar.gz#ddfb90f94db629191539415499ecc494bab66234d24d9c1ab6bd6d6da7738d32"
+install_bsd_32bit "Go Freebsd 32bit 1.10rc1" "go1.10rc1.freebsd-386.tar.gz#ddfb90f94db629191539415499ecc494bab66234d24d9c1ab6bd6d6da7738d32"
 
-install_bsd_64bit "Go Freebsd 64bit 1.10rc1" "https://dl.google.com/go/go1.10rc1.freebsd-amd64.tar.gz#d16b8d525eb0b51c1c97ca96b42c178850ff9de72d4d3cb06625a88265a94ce9"
+install_bsd_64bit "Go Freebsd 64bit 1.10rc1" "go1.10rc1.freebsd-amd64.tar.gz#d16b8d525eb0b51c1c97ca96b42c178850ff9de72d4d3cb06625a88265a94ce9"
 
-install_linux_32bit "Go Linux 32bit 1.10rc1" "https://dl.google.com/go/go1.10rc1.linux-386.tar.gz#03a98cc12b65dde36ed9561fa23530bcf5fa7ed85596aa74f2380f686fcbe928"
+install_linux_32bit "Go Linux 32bit 1.10rc1" "go1.10rc1.linux-386.tar.gz#03a98cc12b65dde36ed9561fa23530bcf5fa7ed85596aa74f2380f686fcbe928"
 
-install_linux_64bit "Go Linux 64bit 1.10rc1" "https://dl.google.com/go/go1.10rc1.linux-amd64.tar.gz#c10d3cc7760bf3799037bd39027bbffdc568aea21d6fe60fe833373289c7b7c6"
+install_linux_64bit "Go Linux 64bit 1.10rc1" "go1.10rc1.linux-amd64.tar.gz#c10d3cc7760bf3799037bd39027bbffdc568aea21d6fe60fe833373289c7b7c6"
 
-install_linux_arm "Go Linux arm 1.10rc1" "https://dl.google.com/go/go1.10rc1.linux-armv6l.tar.gz#2c1ed86e3cbf9d9866333b73cee96a0cd0b8c73654f4705088caa64eb5a624d4"
+install_linux_arm "Go Linux arm 1.10rc1" "go1.10rc1.linux-armv6l.tar.gz#2c1ed86e3cbf9d9866333b73cee96a0cd0b8c73654f4705088caa64eb5a624d4"
