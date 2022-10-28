@@ -141,7 +141,7 @@ OUT
   assert_line 0  'export GOENV_SHELL=bash'
   assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
   assert_line 2  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  assert_line 3  '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  assert_line 3  '  export PATH="$PATH:$GOENV_ROOT/shims"'
   assert_line 4  'fi'
   assert_line 5  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.bash'"
   assert_line 6  'command goenv rehash 2>/dev/null'
@@ -168,7 +168,7 @@ OUT
   assert_line 0  'export GOENV_SHELL=zsh'
   assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
   assert_line 2  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  assert_line 3  '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  assert_line 3  '  export PATH="$PATH:$GOENV_ROOT/shims"'
   assert_line 4  'fi'
   assert_line 5  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.zsh'"
   assert_line 6  'command goenv rehash 2>/dev/null'
@@ -195,7 +195,7 @@ OUT
   assert_line 0  'set -gx GOENV_SHELL fish'
   assert_line 1  "set -gx GOENV_ROOT $GOENV_ROOT"
   assert_line 2  'if not contains $GOENV_ROOT/shims $PATH'
-  assert_line 3  '  set -gx PATH $GOENV_ROOT/shims $PATH'
+  assert_line 3  '  set -gx PATH $PATH $GOENV_ROOT/shims'
   assert_line 4  'end'
   assert_line 5  "source '$BATS_TEST_DIRNAME/../libexec/../completions/goenv.fish'"
   assert_line 6  'command goenv rehash 2>/dev/null'
@@ -219,7 +219,7 @@ OUT
   assert_line 0  'export GOENV_SHELL=ksh'
   assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
   assert_line 2  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  assert_line 3  '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  assert_line 3  '  export PATH="$PATH:$GOENV_ROOT/shims"'
   assert_line 4  'fi'
   assert_line 5  'command goenv rehash 2>/dev/null'
   assert_line 6  'function goenv {'
@@ -245,7 +245,7 @@ OUT
   assert_line 0  'export GOENV_SHELL=magicshell'
   assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
   assert_line 2  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  assert_line 3  '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  assert_line 3  '  export PATH="$PATH:$GOENV_ROOT/shims"'
   assert_line 4  'fi'
   assert_line 5  'command goenv rehash 2>/dev/null'
   assert_line 6  'goenv() {'
