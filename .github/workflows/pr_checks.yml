@@ -1,0 +1,25 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+        goenv_native_ext: ["", "1"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Remove golang
+        run: sudo rm -rf $(which go)
+      - name: Run Unit Tests
+        run: make test
+        env:
+          GOENV_NATIVE_EXT: ${{ matrix.goenv_native_ext }}

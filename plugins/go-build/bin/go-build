@@ -13,7 +13,7 @@
 #   -g/--debug       Build a debug version
 #
 
-GO_BUILD_VERSION="2.0.0beta1"
+GO_BUILD_VERSION="2.0.0"
 
 OLDIFS="$IFS"
 
@@ -38,7 +38,7 @@ lib() {
           while option="${arg:$index:1}"; do
             [ -n "$option" ] || break
             OPTIONS[${#OPTIONS[*]}]="$option"
-            index=$(($index+1))
+            index=$(($index + 1))
           done
         fi
       else
@@ -54,7 +54,6 @@ lib() {
   fi
 }
 lib "$1"
-
 
 resolve_link() {
   $(type -p greadlink readlink | head -1) "$1"
@@ -115,13 +114,8 @@ is_mac() {
 # 0.10.9  -> 1009
 # 0.10.10 -> 1010
 osx_version() {
-  local -a ver
-
-  OLDIFS=$IFS
-  IFS=.
-  ver=( `sw_vers -productVersion` )
-  IFS=$OLDIFS
-  OSX_VER=$(( ${ver[1]} * 100 + ${ver[2]} ))
+  ver=($(sw_vers -productVersion | tr '.' ' '))
+  OSX_VER=$((${ver[0]} * 100 + ${ver[1]})) # macOS uses zero-index array accessors for bash
 }
 
 build_failed() {
@@ -150,7 +144,7 @@ file_is_not_empty() {
   local line_count="$(wc -l "$filename" 2>/dev/null || true)"
 
   if [ -n "$line_count" ]; then
-    words=( $line_count )
+    words=($line_count)
     [ "${words[0]}" -gt 0 ]
   else
     return 1
@@ -160,10 +154,10 @@ file_is_not_empty() {
 num_cpu_cores() {
   local num
   case "$(uname -s)" in
-  Darwin | *BSD )
+  Darwin | *BSD)
     num="$(sysctl -n hw.ncpu 2>/dev/null || true)"
     ;;
-  * )
+  *)
     num="$(grep ^processor /proc/cpuinfo 2>/dev/null | wc -l | xargs)"
     num="${num#0}"
     ;;
@@ -172,140 +166,139 @@ num_cpu_cores() {
 }
 
 install_darwin_64bit() {
-    if [ "$(uname -s)" = "Darwin" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "x86_64" ]; then
-            install_package_using "tarball" 1 "$@"
-        fi
+    if [ $arch = "x86_64" ] && [ -z "$FORCE_DARWIN_ARCH" ] || [ "$FORCE_DARWIN_ARCH" = "x86_64" ]; then
+      install_package_using "tarball" 1 "$@"
     fi
+  fi
 }
 
 install_darwin_arm() {
-    if [ "$(uname -s)" = "Darwin" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "arm64" ]; then
-            install_package_using "tarball" 1 "$@"
-        fi
+    if [ $arch = "arm64" ] && [ -z "$FORCE_DARWIN_ARCH" ] || [ "$FORCE_DARWIN_ARCH" = "arm64" ]; then
+      install_package_using "tarball" 1 "$@"
     fi
+  fi
 }
 
 install_darwin_106_64bit() {
-    if [ "$(uname -s)" = "Darwin" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "x86_64" ]; then
-            osx_version
+    if [ $arch = "x86_64" ]; then
+      osx_version
 
-            if [ $(echo $OSX_VER | bc) -ge 1060 ] && [ $(echo $OSX_VER | bc) -lt 1080 ]; then
-                install_package_using "tarball" 1 "$@"
-            fi
-        fi
+      if [ $(echo $OSX_VER | bc) -ge 1060 ] && [ $(echo $OSX_VER | bc) -lt 1080 ]; then
+        install_package_using "tarball" 1 "$@"
+      fi
     fi
+  fi
 }
 
 install_darwin_106_32bit() {
-    if [ "$(uname -s)" = "Darwin" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
-            osx_version
+    if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
+      osx_version
 
-            if [ $(echo $OSX_VER | bc) -ge 1060 ] && [ $(echo $OSX_VER | bc) -lt 1080 ]; then
-                install_package_using "tarball" 1 "$@"
-            fi
-        fi
+      if [ $(echo $OSX_VER | bc) -ge 1060 ] && [ $(echo $OSX_VER | bc) -lt 1080 ]; then
+        install_package_using "tarball" 1 "$@"
+      fi
     fi
+  fi
 }
 
 install_darwin_108_64bit() {
-    if [ "$(uname -s)" = "Darwin" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "x86_64" ]; then
-            osx_version
+    if [ $arch = "x86_64" ]; then
+      osx_version
 
-            if [ $(echo $OSX_VER | bc) -ge 1080 ]; then
-                install_package_using "tarball" 1 "$@"
-            fi
-        fi
+      if [ $(echo $OSX_VER | bc) -ge 1080 ]; then
+        install_package_using "tarball" 1 "$@"
+      fi
     fi
+  fi
 }
 
 install_darwin_108_32bit() {
-    if [ "$(uname -s)" = "Darwin" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
-            osx_version
+    if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
+      osx_version
 
-            if [ $(echo $OSX_VER | bc) -ge 1080 ]; then
-                install_package_using "tarball" 1 "$@"
-            fi
-        fi
+      if [ $(echo $OSX_VER | bc) -ge 1080 ]; then
+        install_package_using "tarball" 1 "$@"
+      fi
     fi
+  fi
 }
 
-
 install_linux_64bit() {
-    if [ "$(uname -s)" = "Linux" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Linux" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "x86_64" ]; then
-            install_package_using "tarball" 1 "$@"
-        fi
+    if [ $arch = "x86_64" ]; then
+      install_package_using "tarball" 1 "$@"
     fi
+  fi
 }
 
 install_linux_32bit() {
-    if [ "$(uname -s)" = "Linux" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Linux" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
-          install_package_using "tarball" 1 "$@"
-        fi
+    if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
+      install_package_using "tarball" 1 "$@"
     fi
+  fi
 }
 
 install_linux_arm_64bit() {
-    if [ "$(uname -s)" = "Linux" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Linux" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "aarch64" ]; then
-            install_package_using "tarball" 1 "$@"
-        fi
+    if [ $arch = "aarch64" ]; then
+      install_package_using "tarball" 1 "$@"
     fi
+  fi
 }
 
 install_linux_arm() {
-    if [ "$(uname -s)" = "Linux" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "Linux" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "armv6l" ] || [ $arch = "armv7l" ]; then
-            install_package_using "tarball" 1 "$@"
-        fi
+    if [ $arch = "armv6l" ] || [ $arch = "armv7l" ]; then
+      install_package_using "tarball" 1 "$@"
     fi
+  fi
 }
 
 install_bsd_64bit() {
-    if [ "$(uname -s)" = "FreeBSD" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "FreeBSD" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "x86_64" ] || [ $arch = 'amd64' ]; then
-            install_package_using "tarball" 1 "$@"
-        fi
+    if [ $arch = "x86_64" ] || [ $arch = 'amd64' ]; then
+      install_package_using "tarball" 1 "$@"
     fi
+  fi
 }
 
 install_bsd_32bit() {
-    if [ "$(uname -s)" = "FreeBSD" ]; then
-        local arch="$(uname -m)"
+  if [ "$(uname -s)" = "FreeBSD" ]; then
+    local arch="$(uname -m)"
 
-        if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
-            install_package_using "tarball" 1 "$@"
-        fi
+    if [ $arch = "i386" ] || [ $arch = 'i686' ]; then
+      install_package_using "tarball" 1 "$@"
     fi
+  fi
 }
 
 install_package_using() {
@@ -314,7 +307,7 @@ install_package_using() {
   local package_name="$3"
   shift 3
 
-  local fetch_args=( "$package_name" "${@:1:$package_type_nargs}" )
+  local fetch_args=("$package_name" "${@:1:$package_type_nargs}")
   local arg last_arg
 
   pushd "$BUILD_PATH" >&4
@@ -356,20 +349,20 @@ compute_sha2() {
 }
 
 compute_sha1() {
-    local output
-    if type shasum &>/dev/null; then
-        output="$(shasum -a 1 -b)" || return 1
-        echo "${output% *}"
-    elif type openssl &>/dev/null; then
-        local openssl="$(command -v "$(brew --prefix openssl 2>/dev/null || true)"/bin/openssl openssl | head -1)"
-        output="$("$openssl" dgst -sha1 2>/dev/null)" || return 1
-        echo "${output##* }"
-    elif type sha1sum &>/dev/null; then
-        output="$(sha1sum --quiet)" || return 1
-        echo "${output% *}"
-    else
-        return 1
-    fi
+  local output
+  if type shasum &>/dev/null; then
+    output="$(shasum -a 1 -b)" || return 1
+    echo "${output% *}"
+  elif type openssl &>/dev/null; then
+    local openssl="$(command -v "$(brew --prefix openssl 2>/dev/null || true)"/bin/openssl openssl | head -1)"
+    output="$("$openssl" dgst -sha1 2>/dev/null)" || return 1
+    echo "${output##* }"
+  elif type sha1sum &>/dev/null; then
+    output="$(sha1sum --quiet)" || return 1
+    echo "${output% *}"
+  else
+    return 1
+  fi
 }
 
 compute_md5() {
@@ -392,7 +385,10 @@ has_checksum_support() {
   local has_checksum_var="HAS_CHECKSUM_SUPPORT_${checksum_command}"
 
   if [ -z "${!has_checksum_var+defined}" ]; then
-    printf -v "$has_checksum_var" "$(echo test | "$checksum_command" >/dev/null; echo $?)"
+    printf -v "$has_checksum_var" "$(
+      echo test | "$checksum_command" >/dev/null
+      echo $?
+    )"
   fi
   return "${!has_checksum_var}"
 }
@@ -417,14 +413,15 @@ verify_checksum() {
       echo "expected 0 (no checksum), 32 (MD5), 40 (SHA1) or 64 (SHA2-256)"
       echo
     } >&4
-    return 1 ;;
+    return 1
+    ;;
   esac
 
   # If chosen provided checksum algorithm isn't supported, return success
   has_checksum_support "$checksum_command" || return 0
 
   # If the computed checksum is empty, return failure
-  local computed_checksum=`echo "$($checksum_command < "$filename")" | tr [A-Z] [a-z]`
+  local computed_checksum=$(echo "$($checksum_command <"$filename")" | tr [A-Z] [a-z])
   [ -n "$computed_checksum" ] || return 1
 
   if [ "$expected_checksum" != "$computed_checksum" ]; then
@@ -444,6 +441,10 @@ http() {
   local file="$3"
   [ -n "$url" ] || return 1
 
+  if [[ $IS_TEST != "true" ]]; then
+    url="https://go.dev/dl/${url}"
+  fi
+
   if type curl &>/dev/null; then
     "http_${method}_curl" "$url" "$file"
   elif type wget &>/dev/null; then
@@ -462,10 +463,14 @@ http_head_curl() {
 }
 
 http_get_curl() {
-  options=""
+  if [[ $DISABLE_PROGRESS_BAR == "true" ]]; then
+    options="-s"
+  else
+    options="--progress-bar"
+  fi
   [ -n "${IPV4}" ] && options="--ipv4"
   [ -n "${IPV6}" ] && options="--ipv6"
-  curl -q -o "${2:--}" -sSLf ${options} "$1"
+  curl -q -o "${2:--}" -SLf ${options} "$1"
 }
 
 http_head_wget() {
@@ -476,10 +481,10 @@ http_head_wget() {
 }
 
 http_get_wget() {
-  options=""
+  options="--show-progress"
   [ -n "${IPV4}" ] && options="--inet4-only"
   [ -n "${IPV6}" ] && options="--inet6-only"
-  wget -nv ${options} -O "${2:--}" "$1"
+  wget -qnv ${options} -O "${2:--}" "$1"
 }
 
 fetch_tarball() {
@@ -488,12 +493,12 @@ fetch_tarball() {
   local mirror_url
   local checksum
 
-  if [ "$package_url" != "${package_url/\#}" ]; then
+  if [ "$package_url" != "${package_url/\#/}" ]; then
     checksum="${package_url#*#}"
     package_url="${package_url%%#*}"
 
     if [ -n "$GO_BUILD_MIRROR_URL" ]; then
-      if [[ -z "$GO_BUILD_DEFAULT_MIRROR" || $package_url != */www.golang.org/* ]]; then
+      if [[ -z "$GO_BUILD_DEFAULT_MIRROR" || $package_url != */go.dev/* ]]; then
         mirror_url="${GO_BUILD_MIRROR_URL}/$(basename $package_url)"
       fi
     fi
@@ -510,20 +515,20 @@ fetch_tarball() {
     tar_args="${tar_args/z/j}"
   fi
 
-   if [ "$package_url" != "${package_url%xz}" ]; then
-     if ! type -p xz >/dev/null; then
+  if [ "$package_url" != "${package_url%xz}" ]; then
+    if ! type -p xz >/dev/null; then
       echo "warning: xz not found; consider installing \`xz\` package" >&4
-     fi
-     package_filename="${package_filename%.gz}.xz"
-     tar_args="${tar_args/z/J}"
-   fi
+    fi
+    package_filename="${package_filename%.gz}.xz"
+    tar_args="${tar_args/z/J}"
+  fi
 
   if ! reuse_existing_tarball "$package_filename" "$checksum"; then
     local tarball_filename=$(basename $package_url)
     echo "Downloading ${tarball_filename}..." >&2
     http head "$mirror_url" &&
-    download_tarball "$mirror_url" "$package_filename" "$checksum" ||
-    download_tarball "$package_url" "$package_filename" "$checksum"
+      download_tarball "$mirror_url" "$package_filename" "$checksum" ||
+      download_tarball "$package_url" "$package_filename" "$checksum"
   fi
 
   {
@@ -564,7 +569,7 @@ download_tarball() {
 
   echo "-> $package_url" >&2
 
-  if http get "$package_url" "$package_filename" >&4 2>&1; then
+  if http get "$package_url" "$package_filename" >&4; then
     verify_checksum "$package_filename" "$checksum" >&4 2>&1 || return 1
   else
     echo "error: failed to download $package_filename" >&2
@@ -604,7 +609,8 @@ fetch_git() {
     fi
 
     if [ -e "${package_name}" ]; then
-      ( cd "${package_name}"
+      (
+        cd "${package_name}"
         git fetch --depth 1 origin "+${git_ref}"
         git checkout -q -B "$git_ref" "origin/${git_ref}"
       ) >&4 2>&1
@@ -623,7 +629,7 @@ fetch_zip() {
   local mirror_url
   local checksum
 
-  if [ "$package_url" != "${package_url/\#}" ]; then
+  if [ "$package_url" != "${package_url/\#/}" ]; then
     checksum="${package_url#*#}"
     package_url="${package_url%%#*}"
 
@@ -637,8 +643,8 @@ fetch_zip() {
   if ! reuse_existing_tarball "$package_filename" "$checksum"; then
     echo "Downloading ${package_filename}..." >&2
     http head "$mirror_url" &&
-    download_tarball "$mirror_url" "$package_filename" "$checksum" ||
-    download_tarball "$package_url" "$package_filename" "$checksum"
+      download_tarball "$mirror_url" "$package_filename" "$checksum" ||
+      download_tarball "$package_url" "$package_filename" "$checksum"
   fi
 
   {
@@ -658,7 +664,7 @@ package_option() {
   local variable="$(capitalize "${package_name}_${command_name}")_OPTS_ARRAY"
   local array="$variable[@]"
   shift 2
-  local value=( "${!array}" "$@" )
+  local value=("${!array}" "$@")
   eval "$variable=( \"\${value[@]}\" )"
 }
 
@@ -692,19 +698,19 @@ verify_go() {
     for file in "${PREFIX_PATH}/bin"/*; do
       unset link
       case "${file}" in
-      */"go${suffix}-config" )
+      */"go${suffix}-config")
         # Symlink `goX.Y-config` to `go-config` if `go-config` is missing (#296)
         link="${file%/*}/go-config"
-      ;;
-      */*"-${suffix}" )
+        ;;
+      */*"-${suffix}")
         link="${file%%-${suffix}}"
-      ;;
-      */*"${suffix}" )
+        ;;
+      */*"${suffix}")
         link="${file%%${suffix}}"
-      ;;
+        ;;
       esac
       if [ -n "$link" ] && [ ! -e "$link" ]; then
-        ( cd "${file%/*}" && ln -fs "${file##*/}" "${link##*/}" )
+        (cd "${file%/*}" && ln -fs "${file##*/}" "${link##*/}")
       fi
     done
     shopt -u nullglob
@@ -728,7 +734,7 @@ version() {
 }
 
 usage() {
-  sed -ne '/^#/!q;s/.\{1,2\}//;1,2d;p' < "$0"
+  sed -ne '/^#/!q;s/.\{1,2\}//;1,2d;p' <"$0"
   [ -z "$1" ] || exit "$1"
 }
 
@@ -741,10 +747,13 @@ list_definitions() {
 }
 
 sort_versions() {
-  sed 'h; s/[+-]/./g; s/.p\([[:digit:]]\)/.z\1/; s/$/.z/; G; s/\n/ /' | \
+  sed 'h; s/[+-]/./g; s/.p\([[:digit:]]\)/.z\1/; s/$/.z/; G; s/\n/ /' |
     LC_ALL=C sort -t. -k 1,1 -k 2,2n -k 3,3n -k 4,4n -k 5,5n | awk '{print $2}'
 }
 
+latest_version() {
+  list_definitions | grep -oE "^$1\\.([0-9]+)?" | tail -1
+}
 
 unset VERBOSE
 unset KEEP_BUILD_PATH
@@ -754,29 +763,36 @@ unset IPV6
 
 GO_BUILD_INSTALL_PREFIX="$(abs_dirname "$0")/.."
 
-IFS=: GO_BUILD_DEFINITIONS=($GO_BUILD_DEFINITIONS ${GO_BUILD_ROOT:-$GO_BUILD_INSTALL_PREFIX}/share/go-build)
+# USE_FAKE_DEFINITIONS is used for tests to mock the definitions list to our available test fixtures
+if [[ $USE_FAKE_DEFINITIONS == "true" ]]; then
+  DIR_SUFFIX=test/fixtures/definitions
+else
+  DIR_SUFFIX=share/go-build
+fi
+
+IFS=: GO_BUILD_DEFINITIONS=($GO_BUILD_DEFINITIONS ${GO_BUILD_ROOT:-$GO_BUILD_INSTALL_PREFIX/$DIR_SUFFIX})
 IFS="$OLDIFS"
 
 parse_options "$@"
 
 for option in "${OPTIONS[@]}"; do
   case "$option" in
-  "h" | "help" )
+  "h" | "help")
     version
     echo
     usage 0
     ;;
-  "definitions" )
+  "definitions")
     list_definitions
     exit 0
     ;;
-  "k" | "keep" )
+  "k" | "keep")
     KEEP_BUILD_PATH=true
     ;;
-  "v" | "verbose" )
+  "v" | "verbose")
     VERBOSE=true
     ;;
-  "g" | "debug" )
+  "g" | "debug")
     DEBUG=true
     ;;
   "4" | "ipv4")
@@ -785,7 +801,7 @@ for option in "${OPTIONS[@]}"; do
   "6" | "ipv6")
     IPV6=true
     ;;
-  "version" )
+  "version")
     version
     exit 0
     ;;
@@ -796,11 +812,13 @@ done
 
 DEFINITION_PATH="${ARGUMENTS[0]}"
 
-# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version.
-# A patch version of 0 will be added, e.g they'll be changed to `1.11.0`.
-if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<< ${DEFINITION_PATH}; then
-  DEFINITION_PATH="${DEFINITION_PATH}.0"
-  echo "Adding patch version 0 to ${DEFINITION_PATH}"
+# The latest patch version will be located, e.g if 1.11 is supplied they'll be changed to `1.11.x`.
+# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version and install latest patch.
+if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${DEFINITION_PATH}; then
+  REGEX=$(echo $DEFINITION_PATH | sed s/\\./\\\\./)
+  LATEST_PATCH=$(latest_version $REGEX)
+  echo "Using latest patch version $LATEST_PATCH"
+  DEFINITION_PATH="$LATEST_PATCH"
 fi
 
 if [ -z "$DEFINITION_PATH" ]; then
@@ -836,7 +854,7 @@ fi
 tmp_executable="${TMP}/go-build-test.$$"
 noexec=""
 if mkdir -p "$TMP" && touch "$tmp_executable" 2>/dev/null; then
-  cat > "$tmp_executable" <<-EOF
+  cat >"$tmp_executable" <<-EOF
 	#!${BASH}
 	exit 0
 	EOF
@@ -884,7 +902,7 @@ else
   BUILD_PATH="$GO_BUILD_BUILD_PATH"
 fi
 
-exec 4<> "$LOG_PATH" # open the log file at fd 4
+exec 4<>"$LOG_PATH" # open the log file at fd 4
 if [ -n "$VERBOSE" ]; then
   tail -f "$LOG_PATH" &
   TAIL_PID=$!

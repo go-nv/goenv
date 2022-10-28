@@ -1,11 +1,11 @@
-install_darwin_64bit "Go Darwin 64bit 1.9.0" "https://storage.googleapis.com/golang/go1.9.darwin-amd64.tar.gz#c2df361ec6c26fcf20d5569496182cb20728caa4d351bc430b2f0f1212cca3e0"
+install_darwin_64bit "Go Darwin 64bit 1.9.0" "go1.9.darwin-amd64.tar.gz#c2df361ec6c26fcf20d5569496182cb20728caa4d351bc430b2f0f1212cca3e0"
 
-install_bsd_32bit "Go Freebsd 32bit 1.9.0" "https://storage.googleapis.com/golang/go1.9.freebsd-386.tar.gz#9e415e340eaea526170b0fd59aa55939ff4f76c126193002971e8c6799e2ed3a"
+install_bsd_32bit "Go Freebsd 32bit 1.9.0" "go1.9.freebsd-386.tar.gz#9e415e340eaea526170b0fd59aa55939ff4f76c126193002971e8c6799e2ed3a"
 
-install_bsd_64bit "Go Freebsd 64bit 1.9.0" "https://storage.googleapis.com/golang/go1.9.freebsd-amd64.tar.gz#ba54efb2223fb4145604dcaf8605d519467f418ab02c081d3cd0632b6b43b6e7"
+install_bsd_64bit "Go Freebsd 64bit 1.9.0" "go1.9.freebsd-amd64.tar.gz#ba54efb2223fb4145604dcaf8605d519467f418ab02c081d3cd0632b6b43b6e7"
 
-install_linux_32bit "Go Linux 32bit 1.9.0" "https://storage.googleapis.com/golang/go1.9.linux-386.tar.gz#7cccff99dacf59162cd67f5b11070d667691397fd421b0a9ad287da019debc4f"
+install_linux_32bit "Go Linux 32bit 1.9.0" "go1.9.linux-386.tar.gz#7cccff99dacf59162cd67f5b11070d667691397fd421b0a9ad287da019debc4f"
 
-install_linux_64bit "Go Linux 64bit 1.9.0" "https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz#d70eadefce8e160638a9a6db97f7192d8463069ab33138893ad3bf31b0650a79"
+install_linux_64bit "Go Linux 64bit 1.9.0" "go1.9.linux-amd64.tar.gz#d70eadefce8e160638a9a6db97f7192d8463069ab33138893ad3bf31b0650a79"
 
-install_linux_arm "Go Linux arm 1.9.0" "https://dl.google.com/go/go1.9.linux-armv6l.tar.gz#f52ca5933f7a8de2daf7a3172b0406353622c6a39e67dd08bbbeb84c6496f487"
+install_linux_arm "Go Linux arm 1.9.0" "go1.9.linux-armv6l.tar.gz#f52ca5933f7a8de2daf7a3172b0406353622c6a39e67dd08bbbeb84c6496f487"
