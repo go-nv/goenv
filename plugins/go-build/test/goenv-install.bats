@@ -873,7 +873,7 @@ OUT
 
   assert_success
   assert_output <<-OUT
-go-build 2.0.0
+go-build 2.0.2
 OUT
 }
 
