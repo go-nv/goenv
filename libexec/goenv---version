@@ -6,6 +6,6 @@
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
 
-version="2.0.0beta11"
+version="2.0.2"
 
 echo "goenv ${version}"
