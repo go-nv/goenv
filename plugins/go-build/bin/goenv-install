@@ -63,11 +63,11 @@ definitions() {
 }
 
 latest_version() {
-  definitions | grep -oE "^$1\\.([0-9]+)?" | tail -1
+  definitions | grep -oE "^$1\\.([0-9]+)?$" | tail -1
 }
 
 latest_includes_unstable_version() {
-  definitions | grep -ioE "^$1\\.?([0-9]+|beta[0-9]+|rc[0-9]+)?" | tail -1
+  definitions | grep -ioE "^$1\\.?([0-9]+|beta[0-9]+|rc[0-9]+)?$" | tail -1
 }
 
 indent() {
