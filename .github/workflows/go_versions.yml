@@ -1,7 +1,7 @@
 name: CI
-# on:
-#   schedule:
-#     - cron: "0 0 * * *" # every day at midnight
+on:
+  schedule:
+    - cron: "0 0 * * *" # every day at midnight
 jobs:
   build:
     strategy:
@@ -18,3 +18,5 @@ jobs:
         run: export PATH="$PATH:./bin/goenv"
       - name: Check latest version of Go against Goenv
         run: ./scripts/latest_version.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
