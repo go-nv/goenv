@@ -113,16 +113,22 @@ printf " done\n"
 
 echo "Committing changes..."
 
-git commit -am "[goenv-bot]: Add $LATEST_GO_VERSION definition to goenv"
+COMMIT_MSG="[goenv-bot]: Add $LATEST_GO_VERSION definition to goenv"
+
+git commit -am "$COMMIT_MSG"
 
 echo "Pushing to origin..."
 
 git push -u origin $BRANCH_NAME
+
+echo "Creating Pull Request..."
+
+gh pr create -B master -H $BRANCH_NAME --title "$COMMIT_MSG" --body 'Created by Github action automation'
 
 echo 'All done!'
 
 # All done, reset PATH
 PATH=$OLD_PATH
 
-export CREATED_BRANCH_NAME=$BRANCH_NAME
-export NEW_VERSION=true
+# export CREATED_BRANCH_NAME=$BRANCH_NAME
+# export NEW_VERSION=true
