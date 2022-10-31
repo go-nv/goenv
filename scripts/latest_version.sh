@@ -123,3 +123,6 @@ echo 'All done!'
 
 # All done, reset PATH
 PATH=$OLD_PATH
+
+export CREATED_BRANCH_NAME=$BRANCH_NAME
+export NEW_VERSION=true
