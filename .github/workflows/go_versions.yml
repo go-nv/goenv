@@ -1,0 +1,23 @@
+name: CI
+# on:
+#   schedule:
+#     - cron: "0 0 * * *" # every day at midnight
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: ["ubuntu-latest"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install JQ
+        run: sudo apt install jq
+      - name: Remove golang
+        run: sudo rm -rf $(which go)
+      - name: Add goenv to PATH
+        run: export PATH="$PATH:./bin/goenv"
+      - name: Check latest version of Go against Goenv
+        run: |
+          . ./scripts/latest_version.sh
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4.2.0
