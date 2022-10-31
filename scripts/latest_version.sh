@@ -38,7 +38,7 @@ if [[ $LATEST_GO_VERSION == $LATEST_GOENV_DEFINITION ]]; then
     exit 0
 fi
 
-BRANCH_NAME="add_$LATEST_GO_VERSION"
+BRANCH_NAME="goenv_bot_add_$LATEST_GO_VERSION"
 
 EXISTS=$(git branch -r -l 'origin*' | sed -E -e 's/^[^\/]+\///g' -e 's/HEAD.+//' | grep "$BRANCH_NAME")
 
