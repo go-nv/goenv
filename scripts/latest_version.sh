@@ -123,7 +123,7 @@ git push -u origin $BRANCH_NAME
 
 echo "Creating Pull Request..."
 
-gh pr create -B master -H $BRANCH_NAME --title "$COMMIT_MSG" --body 'Created by Github action automation'
+gh pr create -B master --title "$COMMIT_MSG" --body 'Created by Github action automation'
 
 echo 'All done!'
 
