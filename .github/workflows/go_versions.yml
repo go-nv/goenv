@@ -10,6 +10,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: master
       - name: Install JQ
         run: sudo apt install jq
       - name: Remove golang
