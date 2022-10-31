@@ -34,7 +34,6 @@ printf " %s\n" $LATEST_GO_VERSION
 
 if [[ $LATEST_GO_VERSION == $LATEST_GOENV_DEFINITION ]]; then
     echo "latest goenv definition ($LATEST_GOENV_DEFINITION) matches latest Go version ($LATEST_GO_VERSION)"
-    export NEW_VERSION=false
     exit 0
 fi
 
@@ -44,7 +43,6 @@ EXISTS=$(git branch -r -l 'origin*' | sed -E -e 's/^[^\/]+\///g' -e 's/HEAD.+//'
 
 if [[ -n $EXISTS ]]; then
     echo "A PR already exists on branch $BRANCH_NAME for the latest Go version ($LATEST_GO_VERSION)"
-    export NEW_VERSION=false
     exit 0
 fi
 
@@ -123,12 +121,12 @@ git push -u origin $BRANCH_NAME
 
 echo "Creating Pull Request..."
 
-gh pr create -B master --title "$COMMIT_MSG" --body 'Created by Github action automation'
+gh pr create -B master \
+    -t "$COMMIT_MSG" \
+    -b "This adds the Go Definitions for version $LATEST_GO_VERSION.\n\nCreated by Github action automation" \
+    -r syndbg,ChronosMasterOfAllTime
 
 echo 'All done!'
 
 # All done, reset PATH
 PATH=$OLD_PATH
-
-# export CREATED_BRANCH_NAME=$BRANCH_NAME
-# export NEW_VERSION=true
