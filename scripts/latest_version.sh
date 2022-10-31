@@ -123,7 +123,8 @@ echo "Creating Pull Request..."
 
 gh pr create -B master \
     -t "$COMMIT_MSG" \
-    -b "This adds the Go Definitions for version $LATEST_GO_VERSION.\n\nCreated by Github action automation" \
+    -b "This adds the Go Definitions for version $LATEST_GO_VERSION. 
+    Created by Github action automation" \
     -r syndbg,ChronosMasterOfAllTime
 
 echo 'All done!'
