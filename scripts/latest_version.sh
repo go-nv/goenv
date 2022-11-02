@@ -2,6 +2,7 @@
 
 GIT_ROOT=$(git rev-parse --show-toplevel)
 GO_BUILD_DIR=$GIT_ROOT/plugins/go-build
+GO_DEFINITIONS_DIR=$GO_BUILD_DIR/share/go-build
 
 OLD_PATH=$PATH
 
@@ -50,7 +51,7 @@ while read LATEST_GO_DEFINITION; do
 
     echo $BRANCH_NAME
 
-    GO_BUILD_DEFINITION_FILE=$GO_BUILD_DIR/share/go-build/$LATEST_GO_VERSION
+    GO_BUILD_DEFINITION_FILE=$GO_DEFINITIONS_DIR/$LATEST_GO_VERSION
 
     LATEST_FILE_LIST=$(echo $LATEST_GO_DEFINITION | jq -c '.files[] | select(.os == "darwin" or .os == "linux" or .os == "freebsd") | select(.arch == "386" or .arch == "amd64" or .arch == "armv6l" or .arch == "arm64") | select(.kind == "archive")')
 
@@ -120,9 +121,11 @@ printf " done\n"
 
 echo "Committing changes..."
 
-COMMIT_MSG="[goenv-bot]: Add $LATEST_GO_VERSION definition to goenv"
+COMMIT_MSG="[goenv-bot]: Add ${LATEST_GO_VERSIONS[@]} definition to goenv"
 
-git commit -am "$COMMIT_MSG"
+git add $GO_DEFINITIONS_DIR
+
+git commit -m "$COMMIT_MSG"
 
 echo "Pushing to origin..."
 
@@ -132,7 +135,7 @@ echo "Creating Pull Request..."
 
 gh pr create -B master \
     -t "$COMMIT_MSG" \
-    -b "This adds the Go Definitions for version $LATEST_GO_VERSION. 
+    -b "This adds the Go Definitions for version ${LATEST_GO_VERSIONS[@]}. 
     Created by Github action automation" \
     -r syndbg,ChronosMasterOfAllTime
 
