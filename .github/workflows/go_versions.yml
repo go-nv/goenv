@@ -21,4 +21,4 @@ jobs:
       - name: Check latest version of Go against Goenv
         run: ./scripts/latest_version.sh
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
