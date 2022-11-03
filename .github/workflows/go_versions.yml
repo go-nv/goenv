@@ -1,7 +1,7 @@
 name: CI
 on:
   schedule:
-    - cron: "0 0 * * *" # every day at midnight
+    - cron: "0 8 * * *" # every day at 8AM UTC
 jobs:
   build:
     strategy:
