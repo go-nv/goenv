@@ -31,6 +31,7 @@ OUT
 }
 
 @test "prints global file when no arguments are provided, go.mod exists and GOENV_GOMOD_VERSION_ENABLE is not set" {
+  unset GOENV_GOMOD_VERSION_ENABLE
   assert [ ! -e "${GOENV_ROOT}/version" ]
   assert [ ! -e ".go-version" ]
 
