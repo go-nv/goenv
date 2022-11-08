@@ -53,6 +53,140 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.0.2
+
+### Added
+
+* fix version printout for `goenv --version`; update changelog  Ref: https://github.com/syndbg/goenv/pull/260
+
+## 2.0.1
+
+### Added
+
+* install latest patch in go-build script Ref: https://github.com/syndbg/goenv/pull/258
+* Download all packages from go.dev Ref: https://github.com/syndbg/goenv/pull/218
+* move shims to end of $PATH Ref: https://github.com/syndbg/goenv/pull/248
+* fix tests Ref: https://github.com/syndbg/goenv/pull/259
+
+## 2.0.0
+
+### Added
+
+* Prepare goenv 2.0.0beta1 Ref: https://github.com/syndbg/goenv/pull/62
+* Follow up of PR #56 Ref: https://github.com/syndbg/goenv/pull/63
+* :tada: add 1.12beta2 Ref: https://github.com/syndbg/goenv/pull/64
+* add 1.11.5 and 1.10.8 Ref: https://github.com/syndbg/goenv/pull/65
+* add 1.12rc1 Ref: https://github.com/syndbg/goenv/pull/66
+* add 1.12.0 Ref: https://github.com/syndbg/goenv/pull/68
+* [GH-30][GH-50] Improve GOPATH and GOROOT env var management Ref: https://github.com/syndbg/goenv/pull/70
+* add 1.12.1 and 1.11.6 Ref: https://github.com/syndbg/goenv/pull/71
+* add 1.12.2, 1.12.3, 1.11.7 and 1.11.8 Ref: https://github.com/syndbg/goenv/pull/73
+* Prepare 2.0.0beta8 Ref: https://github.com/syndbg/goenv/pull/74
+* [GH-76] Fix docs values Ref: https://github.com/syndbg/goenv/pull/77
+* add 1.12.4 and 1.11.9 Ref: https://github.com/syndbg/goenv/pull/78
+* [GH-54] Fix golang releases without patch version not being installed Ref: https://github.com/syndbg/goenv/pull/75
+* Prepare 2.0.0beta9 Ref: https://github.com/syndbg/goenv/pull/79
+* add 1.12.5 and 1.11.10 Ref: https://github.com/syndbg/goenv/pull/83
+* add 1.12.6 and 1.11.11 Ref: https://github.com/syndbg/goenv/pull/84
+* add 1.13beta1 Ref: https://github.com/syndbg/goenv/pull/86
+* add 1.12.7 and 1.11.12 Ref: https://github.com/syndbg/goenv/pull/88
+* add 1.12.8 and 1.11.13 Ref: https://github.com/syndbg/goenv/pull/90
+* add 1.12.9 Ref: https://github.com/syndbg/goenv/pull/91
+* :tada: add 1.13rc1 Ref: https://github.com/syndbg/goenv/pull/92
+* add 1.13 Ref: https://github.com/syndbg/goenv/pull/95
+* add 1.13rc2 Ref: https://github.com/syndbg/goenv/pull/94
+* `go-build` fails if curl or wget does not exist, but no error message is displayed. Ref: https://github.com/syndbg/goenv/pull/93
+* Fixed typo Ref: https://github.com/syndbg/goenv/pull/96
+* add 1.13.1 and 1.12.10 Ref: https://github.com/syndbg/goenv/pull/97
+* move $GOPATH/bin to end of $PATH Ref: https://github.com/syndbg/goenv/pull/100
+* add 1.13.3 and 1.12.12 Ref: https://github.com/syndbg/goenv/pull/102
+* add 1.13.2 and 1.12.11 Ref: https://github.com/syndbg/goenv/pull/101
+* add 1.13.4 and 1.12.13 Ref: https://github.com/syndbg/goenv/pull/103
+* add 1.13.5 and 1.12.14 Ref: https://github.com/syndbg/goenv/pull/104
+* add 1.14beta1 Ref: https://github.com/syndbg/goenv/pull/105
+* 1.13.6 and 1.12.15 Ref: https://github.com/syndbg/goenv/pull/107
+* add 1.13.7 and 1.12.16 Ref: https://github.com/syndbg/goenv/pull/108
+* add 1.14rc1 Ref: https://github.com/syndbg/goenv/pull/109
+* add 1.13.8 and 1.12.17 Ref: https://github.com/syndbg/goenv/pull/110
+* add macos testing Ref: https://github.com/syndbg/goenv/pull/111
+* add 1.14.0 Ref: https://github.com/syndbg/goenv/pull/113
+* add 1.14.1 and 1.13.9 Ref: https://github.com/syndbg/goenv/pull/116
+* add 1.14.2 and 1.13.10 Ref: https://github.com/syndbg/goenv/pull/120
+* Add ZPlug installation instructions Ref: https://github.com/syndbg/goenv/pull/122
+* add 1.14.3 and 1.13.11 Ref: https://github.com/syndbg/goenv/pull/124
+* automatic shims Ref: https://github.com/syndbg/goenv/pull/119
+* add 1.14.4 and 1.13.12 Ref: https://github.com/syndbg/goenv/pull/125
+* add 1.15beta1 Ref: https://github.com/syndbg/goenv/pull/126
+* Remove duplicate test Ref: https://github.com/syndbg/goenv/pull/128
+* add 1.14.5 and 1.13.13 Ref: https://github.com/syndbg/goenv/pull/127
+* add 1.14.6 and 1.13.14 Ref: https://github.com/syndbg/goenv/pull/129
+* add 1.15rc2 Ref: https://github.com/syndbg/goenv/pull/134
+* add 1.13.15 Ref: https://github.com/syndbg/goenv/pull/137
+* add 1.15.0 Ref: https://github.com/syndbg/goenv/pull/138
+* add 1.14.7 Ref: https://github.com/syndbg/goenv/pull/135
+* Add 1.15.1 and 1.14.8 Ref: https://github.com/syndbg/goenv/pull/139
+* support go1.15.2 Ref: https://github.com/syndbg/goenv/pull/142
+* add 1.14.9 Ref: https://github.com/syndbg/goenv/pull/141
+* Add 1.15.3 and 1.14.10 Ref: https://github.com/syndbg/goenv/pull/149
+* search relative to bin_path for plugins Ref: https://github.com/syndbg/goenv/pull/146
+* Add 1.15.4 and 1.14.11 Ref: https://github.com/syndbg/goenv/pull/152
+* Add 1.15.5 and 1.14.12 Ref: https://github.com/syndbg/goenv/pull/153
+* Add 1.15.6 and 1.14.13 Ref: https://github.com/syndbg/goenv/pull/154
+* Add 1.16beta1 Ref: https://github.com/syndbg/goenv/pull/155
+* Support darwin-arm64 arch on 1.16beta1 Ref: https://github.com/syndbg/goenv/pull/158
+* Add Linux arm 64bit Ref: https://github.com/syndbg/goenv/pull/159
+* Add 1.15.7 and 1.14.14 Ref: https://github.com/syndbg/goenv/pull/160
+* add GOENV_APPEND_GOPATH and GOENV_PREPEND_GOPATH options Ref: https://github.com/syndbg/goenv/pull/148
+* clean up init function Ref: https://github.com/syndbg/goenv/pull/161
+* Add 1.15.8 and 1.14.15 Ref: https://github.com/syndbg/goenv/pull/162
+* Add Go 1.16 Ref: https://github.com/syndbg/goenv/pull/164
+* Fix linux arm 64bit version in link Ref: https://github.com/syndbg/goenv/pull/166
+* Add 1.15.9 and 1.16.1 Ref: https://github.com/syndbg/goenv/pull/165
+* Add go 1.15.10 and 1.16.2 Ref: https://github.com/syndbg/goenv/pull/167
+* ISSUE-169: GOENV_GOPATH_PREFIX does not work as expected Ref: https://github.com/syndbg/goenv/pull/170
+* Add go1.16.3 (#173) Ref: https://github.com/syndbg/goenv/pull/174
+* Add 1.15.11 Ref: https://github.com/syndbg/goenv/pull/175
+* Use a POSIX-compatible regex in goenv-version-file-read Ref: https://github.com/syndbg/goenv/pull/176
+* Add 1.16.4 and 1.15.12 Ref: https://github.com/syndbg/goenv/pull/178
+* Add 1.16.5 and 1.15.13 Ref: https://github.com/syndbg/goenv/pull/181
+* Add 1.16.6, 1.15.14 and 1.17beta1 Ref: https://github.com/syndbg/goenv/pull/183
+* Add 1.17rc1 Ref: https://github.com/syndbg/goenv/pull/185
+* Show progress bar during download tarball Ref: https://github.com/syndbg/goenv/pull/187
+* Add 1.15.15, 1.16.7 and 1.17rc2 Ref: https://github.com/syndbg/goenv/pull/189
+* Add 1.17 Ref: https://github.com/syndbg/goenv/pull/193
+* Add 1.17.1 and 1.16.8 Ref: https://github.com/syndbg/goenv/pull/195
+* Add 1.17.2 and 1.16.9 Ref: https://github.com/syndbg/goenv/pull/196
+* Use correct checksum for Go Darwin arm 1.17.2 Ref: https://github.com/syndbg/goenv/pull/197
+* Add 1.17.3 and 1.16.10 Ref: https://github.com/syndbg/goenv/pull/199
+* test_assert_helper: use type -aP instead of which -a Ref: https://github.com/syndbg/goenv/pull/201
+* Add 1.17.4, 1.17.5, 1.16.11 and 1.16.12 Ref: https://github.com/syndbg/goenv/pull/204
+* Add 1.18beta1 Ref: https://github.com/syndbg/goenv/pull/208
+* Add 1.17.6 and 1.16.13 Ref: https://github.com/syndbg/goenv/pull/211
+* Update realpath extension source with upstream changes Ref: https://github.com/syndbg/goenv/pull/206
+* Add 1.18beta2 Ref: https://github.com/syndbg/goenv/pull/212
+* Add 1.16.14 & 1.17.7 Ref: https://github.com/syndbg/goenv/pull/213
+* Adds support for 1.18rc1 release Ref: https://github.com/syndbg/goenv/pull/214
+* add 1.17.8 and 1.16.15 Ref: https://github.com/syndbg/goenv/pull/216
+* Support 1.18.0 Ref: https://github.com/syndbg/goenv/pull/217
+* support 1.18.1 Ref: https://github.com/syndbg/goenv/pull/219
+* Support go 1.17.9 Ref: https://github.com/syndbg/goenv/pull/221
+* feat: suport force darwin arch Ref: https://github.com/syndbg/goenv/pull/220
+* Go 1.18.2 Ref: https://github.com/syndbg/goenv/pull/224
+* Add Go 1.17.10 Ref: https://github.com/syndbg/goenv/pull/225
+* Support Go 1.18.3 Ref: https://github.com/syndbg/goenv/pull/228
+* Go 1.18.3 Fix tar.gz MacOS checksum Ref: https://github.com/syndbg/goenv/pull/229
+* Support go 1.17.11 Ref: https://github.com/syndbg/goenv/pull/231
+* Add go1.19beta1 support Ref: https://github.com/syndbg/goenv/pull/232
+* Support Go 1.18.4 and 1.17.12 Ref: https://github.com/syndbg/goenv/pull/236
+* Remove redundant command prompts Ref: https://github.com/syndbg/goenv/pull/235
+* Support Go 1.18.5 and 1.17.13 Ref: https://github.com/syndbg/goenv/pull/239
+* Support Go 1.19 Ref: https://github.com/syndbg/goenv/pull/240
+* Doc: simplify git cmd for upgrade & checkout version Ref: https://github.com/syndbg/goenv/pull/242
+* Support Go 1.19.1 and 1.18.6 Ref: https://github.com/syndbg/goenv/pull/245
+* If `.go-version` is missing, fallback on `go.mod` Ref: https://github.com/syndbg/goenv/pull/227
+* Support 1.19.2 and 1.18.7 Ref: https://github.com/syndbg/goenv/pull/250
+* Install latest patch version if major.minor semantic version provided; Add latest command to install Ref: https://github.com/syndbg/goenv/pull/252
+
 ## 2.0.0beta11
 
 ### Added
