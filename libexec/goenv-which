@@ -59,8 +59,28 @@ for version in "${versions[@]}"; do
   fi
 done
 
+version_exists() {
+  local input_version="$1"
+  local use_go_mod="$2"
+
+  if [[ -n use_go_mod ]] && [[ -d ${GOENV_ROOT}/versions ]] && grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${input_version}; then
+    OLDIFS="$IFS"
+    IFS=$'\n'
+    local version_regex=$(echo ${input_version} | sed s/\\./\\\\./)
+    local versions=($(ls ${GOENV_ROOT}/versions | grep -E "^$version_regex(\\.[0-9]+)?$" | sort -V))
+    IFS="$OLDIFS"
+    if [[ ${#versions[@]} -eq 0 ]]; then
+      return 1
+    fi
+    version=${versions[${#versions[@]} - 1]}
+  fi
+
+  [ -d "${GOENV_ROOT}/versions/${version}" ]
+}
+
 OLDIFS="$IFS"
-IFS=$'\n' scripts=(`goenv-hooks which`)
+IFS=$'\n'
+scripts=($(goenv-hooks which))
 IFS="$OLDIFS"
 for script in "${scripts[@]}"; do
   source "$script"
@@ -76,7 +96,7 @@ for version in "${versions[@]}"; do
   if [ "$version" = "system" ]; then
     continue
   fi
-  if ! [ -d "${GOENV_ROOT}/versions/${version}" ]; then
+  if ! version_exists "$version" "$GOENV_GO_MOD_ENABLE"; then
     echo "goenv: version '$version' is not installed (set by $(goenv-version-origin))" >&2
     any_not_installed=1
   fi
