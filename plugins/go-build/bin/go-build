@@ -302,6 +302,7 @@ install_bsd_32bit() {
 }
 
 install_package_using() {
+  INSTALL_FOUND=true
   local package_type="$1"
   local package_type_nargs="$2"
   local package_name="$3"
@@ -914,6 +915,11 @@ unset GOPATH
 trap build_failed ERR
 mkdir -p "$BUILD_PATH"
 # Executes the file and the commands inside
+INSTALL_FOUND=false
 source "$DEFINITION_PATH"
+if [[ $INSTALL_FOUND = false ]]; then
+  echo "No installable version found for $(uname -s) $(uname -m)"
+  exit 1
+fi
 [ -z "${KEEP_BUILD_PATH}" ] && rm -fr "$BUILD_PATH"
 trap - ERR
