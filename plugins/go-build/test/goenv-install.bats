@@ -26,6 +26,7 @@ OUT
 --verbose
 --version
 --debug
+1.0.0
 1.2.0
 1.2.2
 1.3beta1
@@ -283,6 +284,7 @@ OUT
   assert_success
   assert_output <<-OUT
 Available versions:
+  1.0.0
   1.2.0
   1.2.2
   1.3beta1
@@ -297,6 +299,7 @@ OUT
   assert_success
   assert_output <<-OUT
 Available versions:
+  1.0.0
   1.2.0
   1.2.2
   1.3beta1
@@ -413,6 +416,33 @@ OUT
 
   assert [ -f "${GOENV_ROOT}/versions/${LATEST_VERSION}/bin/go" ]
   run cat "${GOENV_ROOT}/versions/${LATEST_VERSION}/bin/go"
+}
+
+@test "install does not silently fail when no available version to install" {
+  # NOTE: Create fake definition to install
+  mkdir -p $GOENV_ROOT/plugins/go-build/share/go-build
+
+  LATEST_VERSION=1.0.0
+
+  stub goenv-hooks "install : echo '$HOOK_PATH'/install.bash"
+
+  export USE_FAKE_DEFINITIONS=true
+
+  run goenv-install ${LATEST_VERSION}
+
+  unset USE_FAKE_DEFINITIONS
+
+  arch=" "
+  if [ "$(uname -m)" = "aarch64" ]; then
+    arch=" arm "
+  fi
+
+  assert_output <<-OUT
+No installable version found for $(uname -s) $(uname -m)
+
+OUT
+
+  assert_failure
 }
 
 @test "{before,after}_install hooks get triggered when '--force' argument and version argument is not already installed version and gets installed" {
