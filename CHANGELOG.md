@@ -53,6 +53,12 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.0.4
+
+### Added
+
+- Resolve init rehash issue Ref: https://github.com/syndbg/goenv/pull/275
+
 ## 2.0.3
 
 ### Added
