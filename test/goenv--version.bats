@@ -2,7 +2,7 @@
 
 load test_helper
 
-expected_version="goenv 2.0.2"
+expected_version="goenv 2.0.3"
 
 @test "default version is 'version' variable" {
   assert [ ! -e "$GOENV_ROOT" ]
