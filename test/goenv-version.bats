@@ -30,7 +30,7 @@ OUT
 
 @test "uses version from '.go-version' local file when no version arguments are given and version is present in GOENV_ROOT/versions/<version>" {
   create_version "1.11.1"
-  echo "1.11.1" > '.go-version'
+  echo "1.11.1" >'.go-version'
 
   run goenv-version
   assert_success "1.11.1 (set by ${PWD}/.go-version)"
@@ -38,7 +38,7 @@ OUT
 
 @test "uses version from 'GOENV_ROOT/version' file when no version arguments are given and version is present in GOENV_ROOT/versions/<version>" {
   create_version "1.11.1"
-  echo "1.11.1" > "${GOENV_ROOT}/version"
+  echo "1.11.1" >"${GOENV_ROOT}/version"
 
   run goenv-version
   assert_success "1.11.1 (set by ${GOENV_ROOT}/version)"
@@ -48,7 +48,7 @@ OUT
   create_version "1.11.1"
   create_version "1.10.3"
 
-  echo "1.11.1:1.10.3" > "${GOENV_ROOT}/version"
+  echo "1.11.1:1.10.3" >"${GOENV_ROOT}/version"
 
   run goenv-version
   assert_success
@@ -68,4 +68,19 @@ goenv: version '1.1' is not installed (set by GOENV_VERSION environment variable
 goenv: version '1.2' is not installed (set by GOENV_VERSION environment variable)
 1.11.1 (set by GOENV_VERSION environment variable)
 OUT
+}
+
+@test "With GOENV_GOMOD_VERSION_ENABLE=1 fails when versions separated by ':' from 'GOENV_VERSION' environment variable, no version arguments are given, but only one version is present in GOENV_ROOT/versions/<version>" {
+  GOENV_GOMOD_VERSION_ENABLE=1
+
+  create_version "1.11.1"
+
+  GOENV_VERSION=1.1:1.11.1:1.2 run goenv-version
+  assert_failure
+  assert_output <<OUT
+goenv: version '1.1' is not installed (set by GOENV_VERSION environment variable)
+goenv: version '1.2' is not installed (set by GOENV_VERSION environment variable)
+1.11.1 (set by GOENV_VERSION environment variable)
+OUT
+  unset GOENV_GOMOD_VERSION_ENABLE
 }
