@@ -136,20 +136,22 @@ if [[ ${DEFINITION} == "latest" ]]; then
   DEFINITION=$LATEST
 # If unstable is supplied, install the latest available (including beta/rc) version
 elif [[ ${DEFINITION} == "unstable" ]]; then
-  LATEST=$(latest_includes_unstable_version "[0-9]\\.[0-9]+")
-  echo "Installing latest (including unstable) version ${LATEST}..."
-  DEFINITION=$LATEST
-# The latest patch version will be located, e.g if 1.11 is supplied they'll be changed to `1.11.x`.
-# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version and install latest patch.
-elif grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${DEFINITION}; then
-  REGEX=$(echo $DEFINITION | sed s/\\./\\\\./)
-  LATEST_PATCH=$(latest_version $REGEX)
-  echo "Using latest patch version $LATEST_PATCH"
-  DEFINITION="$LATEST_PATCH"
+  LATEST_UNSTABLE=$(latest_includes_unstable_version "[0-9]\\.[0-9]+")
+  echo "Installing latest (including unstable) version ${LATEST_UNSTABLE}..."
+  DEFINITION=$LATEST_UNSTABLE
 fi
 
 [ -n "$DEFINITION" ] || DEFINITION="$(goenv-local 2>/dev/null || true)"
 [ -n "$DEFINITION" ] || usage 1 >&2
+
+# The latest patch version will be located, e.g if 1.11 is supplied they'll be changed to `1.11.x`.
+# NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version and install latest patch.
+if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${DEFINITION}; then
+  REGEX=$(echo $DEFINITION | sed s/\\./\\\\./)
+  LATEST_PATCH=$(latest_version $REGEX)
+  echo "Using latest patch version $LATEST_PATCH"
+  DEFINITION=$LATEST_PATCH
+fi
 
 # Define `before_install` and `after_install` functions that allow
 # plugin hooks to register a string of code for execution before or
