@@ -1,0 +1,15 @@
+install_darwin_64bit "Go Darwin 64bit 1.1.20rc1" "go1.20rc1.darwin-amd64.tar.gz#bd7f6b14655d83126b85331b1c99032b4417982377ff1ee4cb0b4fa955935e52"
+
+install_darwin_arm "Go Darwin arm 1.1.20rc1" "go1.20rc1.darwin-arm64.tar.gz#26c063e947b4f5a66a37e3c45af0bc6d27e858611fea6387f13a92b7a1f4eaa7"
+
+install_bsd_32bit "Go Freebsd 32bit 1.1.20rc1" "go1.20rc1.freebsd-386.tar.gz#3a24e5b8f36fb70e602f8cfe3cd10ce75efe70f240707817a9379a1058929fba"
+
+install_bsd_64bit "Go Freebsd 64bit 1.1.20rc1" "go1.20rc1.freebsd-amd64.tar.gz#3a24e5b8f36fb70e602f8cfe3cd10ce75efe70f240707817a9379a1058929fba"
+
+install_linux_32bit "Go Linux 32bit 1.1.20rc1" "go1.20rc1.linux-386.tar.gz#a6e90a0c39d55d7d671090cfd25e4b24447b9be3c6e12c142f18adb65687df12"
+
+install_linux_64bit "Go Linux 64bit 1.1.20rc1" "go1.20rc1.linux-amd64.tar.gz#4757fb32d7514145e43d4f37713f98d8cc0ecbbb5b1737accfc84be50e1e2e32"
+
+install_linux_arm "Go Linux arm 1.1.20rc1" "go1.20rc1.linux-armv6l.tar.gz#518267b51750d3831c535d1bc734355f4ebec7f9a9ef7142b7138c7491088b1f"
+
+install_linux_arm_64bit "Go Linux arm 64bit 1.1.20rc1" "go1.20rc1.linux-arm64.tar.gz#dfc64ba011710565821cc97a2685c5afe3b9cbd5a3e3b665ffb3384d15c5ae50"
