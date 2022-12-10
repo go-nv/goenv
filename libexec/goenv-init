@@ -91,7 +91,7 @@ fish )
   echo "set -gx GOENV_ROOT $GOENV_ROOT"
 
   echo 'if not contains $GOENV_ROOT/shims $PATH'
-  echo '  set -gx PATH $GOENV_ROOT/shims $PATH'
+  echo '  set -gx PATH $PATH $GOENV_ROOT/shims'
   echo 'end'
   ;;
 * )
@@ -99,7 +99,7 @@ fish )
   echo "export GOENV_ROOT=$GOENV_ROOT"
 
   echo 'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  echo '  export PATH="$GOENV_ROOT/shims:$PATH"'
+  echo '  export PATH="$PATH:$GOENV_ROOT/shims"'
   echo 'fi'
   ;;
 esac

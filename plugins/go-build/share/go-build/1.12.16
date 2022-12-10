@@ -1,11 +1,11 @@
-install_darwin_64bit "Go Darwin 64bit 1.12.16" "https://dl.google.com/go/go1.12.16.darwin-amd64.tar.gz#5d11cb80375f8758f90d5787b1e349604a9e38815fb1f8944322b3d4d2952180"
+install_darwin_64bit "Go Darwin 64bit 1.12.16" "go1.12.16.darwin-amd64.tar.gz#5d11cb80375f8758f90d5787b1e349604a9e38815fb1f8944322b3d4d2952180"
 
-install_bsd_32bit "Go Freebsd 32bit 1.12.16" "https://dl.google.com/go/go1.12.16.freebsd-386.tar.gz#fd0632920773e1779588fc95e1864e74cd3d2df47712234717b06508b330f9b7"
+install_bsd_32bit "Go Freebsd 32bit 1.12.16" "go1.12.16.freebsd-386.tar.gz#fd0632920773e1779588fc95e1864e74cd3d2df47712234717b06508b330f9b7"
 
-install_bsd_64bit "Go Freebsd 64bit 1.12.16" "https://dl.google.com/go/go1.12.16.freebsd-amd64.tar.gz#3f0a65d47a51f4128556866d1a1f2b3b87674c91a7371fb2439672f9368a3f37"
+install_bsd_64bit "Go Freebsd 64bit 1.12.16" "go1.12.16.freebsd-amd64.tar.gz#3f0a65d47a51f4128556866d1a1f2b3b87674c91a7371fb2439672f9368a3f37"
 
-install_linux_32bit "Go Linux 32bit 1.12.16" "https://dl.google.com/go/go1.12.16.linux-386.tar.gz#e6ebf5622203f2ceee138af16c765818bf65b74668d5e73c1da6491c3e890a88"
+install_linux_32bit "Go Linux 32bit 1.12.16" "go1.12.16.linux-386.tar.gz#e6ebf5622203f2ceee138af16c765818bf65b74668d5e73c1da6491c3e890a88"
 
-install_linux_64bit "Go Linux 64bit 1.12.16" "https://dl.google.com/go/go1.12.16.linux-amd64.tar.gz#bf3a85d75658144c06ce986ba05e07ef08af4320089b74b1d41de3b0f340ea7e"
+install_linux_64bit "Go Linux 64bit 1.12.16" "go1.12.16.linux-amd64.tar.gz#bf3a85d75658144c06ce986ba05e07ef08af4320089b74b1d41de3b0f340ea7e"
 
-install_linux_arm "Go Linux arm 1.12.16" "https://dl.google.com/go/go1.12.16.linux-armv6l.tar.gz#2f77688eaf25d8ae58adc5164de0fc13d600705c2ebadc6e1138e5ce9ceadc41"
+install_linux_arm "Go Linux arm 1.12.16" "go1.12.16.linux-armv6l.tar.gz#2f77688eaf25d8ae58adc5164de0fc13d600705c2ebadc6e1138e5ce9ceadc41"

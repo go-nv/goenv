@@ -14,6 +14,7 @@ OUT
 }
 
 @test "has completion support" {
+  export USE_FAKE_DEFINITIONS=true
   run goenv-install --complete
   assert_success
   assert_output <<'OUT'
@@ -25,207 +26,19 @@ OUT
 --verbose
 --version
 --debug
+1.0.0
+1.2.0
 1.2.2
-1.3.0
-1.3.1
-1.3.2
-1.3.3
-1.4.0
-1.4.1
-1.4.2
-1.4.3
-1.5.0
-1.5.1
-1.5.2
-1.5.3
-1.5.4
-1.6.0
-1.6.1
-1.6.2
-1.6.3
-1.6.4
-1.7.0
-1.7.1
-1.7.3
-1.7.4
-1.7.5
-1.8.0
-1.8.1
-1.8.3
-1.8.4
-1.8.5
-1.8.7
-1.9.0
-1.9.1
-1.9.2
-1.9.3
-1.9.4
-1.9.5
-1.9.6
-1.9.7
-1.10.0
-1.10beta2
-1.10rc1
-1.10rc2
-1.10.1
-1.10.2
-1.10.3
-1.10.4
-1.10.5
-1.10.6
-1.10.7
-1.10.8
-1.11.0
-1.11beta2
-1.11beta3
-1.11rc1
-1.11rc2
-1.11.1
-1.11.2
-1.11.3
-1.11.4
-1.11.5
-1.11.6
-1.11.7
-1.11.8
-1.11.9
-1.11.10
-1.11.11
-1.11.12
-1.11.13
-1.12.0
-1.12beta1
-1.12beta2
-1.12rc1
-1.12.1
-1.12.2
-1.12.3
-1.12.4
-1.12.5
-1.12.6
-1.12.7
-1.12.8
-1.12.9
-1.12.10
-1.12.11
-1.12.12
-1.12.13
-1.12.14
-1.12.15
-1.12.16
-1.12.17
-1.13.0
-1.13beta1
-1.13rc1
-1.13rc2
-1.13.1
-1.13.2
-1.13.3
-1.13.4
-1.13.5
-1.13.6
-1.13.7
-1.13.8
-1.13.9
-1.13.10
-1.13.11
-1.13.12
-1.13.13
-1.13.14
-1.13.15
-1.14.0
-1.14beta1
-1.14rc1
-1.14.1
-1.14.2
-1.14.3
-1.14.4
-1.14.5
-1.14.6
-1.14.7
-1.14.8
-1.14.9
-1.14.10
-1.14.11
-1.14.12
-1.14.13
-1.14.14
-1.14.15
-1.15.0
-1.15beta1
-1.15rc2
-1.15.1
-1.15.2
-1.15.3
-1.15.4
-1.15.5
-1.15.6
-1.15.7
-1.15.8
-1.15.9
-1.15.10
-1.15.11
-1.15.12
-1.15.13
-1.15.14
-1.15.15
-1.16.0
-1.16beta1
-1.16.1
-1.16.2
-1.16.3
-1.16.4
-1.16.5
-1.16.6
-1.16.7
-1.16.8
-1.16.9
-1.16.10
-1.16.11
-1.16.12
-1.16.13
-1.16.14
-1.16.15
-1.17.0
-1.17beta1
-1.17rc1
-1.17rc2
-1.17.1
-1.17.2
-1.17.3
-1.17.4
-1.17.5
-1.17.6
-1.17.7
-1.17.8
-1.17.9
-1.17.10
-1.17.11
-1.17.12
-1.17.13
-1.18.0
-1.18beta1
-1.18beta2
-1.18rc1
-1.18.1
-1.18.2
-1.18.3
-1.18.4
-1.18.5
-1.18.6
-1.18.7
-1.19.0
-1.19beta1
-1.19.1
-1.19.2
+1.3beta1
 OUT
+  unset USE_FAKE_DEFINITIONS
 }
 
 @test "prints full usage when '-h' is first argument given" {
   run goenv-install -h
   assert_success
   assert_output <<'OUT'
-Usage: goenv install [-f] [-kvp] <version>
+Usage: goenv install [-f] [-kvp] <version>|latest|unstable
        goenv install [-f] [-kvp] <definition-file>
        goenv install -l|--list
        goenv install --version
@@ -253,7 +66,7 @@ OUT
   run goenv-install --help
   assert_success
   assert_output <<'OUT'
-Usage: goenv install [-f] [-kvp] <version>
+Usage: goenv install [-f] [-kvp] <version>|latest|unstable
        goenv install [-f] [-kvp] <definition-file>
        goenv install -l|--list
        goenv install --version
@@ -281,7 +94,7 @@ OUT
   run goenv-install
   assert_failure
   assert_output <<'OUT'
-Usage: goenv install [-f] [-kvp] <version>
+Usage: goenv install [-f] [-kvp] <version>|latest|unstable
        goenv install [-f] [-kvp] <definition-file>
        goenv install -l|--list
        goenv install --version
@@ -309,7 +122,7 @@ OUT
   run goenv-install -f
   assert_failure
   assert_output <<'OUT'
-Usage: goenv install [-f] [-kvp] <version>
+Usage: goenv install [-f] [-kvp] <version>|latest|unstable
        goenv install [-f] [-kvp] <definition-file>
        goenv install -l|--list
        goenv install --version
@@ -337,7 +150,7 @@ OUT
   run goenv-install --force
   assert_failure
   assert_output <<'OUT'
-Usage: goenv install [-f] [-kvp] <version>
+Usage: goenv install [-f] [-kvp] <version>|latest|unstable
        goenv install [-f] [-kvp] <definition-file>
        goenv install -l|--list
        goenv install --version
@@ -365,7 +178,7 @@ OUT
   run goenv-install -f -
   assert_failure
   assert_output <<'OUT'
-Usage: goenv install [-f] [-kvp] <version>
+Usage: goenv install [-f] [-kvp] <version>|latest|unstable
        goenv install [-f] [-kvp] <definition-file>
        goenv install -l|--list
        goenv install --version
@@ -393,7 +206,7 @@ OUT
   run goenv-install --force
   assert_failure
   assert_output <<'OUT'
-Usage: goenv install [-f] [-kvp] <version>
+Usage: goenv install [-f] [-kvp] <version>|latest|unstable
        goenv install [-f] [-kvp] <definition-file>
        goenv install -l|--list
        goenv install --version
@@ -465,12 +278,16 @@ OUT
 }
 
 @test "prints all available definitions when '-l' argument is given" {
+  export USE_FAKE_DEFINITIONS=true
   run goenv-install -l
 
   assert_success
   assert_output <<-OUT
 Available versions:
+  1.0.0
+  1.2.0
   1.2.2
+<<<<<<< HEAD
   1.3.0
   1.3.1
   1.3.2
@@ -663,16 +480,24 @@ Available versions:
   1.19beta1
   1.19.1
   1.19.2
+=======
+  1.3beta1
+>>>>>>> upstream/master
 OUT
+  unset USE_FAKE_DEFINITIONS
 }
 
 @test "prints all available definitions when '--list' argument is given" {
+  export USE_FAKE_DEFINITIONS=true
   run goenv-install --list
 
   assert_success
   assert_output <<-OUT
 Available versions:
+  1.0.0
+  1.2.0
   1.2.2
+<<<<<<< HEAD
   1.3.0
   1.3.1
   1.3.2
@@ -865,7 +690,11 @@ Available versions:
   1.19beta1
   1.19.1
   1.19.2
+=======
+  1.3beta1
+>>>>>>> upstream/master
 OUT
+  unset USE_FAKE_DEFINITIONS
 }
 
 @test "prints go-build version when '--version' argument is given" {
@@ -873,8 +702,137 @@ OUT
 
   assert_success
   assert_output <<-OUT
-go-build 2.0.0beta1
+go-build 2.0.3
 OUT
+}
+
+@test "installs the latest version when latest is given as an argument to install" {
+  # NOTE: Create fake definition to install
+  mkdir -p $GOENV_ROOT/plugins/go-build/share/go-build
+
+  LATEST_VERSION=1.2.2
+
+  stub goenv-hooks "install : echo '$HOOK_PATH'/install.bash"
+
+  export USE_FAKE_DEFINITIONS=true
+
+  run goenv-install latest
+
+  unset USE_FAKE_DEFINITIONS
+
+  arch=" "
+  if [ "$(uname -m)" = "aarch64" ]; then
+    arch=" arm "
+  fi
+
+  unameOut="$(uname -s)"
+  case "${unameOut}" in
+  Linux*)
+    assert_output <<-OUT
+Installing latest version ${LATEST_VERSION}...
+Downloading ${LATEST_VERSION}.tar.gz...
+-> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
+Installing Go Linux${arch}64bit ${LATEST_VERSION}...
+Installed Go Linux${arch}64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
+
+OUT
+    ;;
+  Darwin*)
+    assert_output <<-OUT
+Installing latest version ${LATEST_VERSION}...
+Downloading ${LATEST_VERSION}.tar.gz...
+-> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
+Installing Go Darwin 10.8 64bit ${LATEST_VERSION}...
+Installed Go Darwin 10.8 64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
+
+OUT
+    ;;
+  *) machine="UNKNOWN:${unameOut}" ;;
+  esac
+  echo ${machine}
+
+  assert_success
+
+  assert [ -f "${GOENV_ROOT}/versions/${LATEST_VERSION}/bin/go" ]
+  run cat "${GOENV_ROOT}/versions/${LATEST_VERSION}/bin/go"
+}
+
+@test "installs the latest (including unstable) version when unstable is given as an argument to install" {
+  # NOTE: Create fake definition to install
+  mkdir -p $GOENV_ROOT/plugins/go-build/share/go-build
+
+  LATEST_VERSION=1.3beta1
+
+  stub goenv-hooks "install : echo '$HOOK_PATH'/install.bash"
+
+  export USE_FAKE_DEFINITIONS=true
+
+  run goenv-install unstable
+
+  unset USE_FAKE_DEFINITIONS
+
+  arch=" "
+  if [ "$(uname -m)" = "aarch64" ]; then
+    arch=" arm "
+  fi
+
+  unameOut="$(uname -s)"
+  case "${unameOut}" in
+  Linux*)
+    assert_output <<-OUT
+Installing latest (including unstable) version ${LATEST_VERSION}...
+Downloading ${LATEST_VERSION}.tar.gz...
+-> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
+Installing Go Linux${arch}64bit ${LATEST_VERSION}...
+Installed Go Linux${arch}64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
+
+OUT
+    ;;
+  Darwin*)
+    assert_output <<-OUT
+Installing latest (including unstable) version ${LATEST_VERSION}...
+Downloading ${LATEST_VERSION}.tar.gz...
+-> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
+Installing Go Darwin 10.8 64bit ${LATEST_VERSION}...
+Installed Go Darwin 10.8 64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
+
+OUT
+    ;;
+  *) machine="UNKNOWN:${unameOut}" ;;
+  esac
+  echo ${machine}
+
+  assert_success
+
+  assert [ -f "${GOENV_ROOT}/versions/${LATEST_VERSION}/bin/go" ]
+  run cat "${GOENV_ROOT}/versions/${LATEST_VERSION}/bin/go"
+}
+
+@test "install does not silently fail when no available version to install" {
+  # NOTE: Create fake definition to install
+  mkdir -p $GOENV_ROOT/plugins/go-build/share/go-build
+
+  LATEST_VERSION=1.0.0
+
+  stub goenv-hooks "install : echo '$HOOK_PATH'/install.bash"
+
+  export USE_FAKE_DEFINITIONS=true
+
+  run goenv-install ${LATEST_VERSION}
+
+  unset USE_FAKE_DEFINITIONS
+
+  arch=" "
+  if [ "$(uname -m)" = "aarch64" ]; then
+    arch=" arm "
+  fi
+
+  assert_output <<-OUT
+No installable version found for $(uname -s) $(uname -m)
+
+OUT
+
+  assert_failure
 }
 
 @test "{before,after}_install hooks get triggered when '--force' argument and version argument is not already installed version and gets installed" {
@@ -1070,10 +1028,11 @@ OUT
   assert [ -x "${GOENV_ROOT}/shims/go" ]
 }
 
-@test "adds patch version '0' to definition when version argument is not already installed version and gets installed" {
+@test "installs latest patch version to definition when version argument is not already installed version and gets installed" {
   # NOTE: Create fake definition to install
   mkdir -p $GOENV_ROOT/plugins/go-build/share/go-build
   cp $BATS_TEST_DIRNAME/fixtures/definitions/1.2.0 $GOENV_ROOT/plugins/go-build/share/go-build
+  cp $BATS_TEST_DIRNAME/fixtures/definitions/1.2.2 $GOENV_ROOT/plugins/go-build/share/go-build
 
   stub goenv-hooks "install : echo '$HOOK_PATH'/install.bash"
 
@@ -1088,21 +1047,21 @@ OUT
   case "${unameOut}" in
   Linux*)
     assert_output <<-OUT
-Adding patch version 0 to 1.2
-Downloading 1.2.0.tar.gz...
--> http://localhost:8090/1.2.0/1.2.0.tar.gz
-Installing Go Linux${arch}64bit 1.2.0...
-Installed Go Linux${arch}64bit 1.2.0 to ${GOENV_ROOT}/versions/1.2.0
+Using latest patch version 1.2.2
+Downloading 1.2.2.tar.gz...
+-> http://localhost:8090/1.2.2/1.2.2.tar.gz
+Installing Go Linux${arch}64bit 1.2.2...
+Installed Go Linux${arch}64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 OUT
     ;;
   Darwin*)
     assert_output <<-OUT
-Adding patch version 0 to 1.2
-Downloading 1.2.0.tar.gz...
--> http://localhost:8090/1.2.0/1.2.0.tar.gz
-Installing Go Darwin 10.8 64bit 1.2.0...
-Installed Go Darwin 10.8 64bit 1.2.0 to ${GOENV_ROOT}/versions/1.2.0
+Using latest patch version 1.2.2
+Downloading 1.2.2.tar.gz...
+-> http://localhost:8090/1.2.2/1.2.2.tar.gz
+Installing Go Darwin 10.8 64bit 1.2.2...
+Installed Go Darwin 10.8 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 OUT
     ;;
@@ -1112,6 +1071,6 @@ OUT
 
   assert_success
 
-  assert [ -f "${GOENV_ROOT}/versions/1.2.0/bin/go" ]
-  run cat "${GOENV_ROOT}/versions/1.2.0/bin/go"
+  assert [ -f "${GOENV_ROOT}/versions/1.2.2/bin/go" ]
+  run cat "${GOENV_ROOT}/versions/1.2.2/bin/go"
 }

@@ -1,15 +1,15 @@
-install_darwin_64bit "Go Darwin 64bit 1.18rc1" "https://go.dev/dl/go1.18rc1.darwin-amd64.tar.gz#67fd5b9b1859e532081242df780eaf0add33825097b1091247face8ad9b3ae8c"
+install_darwin_64bit "Go Darwin 64bit 1.18rc1" "go1.18rc1.darwin-amd64.tar.gz#67fd5b9b1859e532081242df780eaf0add33825097b1091247face8ad9b3ae8c"
 
-install_darwin_arm "Go Darwin arm 1.18rc1" "https://golang.org/dl/go1.18rc1.darwin-arm64.tar.gz#c82d02b5e80072756973f526e7b63403eb7632e254ab5ff2ae25935de8591a11"
+install_darwin_arm "Go Darwin arm 1.18rc1" "go1.18rc1.darwin-arm64.tar.gz#c82d02b5e80072756973f526e7b63403eb7632e254ab5ff2ae25935de8591a11"
 
-install_bsd_32bit "Go Freebsd 32bit 1.18rc1" "https://golang.org/dl/go1.18rc1.freebsd-386.tar.gz#1aed10931489e30910b73482ac00a4e56cbb749c21a0e1025c5ec06c7f2254a5"
+install_bsd_32bit "Go Freebsd 32bit 1.18rc1" "go1.18rc1.freebsd-386.tar.gz#1aed10931489e30910b73482ac00a4e56cbb749c21a0e1025c5ec06c7f2254a5"
 
-install_bsd_64bit "Go Freebsd 64bit 1.18rc1" "https://golang.org/dl/go1.18rc1.freebsd-amd64.tar.gz#c94afba94c931f4106e82ab4e6ddb47db38034057ef157d2dce3e6e3eab9286b"
+install_bsd_64bit "Go Freebsd 64bit 1.18rc1" "go1.18rc1.freebsd-amd64.tar.gz#c94afba94c931f4106e82ab4e6ddb47db38034057ef157d2dce3e6e3eab9286b"
 
-install_linux_32bit "Go Linux 32bit 1.18rc1" "https://golang.org/dl/go1.18rc1.linux-386.tar.gz#a4bb0097276fa3523f1ce84dc4ee50fab0b3b0f7fbe72833710434889516c51e"
+install_linux_32bit "Go Linux 32bit 1.18rc1" "go1.18rc1.linux-386.tar.gz#a4bb0097276fa3523f1ce84dc4ee50fab0b3b0f7fbe72833710434889516c51e"
 
-install_linux_64bit "Go Linux 64bit 1.18rc1" "https://golang.org/dl/go1.18rc1.linux-amd64.tar.gz#9ea4e6adee711e06fa95546e1a9629b63de3aaae85fac9dc752fb533f3e5be23"
+install_linux_64bit "Go Linux 64bit 1.18rc1" "go1.18rc1.linux-amd64.tar.gz#9ea4e6adee711e06fa95546e1a9629b63de3aaae85fac9dc752fb533f3e5be23"
 
-install_linux_arm "Go Linux arm 1.18rc1" "https://golang.org/dl/go1.18rc1.linux-armv6l.tar.gz#d7a3f97b23b1e1f2e1a3596ff011e78f93aa8bbd991e2065ac34c18993884ea1"
+install_linux_arm "Go Linux arm 1.18rc1" "go1.18rc1.linux-armv6l.tar.gz#d7a3f97b23b1e1f2e1a3596ff011e78f93aa8bbd991e2065ac34c18993884ea1"
 
-install_linux_arm_64bit "Go Linux arm 64bit 1.18rc1" "https://golang.org/dl/go1.18rc1.linux-arm64.tar.gz#e4528a113016872a3715cec37a6c6dad36d76d51a50fa19b33b7673e47e6df44"
+install_linux_arm_64bit "Go Linux arm 64bit 1.18rc1" "go1.18rc1.linux-arm64.tar.gz#e4528a113016872a3715cec37a6c6dad36d76d51a50fa19b33b7673e47e6df44"

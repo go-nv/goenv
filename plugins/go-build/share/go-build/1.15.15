@@ -1,13 +1,13 @@
-install_darwin_64bit "Go Darwin 64bit 1.15.15" "https://golang.org/dl/go1.15.15.darwin-amd64.tar.gz#2f4c119524450ee94062a1ce7112fb88ce0fe4bb0303a302e002183a550c25c2"
+install_darwin_64bit "Go Darwin 64bit 1.15.15" "go1.15.15.darwin-amd64.tar.gz#2f4c119524450ee94062a1ce7112fb88ce0fe4bb0303a302e002183a550c25c2"
 
-install_bsd_32bit "Go Freebsd 32bit 1.15.15" "https://golang.org/dl/go1.15.15.freebsd-386.tar.gz#7174078a53e330cf351dc20bed6682033f44066d8aed754139bcaef52e53c214"
+install_bsd_32bit "Go Freebsd 32bit 1.15.15" "go1.15.15.freebsd-386.tar.gz#7174078a53e330cf351dc20bed6682033f44066d8aed754139bcaef52e53c214"
 
-install_bsd_64bit "Go Freebsd 64bit 1.15.15" "https://golang.org/dl/go1.15.15.freebsd-amd64.tar.gz#1f80a20419b2618182ef5b9615dd990b32b952d81b354b373c6fd304527bb70c"
+install_bsd_64bit "Go Freebsd 64bit 1.15.15" "go1.15.15.freebsd-amd64.tar.gz#1f80a20419b2618182ef5b9615dd990b32b952d81b354b373c6fd304527bb70c"
 
-install_linux_32bit "Go Linux 32bit 1.15.15" "https://golang.org/dl/go1.15.15.linux-386.tar.gz#3310fb0e48b0907bb520f6e3c6dcff63cc0913b92a76456f12980d0eb13b77d4"
+install_linux_32bit "Go Linux 32bit 1.15.15" "go1.15.15.linux-386.tar.gz#3310fb0e48b0907bb520f6e3c6dcff63cc0913b92a76456f12980d0eb13b77d4"
 
-install_linux_64bit "Go Linux 64bit 1.15.15" "https://golang.org/dl/go1.15.15.linux-amd64.tar.gz#0885cf046a9f099e260d98d9ec5d19ea9328f34c8dc4956e1d3cd87daaddb345"
+install_linux_64bit "Go Linux 64bit 1.15.15" "go1.15.15.linux-amd64.tar.gz#0885cf046a9f099e260d98d9ec5d19ea9328f34c8dc4956e1d3cd87daaddb345"
 
-install_linux_arm "Go Linux arm 1.15.15" "https://golang.org/dl/go1.15.15.linux-armv6l.tar.gz#7192603af50afb23c9d8cd14d2b2c19e0985a34d3eca685fa098df7893000d19"
+install_linux_arm "Go Linux arm 1.15.15" "go1.15.15.linux-armv6l.tar.gz#7192603af50afb23c9d8cd14d2b2c19e0985a34d3eca685fa098df7893000d19"
 
-install_linux_arm_64bit "Go Linux arm 64bit 1.15.15" "https://golang.org/dl/go1.15.15.linux-arm64.tar.gz#714abb01af210473dd6af331094ad6847162eff81a7fc7241d24f5a85496c9fa"
+install_linux_arm_64bit "Go Linux arm 64bit 1.15.15" "go1.15.15.linux-arm64.tar.gz#714abb01af210473dd6af331094ad6847162eff81a7fc7241d24f5a85496c9fa"
