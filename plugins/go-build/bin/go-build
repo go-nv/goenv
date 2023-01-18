@@ -13,7 +13,7 @@
 #   -g/--debug       Build a debug version
 #
 
-GO_BUILD_VERSION="2.0.3"
+GO_BUILD_VERSION="2.0.5"
 
 OLDIFS="$IFS"
 

@@ -53,6 +53,13 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.0.5
+
+### Added
+
+- Support Golang 1.18.9 and 1.19.4 https://github.com/syndbg/goenv/pull/277
+- Support 1.18.10, 1.19.5, 1.20rc2: https://github.com/syndbg/goenv/pull/275
+
 ## 2.0.4
 
 ### Added
