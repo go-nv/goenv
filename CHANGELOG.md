@@ -53,6 +53,13 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.0.6
+
+### Added
+
+- Add support for go 1.19.6 and 1.20.1 (#288)
+- Add support for 1.20 (#284)
+
 ## 2.0.5
 
 ### Added
