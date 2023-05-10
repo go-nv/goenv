@@ -1,8 +1,6 @@
 # Go Version Management: goenv
 
-![PR Checks Status](https://github.com/syndbg/goenv/actions/workflows/pr_checks.yml/badge.svg)
-
-[![Build Status](https://travis-ci.org/syndbg/goenv.svg?branch=master)](https://travis-ci.org/syndbg/goenv)
+[![PR Checks Status](https://github.com/syndbg/goenv/actions/workflows/pr_checks.yml/badge.svg)](https://github.com/syndbg/goenv/actions/workflows/pr_checks.yml)
 
 goenv aims to be as simple as possible and follow the already established
 successful version management model of [pyenv](https://github.com/yyuu/pyenv) and [rbenv](https://github.com/rbenv/rbenv).
@@ -21,7 +19,6 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
 
 ### goenv compared to others:
 
-- https://github.com/pwoolcoc/goenv depends on Python,
 - https://github.com/crsmithdev/goenv depends on Go,
 - https://github.com/moovweb/gvm is a different approach to the problem that's modeled after `nvm`.
   `goenv` is more simplified.
