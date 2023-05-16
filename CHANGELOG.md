@@ -53,6 +53,19 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.0.7
+
+### Added
+
+- Golang version 1.19.7 and 1.20.2 (#292)
+- Golang Version 1.19.8 and 1.20.3 (#295)
+- Add codeowners file by (#300)
+- Support go 1.20.4 and go 1.19.9 (#299)
+
+### Removed
+
+- Delete the travis config file (#301)
+
 ## 2.0.6
 
 ### Added
