@@ -70,6 +70,11 @@ easy to fork and contribute any changes back upstream.
        goenv install 1.12.0
 
    **NOTE:** It downloads and places the prebuilt Go binaries provided by Google.
+
+7. **Set goenv global version.**
+   For example, to set the version to Go 1.12.0, run:
+
+       goenv global 1.12.0
    
 An example `.zshrc` that is properly configured may look like
 
