@@ -53,6 +53,12 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.0.8
+
+### Added
+
+- Golang 1.19.10 and 1.20.5 (#304)
+
 ## 2.0.7
 
 ### Added
