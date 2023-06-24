@@ -17,6 +17,44 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
   variable.
 - Search commands from **multiple versions of Go at a time**.
 
+### goenv install
+1.Install Goenv:
+   
+```ssh
+git clone https://github.com/syndbg/goenv.git ~/.goenv
+```
+
+2.Configure environment variables:
+
+Open a terminal and edit the ~/.bash_profile file (if you're using Bash) or ~/.zshrc file (if you're using Zsh):
+
+```ssh
+vim ~/.bash_profile  # or vim ~/.zshrc
+```
+
+Add the following lines at the end of the file:
+
+```ssh
+export GOENV_ROOT="$HOME/.goenv"
+export PATH="$GOENV_ROOT/bin:$PATH"
+eval "$(goenv init -)"
+```
+
+Save and close the file.
+Execute the following command to reload the configuration:
+
+```ssh
+source ~/.bash_profile  # or source ~/.zshrc
+```
+
+3.Verify the installation:
+
+Run the following command to verify that Goenv is properly installed:
+
+```ssh
+goenv -h
+```
+
 ### goenv compared to others:
 
 - https://github.com/crsmithdev/goenv depends on Go,
