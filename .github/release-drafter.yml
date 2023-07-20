@@ -21,6 +21,7 @@ autolabeler:
   - label: "chore"
     files:
       - "*.md"
+      - ".github/*"
     branch:
       - '/docs{0,1}\/.+/'
     title:
