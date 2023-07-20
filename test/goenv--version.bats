@@ -2,7 +2,9 @@
 
 load test_helper
 
-expected_version="goenv 2.0.8"
+base_dir=$(echo $(dirname -- "$0") | sed -E 's/goenv(\/[0-9]+\.[0-9]+\.[0-9]+)?.+/goenv\/\1/i')
+
+expected_version="goenv $(cat $base_dir/VERSION)"
 
 @test "default version is 'version' variable" {
   assert [ ! -e "$GOENV_ROOT" ]

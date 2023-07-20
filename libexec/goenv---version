@@ -6,6 +6,8 @@
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
 
-version="2.0.8"
+base_dir=$(echo $(dirname -- "$0") | sed -E 's/goenv(\/[0-9]+\.[0-9]+\.[0-9]+)?.+/goenv\/\1/i')
+
+version="$(cat ${base_dir}VERSION)"
 
 echo "goenv ${version}"

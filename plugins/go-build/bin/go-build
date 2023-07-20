@@ -13,8 +13,6 @@
 #   -g/--debug       Build a debug version
 #
 
-GO_BUILD_VERSION="2.0.8"
-
 OLDIFS="$IFS"
 
 set -E
@@ -731,6 +729,10 @@ verify_go() {
 }
 
 version() {
+  base_dir=$(echo $(dirname -- "$0") | sed -E 's/goenv(\/[0-9]+\.[0-9]+\.[0-9]+)?.+/goenv\/\1/i')
+
+  GO_BUILD_VERSION="$(cat $base_dir/VERSION)"
+
   echo "go-build ${GO_BUILD_VERSION}"
 }
 
