@@ -309,6 +309,8 @@ OUT
 
 @test "prints go-build version when '--version' argument is given" {
   base_dir=$(echo $(dirname -- "$0") | sed -E 's/goenv(\/[0-9]+\.[0-9]+\.[0-9]+)?.+/goenv\/\1/i')
+  base_dir=$(echo $base_dir | sed -E 's/\/$//')
+
   run goenv-install --version
 
   assert_success
