@@ -9,6 +9,6 @@ set -e
 base_dir=$(echo $(dirname -- "$0") | sed -E 's/goenv(\/[0-9]+\.[0-9]+\.[0-9]+|\/goenv)?.+/goenv\/\1/i')
 base_dir=$(echo $base_dir | sed -E 's/\/$//')
 
-version="$(cat ${base_dir}/VERSION)"
+version="$(cat $base_dir/APP_VERSION)"
 
 echo "goenv ${version}"

@@ -315,7 +315,7 @@ OUT
 
   assert_success
   assert_output <<-OUT
-go-build $(cat $base_dir/VERSION)
+go-build $(cat $base_dir/APP_VERSION)
 OUT
 }
 
