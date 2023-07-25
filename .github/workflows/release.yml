@@ -1,3 +1,4 @@
+name: Publish to Homebrew
 on:
   workflow_dispatch:
   release:
