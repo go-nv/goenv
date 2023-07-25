@@ -21,6 +21,6 @@ jobs:
       - name: Remove golang
         run: sudo rm -rf $(which go)
       - name: Add goenv to PATH
-        run: export PATH="$PATH:./bin/goenv:/home/linuxbrew/.linuxbrew/bin"
+        run: export PATH="$PATH:./bin/goenv"
       - name: Create Homebrew PR
         run: ./scripts/release.sh goenv
