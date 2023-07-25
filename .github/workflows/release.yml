@@ -4,7 +4,7 @@ on:
   release:
     types: [published]
 jobs:
-  build:
+  release:
     strategy:
       matrix:
         os: ["ubuntu-latest"]
@@ -12,9 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Homebrew
-        run: NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-      - name: Install JQ
-        run: sudo apt install jq
+        run: |
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/runner/.bash_profile
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+      - name: Install Dependencies
+        run: sudo apt install jq build-essential
       - name: Remove golang
         run: sudo rm -rf $(which go)
       - name: Add goenv to PATH
