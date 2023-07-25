@@ -11,16 +11,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
-      - name: Install Homebrew
-        run: |
-          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/runner/.bash_profile
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-      - name: Install Dependencies
-        run: sudo apt install jq build-essential
       - name: Remove golang
         run: sudo rm -rf $(which go)
       - name: Add goenv to PATH
         run: export PATH="$PATH:./bin/goenv"
       - name: Create Homebrew PR
-        run: ./scripts/release.sh goenv
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          # Required, custom GitHub access token with the 'public_repo' and 'workflow' scopes
+          token: ${{secrets.TOKEN}}
+          # Optional, will create tap repo fork in organization
+          # org: ORG
+          # Optional, use the origin repository instead of forking
+          no_fork: false
+          # Formula name, required
+          formula: FORMULA
+          # Optional, will be determined automatically
+          tag: ${{github.ref}}
+          # Optional, will be determined automatically
+          revision: ${{github.sha}}
+          # Optional, if don't want to check for already open PRs
+          force: false # true
