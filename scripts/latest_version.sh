@@ -25,7 +25,7 @@ capitalize() {
     printf '%s' "$1" | tail -c '+2'
 }
 
-BRANCH_NAME="goenv_bot_add"
+BRANCH_NAME_PREFIX="goenv_bot_add"
 
 while read LATEST_GO_DEFINITION; do
     printf "fetching latest go version..."
@@ -47,9 +47,7 @@ while read LATEST_GO_DEFINITION; do
 
     printf "Creating new definitions for $LATEST_GO_VERSION..."
 
-    BRANCH_NAME="${BRANCH_NAME}_${LATEST_GO_VERSION}"
-
-    echo $BRANCH_NAME
+    BRANCH_NAME="${BRANCH_NAME_PREFIX}_${LATEST_GO_VERSION}"
 
     GO_BUILD_DEFINITION_FILE=$GO_DEFINITIONS_DIR/$LATEST_GO_VERSION
 
@@ -106,6 +104,9 @@ while read LATEST_GO_DEFINITION; do
 
 done <<<"$(curl -s 'https://go.dev/dl/?mode=json' | jq -c '.[]')"
 
+git config --global user.name "${GITHUB_ACTOR}"
+git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+
 EXISTS=$(git branch -r -l 'origin*' | sed -E -e 's/^[^\/]+\///g' -e 's/HEAD.+//' | grep "$BRANCH_NAME")
 
 if [[ -n $EXISTS ]]; then
@@ -115,7 +116,7 @@ fi
 
 echo "checking out new Git branch $BRANCH_NAME..."
 
-git checkout -b $BRANCH_NAME
+git switch -c $BRANCH_NAME master
 
 printf " done\n"
 
@@ -136,8 +137,7 @@ echo "Creating Pull Request..."
 gh pr create -B master \
     -t "$COMMIT_MSG" \
     -b "This adds the Go Definitions for version ${LATEST_GO_VERSIONS[@]}. 
-    Created by Github action automation" \
-    -r syndbg,ChronosMasterOfAllTime
+    Created by Github action automation"
 
 echo 'All done!'
 
