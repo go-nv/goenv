@@ -104,6 +104,11 @@ while read LATEST_GO_DEFINITION; do
 
 done <<<"$(curl -s 'https://go.dev/dl/?mode=json' | jq -c '.[]')"
 
+if [[ ${#LATEST_GO_VERSIONS[@]} == 0 ]]; then
+    echo "There are no versions to update. Exiting..."
+    exit 0
+fi
+
 git config --global user.name "${GITHUB_ACTOR}"
 git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 
