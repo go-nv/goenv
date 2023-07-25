@@ -2,9 +2,10 @@
 
 set -o errexit
 
+echo $PATH
+
 cd $(brew --repository homebrew/core)
 
-git remote add
 git remote set-url origin https://github.com/homebrew/homebrew-core.git
 git remote add $GITHUB_ACTOR https://github.com/$GITHUB_ACTOR/homebrew-core.git
 brew update-reset
