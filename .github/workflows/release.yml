@@ -28,7 +28,7 @@ jobs:
           # Optional, use the origin repository instead of forking
           no_fork: false
           # Formula name, required
-          formula: FORMULA
+          formula: goenv
           # Optional, will be determined automatically
           tag: ${{github.ref}}
           # Optional, will be determined automatically
