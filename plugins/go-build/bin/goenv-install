@@ -2,8 +2,8 @@
 #
 # Summary: Install a Go version using go-build
 #
-# Usage: goenv install [-f] [-kvp] <version>|latest|unstable
-#        goenv install [-f] [-kvp] <definition-file>
+# Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
+#        goenv install [-f] [-kvpq] <definition-file>
 #        goenv install -l|--list
 #        goenv install --version
 #
@@ -17,6 +17,7 @@
 #                      (defaults to $GOENV_ROOT/sources)
 #   -p/--patch         Apply a patch from stdin before building
 #   -v/--verbose       Verbose mode: print compilation status to stdout
+#   -q/--quiet         Disable Progress Bar
 #   --version          Show version of go-build
 #   -g/--debug         Build a debug version
 #
@@ -46,6 +47,7 @@ if [ "$1" = "--complete" ]; then
   echo --verbose
   echo --version
   echo --debug
+  echo --quiet
   exec go-build --definitions
 fi
 
@@ -106,6 +108,9 @@ for option in "${OPTIONS[@]}"; do
     ;;
   "p" | "patch")
     HAS_PATCH="-p"
+    ;;
+  "q" | "quiet")
+    QUIET="-q"
     ;;
   "g" | "debug")
     DEBUG="-g"
@@ -228,7 +233,7 @@ trap cleanup SIGINT
 
 # Invoke `go-build` and record the exit status in $STATUS.
 STATUS=0
-go-build $KEEP $VERBOSE $HAS_PATCH $DEBUG "$DEFINITION" "$PREFIX" || STATUS="$?"
+go-build $KEEP $VERBOSE $HAS_PATCH $QUIET $DEBUG "$DEFINITION" "$PREFIX" || STATUS="$?"
 
 # Display a more helpful message if the definition wasn't found.
 if [ "$STATUS" == "2" ]; then
