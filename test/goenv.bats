@@ -27,6 +27,42 @@ For full documentation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
+@test "Runs install when no command argument is given and GOENV_AUTO_INSTALL is set to 1" {
+  export GOENV_AUTO_INSTALL=1
+
+  echo "Path is $PATH"
+
+  run goenv
+
+  unset GOENV_AUTO_INSTALL
+  
+  assert_failure
+  assert_output <<'OUT'
+Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
+       goenv install [-f] [-kvpq] <definition-file>
+       goenv install -l|--list
+       goenv install --version
+
+  -l/--list          List all available versions
+  -f/--force         Install even if the version appears to be installed already
+  -s/--skip-existing Skip if the version appears to be installed already
+
+  go-build options:
+
+  -k/--keep          Keep source tree in $GOENV_BUILD_ROOT after installation
+                     (defaults to $GOENV_ROOT/sources)
+  -p/--patch         Apply a patch from stdin before building
+  -v/--verbose       Verbose mode: print compilation status to stdout
+  -q/--quiet         Disable Progress Bar
+  --version          Show version of go-build
+  -g/--debug         Build a debug version
+
+For detailed information on installing Go versions with
+go-build, including a list of environment variables for adjusting
+compilation, see: https://github.com/go-nv/goenv#readme
+OUT
+}
+
 @test "fails when invalid command argument is given" {
   run goenv does-not-exist
   assert_failure
