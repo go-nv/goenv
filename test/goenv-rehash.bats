@@ -56,7 +56,7 @@ go
 godoc
 OUT
 
-  run "$(cat ${GOENV_ROOT}/shims/go)"
+  run -127 "$(cat ${GOENV_ROOT}/shims/go)"
 
   # NOTE: Don't assert line 0 since bats modifies it
   assert_line 1  'set -e'
@@ -81,7 +81,7 @@ OUT
 
   assert [ -x "${GOENV_ROOT}/shims/go" ]
 
-  run "$(cat ${GOENV_ROOT}/shims/godoc)"
+  run -127 "$(cat ${GOENV_ROOT}/shims/godoc)"
 
   # NOTE: Don't assert line 0 since bats modifies it
   assert_line 1  'set -e'
@@ -127,7 +127,7 @@ OUT
 
   assert [ -x "${GOENV_ROOT}/shims/go" ]
 
-  run "$(cat ${GOENV_ROOT}/shims/go)"
+  run -127 "$(cat ${GOENV_ROOT}/shims/go)"
 
   # NOTE: Don't assert line 0 since bats modifies it
   assert_line 1  'set -e'

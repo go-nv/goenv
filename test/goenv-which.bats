@@ -65,13 +65,13 @@ OUT
 
 @test "fails when specified executable argument is not found for installed version specified in 'GOENV_VERSION' environment variable" {
   create_executable "1.8.1" "go"
-  GOENV_VERSION=1.8.1 run goenv-which gofmt
+  GOENV_VERSION=1.8.1 run -127 goenv-which gofmt
   assert_failure "goenv: 'gofmt' command not found"
 }
 
 @test "fails when no executable found for system version specified in 'GOENV_VERSION' environment variable" {
   export PATH="$(path_without "go")"
-  GOENV_VERSION=system run goenv-which go
+  GOENV_VERSION=system run -127 goenv-which go
   assert_failure "goenv: 'go' command not found"
 }
 
@@ -80,7 +80,7 @@ OUT
   create_executable "1.10.3" "gofmt"
   create_executable "1.11.1" "gofmt"
 
-  GOENV_VERSION=1.4.0 run goenv-which gofmt
+  GOENV_VERSION=1.4.0 run -127 goenv-which gofmt
   assert_failure
   assert_output <<OUT
 goenv: 'gofmt' command not found
@@ -144,7 +144,7 @@ SH
   touch kill-all-humans
   chmod +x kill-all-humans
 
-  GOENV_VERSION=system run goenv-which kill-all-humans
+  GOENV_VERSION=system run -127 goenv-which kill-all-humans
   assert_failure "goenv: 'kill-all-humans' command not found"
 }
 

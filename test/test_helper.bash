@@ -35,6 +35,10 @@ if [ -z "$GOENV_TEST_DIR" ]; then
   unset xdg_var
 fi
 
+setup() {
+  bats_require_minimum_version 1.5.0
+}
+
 teardown() {
   rm -rf "$GOENV_TEST_DIR"
 }
