@@ -105,7 +105,7 @@ OUT
   run goenv shell
   assert_output <<'OUT'
 eval "$(goenv init -)" has not been executed.
-Please read the installation instructions in the README.md at github.com/syndbg/goenv
+Please read the installation instructions in the README.md at github.com/go-nv/goenv
 or run 'goenv help init' for more information
 OUT
 

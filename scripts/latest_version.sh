@@ -139,7 +139,7 @@ git push -u origin $BRANCH_NAME
 
 echo "Creating Pull Request..."
 
-gh pr create -R syndbg/goenv -B master \
+gh pr create -R go-nv/goenv -B master \
     -t "$COMMIT_MSG" \
     -b "This adds the Go Definitions for version ${LATEST_GO_VERSIONS[@]}. 
     Created by Github action automation"

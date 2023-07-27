@@ -387,7 +387,7 @@ Change line format:
 - Backfilled the CHANGELOG.md
   ; Ref: https://github.com/go-nv/goenv/pull/62
 - `goenv` error message when `GOENV_NATIVE_EXT=1`, but native extension is not present, to quote `realpath` with single quotes. It's now `failed to load 'realpath' builtin`
-- `goenv` error message when `GOENV_DIR` (e.g `/home/syndbg/.goenv`), but it's not writable, to quote `$GOENV_DIR` with single quotes. It's now `cannot change working directory to '$GOENV_DIR'`.
+- `goenv` error message when `GOENV_DIR` (e.g `/home/go-nv/.goenv`), but it's not writable, to quote `$GOENV_DIR` with single quotes. It's now `cannot change working directory to '$GOENV_DIR'`.
 - `goenv` error message when unknown command is given (e.g `goenv potato`), to quote `$command` with single quotes. It's now `no such command '$command'`.
   ; Ref: https://github.com/go-nv/goenv/pull/62
 - `goenv` and `goenv help` is called to quote `goenv help <command>` with single quotes. It's now `'goenv help <command>'`.
