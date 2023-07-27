@@ -5,6 +5,8 @@
 goenv aims to be as simple as possible and follow the already established
 successful version management model of [pyenv](https://github.com/yyuu/pyenv) and [rbenv](https://github.com/rbenv/rbenv).
 
+New go versions are added automatically on a daily CRON schedule.
+
 This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified for Go.
 
 [![asciicast](https://asciinema.org/a/17IT3YiQ56hiJsb2iHpGHlJqj.svg)](https://asciinema.org/a/17IT3YiQ56hiJsb2iHpGHlJqj)
