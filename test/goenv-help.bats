@@ -27,7 +27,7 @@ Some useful goenv commands are:
    whence      List all Go versions that contain the given executable
 
 See 'goenv help <command>' for information on a specific command.
-For full documentation, see: https://github.com/syndbg/goenv#readme
+For full documentation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
@@ -38,7 +38,7 @@ OUT
 
 @test "shows help for a specific command that exists" {
   mkdir -p "${GOENV_TEST_DIR}/bin"
-  cat > "${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
+  cat >"${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
 #!shebang
 # Usage: goenv hello <world>
 # Summary: Says "hello" to you, from goenv
@@ -57,7 +57,7 @@ SH
 
 @test "replaces missing extended help with summary text for a specific command that exists" {
   mkdir -p "${GOENV_TEST_DIR}/bin"
-  cat > "${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
+  cat >"${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
 #!shebang
 # Usage: goenv hello <world>
 # Summary: Says "hello" to you, from goenv
@@ -75,7 +75,7 @@ SH
 
 @test "extracts only usage when '--usage' for a specific command that exists" {
   mkdir -p "${GOENV_TEST_DIR}/bin"
-  cat > "${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
+  cat >"${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
 #!shebang
 # Usage: goenv hello <world>
 # Summary: Says "hello" to you, from goenv
@@ -89,7 +89,7 @@ SH
 
 @test "multiline usage section is returned when '--usage' for a specific command that exists" {
   mkdir -p "${GOENV_TEST_DIR}/bin"
-  cat > "${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
+  cat >"${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
 #!shebang
 # Usage: goenv hello <world>
 #        goenv hi [everybody]
@@ -112,7 +112,7 @@ SH
 
 @test "multiline extended help section is returned for a specific command that exists" {
   mkdir -p "${GOENV_TEST_DIR}/bin"
-  cat > "${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
+  cat >"${GOENV_TEST_DIR}/bin/goenv-hello" <<SH
 #!shebang
 # Usage: goenv hello <world>
 # Summary: Says "hello" to you, from goenv

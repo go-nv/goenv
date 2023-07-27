@@ -58,7 +58,7 @@ Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 
 For detailed information on installing Go versions with
 go-build, including a list of environment variables for adjusting
-compilation, see: https://github.com/syndbg/goenv#readme
+compilation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
@@ -86,7 +86,7 @@ Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 
 For detailed information on installing Go versions with
 go-build, including a list of environment variables for adjusting
-compilation, see: https://github.com/syndbg/goenv#readme
+compilation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
@@ -114,7 +114,7 @@ Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 
 For detailed information on installing Go versions with
 go-build, including a list of environment variables for adjusting
-compilation, see: https://github.com/syndbg/goenv#readme
+compilation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
@@ -142,7 +142,7 @@ Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 
 For detailed information on installing Go versions with
 go-build, including a list of environment variables for adjusting
-compilation, see: https://github.com/syndbg/goenv#readme
+compilation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
@@ -170,7 +170,7 @@ Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 
 For detailed information on installing Go versions with
 go-build, including a list of environment variables for adjusting
-compilation, see: https://github.com/syndbg/goenv#readme
+compilation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
@@ -198,7 +198,7 @@ Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 
 For detailed information on installing Go versions with
 go-build, including a list of environment variables for adjusting
-compilation, see: https://github.com/syndbg/goenv#readme
+compilation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
@@ -226,7 +226,7 @@ Usage: goenv install [-f] [-kvp] <version>|latest|unstable
 
 For detailed information on installing Go versions with
 go-build, including a list of environment variables for adjusting
-compilation, see: https://github.com/syndbg/goenv#readme
+compilation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 

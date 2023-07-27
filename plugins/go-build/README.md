@@ -1,13 +1,13 @@
 # go-build
 
-go-build is a [goenv](https://github.com/syndbg/goenv) plugin that
+go-build is a [goenv](https://github.com/go-nv/goenv) plugin that
 provides a `goenv install` command to compile and install different versions
 of Go on UNIX-like systems.
 
 You can also use go-build without goenv in environments where you need
 precise control over Go version installation.
 
-See the [list of releases](https://github.com/syndbg/goenv/releases)
+See the [list of releases](https://github.com/go-nv/goenv/releases)
 for changes in each version.
 
 
@@ -54,7 +54,7 @@ Or, if you would like to install the latest development release:
 ## Usage
 
 Before you begin, you should ensure that your build environment has the proper
-system dependencies for compiling the wanted Go Version (see our [recommendations](https://github.com/syndbg/goenv/wiki#suggested-build-environment)).
+system dependencies for compiling the wanted Go Version (see our [recommendations](https://github.com/go-nv/goenv/wiki#suggested-build-environment)).
 
 ### Using `goenv install` with goenv
 
@@ -92,10 +92,10 @@ Both `goenv install` and `go-build` accept a path to a custom definition file
 in place of a version name. Custom definitions let you develop and install
 versions of Golang that are not yet supported by go-build.
 
-See the [go-build built-in definitions](https://github.com/syndbg/goenv/tree/master/plugins/go-build/share/go-build) as a starting point for
+See the [go-build built-in definitions](https://github.com/go-nv/goenv/tree/master/plugins/go-build/share/go-build) as a starting point for
 custom definition files.
 
-[definitions]: https://github.com/syndbg/goenv/tree/master/plugins/go-build/share/go-build
+[definitions]: https://github.com/go-nv/goenv/tree/master/plugins/go-build/share/go-build
 
 ### Special environment variables
 
@@ -194,5 +194,5 @@ variable when using `--keep` with `go-build`.
 ## Getting Help
 
 If you can't find an answer on the, open an issue on the [issue
-tracker](https://github.com/syndbg/goenv/issues). Be sure to include
+tracker](https://github.com/go-nv/goenv/issues). Be sure to include
 the full build log for build failures.

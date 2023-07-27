@@ -8,7 +8,7 @@ easy to fork and contribute any changes back upstream.
 1. **Check out goenv where you want it installed.**
    A good place to choose is `$HOME/.goenv` (but you can install it somewhere else).
 
-       git clone https://github.com/syndbg/goenv.git ~/.goenv
+       git clone https://github.com/go-nv/goenv.git ~/.goenv
 
 2. **Define environment variable `GOENV_ROOT`** to point to the path where
    goenv repo is cloned and add `$GOENV_ROOT/bin` to your `$PATH` for access
@@ -55,7 +55,7 @@ easy to fork and contribute any changes back upstream.
 
     **Security warning**: You likely want to keep $GOPATH/bin at the end
     of your $PATH as shown above, rather than at the beginning.  See
-    [#99](https://github.com/syndbg/goenv/issues/99) for details and
+    [#99](https://github.com/go-nv/goenv/issues/99) for details and
     discussion.
   
 

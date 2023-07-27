@@ -1,6 +1,6 @@
 # Go Version Management: goenv
 
-[![PR Checks Status](https://github.com/syndbg/goenv/actions/workflows/pr_checks.yml/badge.svg)](https://github.com/syndbg/goenv/actions/workflows/pr_checks.yml)
+[![PR Checks Status](https://github.com/go-nv/goenv/actions/workflows/pr_checks.yml/badge.svg)](https://github.com/go-nv/goenv/actions/workflows/pr_checks.yml)
 
 goenv aims to be as simple as possible and follow the already established
 successful version management model of [pyenv](https://github.com/yyuu/pyenv) and [rbenv](https://github.com/rbenv/rbenv).

@@ -23,7 +23,7 @@ Some useful goenv commands are:
    whence      List all Go versions that contain the given executable
 
 See 'goenv help <command>' for information on a specific command.
-For full documentation, see: https://github.com/syndbg/goenv#readme
+For full documentation, see: https://github.com/go-nv/goenv#readme
 OUT
 }
 
@@ -100,7 +100,7 @@ OUT
   assert_success "${GOENV_ROOT}/goenv.d:${BATS_TEST_DIRNAME%/*}/goenv.d:/usr/local/etc/goenv.d:/etc/goenv.d:/usr/lib/goenv/hooks"
 }
 
-@test "prints error when called with 'shell' subcommand, but `GOENV_SHELL` environment variable is not present" {
+@test "prints error when called with 'shell' subcommand, but $(GOENV_SHELL) environment variable is not present" {
   unset GOENV_SHELL
   run goenv shell
   assert_output <<'OUT'
