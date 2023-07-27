@@ -36,7 +36,7 @@ OUT
 @test "reads go.mod file specified in arguments that exists and is not blank" {
   cat >go.mod <<IN
 
-module github.com/syndbg/goenv
+module github.com/go-nv/goenv
 
 go 1.11
 

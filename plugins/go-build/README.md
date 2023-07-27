@@ -24,7 +24,7 @@ Installing go-build as a standalone program will give you access to the
 `go-build` command for precise control over Go version installation. If you
 have goenv installed, you will also be able to use the `goenv install` command.
 
-    git clone git://github.com/syndbg/goenv.git
+    git clone git://github.com/go-nv/goenv.git
     cd goenv/plugins/go-build
     ./install.sh
 

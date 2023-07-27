@@ -63,10 +63,10 @@ setting the `GOENV_VERSION` environment variable.
 # Showcase
 > goenv versions
   system
-  * 1.5.4 (set by /Users/syndbg/.goenv/version)
+  * 1.5.4 (set by /Users/go-nv/.goenv/version)
 
 > goenv version
-1.5.4 (set by /Users/syndbg/.goenv/version)
+1.5.4 (set by /Users/go-nv/.goenv/version)
 
 > go version
 go version go1.5.4 darwin/amd64
@@ -183,7 +183,7 @@ currently selected version.
 
 ```shell
 > goenv prefix
-/home/syndbg/.goenv/versions/1.11.1
+/home/go-nv/.goenv/versions/1.11.1
 ```
 
 ## `goenv rehash`
@@ -203,7 +203,7 @@ Display the root directory where versions and shims are kept
 
 ```shell
 > goenv root
-/home/syndbg/.goenv
+/home/go-nv/.goenv
 ```
 
 ## `goenv shell`
@@ -237,9 +237,9 @@ List existing goenv shims
 
 ```shell
 > goenv shims
-/home/syndbg/.goenv/shims/go
-/home/syndbg/.goenv/shims/godoc
-/home/syndbg/.goenv/shims/gofmt
+/home/go-nv/.goenv/shims/go
+/home/go-nv/.goenv/shims/godoc
+/home/go-nv/.goenv/shims/gofmt
 ```
 
 ## `goenv uninstall`
@@ -257,7 +257,7 @@ how it was set.
 
 ```shell
 > goenv version
-1.11.1 (set by /home/syndbg/work/syndbg/goenv/.go-version)
+1.11.1 (set by /home/syndbg/work/go-nv/goenv/.go-version)
 ```
 
 ## `goenv --version`
@@ -271,7 +271,7 @@ Detect the file that sets the current goenv version
 
 ```shell
 > goenv version-file
-/home/syndbg/work/syndbg/goenv/.go-version
+/home/syndbg/work/go-nv/goenv/.go-version
 ```
 
 ## `goenv version-file-read`
@@ -306,7 +306,7 @@ Explain how the current Go version is set.
 
 ```shell
 > goenv version-origin
-/home/syndbg/.goenv/version)
+/home/go-nv/.goenv/version)
 ```
 
 ## `goenv versions`
@@ -326,7 +326,7 @@ the currently active version.
   1.5.3
   1.5.4
   1.6.0
-* 1.6.1 (set by /home/syndbg/.goenv/version)
+* 1.6.1 (set by /home/go-nv/.goenv/version)
   1.6.2
 ```
 
@@ -361,5 +361,5 @@ you run the given command.
 
 ```shell
 > goenv which gofmt
-/home/syndbg/.goenv/versions/1.6.1/bin/gofmt
+/home/go-nv/.goenv/versions/1.6.1/bin/gofmt
 ```

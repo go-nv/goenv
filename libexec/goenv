@@ -123,7 +123,7 @@ case "$command" in
 * )
   if [ "$command" = "shell" ] && [ -z "${GOENV_SHELL}" ]; then
     echo 'eval "$(goenv init -)" has not been executed.'
-    echo "Please read the installation instructions in the README.md at github.com/syndbg/goenv"
+    echo "Please read the installation instructions in the README.md at github.com/go-nv/goenv"
     echo "or run 'goenv help init' for more information"
     exit 1
   fi
