@@ -22,7 +22,7 @@
 #
 # For detailed information on installing Go versions with
 # go-build, including a list of environment variables for adjusting
-# compilation, see: https://github.com/syndbg/goenv#readme
+# compilation, see: https://github.com/go-nv/goenv#readme
 #
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x

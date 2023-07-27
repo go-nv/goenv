@@ -46,19 +46,19 @@ When you execute a shim, goenv determines which Go version to use by
 reading it from the following sources, in this order:
 
 1. The `GOENV_VERSION` environment variable (if specified). You can use
-   the [`goenv shell`](https://github.com/syndbg/goenv/blob/master/COMMANDS.md#goenv-shell) command to set this environment
+   the [`goenv shell`](https://github.com/go-nv/goenv/blob/master/COMMANDS.md#goenv-shell) command to set this environment
    variable in your current shell session.
 
 2. The application-specific `.go-version` file in the current
    directory (if present). You can modify the current directory's
-   `.go-version` file with the [`goenv local`](https://github.com/syndbg/goenv/blob/master/COMMANDS.md#goenv-local)
+   `.go-version` file with the [`goenv local`](https://github.com/go-nv/goenv/blob/master/COMMANDS.md#goenv-local)
    command.
 
 3. The first `.go-version` file found (if any) by searching each parent
    directory, until reaching the root of your filesystem.
 
 4. The global `~/.goenv/version` file. You can modify this file using
-   the [`goenv global`](https://github.com/syndbg/goenv/blob/master/COMMANDS.md#goenv-global) command. If the global version
+   the [`goenv global`](https://github.com/go-nv/goenv/blob/master/COMMANDS.md#goenv-global) command. If the global version
    file is not present, goenv assumes you want to use the "system"
    Go. (In other words, whatever version would run if goenv isn't present in
    `PATH`.)
