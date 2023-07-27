@@ -38,6 +38,10 @@ if [ "$FIXTURE_ROOT" != "$BATS_TEST_DIRNAME/fixtures" ]; then
   export PATH
 fi
 
+setup() {
+  bats_require_minimum_version 1.5.0
+}
+
 teardown() {
   rm -rf "$GOENV_TEST_DIR"
   rm -fr "${TMP:?}"/*

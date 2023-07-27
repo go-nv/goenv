@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-project_root="${PWD%plugins/go-build}"
+project_root="$(git rev-parse --show-toplevel)"
 load test_helper
 
-export PATH="${project_root}libexec:$PATH"
+export PATH="${project_root}/libexec:$PATH"
 
 @test "has usage instructions" {
   run goenv-help --usage uninstall
@@ -732,7 +732,7 @@ OUT
 
   assert [ $output = $expected_binary_contents ]
 
-  run "$(cat ${GOENV_ROOT}/shims/go)"
+  run -127 "$(cat ${GOENV_ROOT}/shims/go)"
 
   # NOTE: Don't assert line 0 since bats modifies it
   assert_line 1 'set -e'

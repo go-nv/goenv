@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 
-project_root="${PWD%plugins/go-build}"
+project_root="$(git rev-parse --show-toplevel)"
 load test_helper
 
-export PATH="${project_root}libexec:$PATH"
+export PATH="${project_root}/libexec:$PATH"
 
 @test "has usage instructions" {
   run goenv-help --usage uninstall
