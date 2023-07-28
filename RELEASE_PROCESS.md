@@ -10,7 +10,7 @@ Releases are done **automatically** via GitHub actions and Release Drafter.
 1. Releases are following *semantic versioning*.
 1. Releases are to be named in pattern of `X.Y.Z`. The produced binary artifacts contain the `X.Y.Z` in their names.
 1. Changelog must up-to-date with what's going to be released. Check [CHANGELOG](./CHANGELOG.md).
-1. **Make sure** to bump the version of `goenv`. Bumping the version of `go-build` is often omitted.
+1. APP_VERSION file **must be updated** to match the draft version to be released.
 
 ## Flow
 

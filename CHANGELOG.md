@@ -53,6 +53,13 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.1.0
+
+## Added
+- Silent install option (#327)
+- GOENV_AUTO_INSTALL support (#327)
+- Updated all stale references to the old repo organization
+
 ## 2.0.9
 
 ### Added
