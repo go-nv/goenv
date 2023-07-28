@@ -27,6 +27,18 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
 
 ---
 
+### Hints
+
+#### AWS CodeBuild
+
+```yaml
+- BUILD_DIR=$PWD
+- cd /root/.goenv/plugins/go-build/../.. && git pull && cd -
+- cd $BUILD_DIR
+```
+
+---
+
 ## Links
 
 - **[How It Works](./HOW_IT_WORKS.md)**

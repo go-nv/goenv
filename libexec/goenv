@@ -105,7 +105,7 @@ export GOENV_HOOK_PATH
 
 shopt -u nullglob
 
-if [[ $# == 0 ]] && [[ $GOENV_AUTO_INSTALL == 1 ]]; then
+if [[ -z ${@} ]] && [[ $GOENV_AUTO_INSTALL == 1 ]]; then
     set -- "install"
 fi
 
