@@ -139,9 +139,9 @@ git push -u origin $BRANCH_NAME
 
 echo "Creating Pull Request..."
 
-gh pr create -R go-nv/goenv -B master \
+printf "This adds the Go Definitions for version ${LATEST_GO_VERSIONS[@]}.\n\nCreated by Github action automation\n" | gh pr create -R go-nv/goenv -B master \
     -t "$COMMIT_MSG" \
-    -b "This adds the Go Definitions for version ${LATEST_GO_VERSIONS[@]}.\n\nCreated by Github action automation"
+    -F -
 
 echo 'All done!'
 
