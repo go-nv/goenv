@@ -1,10 +1,10 @@
-name: Daily Go Check
+name: Pre Release
+
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 8 * * *" # every day at 8AM UTC
+
 jobs:
-  check-go-version:
+  do_prerelease:
     if: github.repository_owner == 'go-nv'
     strategy:
       matrix:
@@ -18,11 +18,7 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
       - name: Install JQ
         run: sudo apt install jq
-      - name: Remove golang
-        run: sudo rm -rf $(which go)
-      - name: Add goenv to PATH
-        run: export PATH="$PATH:./bin/goenv"
-      - name: Check latest version of Go against Goenv
-        run: ./scripts/latest_version.sh
+      - name: Update App Version
+        run: ./scripts/update_app_version.sh
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
