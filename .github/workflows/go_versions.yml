@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: "0 8 * * *" # every day at 8AM UTC
 jobs:
-  build:
+  check-go-version:
     if: github.repository_owner == 'go-nv'
     strategy:
       matrix:
