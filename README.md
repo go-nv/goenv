@@ -31,6 +31,10 @@ This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified
 
 #### AWS CodeBuild
 
+The following snippet can be inserted in your buildspec.yml (or buildspec definition) for AWS CodeBuild. It's recommended to do this during the `pre_build` phase.
+    
+**Side Note:** if you use the below steps, please unset your golang version in the buildspec and run the installer manually.
+
 ```yaml
 - BUILD_DIR=$PWD
 - cd /root/.goenv/plugins/go-build/../.. && git pull && cd -
