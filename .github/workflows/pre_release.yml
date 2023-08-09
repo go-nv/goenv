@@ -1,0 +1,24 @@
+name: Pre Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  do_prerelease:
+    if: github.repository_owner == 'go-nv'
+    strategy:
+      matrix:
+        os: ["ubuntu-latest"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: master
+          token: ${{ secrets.GH_TOKEN }}
+      - name: Install JQ
+        run: sudo apt install jq
+      - name: Update App Version
+        run: ./scripts/update_app_version.sh
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
