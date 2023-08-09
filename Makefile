@@ -23,6 +23,7 @@ test-target: bats
 		src/configure; \
 		make -C src; \
 	fi; \
+	unset $${!GOENV_*}; \
 	test_target=$${test_target:-test}; \
 	exec bats $(TEST_TARGET_ARGS);
 
@@ -33,6 +34,7 @@ test-goenv: bats
 		src/configure; \
 		make -C src; \
 	fi; \
+	unset $${!GOENV_*}; \
 	test_target=$${test_target:-test}; \
 	exec bats $${CI:+--tap} $$test_target;
 
@@ -48,6 +50,7 @@ run-goenv-go-build-tests:
 		src/configure; \
 		make -C src; \
 	fi; \
+	unset $${!GOENV_*}; \
 	test_target=$${test_target:-test}; \
 	cd plugins/go-build; \
 	exec bats $${CI:+--tap} $$test_target;
