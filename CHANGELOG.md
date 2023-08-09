@@ -53,6 +53,12 @@ Change line format:
 
 ## Unreleased (master)
 
+## 2.1.4
+
+### Added
+- Golang 1.21.0 (#335)
+- Support for FreeBSD ARM installers (#339)
+
 ## 2.1.3
 - Fix application version (#334)
 

@@ -10,7 +10,7 @@ Releases are done **automatically** via GitHub actions and Release Drafter.
 1. Releases are following *semantic versioning*.
 1. Releases are to be named in pattern of `X.Y.Z`. The produced binary artifacts contain the `X.Y.Z` in their names.
 1. Changelog must up-to-date with what's going to be released. Check [CHANGELOG](./CHANGELOG.md).
-1. APP_VERSION file **must be updated** to match the draft version to be released.
+1. APP_VERSION file **must be updated** to match the draft version to be released (Please run the Pre Release action to create a PR update).
 
 ## Flow
 
