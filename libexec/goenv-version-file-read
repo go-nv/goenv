@@ -13,7 +13,7 @@ fi
 if [[ "$(basename $VERSION_FILE)" == "go.mod" ]]; then
   expression_prefix=""
 
-  has_toolchain=$(cat $VERSION_FILE | grep -E "^toolchain[ \\t]*")
+  has_toolchain=$(cat $VERSION_FILE | { grep -E "^toolchain[ \\t]*" || true; })
   if [[ -n "$has_toolchain" ]]; then
     expression_prefix="^toolchain[ \\t]*"
   fi
