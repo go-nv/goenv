@@ -13,8 +13,11 @@ if [ -n "$GOENV_DEBUG" ]; then
 fi
 
 abort() {
-  { if [ "$#" -eq 0 ]; then cat -
-    else echo "goenv: $*"
+  {
+    if [ "$#" -eq 0 ]; then
+      cat -
+    else
+      echo "goenv: $*"
     fi
   } >&2
   exit 1
@@ -79,7 +82,6 @@ else
 fi
 export GOENV_DIR
 
-
 shopt -s nullglob
 
 bin_path="$(abs_dirname "$0")"
@@ -106,24 +108,24 @@ export GOENV_HOOK_PATH
 shopt -u nullglob
 
 if [[ -z ${@} ]] && [[ $GOENV_AUTO_INSTALL == 1 ]]; then
-    set -- "install"
+  set -- "install" $GOENV_AUTO_INSTALL_FLAGS
 fi
 
 command="$1"
 case "$command" in
-"" )
+"")
   {
     goenv---version
     goenv-help
   } | abort
   ;;
--v | --version )
+-v | --version)
   exec goenv---version
   ;;
--h | --help )
+-h | --help)
   exec goenv-help
   ;;
-* )
+*)
   if [ "$command" = "shell" ] && [ -z "${GOENV_SHELL}" ]; then
     echo 'eval "$(goenv init -)" has not been executed.'
     echo "Please read the installation instructions in the README.md at github.com/go-nv/goenv"

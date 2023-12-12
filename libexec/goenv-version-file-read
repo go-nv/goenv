@@ -11,7 +11,16 @@ if [ ! -f "$VERSION_FILE" ]; then
 fi
 
 if [[ "$(basename $VERSION_FILE)" == "go.mod" ]]; then
-  versions=($(cat $VERSION_FILE | grep -E "^go [0-9]\\.[0-9]{1,2}(beta|rc)?" | sed 's/go //'))
+  expression_prefix=""
+
+  has_toolchain=$(cat $VERSION_FILE | { grep -E "^toolchain[ \\t]*" || true; })
+  if [[ -n "$has_toolchain" ]]; then
+    expression_prefix="^toolchain[ \\t]*"
+  fi
+
+  expression="${expression_prefix}go[ \\t]*[0-9]+\\.[0-9]+(beta|rc)?"
+
+  versions=($(cat $VERSION_FILE | grep -E "${expression}" | sed "s/${expression_prefix}go[ \\t]*//"))
 else
   # NOTE: Read the first non-whitespace word from the specified version file.
   # Be careful not to load it whole in case there's something crazy in it.
