@@ -50,6 +50,25 @@ IN
   assert_success "1.11"
 }
 
+@test "reads go.mod file with toolchain specified in arguments that exists and is not blank" {
+  cat >go.mod <<IN
+
+module github.com/go-nv/goenv
+
+go 1.11
+
+toolchain go1.11.4
+
+require (
+	github.com/foo/bar v0.0.0-20220101000000-0123456789abcdef // indirect
+)
+
+IN
+
+  run goenv-version-file-read go.mod
+  assert_success "1.11.4"
+}
+
 @test "reads version file specified in arguments that exists and is not blank" {
   echo "1.11.1" >my-version
 
