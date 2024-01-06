@@ -22,10 +22,10 @@ then `/bin`.
 
 ## Understanding Shims
 
-goenv works by inserting a directory of _shims_ at the front of your
-`PATH`:
+goenv works by inserting a directory of _shims_ at the end of your
+`PATH`, so if you have `go` in `/usr/bin` it will be found first:
 
-    ~/.goenv/shims:/usr/local/bin:/usr/bin:/bin
+    /usr/local/bin:/usr/bin:/bin:~/.goenv/shims
 
 Through a process called _rehashing_, goenv maintains shims in that
 directory to match every `go` command across every installed version
