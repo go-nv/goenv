@@ -516,7 +516,7 @@ OUT
   run goenv-sh-rehash
   assert_success ""
 
-  run ls "${GOENV_ROOT}/shims"
+  run /bin/ls "${GOENV_ROOT}/shims"
   assert_success
   assert_output <<OUT
 go
@@ -633,7 +633,7 @@ OUT
   run goenv-sh-rehash
   assert_success ""
 
-  run ls "${GOENV_ROOT}/shims"
+  run /bin/ls "${GOENV_ROOT}/shims"
   assert_success
   assert_output <<OUT
 go

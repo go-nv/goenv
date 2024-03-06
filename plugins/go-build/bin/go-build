@@ -451,7 +451,7 @@ http() {
   local file="$3"
   [ -n "$url" ] || return 1
 
-  if [[ $IS_TEST != "true" ]]; then
+  if [[ -z $GO_BUILD_MIRROR_URL ]] && [[ $IS_TEST != "true" ]]; then
     url="https://go.dev/dl/${url}"
   fi
 

@@ -26,6 +26,16 @@ OUT
   assert_success "${GOENV_ROOT}/versions/1.2.3"
 }
 
+@test "returns GOENV_ROOT/versions/<version> when only major.minor version is given and it matches the latest patch version installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.2.3"
+
+  run goenv-prefix 1.2
+  assert_output <<-OUT
+Using latest patch version 1.2.3
+${GOENV_ROOT}/versions/1.2.3
+OUT
+}
+
 @test "fails when no '.go-version' exists, version is system and there's no 'go' executable in PATH" {
   run goenv-prefix
   assert_failure "goenv: system version not found in PATH"

@@ -15,6 +15,14 @@ if [ "$1" = "--complete" ]; then
   exec goenv-versions --bare
 fi
 
+versions() {
+  goenv versions --bare | $(type -p ggrep grep | head -1) -F "$query" || true
+}
+
+latest_version() {
+  versions | grep -oE "^$1\\.([0-9]+)?$" | tail -1
+}
+
 if [ -n "$1" ]; then
   OLDIFS="$IFS"
   {
@@ -39,6 +47,13 @@ OLDIFS="$IFS"
         exit 1
       fi
     else
+      if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${version}; then
+        REGEX=$(echo $version | sed s/\\./\\\\./)
+        LATEST_PATCH=$(latest_version $REGEX)
+        echo "Using latest patch version $LATEST_PATCH"
+        version=$LATEST_PATCH
+      fi
+
       GOENV_PREFIX_PATH="${GOENV_ROOT}/versions/${version}"
     fi
     if [ -d "$GOENV_PREFIX_PATH" ]; then
