@@ -16,3 +16,4 @@ name | default | description
 `GOENV_PREPEND_GOPATH` | | If `GOPATH` is set, it will be prepended to the computed `GOPATH`.
 `GOENV_GOMOD_VERSION_ENABLE` | | if `GOENV_GOMOD_VERSION_ENABLE` is set to 1, it will try to use the project's `go.mod` file to get the version.
 `GOENV_AUTO_INSTALL` | | if `GOENV_AUTO_INSTALL` is set to 1, it will automatically run install if no command arguments specified (just run `goenv`!)
+`GOENV_AUTO_INSTALL_FLAGS` | | (Note: only works if `GOENV_AUTO_INSTALL` is set to 1) Appends flags to the auto install command (see `goenv install --help` for all available flags)
