@@ -342,7 +342,7 @@ OUT
   unset USE_FAKE_DEFINITIONS
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -363,8 +363,8 @@ OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
-Installing Go Darwin 10.8 64bit ${LATEST_VERSION}...
-Installed Go Darwin 10.8 64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
+Installing Go Darwin 10.8${arch}${LATEST_VERSION}...
+Installed Go Darwin 10.8${arch}${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
 
 OUT
     ;;
@@ -397,7 +397,7 @@ OUT
   export DISABLE_PROGRESS_BAR=true
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -418,8 +418,8 @@ OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
-Installing Go Darwin 10.8 64bit ${LATEST_VERSION}...
-Installed Go Darwin 10.8 64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
+Installing Go Darwin 10.8${arch}${LATEST_VERSION}...
+Installed Go Darwin 10.8${arch}${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
 
 OUT
     ;;
@@ -451,7 +451,7 @@ OUT
   export DISABLE_PROGRESS_BAR=true
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -472,8 +472,8 @@ OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
-Installing Go Darwin 10.8 64bit ${LATEST_VERSION}...
-Installed Go Darwin 10.8 64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
+Installing Go Darwin 10.8${arch}${LATEST_VERSION}...
+Installed Go Darwin 10.8${arch}${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
 
 OUT
     ;;
@@ -502,7 +502,7 @@ OUT
   unset USE_FAKE_DEFINITIONS
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -523,8 +523,8 @@ OUT
 Installing latest (including unstable) version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
-Installing Go Darwin 10.8 64bit ${LATEST_VERSION}...
-Installed Go Darwin 10.8 64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
+Installing Go Darwin 10.8${arch}${LATEST_VERSION}...
+Installed Go Darwin 10.8${arch}${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LATEST_VERSION}
 
 OUT
     ;;
@@ -553,7 +553,7 @@ OUT
   unset USE_FAKE_DEFINITIONS
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -588,7 +588,7 @@ SH
   rm -rf $GOENV_ROOT
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -611,8 +611,8 @@ OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Darwin 10.8 64bit 1.2.2...
-Installed Go Darwin 10.8 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go Darwin 10.8${arch}1.2.2...
+Installed Go Darwin 10.8${arch}1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 after: 0
 REHASHED
@@ -648,7 +648,7 @@ SH
   rm -rf $GOENV_ROOT
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -671,8 +671,8 @@ OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Darwin 10.8 64bit 1.2.2...
-Installed Go Darwin 10.8 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go Darwin 10.8${arch}1.2.2...
+Installed Go Darwin 10.8${arch}1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 after: 0
 REHASHED
@@ -695,7 +695,7 @@ OUT
   run goenv-install -f 1.2.2
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -714,8 +714,8 @@ OUT
     assert_output <<-OUT
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Darwin 10.8 64bit 1.2.2...
-Installed Go Darwin 10.8 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go Darwin 10.8${arch}1.2.2...
+Installed Go Darwin 10.8${arch}1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 OUT
     ;;
@@ -769,7 +769,7 @@ OUT
   run goenv-install -f 1.2
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -790,8 +790,8 @@ OUT
 Using latest patch version 1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
-Installing Go Darwin 10.8 64bit 1.2.2...
-Installed Go Darwin 10.8 64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
+Installing Go Darwin 10.8${arch}1.2.2...
+Installed Go Darwin 10.8${arch}1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 
 OUT
     ;;
