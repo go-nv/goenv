@@ -346,6 +346,8 @@ OUT
     arch=" arm "
   fi
 
+  echo $(uname -m)
+
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
