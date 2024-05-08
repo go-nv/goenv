@@ -342,7 +342,7 @@ OUT
   unset USE_FAKE_DEFINITIONS
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -397,7 +397,7 @@ OUT
   export DISABLE_PROGRESS_BAR=true
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -451,7 +451,7 @@ OUT
   export DISABLE_PROGRESS_BAR=true
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -502,7 +502,7 @@ OUT
   unset USE_FAKE_DEFINITIONS
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -553,7 +553,7 @@ OUT
   unset USE_FAKE_DEFINITIONS
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -588,7 +588,7 @@ SH
   rm -rf $GOENV_ROOT
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -648,7 +648,7 @@ SH
   rm -rf $GOENV_ROOT
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -695,7 +695,7 @@ OUT
   run goenv-install -f 1.2.2
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
@@ -769,7 +769,7 @@ OUT
   run goenv-install -f 1.2
 
   arch=" "
-  if [ "$(uname -m)" = "aarch64" ]; then
+  if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
     arch=" arm "
   fi
 
