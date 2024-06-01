@@ -35,7 +35,7 @@ easy to fork and contribute any changes back upstream.
     to point to `.bashrc`. On such systems you should almost certainly put the abovementioned line
     `eval "$(goenv init -)` into `.bash_profile`, and **not** into `.bashrc`. Otherwise you
     may observe strange behaviour, such as `goenv` getting into an infinite loop.
-    See pyenv's issue [#264](https://github.com/yyuu/pyenv/issues/264) for details.
+    See pyenv's issue [#264](https://github.com/pyenv/pyenv/issues/264) for details.
     
 4. **If you want  `goenv` to manage `GOPATH` and `GOROOT` (recommended)**, 
   add `GOPATH` and `GOROOT` to your shell **after `eval "$(goenv init -)"`**.
@@ -51,7 +51,7 @@ easy to fork and contribute any changes back upstream.
     to point to `.bashrc`. On such systems you should almost certainly put the abovementioned line
     `eval "$(goenv init -)` into `.bash_profile`, and **not** into `.bashrc`. Otherwise you
     may observe strange behaviour, such as `goenv` getting into an infinite loop.
-    See pyenv's issue [#264](https://github.com/yyuu/pyenv/issues/264) for details.
+    See pyenv's issue [#264](https://github.com/pyenv/pyenv/issues/264) for details.
 
     **Security warning**: You likely want to keep $GOPATH/bin at the end
     of your $PATH as shown above, rather than at the beginning.  See
