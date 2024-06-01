@@ -7,24 +7,21 @@ export PATH="${project_root}/libexec:$PATH"
 
 @test "has usage instructions" {
   run goenv-help --usage uninstall
-  assert_success
-  assert_output <<'OUT'
+  assert_success <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 OUT
 }
 
 @test "has completion support" {
   run goenv-uninstall --complete
-  assert_success
-  assert_output <<'OUT'
+  assert_success <<OUT
 --force
 OUT
 }
 
 @test "prints full usage when '-h' is first argument given" {
   run goenv-uninstall -h
-  assert_success
-  assert_output <<'OUT'
+  assert_success <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -36,8 +33,7 @@ OUT
 
 @test "prints full usage when '--help' is first argument given" {
   run goenv-uninstall --help
-  assert_success
-  assert_output <<'OUT'
+  assert_success <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -49,8 +45,7 @@ OUT
 
 @test "fails and prints full usage when no arguments are given" {
   run goenv-uninstall
-  assert_failure
-  assert_output <<'OUT'
+  assert_failure <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -62,8 +57,7 @@ OUT
 
 @test "fails and prints full usage when '-f' is given and no other arguments" {
   run goenv-uninstall -f
-  assert_failure
-  assert_output <<'OUT'
+  assert_failure <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -75,8 +69,7 @@ OUT
 
 @test "fails and prints full usage when '--force' is given and no other arguments" {
   run goenv-uninstall --force
-  assert_failure
-  assert_output <<'OUT'
+  assert_failure <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -88,8 +81,7 @@ OUT
 
 @test "fails and prints full usage when '-f' is given and '-' version argument" {
   run goenv-uninstall -f -
-  assert_failure
-  assert_output <<'OUT'
+  assert_failure <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -101,8 +93,7 @@ OUT
 
 @test "fails and prints full usage when '--force' is given and '-' version argument" {
   run goenv-uninstall --force
-  assert_failure
-  assert_output <<'OUT'
+  assert_failure <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -121,8 +112,7 @@ SH
 
   IFS=$' \t\n' run goenv-uninstall 1.1.1
   remove_hook uninstall hello.bash
-  assert_success
-  assert_output "HELLO=:hello:ugly:world:again"
+  assert_success "HELLO=:hello:ugly:world:again"
 }
 
 @test "{before,after}_uninstall hooks get triggered when version argument is already installed version and gets uninstalled" {
@@ -141,8 +131,7 @@ SH
   run goenv-uninstall -f 1.2.3
   remove_hook uninstall hello.bash
 
-  assert_success
-  assert_output <<-OUT
+  assert_success <<OUT
 before: ${GOENV_ROOT}/versions/1.2.3
 rm -rf ${GOENV_ROOT}/versions/1.2.3
 after.
@@ -166,8 +155,7 @@ SH
   run goenv-uninstall -f 1.2.3
   remove_hook uninstall hello.bash
 
-  assert_failure
-  assert_output <<-OUT
+  assert_failure <<OUT
 goenv: version '1.2.3' not installed
 OUT
 }
@@ -177,10 +165,7 @@ OUT
 
   run goenv-uninstall -f 1.2.3
 
-  assert_failure
-  assert_output <<-OUT
-goenv: version '1.2.3' not installed
-OUT
+  assert_failure "goenv: version '1.2.3' not installed"
 }
 
 @test "fails when '--force' argument and version argument is not already installed version" {
@@ -188,10 +173,7 @@ OUT
 
   run goenv-uninstall --force 1.2.3
 
-  assert_failure
-  assert_output <<-OUT
-goenv: version '1.2.3' not installed
-OUT
+  assert_failure "goenv: version '1.2.3' not installed"
 }
 
 @test "fails when when version argument is not already installed version" {
@@ -199,10 +181,7 @@ OUT
 
   run goenv-uninstall 1.2.3
 
-  assert_failure
-  assert_output <<-OUT
-goenv: version '1.2.3' not installed
-OUT
+  assert_failure "goenv: version '1.2.3' not installed"
 }
 
 @test "fails when version argument is not already installed version" {
@@ -210,10 +189,7 @@ OUT
 
   run goenv-uninstall 1.2.3
 
-  assert_failure
-  assert_output <<-OUT
-goenv: version '1.2.3' not installed
-OUT
+  assert_failure "goenv: version '1.2.3' not installed"
 }
 
 @test "adds patch version '0' to definition when version argument is already installed version and gets uninstalled" {
@@ -222,10 +198,7 @@ OUT
 
   run goenv-uninstall -f 1.2
 
-  assert_output <<-OUT
-Adding patch version 0 to 1.2
-OUT
-  assert_success
+  assert_success "Adding patch version 0 to 1.2"
 }
 
 @test "shims get rehashed and version uninstalled when version argument is already installed version" {
@@ -240,8 +213,7 @@ OUT
 
   run goenv-uninstall -f 1.10.3
 
-  assert_success
-  assert_output ''
+  assert_success ""
 
   assert [ ! -d "${GOENV_ROOT}/versions/1.2.3" ]
   assert [ ! -e "${GOENV_ROOT}/shims/gofmt" ]

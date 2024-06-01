@@ -4,8 +4,7 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage shell
-  assert_success
-  assert_output <<'OUT'
+  assert_success <<OUT
 Usage: goenv shell <version>
        goenv shell --unset
 OUT
@@ -13,8 +12,7 @@ OUT
 
 @test "has completion support" {
   run goenv-sh-shell --complete
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 --unset
 system
 OUT
@@ -55,8 +53,7 @@ OUT
 
   GOENV_SHELL=bash run goenv-sh-shell 1.2.3
 
-  assert_output 'export GOENV_VERSION="1.2.3"'
-  assert_success
+  assert_success 'export GOENV_VERSION="1.2.3"'
 }
 
 @test "changes 'GOENV_VERSION' environment variable to specified shell version argument if it's installed in GOENV_ROOT/versions/<version> and shell is 'zsh'" {
@@ -64,8 +61,7 @@ OUT
 
   GOENV_SHELL=zsh run goenv-sh-shell 1.2.3
 
-  assert_output 'export GOENV_VERSION="1.2.3"'
-  assert_success
+  assert_success 'export GOENV_VERSION="1.2.3"'
 }
 
 @test "changes 'GOENV_VERSION' environment variable to specified shell version argument if it's installed in GOENV_ROOT/versions/<version> and shell is 'ksh'" {
@@ -73,8 +69,7 @@ OUT
 
   GOENV_SHELL=ksh run goenv-sh-shell 1.2.3
 
-  assert_output 'export GOENV_VERSION="1.2.3"'
-  assert_success
+  assert_success 'export GOENV_VERSION="1.2.3"'
 }
 
 @test "changes 'GOENV_VERSION' environment variable to specified shell version argument if it's installed in GOENV_ROOT/versions/<version> and shell is 'fish'" {
@@ -82,17 +77,14 @@ OUT
 
   GOENV_SHELL=fish run goenv-sh-shell 1.2.3
 
-  assert_output 'set -gx GOENV_VERSION "1.2.3"'
-  assert_success
+  assert_success 'set -gx GOENV_VERSION "1.2.3"'
 }
 
 @test "fails changing 'GOENV_VERSION' environment variable to specified shell version argument if version does not exist in GOENV_ROOT/versions/<version>" {
   GOENV_SHELL=bash run goenv-sh-shell 1.2.3
 
-  assert_output <<OUT
+  assert_failure <<OUT
 goenv: version '1.2.3' not installed
 false
 OUT
-
-  assert_failure
 }

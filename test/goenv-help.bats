@@ -11,8 +11,7 @@ OUT
 
 @test "without args shows summary of common commands" {
   run goenv-help
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 Usage: goenv <command> [<args>]
 
 Some useful goenv commands are:
@@ -47,8 +46,7 @@ echo hello
 SH
 
   run goenv-help hello
-  assert_success
-  assert_output <<SH
+  assert_success <<SH
 Usage: goenv hello <world>
 
 This command is useful for saying hello.
@@ -65,8 +63,7 @@ echo hello
 SH
 
   run goenv-help hello
-  assert_success
-  assert_output <<SH
+  assert_success <<SH
 Usage: goenv hello <world>
 
 Says "hello" to you, from goenv
@@ -100,8 +97,7 @@ echo hello
 SH
 
   run goenv-help hello
-  assert_success
-  assert_output <<SH
+  assert_success <<SH
 Usage: goenv hello <world>
        goenv hi [everybody]
        goenv hola --translate
@@ -125,8 +121,7 @@ echo hello
 SH
 
   run goenv-help hello
-  assert_success
-  assert_output <<SH
+  assert_success <<SH
 Usage: goenv hello <world>
 
 This is extended help text.

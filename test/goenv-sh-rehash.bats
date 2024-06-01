@@ -4,23 +4,21 @@ load test_helper
 
 @test "has usage instructions for goenv-sh-rehash" {
   run goenv-help --usage sh-rehash
-  assert_success <<'OUT'
+  assert_success <<OUT
 Usage: goenv sh-rehash
 OUT
 }
 
 @test "has completion support (but pointless)" {
   run goenv-sh-rehash --complete
-  assert_success
-  assert_output ""
+  assert_success ""
 }
 
 @test "when current set 'version' is 'system', it does not export GOPATH and GOROOT env variables" {
   export GOENV_VERSION=system
   export GOENV_SHELL=bash
   run goenv-sh-rehash
-  assert_output ""
-  assert_success
+  assert_success ""
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 1, shell is 'bash', it only echoes rehash of binaries" {
@@ -30,8 +28,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=1 run goenv-sh-rehash
 
-  assert_output "hash -r 2>/dev/null || true"
-  assert_success
+  assert_success "hash -r 2>/dev/null || true"
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 1, shell is 'fish', it does not echo anything" {
@@ -41,8 +38,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=1 run goenv-sh-rehash
 
-  assert_output ""
-  assert_success
+  assert_success ""
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 1, shell is 'ksh', it only echoes rehash of binaries" {
@@ -52,8 +48,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=1 run goenv-sh-rehash
 
-  assert_output "hash -r 2>/dev/null || true"
-  assert_success
+  assert_success "hash -r 2>/dev/null || true"
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 1, shell is 'zsh', it only echoes rehash of binaries" {
@@ -63,8 +58,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=1 run goenv-sh-rehash
 
-  assert_output "hash -r 2>/dev/null || true"
-  assert_success
+  assert_success "hash -r 2>/dev/null || true"
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'bash', it echoes export of 'GOPATH' and rehash of binaries" {
@@ -74,11 +68,10 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'ksh', it echoes export of 'GOPATH' and rehash of binaries" {
@@ -88,11 +81,10 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'zsh', it echoes export of 'GOPATH' and rehash of binaries" {
@@ -102,11 +94,10 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'fish', it echoes only export of 'GOPATH'" {
@@ -116,10 +107,9 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 set -gx GOPATH "${HOME}/go/1.12.0"
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'bash' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -129,12 +119,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'bash' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -144,12 +133,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'bash' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -159,12 +147,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'ksh' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -174,12 +161,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'ksh' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -189,12 +175,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'ksh' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -204,12 +189,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'zsh' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -219,12 +203,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'zsh' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -234,12 +217,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'zsh' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go' and rehash of binaries" {
@@ -249,12 +231,11 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'fish' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go'" {
@@ -264,11 +245,10 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "${HOME}/go/1.12.0"
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'fish' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go'" {
@@ -278,11 +258,10 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "${HOME}/go/1.12.0:/fake-gopath"
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'fish' and 'GOENV_GOPATH_PREFIX' is empty, it echoes export of 'GOROOT', 'GOPATH=\$HOME/go'" {
@@ -292,11 +271,10 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "/fake-gopath:${HOME}/go/1.12.0"
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'bash' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -306,12 +284,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'bash' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -321,12 +298,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'bash' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -336,12 +312,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'ksh' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -351,12 +326,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'ksh' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -366,12 +340,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'ksh' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -381,12 +354,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'zsh' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -396,12 +368,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'zsh' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -411,12 +382,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'zsh' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT', 'GOPATH=<set>' and rehash of binaries" {
@@ -426,12 +396,11 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'fish' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT' and 'GOPATH=<set>'" {
@@ -441,11 +410,10 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "/tmp/example/1.12.0"
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'fish' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT' and 'GOPATH=<set>'" {
@@ -455,11 +423,10 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "/tmp/example/1.12.0:/fake-gopath"
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'fish' and 'GOENV_GOPATH_PREFIX' is present, it echoes export of 'GOROOT' and 'GOPATH=<set>'" {
@@ -469,11 +436,10 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_output <<OUT
+  assert_success <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "/fake-gopath:/tmp/example/1.12.0"
 OUT
-  assert_success
 }
 
 @test "creates 'GOENV_ROOT/shims' when it does not exist" {
@@ -517,8 +483,7 @@ OUT
   assert_success ""
 
   run /bin/ls "${GOENV_ROOT}/shims"
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 go
 godoc
 OUT
@@ -580,7 +545,7 @@ OUT
   chmod +x "${GOENV_ROOT}/shims/oldshim1"
 
   run type oldshim1
-  assert_output "oldshim1 is ${GOENV_ROOT}/shims/oldshim1"
+  assert_success "oldshim1 is ${GOENV_ROOT}/shims/oldshim1"
 
   create_executable "1.11.1" "go"
 
@@ -592,7 +557,7 @@ OUT
 
   assert [ ! -e "${GOENV_ROOT}/shims/oldshim1" ]
   run type go
-  assert_output "go is ${GOENV_ROOT}/shims/go"
+  assert_success "go is ${GOENV_ROOT}/shims/go"
 
   assert [ -x "${GOENV_ROOT}/shims/go" ]
 
@@ -634,12 +599,11 @@ OUT
   assert_success ""
 
   run /bin/ls "${GOENV_ROOT}/shims"
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 go
 OUT
 
   run type go
-  assert_output "go is ${GOENV_ROOT}/shims/go"
+  assert_success "go is ${GOENV_ROOT}/shims/go"
 }
 

@@ -4,7 +4,7 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage shims
-  assert_success <<'OUT'
+  assert_success <<OUT
 Usage: goenv shims [--short]
 OUT
 }
@@ -18,8 +18,7 @@ OUT
 
 @test "prints empty output when no arguments are given and no shims are present in 'GOENV_ROOT/shims/*'" {
   run goenv-shims
-  assert_success
-  assert_output ''
+  assert_success ''
 }
 
 @test "prints found shims paths in alphabetic order when no arguments are given and shims are present in 'GOENV_ROOT/shims/*'" {
@@ -31,13 +30,11 @@ OUT
 
   run goenv-shims
 
-  assert_output <<OUT
+  assert_success <<OUT
 ${GOENV_ROOT}/shims/go
 ${GOENV_ROOT}/shims/godoc
 ${GOENV_ROOT}/shims/gofmt
 OUT
-
-  assert_success
 }
 
 @test "prints found shims names only in alphabetic order when '--short' argument is given and shims are present in 'GOENV_ROOT/shims/*'" {
@@ -49,11 +46,9 @@ OUT
 
   run goenv-shims --short
 
-  assert_output <<OUT
+  assert_success <<OUT
 go
 godoc
 gofmt
 OUT
-
-  assert_success
 }

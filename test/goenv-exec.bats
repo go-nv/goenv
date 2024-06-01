@@ -2,6 +2,11 @@
 
 load test_helper
 
+setup() {
+  mkdir -p "${GOENV_ROOT}/versions/1.9.2"
+  mkdir -p "${GOENV_ROOT}/versions/1.10.1"
+}
+
 @test "has usage instructions" {
   run goenv-help --usage exec
   assert_success "Usage: goenv exec <command> [arg1 arg2...]"
@@ -9,10 +14,7 @@ load test_helper
 
 @test "fails with usage instructions when no command is specified" {
   run goenv-exec
-  assert_failure
-  assert_output <<OUT
-Usage: goenv exec <command> [arg1 arg2...]
-OUT
+  assert_failure "Usage: goenv exec <command> [arg1 arg2...]"
 }
 
 @test "fails with version that's not installed but specified by GOENV_VERSION" {
@@ -36,8 +38,7 @@ OUT
   goenv-rehash
   run goenv-exec Zgo123unique
 
-  assert_output ""
-  assert_success
+  assert_success ""
 }
 
 @test "succeeds with version that's installed and specified by '.go-version' file" {
@@ -56,8 +57,7 @@ OUT
 
   GOENV_VERSION=1.6.1 goenv-rehash
   GOENV_VERSION=1.6.1 run goenv-completions exec
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 --help
 Zgo123unique
 OUT
@@ -85,8 +85,7 @@ done
 SH
 
   GOENV_VERSION=1.6.1 run goenv-exec go run "/path to/go script.go" -- extra args
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 ${GOENV_ROOT}/versions/1.6.1/bin/go
   run
   /path to/go script.go
@@ -106,9 +105,7 @@ echo \$GOPATH
 SH
 
   GOENV_VERSION=system GOENV_SHELL=bash GOROOT="" GOPATH="" PATH="$GOENV_TEST_DIR:$PATH" run goenv-exec go-paths
-
-  assert_output ""
-  assert_success
+  assert_success ""
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 1, shell is 'bash', it does not export GOPATH or GOROOT" {
@@ -120,9 +117,7 @@ echo \$GOPATH
 SH
 
   GOPATH="" GOROOT="" GOENV_SHELL=bash GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=1 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
-
-  assert_output ""
-  assert_success
+  assert_success ""
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 1, shell is 'zsh', it does not export GOPATH or GOROOT" {
@@ -135,8 +130,7 @@ SH
 
   GOPATH="" GOROOT="" GOENV_SHELL=zsh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=1 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output ""
-  assert_success
+  assert_success ""
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 1, shell is 'ksh', it does not export GOPATH or GOROOT" {
@@ -149,8 +143,7 @@ SH
 
   GOPATH="" GOROOT="" GOENV_SHELL=ksh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=1 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output ""
-  assert_success
+  assert_success ""
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 1, shell is 'fish', it does not export GOPATH or GOROOT" {
@@ -163,8 +156,7 @@ SH
 
   GOPATH="" GOROOT="" GOENV_SHELL=fish GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=1 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output ""
-  assert_success
+  assert_success ""
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'bash', it exports 'GOPATH'" {
@@ -177,11 +169,10 @@ SH
 
   GOROOT="" GOENV_SHELL=bash GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 
 $HOME/go/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'ksh', it exports 'GOPATH'" {
@@ -194,11 +185,10 @@ SH
 
   GOROOT="" GOENV_SHELL=ksh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 
 $HOME/go/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'zsh', it exports 'GOPATH'" {
@@ -211,11 +201,10 @@ SH
 
   GOROOT="" GOENV_SHELL=zsh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 
 $HOME/go/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'fish', it exports 'GOPATH'" {
@@ -228,11 +217,10 @@ SH
 
   GOROOT="" GOENV_SHELL=fish GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 
 $HOME/go/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'bash' and GOENV_GOPATH_PREFIX is empty, it exports 'GOROOT' and 'GOPATH'=\$HOME/go/<version>" {
@@ -245,11 +233,10 @@ SH
 
   GOENV_SHELL=bash GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 $GOENV_ROOT/versions/1.12.0
 $HOME/go/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'zsh' and GOENV_GOPATH_PREFIX is empty, it exports 'GOROOT' and 'GOPATH'=\$HOME/go/<version>" {
@@ -262,11 +249,10 @@ SH
 
   GOENV_SHELL=zsh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 $GOENV_ROOT/versions/1.12.0
 $HOME/go/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'ksh' and GOENV_GOPATH_PREFIX is empty, it exports 'GOROOT' and 'GOPATH'=\$HOME/go/<version>" {
@@ -279,11 +265,10 @@ SH
 
   GOENV_SHELL=ksh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 $GOENV_ROOT/versions/1.12.0
 $HOME/go/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'fish' and GOENV_GOPATH_PREFIX is empty, it exports 'GOROOT' and 'GOPATH'=\$HOME/go/<version>" {
@@ -296,11 +281,10 @@ SH
 
   GOENV_SHELL=fish GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 $GOENV_ROOT/versions/1.12.0
 $HOME/go/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'bash' and GOENV_GOPATH_PREFIX is present, it exports 'GOROOT' and 'GOPATH'=\$HOME/go/<version>" {
@@ -313,11 +297,10 @@ SH
 
   GOENV_SHELL=bash GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="/tmp/goenv/example" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'ksh' and GOENV_GOPATH_PREFIX is present, it exports 'GOROOT' and 'GOPATH'=\$HOME/go/<version>" {
@@ -330,11 +313,10 @@ SH
 
   GOENV_SHELL=ksh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="/tmp/goenv/example" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'zsh' and GOENV_GOPATH_PREFIX is present, it exports 'GOROOT' and 'GOPATH'=\$HOME/go/<version>" {
@@ -347,11 +329,10 @@ SH
 
   GOENV_SHELL=zsh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="/tmp/goenv/example" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT
-  assert_success
 }
 
 @test "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, shell is 'fish' and GOENV_GOPATH_PREFIX is present, it exports 'GOROOT' and 'GOPATH'=\$HOME/go/<version>" {
@@ -364,9 +345,8 @@ SH
 
   GOENV_SHELL=fish GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="/tmp/goenv/example" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_output <<OUT
+  assert_success <<OUT
 $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT
-  assert_success
 }

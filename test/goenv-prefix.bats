@@ -4,7 +4,7 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage prefix
-  assert_success <<'OUT'
+  assert_success <<OUT
 Usage: goenv prefix [<version>]
 OUT
 }
@@ -30,7 +30,7 @@ OUT
   mkdir -p "${GOENV_ROOT}/versions/1.2.3"
 
   run goenv-prefix 1.2
-  assert_output <<-OUT
+  assert_success <<OUT
 Using latest patch version 1.2.3
 ${GOENV_ROOT}/versions/1.2.3
 OUT

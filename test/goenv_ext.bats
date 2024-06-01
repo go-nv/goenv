@@ -21,7 +21,7 @@ load test_helper
   touch "${GOENV_TEST_DIR}/dir1/file.go"
 
   GOENV_FILE_ARG="${GOENV_TEST_DIR}/dir1/file.go" run goenv echo GOENV_DIR
-  assert_output "${GOENV_TEST_DIR}/dir1"
+  assert_success "${GOENV_TEST_DIR}/dir1"
 }
 
 @test "follows symlink of file argument as 'GOENV_DIR' environment variable" {
@@ -31,5 +31,5 @@ load test_helper
   ln -s "${GOENV_TEST_DIR}/dir1/file.go" "${GOENV_TEST_DIR}/dir2/symlink.go"
 
   GOENV_FILE_ARG="${GOENV_TEST_DIR}/dir2/symlink.go" run goenv echo GOENV_DIR
-  assert_output "${GOENV_TEST_DIR}/dir1"
+  assert_success "${GOENV_TEST_DIR}/dir1"
 }

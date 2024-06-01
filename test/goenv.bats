@@ -2,10 +2,51 @@
 
 load test_helper
 
+teardown() {
+  rm -rf "${GOENV_ROOT}/versions/" || true
+  rm -f .go-version || true
+}
+
+@test "goenv has completion support" {
+  mkdir -p "${GOENV_ROOT}/versions/1.10.9"
+  mkdir -p "${GOENV_ROOT}/versions/1.9.10"
+  run goenv --complete
+  assert_success <<OUT
+1.10.9
+1.9.10
+commands
+completions
+exec
+global
+help
+hooks
+init
+install
+installed
+latest
+local
+prefix
+rehash
+root
+shell
+shims
+system
+uninstall
+version
+version-file
+version-file-read
+version-file-write
+version-name
+version-origin
+versions
+whence
+which
+OUT
+}
+
 @test "fails and prints help when no command argument is given" {
   run goenv
-  assert_failure
-  assert_output <<OUT
+  assert_failure <<OUT
 $(goenv---version)
 Usage: goenv <command> [<args>]
 
@@ -36,8 +77,7 @@ OUT
 
   unset GOENV_AUTO_INSTALL
   
-  assert_failure
-  assert_output <<'OUT'
+  assert_failure <<OUT
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -65,34 +105,31 @@ OUT
 
 @test "fails when invalid command argument is given" {
   run goenv does-not-exist
-  assert_failure
-  assert_output "goenv: no such command 'does-not-exist'"
+  assert_failure "goenv: no such command 'does-not-exist'"
 }
 
 @test "uses '\$HOME/.goenv' as default 'GOENV_ROOT' when 'GOENV_ROOT' environment variable is blank" {
   GOENV_ROOT="" HOME=/home/mislav run goenv root
 
-  assert_success
-  assert_output "/home/mislav/.goenv"
+  assert_success "/home/mislav/.goenv"
 }
 
 @test "uses provided 'GOENV_ROOT' as default 'GOENV_ROOT' when 'GOENV_ROOT' environment variable is provided" {
   GOENV_ROOT=/opt/goenv run goenv root
 
-  assert_success
-  assert_output "/opt/goenv"
+  assert_success "/opt/goenv"
 }
 
 @test "uses 'PWD' as default 'GOENV_DIR' when no 'GOENV_DIR' is specified" {
   run goenv echo GOENV_DIR
-  assert_output "$(pwd)"
+  assert_success "$(pwd)"
 }
 
 @test "uses provided 'GOENV_DIR' as default 'GOENV_DIR' when 'GOENV_DIR' environment variable is provided" {
   dir="${BATS_TMPDIR}/myproject"
   mkdir -p "$dir"
   GOENV_DIR="$dir" run goenv echo GOENV_DIR
-  assert_output "$dir"
+  assert_success "$dir"
 }
 
 @test "fails when provided 'GOENV_DIR' environment variable cannot be changed current dir into" {
@@ -101,8 +138,7 @@ OUT
 
   GOENV_DIR="$dir" run goenv echo GOENV_DIR
 
-  assert_failure
-  assert_output "goenv: cannot change working directory to '$dir'"
+  assert_failure "goenv: cannot change working directory to '$dir'"
 }
 
 @test "adds its own 'GOENV_ROOT/libexec' to PATH" {
@@ -139,11 +175,63 @@ OUT
 @test "prints error when called with 'shell' subcommand, but $(GOENV_SHELL) environment variable is not present" {
   unset GOENV_SHELL
   run goenv shell
-  assert_output <<'OUT'
+  assert_failure <<OUT
 eval "$(goenv init -)" has not been executed.
 Please read the installation instructions in the README.md at github.com/go-nv/goenv
 or run 'goenv help init' for more information
 OUT
-
-  assert_failure
 }
+
+@test "goenv sets properly sorted latest local version when 'latest' version is given to goenv and any version is installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.10.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.10.9"
+  mkdir -p "${GOENV_ROOT}/versions/1.9.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.9.9"
+  run goenv-local latest
+  assert_success ""
+  assert [ "$(cat .go-version)" = "1.10.10" ]
+}
+
+@test "goenv sets latest local version when major version is given and any matching version is installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.2.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.2.9"
+  mkdir -p "${GOENV_ROOT}/versions/4.5.6"
+  run goenv-local 1
+  assert_success ""
+  assert [ "$(cat .go-version)" = "1.2.10" ]
+}
+
+@test "goenv fails setting latest local version when major or minor single number is given and does not match at 'GOENV_ROOT/versions/<version>'" {
+  mkdir -p "${GOENV_ROOT}/versions/1.2.9"
+  mkdir -p "${GOENV_ROOT}/versions/4.5.10"
+  run goenv-local 9
+  assert_failure "goenv: version '9' not installed"
+}
+
+@test "goenv sets latest local version when minor version is given as single number and any matching major.minor version is installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.2.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.2.9"
+  mkdir -p "${GOENV_ROOT}/versions/1.3.11"
+  mkdir -p "${GOENV_ROOT}/versions/4.5.2"
+  run goenv-local 2
+  assert_success ""
+  assert [ "$(cat .go-version)" = "1.2.10" ]
+}
+
+@test "goenv sets latest local version when minor version is given as major.minor number and any matching version is installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.2.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.2.9"
+  mkdir -p "${GOENV_ROOT}/versions/1.2.2"
+  mkdir -p "${GOENV_ROOT}/versions/1.3.11"
+  mkdir -p "${GOENV_ROOT}/versions/2.1.2"
+  run goenv-local 1.2
+  assert_success ""
+  assert [ "$(cat .go-version)" = "1.2.10" ]
+}
+
+@test "goenv fails setting latest local version when major.minor number is given and does not match at 'GOENV_ROOT/versions/<version>'" {
+  mkdir -p "${GOENV_ROOT}/versions/1.1.9"
+  run goenv-local 1.9
+  assert_failure "goenv: version '1.9' not installed"
+}
+

@@ -4,7 +4,7 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage rehash
-  assert_success <<'OUT'
+  assert_success <<OUT
 Usage: goenv rehash
 OUT
 }
@@ -50,8 +50,7 @@ OUT
   assert_success ""
 
   run /bin/ls "${GOENV_ROOT}/shims"
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 go
 godoc
 OUT
@@ -111,7 +110,7 @@ OUT
   chmod +x "${GOENV_ROOT}/shims/oldshim1"
 
   run type oldshim1
-  assert_output "oldshim1 is ${GOENV_ROOT}/shims/oldshim1"
+  assert_success "oldshim1 is ${GOENV_ROOT}/shims/oldshim1"
 
   create_executable "1.11.1" "go"
 
@@ -123,7 +122,7 @@ OUT
 
   assert [ ! -e "${GOENV_ROOT}/shims/oldshim1" ]
   run type go
-  assert_output "go is ${GOENV_ROOT}/shims/go"
+  assert_success "go is ${GOENV_ROOT}/shims/go"
 
   assert [ -x "${GOENV_ROOT}/shims/go" ]
 
@@ -163,13 +162,10 @@ OUT
   assert_success ""
 
   run /bin/ls "${GOENV_ROOT}/shims"
-  assert_success
-  assert_output <<OUT
-go
-OUT
+  assert_success "go"
 
   run type go
-  assert_output "go is ${GOENV_ROOT}/shims/go"
+  assert_success "go is ${GOENV_ROOT}/shims/go"
 }
 
 @test "carries original IFS within hooks" {
@@ -180,6 +176,5 @@ exit
 SH
 
   IFS=$' \t\n' run goenv-rehash
-  assert_success
-  assert_output "HELLO=:hello:ugly:world:again"
+  assert_success "HELLO=:hello:ugly:world:again"
 }
