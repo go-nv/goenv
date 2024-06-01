@@ -16,7 +16,8 @@ if [ "$1" = "--complete" ]; then
 fi
 
 versions() {
-  goenv versions --bare | $(type -p ggrep grep | head -1) -F "$query" || true
+  # Sort correctly (1.20.9 comes before 1.20.10)
+  goenv versions --bare | sort -V | $(type -p ggrep grep | head -1) -F "$query" || true
 }
 
 latest_version() {
