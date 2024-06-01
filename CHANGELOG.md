@@ -902,4 +902,4 @@ Change line format:
 
 ### Added
 
-- `goenv` basic functionality cloned from https://github.com/yyuu/pyenv
+- `goenv` basic functionality cloned from https://github.com/pyenv/pyenv

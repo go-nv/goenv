@@ -3,11 +3,11 @@
 [![PR Checks Status](https://github.com/go-nv/goenv/actions/workflows/pr_checks.yml/badge.svg)](https://github.com/go-nv/goenv/actions/workflows/pr_checks.yml)
 
 goenv aims to be as simple as possible and follow the already established
-successful version management model of [pyenv](https://github.com/yyuu/pyenv) and [rbenv](https://github.com/rbenv/rbenv).
+successful version management model of [pyenv](https://github.com/pyenv/pyenv) and [rbenv](https://github.com/rbenv/rbenv).
 
 New go versions are added automatically on a daily CRON schedule.
 
-This project was cloned from [pyenv](https://github.com/yyuu/pyenv) and modified for Go.
+This project was cloned from [pyenv](https://github.com/pyenv/pyenv) and modified for Go.
 
 [![asciicast](https://asciinema.org/a/17IT3YiQ56hiJsb2iHpGHlJqj.svg)](https://asciinema.org/a/17IT3YiQ56hiJsb2iHpGHlJqj)
 
