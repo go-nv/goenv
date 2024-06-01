@@ -126,6 +126,10 @@ case "$command" in
 -h | --help)
   exec goenv-help
   ;;
+# NOTE: Provide goenv completions
+--complete)
+  exec goenv-commands
+  ;;
 *)
   if [ "$command" = "shell" ] && [ -z "${GOENV_SHELL}" ]; then
     echo 'eval "$(goenv init -)" has not been executed.'
