@@ -1,0 +1,11 @@
+# GitHub "Languages" statistics only consider file extensions, not contents
+# https://github.com/github-linguist/linguist/blob/master/docs/overrides.md
+# Reclassify files as Shell for proper statistics (instead of "Roff")
+libexec/* linguist-language=Shell
+plugins/go-build/bin/* linguist-language=Shell
+plugins/go-build/share/go-build/* linguist-language=Shell
+plugins/go-build/test/fixtures/definitions/* linguist-language=Shell
+plugins/go-build/test/stubs/* linguist-language=Shell
+src/shobj-conf/* linguist-language=Shell
+test/libexec/* linguist-language=Shell
+
