@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# Summary: Display an installed Go version
+# Usage: goenv installed [<version>]
+#
+# Displays the installed Go version, searching for shortcuts if necessary.
+# If no <version> or `latest` is given, displays the latest installed version (1.23.4).
+# <version> `system` displays `system` if an installed system Go can be found.
+# <version> `1` displays the latest installed major version (1.23.4).
+# <version> `23` or `1.23` displays the latest installed minor version (1.23.4).
+# <version> `1.23.4` displays this installed version (1.23.4).
+# If no version can be found or no versions are installed, an error message will be displayed.
+# Run `goenv versions` for a list of available Go versions.
+
+
+set -e
+[ -n "$GOENV_DEBUG" ] && set -x
+
+# Provide goenv completions
+if [ "$1" = "--complete" ]; then
+  echo latest
+  echo system
+  exec goenv-versions --bare
+fi
+
+#majors=({2,1}) # Supported Go versions: 2,1 (latest first)
+majors=({1,}) # Supported Go versions: 1 (latest first)
+
+versions() {
+  # Sort correctly (1.20.9 comes before 1.20.10)
+  goenv versions --bare | sort -V | $(type -p ggrep grep | head -1) -F "$query" || true
+}
+
+latest_version() {
+  versions | tail -1
+}
+
+latest_major() {
+  # 1 -> latest major 1.23.4
+  versions | grep -oE "^$(regex "$1")\\.[0-9]+\\.[0-9]+$" | tail -1
+}
+
+latest_minor() {
+  # 1.23 -> latest minor 1.23.4
+  versions | grep -oE "^$(regex "$1")\\.([0-9]+)$" | tail -1
+}
+
+installed() {
+  # 1.23.4 -> 1.23.4 if installed (else "")
+  versions | grep -oE "^$(regex "$1")$" || true
+}
+
+regex() {
+  echo "${1//\./\\.}"
+}
+
+
+if [ -n "$1" ]; then
+  version="$1"
+else
+  version="latest"
+fi
+
+if [ "$version" = "system" ]; then
+  if [ -n "$(GOENV_VERSION="${version}" goenv-which go 2>/dev/null)" ]; then
+    echo "system"
+    exit 0
+  else
+    echo "goenv: system version not found in PATH" >&2
+    exit 1
+  fi
+fi
+if [ "$version" = "latest" ]; then
+  LATEST_PATCH=$(latest_version)
+  if [ -n "$LATEST_PATCH" ]; then
+    echo "$LATEST_PATCH"
+    exit 0
+  else
+    echo "goenv: no versions installed" >&2
+    exit 1
+  fi
+fi
+
+# Check version=1 (major without minor and patch) => 1.23.4 (latest major version)
+# Or version=23 (minor without major and patch) => 1.23.4 (latest patch version)
+if grep -q -E "^[0-9]+(\s*)$" <<<"${version}"; then
+  for major in "${majors[@]}"; do
+    if [ "$version" = "$major" ]; then
+      LATEST_MAJOR=$(latest_major "$version")
+      if [ -n "$LATEST_MAJOR" ]; then
+        echo "$LATEST_MAJOR"
+        exit 0
+      fi
+    else
+      LATEST_MINOR=$(latest_minor "$major.$version")
+      if [ -n "$LATEST_MINOR" ]; then
+        echo "$LATEST_MINOR"
+        exit 0
+      fi
+    fi
+  done
+fi
+
+# Check version=1.23 (minor without patch) => 1.23.4 (latest patch version)
+if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<"${version}"; then
+  LATEST_MINOR=$(latest_minor "$version")
+  if [ -n "$LATEST_MINOR" ]; then
+    echo "$LATEST_MINOR"
+    exit 0
+  fi
+fi
+
+# Check version=1.23.4 (full version number) => 1.23.4 (installed version)
+if grep -q -E "^[0-9]+\.[0-9]+\.[0-9]+(\s*)$" <<<"${version}"; then
+  INSTALLED=$(installed "$version")
+  if [ -n "$INSTALLED" ]; then
+    echo "$INSTALLED"
+    exit 0
+  fi
+fi
+
+echo "goenv: version '${version}' not installed" >&2
+exit 1

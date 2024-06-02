@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -e
 export -n CDPATH
+export LC_ALL=C # boost grep performance by disabling unicode
 
 if [ "$1" = "--debug" ]; then
   export GOENV_DEBUG=1
@@ -125,6 +126,10 @@ case "$command" in
 -h | --help)
   exec goenv-help
   ;;
+# NOTE: Provide goenv completions
+--complete)
+  exec goenv-commands
+  ;;
 *)
   if [ "$command" = "shell" ] && [ -z "${GOENV_SHELL}" ]; then
     echo 'eval "$(goenv init -)" has not been executed.'
@@ -133,10 +138,16 @@ case "$command" in
     exit 1
   fi
 
-  command_path="$(command -v "goenv-$command" || true)"
-  [ -n "$command_path" ] || abort "no such command '$command'"
+  # Just a version number given (or `latest` or `system`) -> assume `goenv local $@`
+  if grep -q -E "^[0-9]+(\.[0-9]+){0,2}$" <<<"${command}" || [ "$command" == "latest" ] || [ "$command" == "system" ]; then
+    command_path="goenv-local"
+  else
+    command_path="$(command -v "goenv-$command" || true)"
+    [ -n "$command_path" ] || abort "no such command '$command'"
 
-  shift 1
+    shift 1
+  fi
+
   if [ "$1" = --help ]; then
     exec goenv-help "$command"
   else

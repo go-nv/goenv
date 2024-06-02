@@ -26,6 +26,16 @@ shopt -s nullglob
 
 {
   for path in "${paths[@]}"; do
+    # goenv-init uses --sh, don't output special commands then
+    if [ -z "$sh" ]; then
+      # Output special commands (plugins and version identifiers)
+      echo install
+      echo latest
+      echo system
+      echo uninstall
+      goenv-versions --bare
+    fi
+
     for command in "${path}/goenv-"*; do
       command="${command##*goenv-}"
       if [ -n "$sh" ]; then
@@ -41,4 +51,4 @@ shopt -s nullglob
       fi
     done
   done
-} | sort | uniq
+} | sort | uniq | grep -v -E '^(echo|--version|realpath\.dylib)$'

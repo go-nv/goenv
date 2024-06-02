@@ -4,23 +4,17 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage which
-  assert_success <<'OUT'
-Usage: goenv which <command>
-OUT
+  assert_success "Usage: goenv which <command>"
 }
 
 @test "has completion support" {
   run goenv-which --complete
-  assert_success <<OUT
-OUT
+  assert_success ""
 }
 
 @test "fails and prints usage when no command argument is given" {
   run goenv-which
-  assert_failure
-  assert_output <<OUT
-Usage: goenv which <command>
-OUT
+  assert_failure "Usage: goenv which <command>"
 }
 
 @test "prints path to executable when 'GOENV_VERSION' environment variable is specified and executable argument is found in 'GOENV_ROOT/versions/<version>/bin/<executable>'" {
@@ -28,12 +22,10 @@ OUT
   create_executable "1.11.1" "go"
 
   GOENV_VERSION=1.10.3 run goenv-which gofmt
-  assert_success
-  assert_output "${GOENV_ROOT}/versions/1.10.3/bin/gofmt"
+  assert_success "${GOENV_ROOT}/versions/1.10.3/bin/gofmt"
 
   GOENV_VERSION=1.11.1 run goenv-which go
-  assert_success
-  assert_output "${GOENV_ROOT}/versions/1.11.1/bin/go"
+  assert_success "${GOENV_ROOT}/versions/1.11.1/bin/go"
 }
 
 @test "prints path to executable of first version specified when multiple versions separated by ':' from 'GOENV_VERSION' environment variable executable argument is found in 'GOENV_ROOT/versions/<version>/bin/<executable>'" {
@@ -41,12 +33,10 @@ OUT
   create_executable "1.11.1" "gofmt"
 
   GOENV_VERSION=1.11.1:1.10.3 run goenv-which gofmt
-  assert_success
-  assert_output "${GOENV_ROOT}/versions/1.11.1/bin/gofmt"
+  assert_success "${GOENV_ROOT}/versions/1.11.1/bin/gofmt"
 
   GOENV_VERSION=1.10.3:1.11.1 run goenv-which gofmt
-  assert_success
-  assert_output "${GOENV_ROOT}/versions/1.10.3/bin/gofmt"
+  assert_success "${GOENV_ROOT}/versions/1.10.3/bin/gofmt"
 }
 
 @test "fails when specified version by 'GOENV_VERSION' environment variable is not installed" {
@@ -56,8 +46,7 @@ OUT
 
 @test "fails when specified versions separated by ':' from 'GOENV_VERSION' environment variable are not installed" {
   GOENV_VERSION=1.10.3:1.11.1 run goenv-which go
-  assert_failure
-  assert_output <<OUT
+  assert_failure <<OUT
 goenv: version '1.10.3' is not installed (set by GOENV_VERSION environment variable)
 goenv: version '1.11.1' is not installed (set by GOENV_VERSION environment variable)
 OUT
@@ -81,8 +70,7 @@ OUT
   create_executable "1.11.1" "gofmt"
 
   GOENV_VERSION=1.4.0 run -127 goenv-which gofmt
-  assert_failure
-  assert_output <<OUT
+  assert_failure <<OUT
 goenv: 'gofmt' command not found
 
 The 'gofmt' command exists in these Go versions:
@@ -99,8 +87,7 @@ exit
 SH
 
   IFS=$' \t\n' GOENV_VERSION=system run goenv-which anything
-  assert_success
-  assert_output "HELLO=:hello:ugly:world:again"
+  assert_success "HELLO=:hello:ugly:world:again"
 }
 
 @test "prints executable found in version discovered from 'goenv-version-name' (GOENV_ROOT/version)" {

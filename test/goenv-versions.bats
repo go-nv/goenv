@@ -15,16 +15,14 @@ stub_system_go() {
 
 @test "has usage instructions" {
   run goenv-help --usage versions
-  assert_success
-  assert_output <<'OUT'
+  assert_success <<OUT
 Usage: goenv versions [--bare] [--skip-aliases]
 OUT
 }
 
 @test "has completion support" {
   run goenv-versions --complete
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 --bare
 --skip-aliases
 OUT
@@ -32,8 +30,7 @@ OUT
 
 @test "prints usage instructions when unknown arguments are given" {
   run goenv-versions magic and more
-  assert_failure
-  assert_output <<'OUT'
+  assert_failure <<OUT
 Usage: goenv versions [--bare] [--skip-aliases]
 OUT
 }
@@ -49,8 +46,7 @@ OUT
 @test "fails with warning when no versions are installed and no 'go' executable in 'PATH'" {
   PATH="$(path_without go)" run goenv-versions
 
-  assert_failure
-  assert_output "Warning: no Go detected on the system"
+  assert_failure "Warning: no Go detected on the system"
 }
 
 @test "prints empty output when '--bare' argument is given and no versions installed and no 'go' executable in 'PATH'" {
@@ -75,8 +71,7 @@ OUT
   create_version "1.10.1"
   run goenv-versions
 
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 * system (set by ${GOENV_ROOT}/version)
   1.10.1
   1.10.2
@@ -88,8 +83,7 @@ OUT
   create_version "1.10.3"
   run goenv-versions
 
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
   1.10.3
 OUT
 }
@@ -107,8 +101,7 @@ OUT
   create_version "1.11.1"
 
   GOENV_VERSION=1.10.1 run goenv-versions
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
   system
 * 1.10.1 (set by GOENV_VERSION environment variable)
   1.11.1
@@ -119,8 +112,7 @@ OUT
   create_version "1.10.3"
   create_version "1.11.1"
   GOENV_VERSION=1.10.3 run goenv-versions --bare
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 1.10.3
 1.11.1
 OUT
@@ -134,8 +126,7 @@ OUT
   echo "1.11.1" > "${GOENV_ROOT}/version"
   run goenv-versions
 
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
   system
   1.10.3
 * 1.11.1 (set by ${GOENV_ROOT}/version)
@@ -150,8 +141,7 @@ OUT
   echo "1.6.1" > '.go-version'
 
   run goenv-versions
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
   system
 * 1.6.1 (set by ${GOENV_TEST_DIR}/.go-version)
   1.8.4
@@ -173,8 +163,7 @@ OUT
   ln -s "1.8.3" "${GOENV_ROOT}/versions/1.8.4"
 
   run goenv-versions
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
   1.8.3
   1.8.4
 OUT
@@ -185,8 +174,7 @@ OUT
   ln -s "1.8.3" "${GOENV_ROOT}/versions/1.8.4"
 
   run goenv-versions --skip-aliases
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
   1.8.3
 OUT
 }

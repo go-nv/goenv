@@ -4,8 +4,7 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage whence
-  assert_success
-  assert_output <<'OUT'
+  assert_success <<OUT
 Usage: goenv whence [--path] <command>
 OUT
 }
@@ -20,8 +19,7 @@ OUT
 @test "fails and prints usage when no argument is given" {
   run goenv-whence
 
-  assert_failure
-  assert_output <<OUT
+  assert_failure <<OUT
 Usage: goenv whence [--path] <command>
 OUT
 }
@@ -31,8 +29,7 @@ OUT
   create_executable "1.6.1" "go"
 
   run goenv-whence go
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 1.6.0
 1.6.1
 OUT
@@ -43,8 +40,7 @@ OUT
   create_executable "1.6.1" "go"
 
   run goenv-whence --path go
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 ${GOENV_ROOT}/versions/1.6.0/bin/go
 ${GOENV_ROOT}/versions/1.6.1/bin/go
 OUT
@@ -58,8 +54,7 @@ OUT
   create_executable "1.6.1" "go"
 
   run goenv-whence go
-  assert_success
-  assert_output <<OUT
+  assert_success <<OUT
 1.6.1
 OUT
 }
@@ -70,8 +65,6 @@ OUT
   chmod -x "${GOENV_ROOT}/versions/1.6.1/bin/go"
 
   run goenv-whence go
-  assert_failure
-  assert_output <<OUT
-OUT
+  assert_failure ""
 }
 

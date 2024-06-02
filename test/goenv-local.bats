@@ -9,17 +9,21 @@ setup() {
 
 @test "has usage instructions" {
   run goenv-help --usage local
-  assert_success <<'OUT'
+  assert_success <<OUT
 Usage: goenv local <version>
        goenv local --unset
 OUT
 }
 
-@test "has completion support" {
-  run goenv-local --complete
+@test "local has completion support" {
+  mkdir -p "${GOENV_ROOT}/versions/1.9.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.10.9"
+  run goenv-installed --complete
   assert_success <<OUT
---unset
+latest
 system
+1.10.9
+1.9.10
 OUT
 }
 
@@ -74,13 +78,69 @@ OUT
   assert [ "$(cat .go-version)" = "1.2.3" ]
 }
 
+@test "goenv local sets properly sorted latest version when 'latest' version is given and any version is installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.10.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.10.9"
+  mkdir -p "${GOENV_ROOT}/versions/1.9.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.9.9"
+  run goenv-local latest
+  assert_success ""
+  assert [ "$(cat .go-version)" = "1.10.10" ]
+}
+
+@test "goenv local sets latest version when major version is given and any matching version is installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.2.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.2.9"
+  mkdir -p "${GOENV_ROOT}/versions/4.5.6"
+  run goenv-local 1
+  assert_success ""
+  run goenv-local
+  assert_success "1.2.10"
+}
+
+@test "goenv local fails setting latest version when major or minor single number is given and does not match at 'GOENV_ROOT/versions/<version>'" {
+  mkdir -p "${GOENV_ROOT}/versions/1.2.9"
+  mkdir -p "${GOENV_ROOT}/versions/4.5.10"
+  run goenv-local 9
+  assert_failure "goenv: version '9' not installed"
+}
+
+@test "goenv local sets latest version when minor version is given as single number and any matching major.minor version is installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.2.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.2.9"
+  mkdir -p "${GOENV_ROOT}/versions/1.3.11"
+  mkdir -p "${GOENV_ROOT}/versions/4.5.2"
+  run goenv-local 2
+  assert_success ""
+  run goenv-local
+  assert_success "1.2.10"
+}
+
+@test "goenv local sets latest version when minor version is given as major.minor number and any matching version is installed" {
+  mkdir -p "${GOENV_ROOT}/versions/1.1.2"
+  mkdir -p "${GOENV_ROOT}/versions/1.2.9"
+  mkdir -p "${GOENV_ROOT}/versions/1.2.10"
+  mkdir -p "${GOENV_ROOT}/versions/1.3.11"
+  mkdir -p "${GOENV_ROOT}/versions/2.1.2"
+  run goenv-local 1.2
+  assert_success ""
+  run goenv-local
+  assert_success "1.2.10"
+}
+
+@test "goenv local fails setting latest version when major.minor number is given and does not match at 'GOENV_ROOT/versions/<version>'" {
+  mkdir -p "${GOENV_ROOT}/versions/1.1.9"
+  run goenv-local 1.9
+  assert_failure "goenv: version '1.9' not installed"
+}
+
 @test "fails setting local version when version argument is given and does not match at 'GOENV_ROOT/versions/<version>'" {
   mkdir -p "${GOENV_ROOT}/versions/1.2.3"
   run goenv-local 1.2.4
   assert_failure "goenv: version '1.2.4' not installed"
 }
 
-@test "changes local existing version with version argument when  version argument is given and does match at 'GOENV_ROOT/versions/<version>'" {
+@test "changes local existing version with version argument when version argument is given and does match at 'GOENV_ROOT/versions/<version>'" {
   echo "1.0-pre" > .go-version
   run goenv-local
   assert_success "1.0-pre"
