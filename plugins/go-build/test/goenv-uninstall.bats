@@ -7,21 +7,21 @@ export PATH="${project_root}/libexec:$PATH"
 
 @test "has usage instructions" {
   run goenv-help --usage uninstall
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv uninstall [-f|--force] <version>
 OUT
 }
 
 @test "has completion support" {
   run goenv-uninstall --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 --force
 OUT
 }
 
 @test "prints full usage when '-h' is first argument given" {
   run goenv-uninstall -h
-  assert_success <<OUT
+  assert_success_out <<'OUT'
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -33,7 +33,7 @@ OUT
 
 @test "prints full usage when '--help' is first argument given" {
   run goenv-uninstall --help
-  assert_success <<OUT
+  assert_success_out <<'OUT'
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -45,7 +45,7 @@ OUT
 
 @test "fails and prints full usage when no arguments are given" {
   run goenv-uninstall
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -57,7 +57,7 @@ OUT
 
 @test "fails and prints full usage when '-f' is given and no other arguments" {
   run goenv-uninstall -f
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -69,7 +69,7 @@ OUT
 
 @test "fails and prints full usage when '--force' is given and no other arguments" {
   run goenv-uninstall --force
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -81,7 +81,7 @@ OUT
 
 @test "fails and prints full usage when '-f' is given and '-' version argument" {
   run goenv-uninstall -f -
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -93,7 +93,7 @@ OUT
 
 @test "fails and prints full usage when '--force' is given and '-' version argument" {
   run goenv-uninstall --force
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv uninstall [-f|--force] <version>
 
    -f  Attempt to remove the specified version without prompting
@@ -131,7 +131,7 @@ SH
   run goenv-uninstall -f 1.2.3
   remove_hook uninstall hello.bash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 before: ${GOENV_ROOT}/versions/1.2.3
 rm -rf ${GOENV_ROOT}/versions/1.2.3
 after.
@@ -155,7 +155,7 @@ SH
   run goenv-uninstall -f 1.2.3
   remove_hook uninstall hello.bash
 
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 goenv: version '1.2.3' not installed
 OUT
 }

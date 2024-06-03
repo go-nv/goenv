@@ -11,7 +11,7 @@ teardown() {
   mkdir -p "${GOENV_ROOT}/versions/1.10.9"
   mkdir -p "${GOENV_ROOT}/versions/1.9.10"
   run goenv --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 1.10.9
 1.9.10
 commands
@@ -46,7 +46,7 @@ OUT
 
 @test "fails and prints help when no command argument is given" {
   run goenv
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 $(goenv---version)
 Usage: goenv <command> [<args>]
 
@@ -77,7 +77,7 @@ OUT
 
   unset GOENV_AUTO_INSTALL
   
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -172,10 +172,10 @@ OUT
   assert_success "${GOENV_ROOT}/goenv.d:${BATS_TEST_DIRNAME%/*}/goenv.d:/usr/local/etc/goenv.d:/etc/goenv.d:/usr/lib/goenv/hooks"
 }
 
-@test "prints error when called with 'shell' subcommand, but $(GOENV_SHELL) environment variable is not present" {
+@test "prints error when called with 'shell' subcommand, but GOENV_SHELL environment variable is not present" {
   unset GOENV_SHELL
   run goenv shell
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 eval "$(goenv init -)" has not been executed.
 Please read the installation instructions in the README.md at github.com/go-nv/goenv
 or run 'goenv help init' for more information

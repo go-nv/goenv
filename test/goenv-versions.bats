@@ -15,14 +15,14 @@ stub_system_go() {
 
 @test "has usage instructions" {
   run goenv-help --usage versions
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv versions [--bare] [--skip-aliases]
 OUT
 }
 
 @test "has completion support" {
   run goenv-versions --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 --bare
 --skip-aliases
 OUT
@@ -30,7 +30,7 @@ OUT
 
 @test "prints usage instructions when unknown arguments are given" {
   run goenv-versions magic and more
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 Usage: goenv versions [--bare] [--skip-aliases]
 OUT
 }
@@ -71,7 +71,7 @@ OUT
   create_version "1.10.1"
   run goenv-versions
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 * system (set by ${GOENV_ROOT}/version)
   1.10.1
   1.10.2
@@ -83,7 +83,7 @@ OUT
   create_version "1.10.3"
   run goenv-versions
 
-  assert_success <<OUT
+  assert_success_out <<OUT
   1.10.3
 OUT
 }
@@ -101,7 +101,7 @@ OUT
   create_version "1.11.1"
 
   GOENV_VERSION=1.10.1 run goenv-versions
-  assert_success <<OUT
+  assert_success_out <<OUT
   system
 * 1.10.1 (set by GOENV_VERSION environment variable)
   1.11.1
@@ -112,7 +112,7 @@ OUT
   create_version "1.10.3"
   create_version "1.11.1"
   GOENV_VERSION=1.10.3 run goenv-versions --bare
-  assert_success <<OUT
+  assert_success_out <<OUT
 1.10.3
 1.11.1
 OUT
@@ -126,7 +126,7 @@ OUT
   echo "1.11.1" > "${GOENV_ROOT}/version"
   run goenv-versions
 
-  assert_success <<OUT
+  assert_success_out <<OUT
   system
   1.10.3
 * 1.11.1 (set by ${GOENV_ROOT}/version)
@@ -141,7 +141,7 @@ OUT
   echo "1.6.1" > '.go-version'
 
   run goenv-versions
-  assert_success <<OUT
+  assert_success_out <<OUT
   system
 * 1.6.1 (set by ${GOENV_TEST_DIR}/.go-version)
   1.8.4
@@ -153,7 +153,7 @@ OUT
   touch "${GOENV_ROOT}/versions/hello"
 
   run goenv-versions
-  assert_success <<OUT
+  assert_success_out <<OUT
   1.8.4
 OUT
 }
@@ -163,7 +163,7 @@ OUT
   ln -s "1.8.3" "${GOENV_ROOT}/versions/1.8.4"
 
   run goenv-versions
-  assert_success <<OUT
+  assert_success_out <<OUT
   1.8.3
   1.8.4
 OUT
@@ -174,7 +174,7 @@ OUT
   ln -s "1.8.3" "${GOENV_ROOT}/versions/1.8.4"
 
   run goenv-versions --skip-aliases
-  assert_success <<OUT
+  assert_success_out <<OUT
   1.8.3
 OUT
 }

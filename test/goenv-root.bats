@@ -4,7 +4,7 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage root
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv root
 OUT
 }

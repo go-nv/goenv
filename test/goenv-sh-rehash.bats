@@ -4,8 +4,8 @@ load test_helper
 
 @test "has usage instructions for goenv-sh-rehash" {
   run goenv-help --usage sh-rehash
-  assert_success <<OUT
-Usage: goenv sh-rehash
+  assert_success_out <<OUT
+Usage: goenv sh-rehash [--only-manage-paths]
 OUT
 }
 
@@ -68,7 +68,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
@@ -81,7 +81,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
@@ -94,7 +94,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
 OUT
@@ -107,7 +107,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 set -gx GOPATH "${HOME}/go/1.12.0"
 OUT
 }
@@ -119,7 +119,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
@@ -133,7 +133,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
@@ -147,7 +147,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
@@ -161,7 +161,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
@@ -175,7 +175,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
@@ -189,7 +189,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
@@ -203,7 +203,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
@@ -217,7 +217,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="${HOME}/go/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
@@ -231,7 +231,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:${HOME}/go/1.12.0"
 hash -r 2>/dev/null || true
@@ -245,7 +245,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "${HOME}/go/1.12.0"
 OUT
@@ -258,7 +258,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "${HOME}/go/1.12.0:/fake-gopath"
 OUT
@@ -271,7 +271,7 @@ OUT
 
   GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "/fake-gopath:${HOME}/go/1.12.0"
 OUT
@@ -284,7 +284,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
@@ -298,7 +298,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
@@ -312,7 +312,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
@@ -326,7 +326,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
@@ -340,7 +340,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
@@ -354,7 +354,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
@@ -368,7 +368,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
@@ -382,7 +382,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/tmp/example/1.12.0:/fake-gopath"
 hash -r 2>/dev/null || true
@@ -396,7 +396,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 export GOROOT="$(GOENV_VERSION=1.12.0 goenv-prefix)"
 export GOPATH="/fake-gopath:/tmp/example/1.12.0"
 hash -r 2>/dev/null || true
@@ -410,7 +410,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "/tmp/example/1.12.0"
 OUT
@@ -423,7 +423,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_APPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "/tmp/example/1.12.0:/fake-gopath"
 OUT
@@ -436,7 +436,7 @@ OUT
 
   GOENV_GOPATH_PREFIX=/tmp/example GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_PREPEND_GOPATH=1 GOPATH='/fake-gopath' run goenv-sh-rehash
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 set -gx GOROOT "$(GOENV_VERSION=1.12.0 goenv-prefix)"
 set -gx GOPATH "/fake-gopath:/tmp/example/1.12.0"
 OUT
@@ -483,7 +483,7 @@ OUT
   assert_success ""
 
   run /bin/ls "${GOENV_ROOT}/shims"
-  assert_success <<OUT
+  assert_success_out <<OUT
 go
 godoc
 OUT
@@ -599,7 +599,7 @@ OUT
   assert_success ""
 
   run /bin/ls "${GOENV_ROOT}/shims"
-  assert_success <<OUT
+  assert_success_out <<OUT
 go
 OUT
 

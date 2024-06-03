@@ -4,7 +4,7 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage rehash
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv rehash
 OUT
 }
@@ -50,7 +50,7 @@ OUT
   assert_success ""
 
   run /bin/ls "${GOENV_ROOT}/shims"
-  assert_success <<OUT
+  assert_success_out <<OUT
 go
 godoc
 OUT

@@ -46,7 +46,7 @@ load test_helper
 
 @test "fails when specified versions separated by ':' from 'GOENV_VERSION' environment variable are not installed" {
   GOENV_VERSION=1.10.3:1.11.1 run goenv-which go
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 goenv: version '1.10.3' is not installed (set by GOENV_VERSION environment variable)
 goenv: version '1.11.1' is not installed (set by GOENV_VERSION environment variable)
 OUT
@@ -70,7 +70,7 @@ OUT
   create_executable "1.11.1" "gofmt"
 
   GOENV_VERSION=1.4.0 run -127 goenv-which gofmt
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 goenv: 'gofmt' command not found
 
 The 'gofmt' command exists in these Go versions:

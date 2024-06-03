@@ -49,7 +49,7 @@ setup() {
 
   goenv-rehash
   run goenv-exec Zgo123unique
-  assert_success
+  assert_success ""
 }
 
 @test "completes with names of executables for version that's specified by GOENV_VERSION environment variable" {
@@ -57,7 +57,7 @@ setup() {
 
   GOENV_VERSION=1.6.1 goenv-rehash
   GOENV_VERSION=1.6.1 run goenv-completions exec
-  assert_success <<OUT
+  assert_success_out <<OUT
 --help
 Zgo123unique
 OUT
@@ -85,7 +85,7 @@ done
 SH
 
   GOENV_VERSION=1.6.1 run goenv-exec go run "/path to/go script.go" -- extra args
-  assert_success <<OUT
+  assert_success_out <<OUT
 ${GOENV_ROOT}/versions/1.6.1/bin/go
   run
   /path to/go script.go
@@ -169,7 +169,7 @@ SH
 
   GOROOT="" GOENV_SHELL=bash GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 
 $HOME/go/1.12.0
 OUT
@@ -185,7 +185,7 @@ SH
 
   GOROOT="" GOENV_SHELL=ksh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 
 $HOME/go/1.12.0
 OUT
@@ -201,7 +201,7 @@ SH
 
   GOROOT="" GOENV_SHELL=zsh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 
 $HOME/go/1.12.0
 OUT
@@ -217,7 +217,7 @@ SH
 
   GOROOT="" GOENV_SHELL=fish GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=1 GOENV_DISABLE_GOPATH=0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 
 $HOME/go/1.12.0
 OUT
@@ -233,7 +233,7 @@ SH
 
   GOENV_SHELL=bash GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 $GOENV_ROOT/versions/1.12.0
 $HOME/go/1.12.0
 OUT
@@ -249,7 +249,7 @@ SH
 
   GOENV_SHELL=zsh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 $GOENV_ROOT/versions/1.12.0
 $HOME/go/1.12.0
 OUT
@@ -265,7 +265,7 @@ SH
 
   GOENV_SHELL=ksh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 $GOENV_ROOT/versions/1.12.0
 $HOME/go/1.12.0
 OUT
@@ -281,7 +281,7 @@ SH
 
   GOENV_SHELL=fish GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 $GOENV_ROOT/versions/1.12.0
 $HOME/go/1.12.0
 OUT
@@ -297,7 +297,7 @@ SH
 
   GOENV_SHELL=bash GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="/tmp/goenv/example" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT
@@ -313,7 +313,7 @@ SH
 
   GOENV_SHELL=ksh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="/tmp/goenv/example" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT
@@ -329,7 +329,7 @@ SH
 
   GOENV_SHELL=zsh GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="/tmp/goenv/example" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT
@@ -345,7 +345,7 @@ SH
 
   GOENV_SHELL=fish GOENV_VERSION=1.12.0 GOENV_DISABLE_GOROOT=0 GOENV_DISABLE_GOPATH=0 GOENV_GOPATH_PREFIX="/tmp/goenv/example" PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-paths
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT

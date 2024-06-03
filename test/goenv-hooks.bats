@@ -5,7 +5,7 @@ load test_helper
 @test "has completion support" {
   run goenv-hooks --complete
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 exec
 rehash
 version-name
@@ -36,7 +36,7 @@ OUT
   create_hook exec "bueno.bash"
 
   GOENV_HOOK_PATH="$path1:$path2" run goenv-hooks exec
-  assert_success <<OUT
+  assert_success_out <<OUT
 ${GOENV_TEST_DIR}/goenv.d/exec/ahoy.bash
 ${GOENV_TEST_DIR}/goenv.d/exec/hello.bash
 ${GOENV_TEST_DIR}/etc/goenv_hooks/exec/bueno.bash
@@ -54,7 +54,7 @@ OUT
   create_hook exec "ahoy.bash"
 
   GOENV_HOOK_PATH="$path1:$path2" run goenv-hooks exec
-  assert_success <<OUT
+  assert_success_out <<OUT
 ${GOENV_TEST_DIR}/my hooks/goenv.d/exec/hello.bash
 ${GOENV_TEST_DIR}/etc/goenv hooks/exec/ahoy.bash
 OUT
@@ -81,7 +81,7 @@ OUT
   ln -s "bright.sh" "${path}/exec/world.bash"
 
   GOENV_HOOK_PATH="$path" run goenv-hooks exec
-  assert_success <<OUT
+  assert_success_out <<OUT
 ${HOME}/hola.bash
 ${GOENV_TEST_DIR}/goenv.d/exec/bright.sh
 OUT

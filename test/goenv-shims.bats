@@ -4,14 +4,14 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage shims
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv shims [--short]
 OUT
 }
 
 @test "has completion support" {
   run goenv-shims --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 --short
 OUT
 }
@@ -30,7 +30,7 @@ OUT
 
   run goenv-shims
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 ${GOENV_ROOT}/shims/go
 ${GOENV_ROOT}/shims/godoc
 ${GOENV_ROOT}/shims/gofmt
@@ -46,7 +46,7 @@ OUT
 
   run goenv-shims --short
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 go
 godoc
 gofmt

@@ -3,15 +3,15 @@
 load test_helper
 
 @test "has usage instructions" {
-  run goenv-help help
-  assert_success <<OUT
-goenv help [--usage] COMMAND
+  run goenv-help --usage help
+  assert_success_out <<OUT
+Usage: goenv help [--usage] COMMAND
 OUT
 }
 
 @test "without args shows summary of common commands" {
   run goenv-help
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv <command> [<args>]
 
 Some useful goenv commands are:
@@ -46,7 +46,7 @@ echo hello
 SH
 
   run goenv-help hello
-  assert_success <<SH
+  assert_success_out <<SH
 Usage: goenv hello <world>
 
 This command is useful for saying hello.
@@ -63,7 +63,7 @@ echo hello
 SH
 
   run goenv-help hello
-  assert_success <<SH
+  assert_success_out <<SH
 Usage: goenv hello <world>
 
 Says "hello" to you, from goenv
@@ -97,7 +97,7 @@ echo hello
 SH
 
   run goenv-help hello
-  assert_success <<SH
+  assert_success_out <<SH
 Usage: goenv hello <world>
        goenv hi [everybody]
        goenv hola --translate
@@ -121,7 +121,7 @@ echo hello
 SH
 
   run goenv-help hello
-  assert_success <<SH
+  assert_success_out <<SH
 Usage: goenv hello <world>
 
 This is extended help text.

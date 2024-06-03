@@ -7,15 +7,18 @@ export PATH="${project_root}/libexec:$PATH"
 
 @test "has usage instructions" {
   run goenv-help --usage install
-  assert_success <<OUT
-Usage: goenv install [-f|--force] <version>
+  assert_success_out <<OUT
+Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
+       goenv install [-f] [-kvpq] <definition-file>
+       goenv install -l|--list
+       goenv install --version
 OUT
 }
 
 @test "has completion support" {
   export USE_FAKE_DEFINITIONS=true
   run goenv-install --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 --list
 --force
 --skip-existing
@@ -35,7 +38,7 @@ OUT
 
 @test "prints full usage when '-h' is first argument given" {
   run goenv-install -h
-  assert_success <<OUT
+  assert_success_out <<'OUT'
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -63,7 +66,7 @@ OUT
 
 @test "prints full usage when '--help' is first argument given" {
   run goenv-install --help
-  assert_success <<OUT
+  assert_success_out <<'OUT'
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -91,7 +94,7 @@ OUT
 
 @test "fails and prints full usage when no arguments are given" {
   run goenv-install
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -119,7 +122,7 @@ OUT
 
 @test "fails and prints full usage when '-f' is given and no other arguments" {
   run goenv-install -f
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -147,7 +150,7 @@ OUT
 
 @test "fails and prints full usage when '--force' is given and no other arguments" {
   run goenv-install --force
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -175,7 +178,7 @@ OUT
 
 @test "fails and prints full usage when '-f' is given and '-' version argument" {
   run goenv-install -f -
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -203,7 +206,7 @@ OUT
 
 @test "fails and prints full usage when '--force' is given and '-' version argument" {
   run goenv-install --force
-  assert_failure <<OUT
+  assert_failure_out <<'OUT'
 Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
        goenv install [-f] [-kvpq] <definition-file>
        goenv install -l|--list
@@ -246,7 +249,7 @@ SH
 
   run goenv-install -f 1.2.3
 
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 go-build: definition not found: 1.2.3
 
 See all available versions with 'goenv install --list'.
@@ -262,7 +265,7 @@ OUT
 
   run goenv-install --force 1.2.3
 
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 go-build: definition not found: 1.2.3
 
 See all available versions with 'goenv install --list'.
@@ -277,7 +280,7 @@ OUT
   export USE_FAKE_DEFINITIONS=true
   run goenv-install -l
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 Available versions:
   1.0.0
   1.2.0
@@ -291,7 +294,7 @@ OUT
   export USE_FAKE_DEFINITIONS=true
   run goenv-install --list
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 Available versions:
   1.0.0
   1.2.0
@@ -307,7 +310,7 @@ OUT
 
   run goenv-install --version
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 go-build $(cat $base_dir/APP_VERSION)
 OUT
 }
@@ -334,7 +337,7 @@ OUT
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
@@ -344,7 +347,7 @@ Installed Go Linux${arch}64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LAT
 OUT
     ;;
   Darwin*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
@@ -389,7 +392,7 @@ OUT
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
@@ -399,7 +402,7 @@ Installed Go Linux${arch}64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LAT
 OUT
     ;;
   Darwin*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
@@ -443,7 +446,7 @@ OUT
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
@@ -453,7 +456,7 @@ Installed Go Linux${arch}64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LAT
 OUT
     ;;
   Darwin*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Installing latest version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
@@ -494,7 +497,7 @@ OUT
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Installing latest (including unstable) version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
@@ -504,7 +507,7 @@ Installed Go Linux${arch}64bit ${LATEST_VERSION} to ${GOENV_ROOT}/versions/${LAT
 OUT
     ;;
   Darwin*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Installing latest (including unstable) version ${LATEST_VERSION}...
 Downloading ${LATEST_VERSION}.tar.gz...
 -> http://localhost:8090/${LATEST_VERSION}/${LATEST_VERSION}.tar.gz
@@ -542,7 +545,7 @@ OUT
     arch=" arm "
   fi
 
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 No installable version found for $(uname -s) $(uname -m)
 
 OUT
@@ -578,7 +581,7 @@ SH
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
@@ -590,7 +593,7 @@ REHASHED
 OUT
     ;;
   Darwin*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
@@ -638,7 +641,7 @@ SH
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
@@ -650,7 +653,7 @@ REHASHED
 OUT
     ;;
   Darwin*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 before: ${GOENV_ROOT}/versions/1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
@@ -685,7 +688,7 @@ OUT
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
 Installing Go Linux${arch}64bit 1.2.2...
@@ -694,7 +697,7 @@ Installed Go Linux${arch}64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 OUT
     ;;
   Darwin*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
 Installing Go Darwin 10.8${arch}1.2.2...
@@ -759,7 +762,7 @@ OUT
   unameOut="$(uname -s)"
   case "${unameOut}" in
   Linux*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Using latest patch version 1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz
@@ -769,7 +772,7 @@ Installed Go Linux${arch}64bit 1.2.2 to ${GOENV_ROOT}/versions/1.2.2
 OUT
     ;;
   Darwin*)
-    assert_success <<OUT
+    assert_success_out <<OUT
 Using latest patch version 1.2.2
 Downloading 1.2.2.tar.gz...
 -> http://localhost:8090/1.2.2/1.2.2.tar.gz

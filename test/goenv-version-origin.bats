@@ -9,7 +9,7 @@ setup() {
 
 @test "has usage instructions" {
   run goenv-help --usage version-origin
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv version-origin
 OUT
 }

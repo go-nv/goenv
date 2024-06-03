@@ -15,11 +15,31 @@ assert_success() {
   fi
 }
 
+assert_success_out() {
+  if [ "$status" -ne 0 ]; then
+    flunk "command failed with exit status $status"
+  elif [ "$#" -gt 0 ]; then
+    assert_output "$1"
+  else
+    assert_output
+  fi
+}
+
 assert_failure() {
   if [ "$status" -eq 0 ]; then
     flunk "expected failed exit status"
   elif [ "$#" -gt 0 ]; then
     assert_output "$1"
+  fi
+}
+
+assert_failure_out() {
+  if [ "$status" -eq 0 ]; then
+    flunk "expected failed exit status"
+  elif [ "$#" -gt 0 ]; then
+    assert_output "$1"
+  else
+    assert_output
   fi
 }
 

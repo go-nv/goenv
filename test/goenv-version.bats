@@ -9,7 +9,7 @@ setup() {
 
 @test "has usage instructions" {
   run goenv-help --usage version
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv version
 OUT
 }
@@ -51,7 +51,7 @@ OUT
   echo "1.11.1:1.10.3" >"${GOENV_ROOT}/version"
 
   run goenv-version
-  assert_success <<OUT
+  assert_success_out <<OUT
 1.11.1 (set by ${GOENV_ROOT}/version)
 1.10.3 (set by ${GOENV_ROOT}/version)
 OUT
@@ -61,7 +61,7 @@ OUT
   create_version "1.11.1"
 
   GOENV_VERSION=1.1:1.11.1:1.2 run goenv-version
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 goenv: version '1.1' is not installed (set by GOENV_VERSION environment variable)
 goenv: version '1.2' is not installed (set by GOENV_VERSION environment variable)
 1.11.1 (set by GOENV_VERSION environment variable)
@@ -74,7 +74,7 @@ OUT
   create_version "1.11.1"
 
   GOENV_VERSION=1.1:1.11.1:1.2 run goenv-version
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 goenv: version '1.1' is not installed (set by GOENV_VERSION environment variable)
 goenv: version '1.2' is not installed (set by GOENV_VERSION environment variable)
 1.11.1 (set by GOENV_VERSION environment variable)
