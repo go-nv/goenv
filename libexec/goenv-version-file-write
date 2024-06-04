@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Summary: Writes specified version(s) to the specified file if the version(s) exist
-# Usage: goenv version-file-write <file> <version>
+# Usage: goenv version-file-write <file> <version>...
 #
 # If a specified version is not installed, only display an error message and abort.
 # If only a single <version> `system` is specified and installed, display previous version (if any) and remove file (similar to --unset).

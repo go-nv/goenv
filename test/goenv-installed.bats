@@ -4,8 +4,8 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage installed
-  assert_success <<OUT
-Usage: goenv installed <version>
+  assert_success_out <<OUT
+Usage: goenv installed [<version>]
 OUT
 }
 
@@ -13,7 +13,7 @@ OUT
   mkdir -p "${GOENV_ROOT}/versions/1.10.9"
   mkdir -p "${GOENV_ROOT}/versions/1.9.10"
   run goenv-installed --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 latest
 system
 1.10.9

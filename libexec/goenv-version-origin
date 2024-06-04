@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Summary: Explain how the current Go version is set
-# Usage: goenv-version-origin
+# Usage: goenv version-origin
 
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x

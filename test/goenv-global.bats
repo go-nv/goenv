@@ -3,9 +3,9 @@
 load test_helper
 
 @test "has usage instructions" {
-  run goenv-help global
-  assert_success <<OUT
-Usage: goenv global <version>
+  run goenv-help --usage global
+  assert_success_out <<OUT
+Usage: goenv global [<version>]
 OUT
 }
 
@@ -13,7 +13,7 @@ OUT
   mkdir -p "${GOENV_ROOT}/versions/1.9.10"
   mkdir -p "${GOENV_ROOT}/versions/1.10.9"
   run goenv-global --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 latest
 system
 1.10.9
@@ -54,7 +54,7 @@ OUT
 @test "writes specified version to GOENV_ROOT/version if version is installed" {
   mkdir -p "$GOENV_ROOT/versions/1.2.3"
   run goenv-global 1.2.3
-  assert_success
+  assert_success ""
   run goenv-global
   assert_success "1.2.3"
 }

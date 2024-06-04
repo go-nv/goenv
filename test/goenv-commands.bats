@@ -10,7 +10,7 @@ setup() {
 @test "has completion support" {
   run goenv-commands --complete
 
-  assert_success <<OUT
+  assert_success_out <<OUT
 --sh
 --no-sh
 OUT

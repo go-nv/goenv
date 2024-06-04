@@ -9,8 +9,8 @@ setup() {
 
 @test "has usage instructions" {
   run goenv-help --usage local
-  assert_success <<OUT
-Usage: goenv local <version>
+  assert_success_out <<OUT
+Usage: goenv local [<version>]
        goenv local --unset
 OUT
 }
@@ -19,7 +19,7 @@ OUT
   mkdir -p "${GOENV_ROOT}/versions/1.9.10"
   mkdir -p "${GOENV_ROOT}/versions/1.10.9"
   run goenv-installed --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 latest
 system
 1.10.9

@@ -2,15 +2,22 @@
 # Summary: Display prefix for a Go version
 # Usage: goenv prefix [<version>]
 #
-# Displays the directory where a Go version is installed. If no
-# version is given, `goenv prefix' displays the location of the
-# currently selected version.
+# Displays the directory where a Go version is installed.
+# If no <version> is given, displays the location of the currently selected version.
+# <version> `latest` is given, displays the latest installed version (1.23.4).
+# <version> `system` displays the system Go location if installed.
+# <version> `1` displays the latest installed major version (1.23.4).
+# <version> `23` or `1.23` displays the latest installed minor version (1.23.4).
+# <version> `1.23.4` displays this installed version (1.23.4).
+# If no version can be found or no versions are installed, an error message will be displayed.
+# Run `goenv versions` for a list of available Go versions.
 
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
 
 # Provide goenv completions
 if [ "$1" = "--complete" ]; then
+  echo latest
   echo system
   exec goenv-versions --bare
 fi
@@ -48,21 +55,13 @@ OLDIFS="$IFS"
         exit 1
       fi
     else
-      if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${version}; then
-        REGEX=$(echo $version | sed s/\\./\\\\./)
-        LATEST_PATCH=$(latest_version $REGEX)
-        echo "Using latest patch version $LATEST_PATCH"
-        version=$LATEST_PATCH
+      if ! LATEST_PATCH="$(goenv-installed "$version" 2>&1)"; then
+        echo "goenv: version '${version}' not installed" >&2
+        exit 1
       fi
-
-      GOENV_PREFIX_PATH="${GOENV_ROOT}/versions/${version}"
+      GOENV_PREFIX_PATH="${GOENV_ROOT}/versions/$LATEST_PATCH"
     fi
-    if [ -d "$GOENV_PREFIX_PATH" ]; then
-      GOENV_PREFIX_PATHS=("${GOENV_PREFIX_PATHS[@]}" "$GOENV_PREFIX_PATH")
-    else
-      echo "goenv: version '${version}' not installed" >&2
-      exit 1
-    fi
+    GOENV_PREFIX_PATHS=("${GOENV_PREFIX_PATHS[@]}" "$GOENV_PREFIX_PATH")
   done
 }
 IFS="$OLDIFS"

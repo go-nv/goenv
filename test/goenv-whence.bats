@@ -4,14 +4,14 @@ load test_helper
 
 @test "has usage instructions" {
   run goenv-help --usage whence
-  assert_success <<OUT
+  assert_success_out <<OUT
 Usage: goenv whence [--path] <command>
 OUT
 }
 
 @test "has completion support" {
   run goenv-whence --complete
-  assert_success <<OUT
+  assert_success_out <<OUT
 --path
 OUT
 }
@@ -19,7 +19,7 @@ OUT
 @test "fails and prints usage when no argument is given" {
   run goenv-whence
 
-  assert_failure <<OUT
+  assert_failure_out <<OUT
 Usage: goenv whence [--path] <command>
 OUT
 }
@@ -29,7 +29,7 @@ OUT
   create_executable "1.6.1" "go"
 
   run goenv-whence go
-  assert_success <<OUT
+  assert_success_out <<OUT
 1.6.0
 1.6.1
 OUT
@@ -40,7 +40,7 @@ OUT
   create_executable "1.6.1" "go"
 
   run goenv-whence --path go
-  assert_success <<OUT
+  assert_success_out <<OUT
 ${GOENV_ROOT}/versions/1.6.0/bin/go
 ${GOENV_ROOT}/versions/1.6.1/bin/go
 OUT
@@ -54,7 +54,7 @@ OUT
   create_executable "1.6.1" "go"
 
   run goenv-whence go
-  assert_success <<OUT
+  assert_success_out <<OUT
 1.6.1
 OUT
 }

@@ -9,18 +9,18 @@ setup() {
 
 @test "has usage instructions" {
   run goenv-help --usage version-file-write
-  assert_success <<OUT
-Usage: goenv version-file-write <file> <version>
+  assert_success_out <<OUT
+Usage: goenv version-file-write <file> <version>...
 OUT
 }
 
 @test "prints usage instructions when 2 arguments aren't specified" {
   run goenv-version-file-write
 
-  assert_failure "Usage: goenv version-file-write <file> <version>"
+  assert_failure "Usage: goenv version-file-write <file> <version>..."
 
   run goenv-version-file-write "one"
-  assert_failure "Usage: goenv version-file-write <file> <version>"
+  assert_failure "Usage: goenv version-file-write <file> <version>..."
 }
 
 @test "fails when 2 arguments are specified, but version is non-existent" {

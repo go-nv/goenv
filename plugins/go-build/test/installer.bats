@@ -23,7 +23,7 @@ load test_helper
   assert_success ""
 
   run $BASH -c '/bin/ls -l usr/share/go-build | tail -2 | cut -c1-10'
-  assert_success <<OUT
+  assert_success_out <<OUT
 -rw-r--r--
 -rw-r--r--
 OUT
