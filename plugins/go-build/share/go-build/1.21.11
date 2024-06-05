@@ -1,0 +1,20 @@
+install_darwin_64bit "Go Darwin 64bit 1.21.11" "go1.21.11.darwin-amd64.tar.gz#a3efff72f7aba31c85b53ebfd3985d0e3157a87b0e69e178161ba7097c197885"
+
+install_darwin_arm "Go Darwin arm 1.21.11" "go1.21.11.darwin-arm64.tar.gz#0142f5ac9f9a1bf19b826ee08a8c7955a745f7a2e62d36e0566d29fcac4d88e0"
+
+install_bsd_32bit "Go Freebsd 32bit 1.21.11" "go1.21.11.freebsd-386.tar.gz#718351eacf1f75e5114033e0c2fdb48b92b447a62244676b054e11073dda1203"
+
+install_bsd_64bit "Go Freebsd 64bit 1.21.11" "go1.21.11.freebsd-amd64.tar.gz#b1737199d1e96e785ec732ec4fc3ffa84b7ceab512ad7bfb18022d65acf55458"
+
+install_bsd_arm "Go Freebsd arm 1.21.11" "go1.21.11.freebsd-arm64.tar.gz#24f9d073a6ade5b7b8445a345dd40f9d4276ffe8fbed8b0efe0bc49544e34335"
+
+install_bsd_arm "Go Freebsd arm 1.21.11" "go1.21.11.freebsd-arm.tar.gz#b1d290d231f34260ab1f3eddc9f8cc34a12d8b766581ee2d02d46e883a2d7ae2"
+
+install_linux_32bit "Go Linux 32bit 1.21.11" "go1.21.11.linux-386.tar.gz#8b00cbc2519c2d052177bf2c8472bf06578d3b0182eeb3406a1d7d4e5d4c59ef"
+
+install_linux_64bit "Go Linux 64bit 1.21.11" "go1.21.11.linux-amd64.tar.gz#54a87a9325155b98c85bc04dc50298ddd682489eb47f486f2e6cb0707554abf0"
+
+install_linux_arm_64bit "Go Linux arm 64bit 1.21.11" "go1.21.11.linux-arm64.tar.gz#715d9a7ff72e4e0e3378c48318c52c6e4dd32a47c4136f3c08846f89b2ee2241"
+
+install_linux_arm "Go Linux arm 1.21.11" "go1.21.11.linux-armv6l.tar.gz#a62bff8297816a387a36bbda2889dd0dbcf0f8ce03bc62162ecd6918d6acecb5"
+
