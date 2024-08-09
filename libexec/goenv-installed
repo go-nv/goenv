@@ -22,7 +22,6 @@ if [ "$1" = "--complete" ]; then
   exec goenv-versions --bare
 fi
 
-#majors=({2,1}) # Supported Go versions: 2,1 (latest first)
 majors=({1,}) # Supported Go versions: 1 (latest first)
 
 versions() {
@@ -40,8 +39,10 @@ latest_major() {
 }
 
 latest_minor() {
+  [[ "$1" =~ ^([0-9]+\.[0-9]+rc)[0-9]+ ]] && minor="${BASH_REMATCH[1]}" || minor="$1"
+  # 1.23rc1 -> latest release candidate 1.23rc2
   # 1.23 -> latest minor 1.23.4
-  versions | grep -oE "^$(regex "$1")\\.([0-9]+)$" | tail -1
+  versions | grep -oE "^$(regex "$minor")\\.([0-9]+)$" | tail -1
 }
 
 installed() {
@@ -82,7 +83,8 @@ fi
 
 # Check version=1 (major without minor and patch) => 1.23.4 (latest major version)
 # Or version=23 (minor without major and patch) => 1.23.4 (latest patch version)
-if grep -q -E "^[0-9]+(\s*)$" <<<"${version}"; then
+# Or version=23rc1 (minor with release candidate) => 1.23rc2 (latest release candidate version)
+if grep -q -E "^[0-9]+(rc[0-9]+)?(\s*)$" <<<"${version}"; then
   for major in "${majors[@]}"; do
     if [ "$version" = "$major" ]; then
       LATEST_MAJOR=$(latest_major "$version")
@@ -101,7 +103,8 @@ if grep -q -E "^[0-9]+(\s*)$" <<<"${version}"; then
 fi
 
 # Check version=1.23 (minor without patch) => 1.23.4 (latest patch version)
-if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<"${version}"; then
+# Or version=1.23rc1 (minor with release candidate) => 1.23rc2 (latest release candidate version)
+if grep -q -E "^[0-9]+\.[0-9]+(rc[0-9]+)?(\s*)$" <<<"${version}"; then
   LATEST_MINOR=$(latest_minor "$version")
   if [ -n "$LATEST_MINOR" ]; then
     echo "$LATEST_MINOR"
