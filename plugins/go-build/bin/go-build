@@ -22,6 +22,8 @@ exec 3<&2 # preserve original stderr at fd 3
 # Verbose output in debug mode
 [ -n "$GOENV_DEBUG" ] && set -x
 
+majors=({1,}) # Supported Go versions: 1 (latest first)
+
 lib() {
   parse_options() {
     OPTIONS=()
@@ -767,7 +769,9 @@ sort_versions() {
 }
 
 latest_version() {
-  list_definitions | grep -oE "^$1\\.([0-9]+)?" | tail -1
+  # Find latest release candidate or patch version
+  [[ "$1" =~ ^([0-9]+\.[0-9]+rc)[0-9]+ ]] && minor="${BASH_REMATCH[1]}" || minor="$1."
+  list_definitions | grep -F "$minor" | tail -1
 }
 
 unset VERBOSE
@@ -828,13 +832,15 @@ done
 
 [ "${#ARGUMENTS[@]}" -eq 2 ] || usage 1 >&2
 
-DEFINITION_PATH="${ARGUMENTS[0]}"
+# Prepend major version if needed
+# 20rc1 -> 1.20rc1
+# 22 -> 1.22
+[[ "${ARGUMENTS[0]}" =~ ^[0-9]+(rc[0-9]+)?$ ]] && DEFINITION_PATH="${majors[0]}.${ARGUMENTS[0]}" || DEFINITION_PATH="${ARGUMENTS[0]}"
 
 # The latest patch version will be located, e.g if 1.11 is supplied they'll be changed to `1.11.x`.
 # NOTE: Try to capture semantic versions such as `1.11` which don't have a patch version and install latest patch.
-if grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${DEFINITION_PATH}; then
-  REGEX=$(echo $DEFINITION_PATH | sed s/\\./\\\\./)
-  LATEST_PATCH=$(latest_version $REGEX)
+if grep -q -E "^[0-9]+\.[0-9]+(rc[0-9]+)(\s*)$" <<<${DEFINITION_PATH}; then
+  LATEST_PATCH=$(latest_version $DEFINITION_PATH)
   echo "Using latest patch version $LATEST_PATCH"
   DEFINITION_PATH="$LATEST_PATCH"
 fi
