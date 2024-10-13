@@ -110,7 +110,7 @@ To upgrade goenv in the future, use `upgrade` instead of `install`.
 
 After installation, you'll need to add `eval "$(goenv init -)"` to your profile (as stated in the caveats displayed by Homebrew — to display them again, use `brew info goenv`). You only need to add that to your profile once.
 
-Then follow the rest of the post-installation steps under "Basic GitHub Checkout" above, starting with #4 ("restart your shell so the path changes take effect").
+Then follow the rest of the post-installation steps under "Basic GitHub Checkout" above, starting with #5 ("restart your shell so the path changes take effect").
 
 ## Upgrading
 
