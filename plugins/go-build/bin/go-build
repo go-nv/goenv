@@ -408,7 +408,7 @@ has_checksum_support() {
 verify_checksum() {
   local checksum_command
   local filename="$1"
-  local expected_checksum="$(echo "$2" | tr [A-Z] [a-z])"
+  local expected_checksum="$(echo "$2" | tr [A-Z] [a-z] | tr -d '[:space:]')"
 
   # If the specified filename doesn't exist, return success
   [ -e "$filename" ] || return 0
@@ -433,7 +433,7 @@ verify_checksum() {
   has_checksum_support "$checksum_command" || return 0
 
   # If the computed checksum is empty, return failure
-  local computed_checksum=$(echo "$($checksum_command <"$filename")" | tr [A-Z] [a-z])
+  local computed_checksum=$(echo "$($checksum_command <"$filename")" | tr [A-Z] [a-z] | tr -d '[:space:]')
   [ -n "$computed_checksum" ] || return 1
 
   if [ "$expected_checksum" != "$computed_checksum" ]; then
