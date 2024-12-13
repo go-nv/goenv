@@ -17,3 +17,5 @@ name | default | description
 `GOENV_GOMOD_VERSION_ENABLE` | | if `GOENV_GOMOD_VERSION_ENABLE` is set to 1, it will try to use the project's `go.mod` file to get the version.
 `GOENV_AUTO_INSTALL` | | if `GOENV_AUTO_INSTALL` is set to 1, it will automatically run install if no command arguments specified (just run `goenv`!)
 `GOENV_AUTO_INSTALL_FLAGS` | | (Note: only works if `GOENV_AUTO_INSTALL` is set to 1) Appends flags to the auto install command (see `goenv install --help` for all available flags)
+`GOENV_RC_FILE` | `$HOME/.goenvrc` | If `GOENV_RC_FILE` is set, it will be modified accordingly.
+`GOENV_PATH_ORDER` | | If `GOENV_PATH_ORDER` is set to `front`, `$GOENV_ROOT/shims` will be prepended to the existing `PATH`.Set `GOENV_PATH_ORDER` to a configuration file named by `GOENV_RC_FILE`(e.g. `~/.goenvrc`), for example `GOENV_PATH_ORDER=front` in `~/.goenvrc`.

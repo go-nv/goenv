@@ -87,20 +87,42 @@ mkdir -p "${GOENV_ROOT}/"{shims,versions}
 
 case "$shell" in
 fish )
-  echo "set -gx GOENV_SHELL $shell"
-  echo "set -gx GOENV_ROOT $GOENV_ROOT"
-
-  echo 'if not contains $GOENV_ROOT/shims $PATH'
-  echo '  set -gx PATH $PATH $GOENV_ROOT/shims'
-  echo 'end'
+  cat <<EOL
+set -gx GOENV_SHELL ${shell}
+set -gx GOENV_ROOT ${GOENV_ROOT}
+if test -z \$GOENV_RC_FILE
+  set GOENV_RC_FILE \$HOME/.goenvrc
+end
+if test -e \$GOENV_RC_FILE
+  source \$GOENV_RC_FILE
+end
+if not contains \$GOENV_ROOT/shims \$PATH
+  if test "\$GOENV_PATH_ORDER" = "front"
+    set -gx PATH \$GOENV_ROOT/shims \$PATH
+  else
+    set -gx PATH \$PATH \$GOENV_ROOT/shims
+  end
+end
+EOL
   ;;
 * )
-  echo "export GOENV_SHELL=$shell"
-  echo "export GOENV_ROOT=$GOENV_ROOT"
-
-  echo 'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  echo '  export PATH="$PATH:$GOENV_ROOT/shims"'
-  echo 'fi'
+  cat <<EOL
+export GOENV_SHELL=${shell}
+export GOENV_ROOT=${GOENV_ROOT}
+if [ -z \${GOENV_RC_FILE} ]; then
+  GOENV_RC_FILE=\${HOME}/.goenvrc
+fi
+if [ -e \${GOENV_RC_FILE} ]; then
+  source \${GOENV_RC_FILE}
+fi
+if [ "\${PATH#*\$GOENV_ROOT/shims}" = "\${PATH}" ]; then
+  if [ "\${GOENV_PATH_ORDER}" = "front" ] ; then
+    export PATH="\${GOENV_ROOT}/shims:\${PATH}"
+  else
+    export PATH="\${PATH}:\${GOENV_ROOT}/shims"
+  fi
+fi
+EOL
   ;;
 esac
 
