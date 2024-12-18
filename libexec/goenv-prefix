@@ -24,6 +24,7 @@ fi
 
 versions() {
   # Sort correctly (1.20.9 comes before 1.20.10)
+  local query="$1"
   goenv versions --bare | sort -V | $(type -p ggrep grep | head -1) -F "$query" || true
 }
 

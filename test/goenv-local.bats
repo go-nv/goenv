@@ -129,9 +129,11 @@ OUT
 }
 
 @test "goenv local fails setting latest version when major.minor number is given and does not match at 'GOENV_ROOT/versions/<version>'" {
+  export USE_FAKE_DEFINITIONS=true
   mkdir -p "${GOENV_ROOT}/versions/1.1.9"
   run goenv-local 1.9
   assert_failure "goenv: version '1.9' not installed"
+  unset USE_FAKE_DEFINITIONS
 }
 
 @test "fails setting local version when version argument is given and does not match at 'GOENV_ROOT/versions/<version>'" {

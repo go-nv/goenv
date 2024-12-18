@@ -23,12 +23,14 @@ OUT
   assert_failure "Usage: goenv version-file-write <file> <version>..."
 }
 
-@test "fails when 2 arguments are specified, but version is non-existent" {
+@test "succeeds when 2 arguments are specified, but version is non-existent" {
   assert [ ! -e ".go-version" ]
 
+  export USE_FAKE_DEFINITIONS=true
   run goenv-version-file-write ".go-version" "1.11.1"
   assert_failure "goenv: version '1.11.1' not installed"
 
+  unset USE_FAKE_DEFINITIONS
   assert [ ! -e ".go-version" ]
 }
 
@@ -57,7 +59,7 @@ OUT
   touch "${GOENV_TEST_DIR}/bin/go"
   chmod +x "${GOENV_TEST_DIR}/bin/go"
   # Make test harder by referencing not installed version
-  echo "4.5.6" > .go-version
+  echo "4.5.6" >.go-version
 
   run goenv-local system
   assert_success "goenv: using system version instead of 4.5.6 now"
@@ -65,7 +67,6 @@ OUT
   run goenv-local
   assert_failure "goenv: no local version configured for this directory"
 }
-
 
 @test "remove global version when 'system' version is given and any global version is installed" {
   mkdir -p "${GOENV_ROOT}/versions/1.2.3"
@@ -82,7 +83,7 @@ OUT
   touch "${GOENV_TEST_DIR}/bin/go"
   chmod +x "${GOENV_TEST_DIR}/bin/go"
   # Make test harder by referencing not installed version
-  echo "4.5.6" > ${GOENV_ROOT}/version
+  echo "4.5.6" >${GOENV_ROOT}/version
 
   run goenv-global system
   assert_success "goenv: using system version instead of 4.5.6 now"
@@ -90,4 +91,3 @@ OUT
   run goenv-global
   assert_success "system"
 }
-

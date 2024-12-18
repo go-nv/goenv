@@ -57,6 +57,12 @@ OUT
   assert_success ""
   run goenv-global
   assert_success "1.2.3"
+
+  mkdir -p "$GOENV_ROOT/versions/1.20rc2"
+  run goenv-global 1.20rc1
+  assert_success ""
+  run goenv-global
+  assert_success "1.20rc2"
 }
 
 @test "sets properly sorted latest global version when 'latest' version is given and any version is installed" {
@@ -81,10 +87,12 @@ OUT
 }
 
 @test "fails setting latest global version when major or minor single number is given and does not match at 'GOENV_ROOT/versions/<version>'" {
+  export USE_FAKE_DEFINITIONS=true
   mkdir -p "${GOENV_ROOT}/versions/1.2.9"
   mkdir -p "${GOENV_ROOT}/versions/4.5.10"
   run goenv-global 9
   assert_failure "goenv: version '9' not installed"
+  unset USE_FAKE_DEFINITIONS
 }
 
 @test "sets latest global version when minor version is given as single number and any matching major.minor version is installed" {
@@ -111,12 +119,15 @@ OUT
 }
 
 @test "fails setting latest global version when major.minor number is given and does not match at 'GOENV_ROOT/versions/<version>'" {
+  export USE_FAKE_DEFINITIONS=true
   mkdir -p "${GOENV_ROOT}/versions/1.1.9"
   run goenv-global 1.9
   assert_failure "goenv: version '1.9' not installed"
+  unset USE_FAKE_DEFINITIONS
 }
 
 @test "fails writing specified version to GOENV_ROOT/version if version is not installed" {
+  export USE_FAKE_DEFINITIONS=true
   mkdir -p "${GOENV_ROOT}/versions/4.5.6"
   run goenv-global system
   assert_failure "goenv: system version not found in PATH"
@@ -132,6 +143,7 @@ OUT
 }
 
 @test "reads version from GOENV_ROOT/{version,global,default} in the order they're specified" {
+  export USE_FAKE_DEFINITIONS=true
   mkdir -p "$GOENV_ROOT"
   echo "1.2.3" > "$GOENV_ROOT/version"
   echo "1.2.4" > "$GOENV_ROOT/global"
@@ -147,4 +159,5 @@ OUT
   rm "$GOENV_ROOT/global"
   run goenv-global
   assert_success "1.2.5"
+  unset USE_FAKE_DEFINITIONS
 }

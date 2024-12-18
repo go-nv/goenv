@@ -43,8 +43,20 @@ OLDIFS="$IFS"
   IFS=:
   for version in ${GOENV_VERSION}; do
     if ! INSTALLED="$(goenv-installed "$version" 2>&1)"; then
-      echo "$INSTALLED" >&2
-      exit 1
+      if [[ $version != "system" ]]; then
+        set +e
+        goenv install -q -f $version &>/dev/null
+        set -e
+        if [[ $? -ne 0 ]]; then
+          echo "$INSTALLED" >&2
+          exit 1
+        fi
+      fi
+      # check again
+      if ! INSTALLED="$(goenv-installed "$version" 2>&1)"; then
+        echo "$INSTALLED" >&2
+        exit 1
+      fi
     fi
     GOENV_VERSIONS=("${GOENV_VERSIONS[@]}" "$INSTALLED")
   done
@@ -62,8 +74,8 @@ if [ "$1" = "system" ]; then
 else
   # Write the version out to disk.
   # Create an empty file. Using "rm" might cause a permission error.
-  > "$GOENV_VERSION_FILE"
+  >"$GOENV_VERSION_FILE"
   for version in "${GOENV_VERSIONS[@]}"; do
-    echo "$version" >> "$GOENV_VERSION_FILE"
+    echo "$version" >>"$GOENV_VERSION_FILE"
   done
 fi

@@ -11,7 +11,6 @@
 # If no version can be found or no versions are installed, an error message will be displayed.
 # Run `goenv versions` for a list of available Go versions.
 
-
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
 
@@ -26,6 +25,7 @@ majors=({1,}) # Supported Go versions: 1 (latest first)
 
 versions() {
   # Sort correctly (1.20.9 comes before 1.20.10)
+  local query="$1"
   goenv versions --bare | sort -V | $(type -p ggrep grep | head -1) -F "$query" || true
 }
 
@@ -42,7 +42,7 @@ latest_minor() {
   [[ "$1" =~ ^([0-9]+\.[0-9]+rc)[0-9]+ ]] && minor="${BASH_REMATCH[1]}" || minor="$1"
   # 1.23rc1 -> latest release candidate 1.23rc2
   # 1.23 -> latest minor 1.23.4
-  versions | grep -oE "^$(regex "$minor")\\.([0-9]+)$" | tail -1
+  versions | grep -oE "^$(regex "$minor")\\.?([0-9]+)?$" | tail -1
 }
 
 installed() {
@@ -53,7 +53,6 @@ installed() {
 regex() {
   echo "${1//\./\\.}"
 }
-
 
 if [ -n "$1" ]; then
   version="$1"
