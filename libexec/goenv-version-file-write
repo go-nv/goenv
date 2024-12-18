@@ -43,8 +43,13 @@ OLDIFS="$IFS"
   IFS=:
   for version in ${GOENV_VERSION}; do
     if ! INSTALLED="$(goenv-installed "$version" 2>&1)"; then
-      goenv-install -q -f $version
-      INSTALLED="$(goenv-installed "$version" 2>&1)"
+      if [[ $version != "system" ]]; then
+        goenv-install -q -f $version
+        if ! INSTALLED="$(goenv-installed "$version" 2>&1)"; then
+          echo "goenv: $INSTALLED" >&2
+          exit 1
+        fi
+      fi
     fi
     GOENV_VERSIONS=("${GOENV_VERSIONS[@]}" "$INSTALLED")
   done
