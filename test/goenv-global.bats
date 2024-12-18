@@ -57,6 +57,12 @@ OUT
   assert_success ""
   run goenv-global
   assert_success "1.2.3"
+
+  mkdir -p "$GOENV_ROOT/versions/1.20rc2"
+  run goenv-global 1.20rc1
+  assert_success ""
+  run goenv-global
+  assert_success "1.20rc2"
 }
 
 @test "sets properly sorted latest global version when 'latest' version is given and any version is installed" {

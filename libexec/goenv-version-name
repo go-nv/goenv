@@ -26,11 +26,17 @@ version_exists() {
   local input_version="$1"
   local use_go_mod="$2"
 
-  if [[ -n use_go_mod ]] && [[ -d ${GOENV_ROOT}/versions ]] && grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${input_version}; then
+  if [[ -n use_go_mod ]] && [[ -d ${GOENV_ROOT}/versions ]] && grep -q -E "^[0-9]+\.[0-9]+\.?[0-9]*(\s*)$" <<<${input_version}; then
     OLDIFS="$IFS"
     IFS=$'\n'
     local version_regex=$(echo ${input_version} | sed s/\\./\\\\./)
-    local versions=($(/bin/ls ${GOENV_ROOT}/versions | grep -E "^$version_regex(\\.[0-9]+)?$" | sort -V))
+
+    # check if input_version is major/minor/patch instead of just major/minor
+    if ! echo "${input_version}" | grep -q -E "^[0-9]+\.[0-9]+\.[0-9]+(\s*)$"; then
+      version_regex="${version_regex}(\\.[0-9]+)?"
+    fi
+
+    local versions=($(/bin/ls ${GOENV_ROOT}/versions | grep -E "^$version_regex$" | sort -V))
     IFS="$OLDIFS"
     if [[ ${#versions[@]} -eq 0 ]]; then
       return 1

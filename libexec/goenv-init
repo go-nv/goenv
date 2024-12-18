@@ -18,8 +18,7 @@ fi
 
 print=""
 no_rehash=""
-for args in "$@"
-do
+for args in "$@"; do
   if [ "$args" = "-" ]; then
     print=1
     shift
@@ -44,23 +43,23 @@ root="${0%/*}/.."
 
 if [ -z "$print" ]; then
   case "$shell" in
-  bash )
+  bash)
     if [ -f "${HOME}/.bashrc" ] && [ ! -f "${HOME}/.bash_profile" ]; then
       profile='~/.bashrc'
     else
       profile='~/.bash_profile'
     fi
     ;;
-  zsh )
+  zsh)
     profile='~/.zshrc'
     ;;
-  ksh )
+  ksh)
     profile='~/.profile'
     ;;
-  fish )
+  fish)
     profile='~/.config/fish/config.fish'
     ;;
-  * )
+  *)
     profile="<unknown shell: $shell, replace with your profile path>"
     ;;
   esac
@@ -70,10 +69,10 @@ if [ -z "$print" ]; then
     echo "# the following to ${profile}:"
     echo
     case "$shell" in
-    fish )
+    fish)
       echo 'status --is-interactive; and source (goenv init -|psub)'
       ;;
-    * )
+    *)
       echo 'eval "$(goenv init -)"'
       ;;
     esac
@@ -86,7 +85,7 @@ fi
 mkdir -p "${GOENV_ROOT}/"{shims,versions}
 
 case "$shell" in
-fish )
+fish)
   cat <<EOL
 set -gx GOENV_SHELL ${shell}
 set -gx GOENV_ROOT ${GOENV_ROOT}
@@ -105,15 +104,15 @@ if not contains \$GOENV_ROOT/shims \$PATH
 end
 EOL
   ;;
-* )
+*)
   cat <<EOL
 export GOENV_SHELL=${shell}
 export GOENV_ROOT=${GOENV_ROOT}
-if [ -z \${GOENV_RC_FILE} ]; then
-  GOENV_RC_FILE=\${HOME}/.goenvrc
+if [ -z "\${GOENV_RC_FILE}" ]; then
+  GOENV_RC_FILE="\${HOME}/.goenvrc"
 fi
-if [ -e \${GOENV_RC_FILE} ]; then
-  source \${GOENV_RC_FILE}
+if [ -e "\${GOENV_RC_FILE}" ]; then
+  source "\${GOENV_RC_FILE}"
 fi
 if [ "\${PATH#*\$GOENV_ROOT/shims}" = "\${PATH}" ]; then
   if [ "\${GOENV_PATH_ORDER}" = "front" ] ; then
@@ -135,9 +134,9 @@ if [ -z "$no_rehash" ]; then
   echo 'command goenv rehash 2>/dev/null'
 fi
 
-commands=(`goenv-commands --sh`)
+commands=($(goenv-commands --sh))
 case "$shell" in
-fish )
+fish)
   cat <<EOS
 function goenv
   set command \$argv[1]
@@ -152,13 +151,13 @@ function goenv
 end
 EOS
   ;;
-ksh )
+ksh)
   cat <<EOS
 function goenv {
   typeset command
 EOS
   ;;
-* )
+*)
   cat <<EOS
 goenv() {
   local command
@@ -167,8 +166,8 @@ EOS
 esac
 
 if [ "$shell" != "fish" ]; then
-IFS="|"
-cat <<EOS
+  IFS="|"
+  cat <<EOS
   command="\$1"
   if [ "\$#" -gt 0 ]; then
     shift
