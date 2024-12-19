@@ -22,7 +22,7 @@ jobs:
         uses: dawidd6/action-homebrew-bump-formula@v4
         with:
           # Required, custom GitHub access token with the 'public_repo' and 'workflow' scopes
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GH_HOMEBREW_TOKEN }}
           # Optional, will create tap repo fork in organization
           # org: ORG
           # Optional, use the origin repository instead of forking
