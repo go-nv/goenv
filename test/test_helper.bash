@@ -26,6 +26,9 @@ if [ -z "$GOENV_TEST_DIR" ]; then
   PATH="${GOENV_TEST_DIR}/bin:$PATH"
   PATH="${BATS_TEST_DIRNAME}/../libexec:$PATH"
   PATH="${BATS_TEST_DIRNAME}/libexec:$PATH"
+  for plugin_bin in "${BATS_TEST_DIRNAME}/../plugins/"*/bin; do
+    PATH="${plugin_bin}:${PATH}"
+  done
   PATH="${GOENV_ROOT}/shims:$PATH"
   export PATH
 
