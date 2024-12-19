@@ -50,3 +50,9 @@ jobs:
         #   disable-autolabeler: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Dispatch Pre-Release Job
+        if: github.event_name == 'push' && github.ref_name == 'master'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: Pre Release
