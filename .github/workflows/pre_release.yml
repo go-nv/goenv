@@ -27,7 +27,12 @@ jobs:
       - name: Update App Version
         run: |
           echo "Doing it as: $GITHUB_ACTOR"
-          ./scripts/update_app_version.sh
+          if [[ ${{ github.event.inputs.debug }} == true ]]; then
+            echo "Debug mode enabled"
+            ./scripts/update_app_version.sh > debug.log 2>&1 | tee -a debug.log
+          else
+            ./scripts/update_app_version.sh
+          fi
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: ${{ github.event.inputs.debug }}

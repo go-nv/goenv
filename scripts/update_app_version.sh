@@ -2,7 +2,7 @@
 
 if [[ DEBUG == "true" ]]; then
     echo "DEBUG is enabled"
-    set -x # Print commands and their arguments as they are executed
+    # set -x # Print commands and their arguments as they are executed
 fi
 
 # This script is used to update the version of the app.
