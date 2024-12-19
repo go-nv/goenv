@@ -1,5 +1,10 @@
 #!/bin/bash -e
 
+if [[ DEBUG == "true" ]]; then
+    echo "DEBUG is enabled"
+    set -x # Print commands and their arguments as they are executed
+fi
+
 # This script is used to update the version of the app.
 
 LATEST_DRAFT_VERSION=$(gh release list -L 1 | awk -F '\t' '{if (match($3, "^[0-9]+\\.[0-9]+\\.[0-9]+")) print $3}')

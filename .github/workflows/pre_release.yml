@@ -2,6 +2,12 @@ name: Pre Release
 
 on:
   workflow_dispatch:
+    inputs:
+      debug:
+        description: "Debug mode"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   do_prerelease:
@@ -22,3 +28,4 @@ jobs:
         run: ./scripts/update_app_version.sh
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          DEBUG: ${{ github.event.inputs.debug }}
