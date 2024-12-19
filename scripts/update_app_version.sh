@@ -24,9 +24,9 @@ BRANCH_NAME_PREFIX="update-app-version"
 
 BRANCH_NAME="$BRANCH_NAME_PREFIX-$LATEST_DRAFT_VERSION"
 
-EXISTS=$(git branch -r -l 'origin*' | sed -E -e 's/^[^\/]+\///g' -e 's/HEAD.+//' | grep "$BRANCH_NAME")
+EXISTS=$(git branch -r -l 'origin*' | sed -E -e 's/^[^\/]+\///g' -e 's/HEAD.+//' | grep "$BRANCH_NAME") || echo "false"
 
-if [[ -n $EXISTS ]]; then
+if [[ -n $EXISTS ]] && [[ $EXISTS != "false" ]]; then
     echo "A PR already exists on branch $BRANCH_NAME for App Version update: $LATET_DRAFT_VERSION"
     exit 0
 fi
