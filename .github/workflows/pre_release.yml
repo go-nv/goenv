@@ -26,7 +26,6 @@ jobs:
         run: sudo apt install jq
       - name: Update App Version
         run: |
-          echo "Doing it as: $GITHUB_ACTOR"
           if [[ "${{ github.event.inputs.debug }}" == "true" ]]; then
             echo "Debug mode enabled"
             ./scripts/update_app_version.sh 2>&1 | tee -a debug.log

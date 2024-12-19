@@ -112,9 +112,9 @@ fi
 git config --global user.name "${GITHUB_ACTOR}"
 git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 
-EXISTS=$(git branch -r -l 'origin*' | sed -E -e 's/^[^\/]+\///g' -e 's/HEAD.+//' | grep "$BRANCH_NAME")
+EXISTS=$(git branch -r -l 'origin*' | sed -E -e 's/^[^\/]+\///g' -e 's/HEAD.+//' | grep "$BRANCH_NAME" || echo "false")
 
-if [[ -n $EXISTS ]]; then
+if [[ -n $EXISTS ]] && [[ $EXISTS != "false" ]]; then
     echo "A PR already exists on branch $BRANCH_NAME for the latest Go version(s) (${LATEST_GO_VERSIONS[@]})"
     exit 0
 fi
