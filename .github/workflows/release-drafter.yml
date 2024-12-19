@@ -57,5 +57,3 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Pre Release
-          ref: master
-          token: ${{ secrets.GITHUB_TOKEN }}
