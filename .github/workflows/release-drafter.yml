@@ -30,6 +30,8 @@ permissions:
 jobs:
   update_release_draft:
     permissions:
+      # permissions required for triggering the dispatch workflow
+      actions: write
       # write permission is required to create a github release
       contents: write
       # write permission is required for autolabeler
@@ -55,4 +57,5 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: Pre Release
+          ref: master
           token: ${{ secrets.GITHUB_TOKEN }}
