@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+set -x # show commands
+
 # This script is used to update the version of the app.
 
 LATEST_DRAFT_VERSION=$(gh release list -L 1 | awk -F '\t' '{if (match($3, "^[0-9]+\\.[0-9]+\\.[0-9]+")) print $3}')
