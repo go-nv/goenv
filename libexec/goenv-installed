@@ -22,11 +22,18 @@ if [ "$1" = "--complete" ]; then
 fi
 
 majors=({1,}) # Supported Go versions: 1 (latest first)
+resolved_versions=()
 
 versions() {
   # Sort correctly (1.20.9 comes before 1.20.10)
   local query="$1"
-  goenv versions --bare | sort -V | $(type -p ggrep grep | head -1) -F "$query" || true
+  if [[ "${#resolved_versions[@]}" -eq 0 ]]; then
+    resolved_versions=($(goenv versions --bare | sort -V | $(type -p ggrep grep | head -1) -F "$query" || true))
+  fi
+
+  for version in "${resolved_versions[@]}"; do
+    echo "$version"
+  done
 }
 
 latest_version() {

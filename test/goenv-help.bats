@@ -19,6 +19,8 @@ Some useful goenv commands are:
    local       Set or show the local application-specific Go version
    global      Set or show the global Go version
    shell       Set or show the shell-specific Go version
+   install     Install a Go version using go-build
+   uninstall   Uninstall a specific Go version
    rehash      Rehash goenv shims (run this after installing executables)
    version     Show the current Go version and its origin
    versions    List all Go versions available to goenv
