@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/bin/bash -e
 
 # This script is used to update the version of the app.
 
-LATEST_DRAFT_VERSION=$(gh release list -L 1 | awk -F '\t' '{if (match($3, "^[0-9]+\.[0-9]+\.[0-9]+")) print $3}')
+LATEST_DRAFT_VERSION=$(gh release list -L 1 | awk -F '\t' '{if (match($3, "^[0-9]+\\.[0-9]+\\.[0-9]+")) print $3}')
 LATEST_VERSION=$(gh release view --json tagName -q .tagName)
 
 if [[ $LATEST_DRAFT_VERSION == $LATEST_VERSION ]]; then
