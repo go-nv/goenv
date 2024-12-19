@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-if [[ DEBUG == "true" ]]; then
+if [[ $DEBUG == "true" ]]; then
     echo "DEBUG is enabled"
     # set -x # Print commands and their arguments as they are executed
 fi
@@ -15,8 +15,10 @@ if [[ $LATEST_DRAFT_VERSION == $LATEST_VERSION ]]; then
     exit 0
 fi
 
-git config --global user.name "${GITHUB_ACTOR}"
-git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+if [[ -n $GITHUB_ACTOR ]]; then
+    git config --global user.name "${GITHUB_ACTOR}"
+    git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+fi
 
 BRANCH_NAME_PREFIX="update-app-version"
 
