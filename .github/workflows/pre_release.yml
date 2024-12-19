@@ -27,9 +27,10 @@ jobs:
       - name: Update App Version
         run: |
           echo "Doing it as: $GITHUB_ACTOR"
-          if [[ ${{ github.event.inputs.debug }} == true ]]; then
+          if [[ "${{ github.event.inputs.debug }}" == "true" ]]; then
             echo "Debug mode enabled"
-            ./scripts/update_app_version.sh > debug.log 2>&1 | tee -a debug.log
+            ./scripts/update_app_version.sh 2>&1 | tee -a debug.log
+            cat debug.log
           else
             ./scripts/update_app_version.sh
           fi
