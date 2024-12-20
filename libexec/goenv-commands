@@ -24,6 +24,10 @@ IFS=: paths=($PATH)
 
 shopt -s nullglob
 
+if [ -z "$sh" ]; then
+  VERSIONS=$(goenv-versions --bare)
+fi
+
 {
   for path in "${paths[@]}"; do
     # goenv-init uses --sh, don't output special commands then
@@ -33,7 +37,7 @@ shopt -s nullglob
       echo latest
       echo system
       echo uninstall
-      goenv-versions --bare
+      echo $VERSIONS | sed 's/ /\n/g'
     fi
 
     for command in "${path}/goenv-"*; do
