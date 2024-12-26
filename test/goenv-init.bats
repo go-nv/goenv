@@ -135,14 +135,14 @@ OUT
 
   assert_line 0  'export GOENV_SHELL=bash'
   assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
-  assert_line 2  'if [ -z "${GOENV_RC_FILE}" ]; then'
+  assert_line 2  'if [ -z "${GOENV_RC_FILE:-}" ]; then'
   assert_line 3  '  GOENV_RC_FILE="${HOME}/.goenvrc"'
   assert_line 4  'fi'
-  assert_line 5  'if [ -e "${GOENV_RC_FILE}" ]; then'
+  assert_line 5  'if [ -e "${GOENV_RC_FILE:-}" ]; then'
   assert_line 6  '  source "${GOENV_RC_FILE}"'
   assert_line 7  'fi'
   assert_line 8  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  assert_line 9  '  if [ "${GOENV_PATH_ORDER}" = "front" ] ; then'
+  assert_line 9  '  if [ "${GOENV_PATH_ORDER:-}" = "front" ] ; then'
   assert_line 10 '    export PATH="${GOENV_ROOT}/shims:${PATH}"'
   assert_line 11 '  else'
   assert_line 12 '    export PATH="${PATH}:${GOENV_ROOT}/shims"'
@@ -173,14 +173,14 @@ OUT
 
   assert_line 0  'export GOENV_SHELL=zsh'
   assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
-  assert_line 2  'if [ -z "${GOENV_RC_FILE}" ]; then'
+  assert_line 2  'if [ -z "${GOENV_RC_FILE:-}" ]; then'
   assert_line 3  '  GOENV_RC_FILE="${HOME}/.goenvrc"'
   assert_line 4  'fi'
-  assert_line 5  'if [ -e "${GOENV_RC_FILE}" ]; then'
+  assert_line 5  'if [ -e "${GOENV_RC_FILE:-}" ]; then'
   assert_line 6  '  source "${GOENV_RC_FILE}"'
   assert_line 7  'fi'
   assert_line 8  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  assert_line 9  '  if [ "${GOENV_PATH_ORDER}" = "front" ] ; then'
+  assert_line 9  '  if [ "${GOENV_PATH_ORDER:-}" = "front" ] ; then'
   assert_line 10 '    export PATH="${GOENV_ROOT}/shims:${PATH}"'
   assert_line 11 '  else'
   assert_line 12 '    export PATH="${PATH}:${GOENV_ROOT}/shims"'
@@ -244,14 +244,14 @@ OUT
 
   assert_line 0  'export GOENV_SHELL=ksh'
   assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
-  assert_line 2  'if [ -z "${GOENV_RC_FILE}" ]; then'
+  assert_line 2  'if [ -z "${GOENV_RC_FILE:-}" ]; then'
   assert_line 3  '  GOENV_RC_FILE="${HOME}/.goenvrc"'
   assert_line 4  'fi'
-  assert_line 5  'if [ -e "${GOENV_RC_FILE}" ]; then'
+  assert_line 5  'if [ -e "${GOENV_RC_FILE:-}" ]; then'
   assert_line 6  '  source "${GOENV_RC_FILE}"'
   assert_line 7  'fi'
   assert_line 8  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  assert_line 9  '  if [ "${GOENV_PATH_ORDER}" = "front" ] ; then'
+  assert_line 9  '  if [ "${GOENV_PATH_ORDER:-}" = "front" ] ; then'
   assert_line 10 '    export PATH="${GOENV_ROOT}/shims:${PATH}"'
   assert_line 11 '  else'
   assert_line 12 '    export PATH="${PATH}:${GOENV_ROOT}/shims"'
@@ -281,14 +281,14 @@ OUT
   # NOTE: This is very likely to be invalid for your specific shell
   assert_line 0  'export GOENV_SHELL=magicshell'
   assert_line 1  "export GOENV_ROOT=$GOENV_ROOT"
-  assert_line 2  'if [ -z "${GOENV_RC_FILE}" ]; then'
+  assert_line 2  'if [ -z "${GOENV_RC_FILE:-}" ]; then'
   assert_line 3  '  GOENV_RC_FILE="${HOME}/.goenvrc"'
   assert_line 4  'fi'
-  assert_line 5  'if [ -e "${GOENV_RC_FILE}" ]; then'
+  assert_line 5  'if [ -e "${GOENV_RC_FILE:-}" ]; then'
   assert_line 6  '  source "${GOENV_RC_FILE}"'
   assert_line 7  'fi'
   assert_line 8  'if [ "${PATH#*$GOENV_ROOT/shims}" = "${PATH}" ]; then'
-  assert_line 9  '  if [ "${GOENV_PATH_ORDER}" = "front" ] ; then'
+  assert_line 9  '  if [ "${GOENV_PATH_ORDER:-}" = "front" ] ; then'
   assert_line 10 '    export PATH="${GOENV_ROOT}/shims:${PATH}"'
   assert_line 11 '  else'
   assert_line 12 '    export PATH="${PATH}:${GOENV_ROOT}/shims"'
@@ -311,4 +311,3 @@ OUT
 
   assert_success
 }
-
