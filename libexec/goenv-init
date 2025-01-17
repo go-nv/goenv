@@ -183,7 +183,9 @@ if [ "$shell" != "fish" ]; then
 EOS
 fi
 
-# NOTE: Rehash again, but only to export managed paths
-cat <<EOS
-goenv rehash --only-manage-paths
+if [ -z "$no_rehash" ]; then
+  # NOTE: Rehash again, but only to export managed paths
+  cat <<EOS
+  goenv rehash --only-manage-paths
 EOS
+fi
