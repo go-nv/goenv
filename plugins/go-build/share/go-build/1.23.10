@@ -1,0 +1,18 @@
+install_darwin_64bit "Go Darwin 64bit 1.23.10" "go1.23.10.darwin-amd64.tar.gz#1cbd7af6f07bc6fa1f8672f9b913c961986864100e467e0acdc942e0ae46fe68"
+
+install_darwin_arm "Go Darwin arm 1.23.10" "go1.23.10.darwin-arm64.tar.gz#25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5"
+
+install_bsd_32bit "Go Freebsd 32bit 1.23.10" "go1.23.10.freebsd-386.tar.gz#5b398be0c699791a4862a9e7be233ff3bef477650ae0ec5dd9f61a6961104c93"
+
+install_bsd_64bit "Go Freebsd 64bit 1.23.10" "go1.23.10.freebsd-amd64.tar.gz#926490e5c21f229ace329d93d7b9e1cbd787fb5ca4deb5cfc6f0f6849a585887"
+
+install_bsd_arm "Go Freebsd arm 1.23.10" "go1.23.10.freebsd-arm64.tar.gz#441d73c73759e011c2a2490f3e3ec4bffa6ca698f73d8f3a40736f3f5ee3b6a8"
+
+install_linux_32bit "Go Linux 32bit 1.23.10" "go1.23.10.linux-386.tar.gz#ded3c0a8d6d2a0ea5e7599c49678efa05cda139d31baaaf7d8d536a9e4cc19b2"
+
+install_linux_64bit "Go Linux 64bit 1.23.10" "go1.23.10.linux-amd64.tar.gz#535f9f81802499f2a7dbfa70abb8fda3793725fcc29460f719815f6e10b5fd60"
+
+install_linux_arm_64bit "Go Linux arm 64bit 1.23.10" "go1.23.10.linux-arm64.tar.gz#bfb1f1df7173f44648ee070a39ab0481068632f595305a699d89cd56a33b8081"
+
+install_linux_arm "Go Linux arm 1.23.10" "go1.23.10.linux-armv6l.tar.gz#b6e00c9a72406d394b9f167e74670e28b72ed559cca8115b21be1cb9d5316cb4"
+
