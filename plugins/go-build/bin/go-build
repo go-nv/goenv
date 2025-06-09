@@ -512,6 +512,7 @@ fetch_tarball() {
     if [ -n "$GO_BUILD_MIRROR_URL" ]; then
       if [[ -z "$GO_BUILD_DEFAULT_MIRROR" || $package_url != */go.dev/* ]]; then
         mirror_url="${GO_BUILD_MIRROR_URL}/$checksum"
+        package_url="${GO_BUILD_MIRROR_URL}/$package_url"
       fi
     fi
   fi
