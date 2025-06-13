@@ -18,7 +18,7 @@ if [[ "$(basename $VERSION_FILE)" == "go.mod" ]]; then
     expression_prefix="^toolchain[ \\t]*"
   fi
 
-  expression="${expression_prefix}go[ \\t]*[0-9]+\\.[0-9]+(beta|rc)?"
+  expression="${expression_prefix}go[ \\t]*[0-9]+\\.[0-9]+(\\.[0-9]+)?(beta|rc)?"
 
   versions=($(cat $VERSION_FILE | grep -E "${expression}" | sed "s/${expression_prefix}go[ \\t]*//"))
 else
