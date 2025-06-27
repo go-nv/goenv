@@ -8,8 +8,7 @@ export PATH="${project_root}/libexec:$PATH"
 @test "has usage instructions" {
   run goenv-help --usage install
   assert_success_out <<OUT
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 OUT
@@ -39,14 +38,16 @@ OUT
 @test "prints full usage when '-h' is first argument given" {
   run goenv-install -h
   assert_success_out <<'OUT'
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 
   -l/--list          List all available versions
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
+
+  If no version is specified, `goenv local` will be used to determine the
+  desired version.
 
   go-build options:
 
@@ -67,14 +68,16 @@ OUT
 @test "prints full usage when '--help' is first argument given" {
   run goenv-install --help
   assert_success_out <<'OUT'
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 
   -l/--list          List all available versions
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
+
+  If no version is specified, `goenv local` will be used to determine the
+  desired version.
 
   go-build options:
 
@@ -95,14 +98,16 @@ OUT
 @test "fails and prints full usage when no arguments are given" {
   run goenv-install
   assert_failure_out <<'OUT'
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 
   -l/--list          List all available versions
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
+
+  If no version is specified, `goenv local` will be used to determine the
+  desired version.
 
   go-build options:
 
@@ -123,14 +128,16 @@ OUT
 @test "fails and prints full usage when '-f' is given and no other arguments" {
   run goenv-install -f
   assert_failure_out <<'OUT'
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 
   -l/--list          List all available versions
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
+
+  If no version is specified, `goenv local` will be used to determine the
+  desired version.
 
   go-build options:
 
@@ -151,14 +158,16 @@ OUT
 @test "fails and prints full usage when '--force' is given and no other arguments" {
   run goenv-install --force
   assert_failure_out <<'OUT'
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 
   -l/--list          List all available versions
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
+
+  If no version is specified, `goenv local` will be used to determine the
+  desired version.
 
   go-build options:
 
@@ -179,14 +188,16 @@ OUT
 @test "fails and prints full usage when '-f' is given and '-' version argument" {
   run goenv-install -f -
   assert_failure_out <<'OUT'
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 
   -l/--list          List all available versions
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
+
+  If no version is specified, `goenv local` will be used to determine the
+  desired version.
 
   go-build options:
 
@@ -207,14 +218,16 @@ OUT
 @test "fails and prints full usage when '--force' is given and '-' version argument" {
   run goenv-install --force
   assert_failure_out <<'OUT'
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 
   -l/--list          List all available versions
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
+
+  If no version is specified, `goenv local` will be used to determine the
+  desired version.
 
   go-build options:
 

@@ -78,14 +78,16 @@ OUT
   unset GOENV_AUTO_INSTALL
   
   assert_failure_out <<'OUT'
-Usage: goenv install [-f] [-kvpq] <version>|latest|unstable
-       goenv install [-f] [-kvpq] <definition-file>
+Usage: goenv install [-f] [-s] [-kvpq] [<version>|latest|unstable]
        goenv install -l|--list
        goenv install --version
 
   -l/--list          List all available versions
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
+
+  If no version is specified, `goenv local` will be used to determine the
+  desired version.
 
   go-build options:
 
