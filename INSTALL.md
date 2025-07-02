@@ -37,41 +37,20 @@ easy to fork and contribute any changes back upstream.
     may observe strange behaviour, such as `goenv` getting into an infinite loop.
     See pyenv's issue [#264](https://github.com/pyenv/pyenv/issues/264) for details.
     
-4. **If you want  `goenv` to manage `GOPATH` and `GOROOT` (recommended)**, 
-  add `GOPATH` and `GOROOT` to your shell **after `eval "$(goenv init -)"`**.
-  
-       echo 'export PATH="$GOROOT/bin:$PATH"' >> ~/.bash_profile
-       echo 'export PATH="$PATH:$GOPATH/bin"' >> ~/.bash_profile
-        
-    **Zsh note**: Modify your `~/.zshenv` or `~/.zshrc` file instead of `~/.bash_profile`.
-    
-    **Ubuntu note**: Modify your `~/.bashrc` file instead of `~/.bash_profile`.
 
-    **General warning**: There are some systems where the `BASH_ENV` variable is configured
-    to point to `.bashrc`. On such systems you should almost certainly put the abovementioned line
-    `eval "$(goenv init -)` into `.bash_profile`, and **not** into `.bashrc`. Otherwise you
-    may observe strange behaviour, such as `goenv` getting into an infinite loop.
-    See pyenv's issue [#264](https://github.com/pyenv/pyenv/issues/264) for details.
-
-    **Security warning**: You likely want to keep $GOPATH/bin at the end
-    of your $PATH as shown above, rather than at the beginning.  See
-    [#99](https://github.com/go-nv/goenv/issues/99) for details and
-    discussion.
-  
-
-5. **Restart your shell so the path changes take effect.**
+4. **Restart your shell so the path changes take effect.**
    You can now begin using goenv.
 
        exec $SHELL
 
-6. **Install Go versions into `$GOENV_ROOT/versions`.**
+5. **Install Go versions into `$GOENV_ROOT/versions`.**
    For example, to download and install Go 1.12.0, run:
 
        goenv install 1.12.0
 
    **NOTE:** It downloads and places the prebuilt Go binaries provided by Google.
 
-7. **Set goenv global version.**
+6. **Set goenv global version.**
    For example, to set the version to Go 1.12.0, run:
 
        goenv global 1.12.0
@@ -82,8 +61,6 @@ An example `.zshrc` that is properly configured may look like
 export GOENV_ROOT="$HOME/.goenv"
 export PATH="$GOENV_ROOT/bin:$PATH"
 eval "$(goenv init -)"
-export PATH="$GOROOT/bin:$PATH"
-export PATH="$PATH:$GOPATH/bin"
 ```
    
 ## via ZPlug plugin manager for Zsh
