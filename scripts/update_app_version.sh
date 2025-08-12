@@ -9,7 +9,17 @@ APP_VERSION_FILE="APP_VERSION"
 
 # This script is used to update the version of the app.
 
-LATEST_DRAFT_VERSION=$(gh release list -L 1 | awk -F '\t' '{if (match($3, "^[0-9]+\\.[0-9]+\\.[0-9]+")) print $3}')
+# Get the latest draft version from the GitHub Releases
+# and take into accoutn that the most recent version is the latest version,
+# while the second most recent version is the second entry.
+# ❯ gh release list -L 5
+# TITLE   TYPE    TAG NAME  PUBLISHED
+# 2.2.27  Latest  2.2.27    about 5 days ago
+# 2.2.28  Draft   2.2.28    about 1 month ago
+# 2.2.26          2.2.26    about 1 month ago
+# 2.2.25          2.2.25    about 2 months ago
+# 2.2.24          2.2.24    about 2 months ago
+LATEST_DRAFT_VERSION=$(gh release list -L 20 | awk -F '\t' '{if ($2 == "Draft" && match($3, "^[0-9]+\\.[0-9]+\\.[0-9]+")) {print $3; exit}}')
 LATEST_VERSION=$(gh release view --json tagName -q .tagName)
 
 if [[ $LATEST_DRAFT_VERSION == $LATEST_VERSION ]]; then
