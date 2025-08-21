@@ -109,3 +109,16 @@ IN
   run goenv-version-file-read my-version
   assert_success "1.11.1"
 }
+
+@test "skips relative path traversal" {
+  cat >my-version <<IN
+1.11.1
+1.10.8
+..
+./*
+1.9.7
+IN
+
+  run goenv-version-file-read my-version
+  assert_success "1.11.1:1.10.8:1.9.7"
+}

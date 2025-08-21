@@ -27,7 +27,19 @@ else
   IFS="${IFS}"$'\r'
   words=($(cut -b 1-1024 "$VERSION_FILE" | sed -n 's/^[[:space:]]*\([^[:space:]#][^[:space:]]*\).*/\1/p'))
 
-  versions=("${words[@]}")
+  # Filter out potentially malicious version strings to prevent path traversal (CVE-2022-35861)
+  versions=()
+  for word in "${words[@]}"; do
+    if [[ -z "$word" || "$word" == \#* ]]; then
+      # Skip empty lines and comments
+      continue
+    elif [[ "$word" == ".." ]] || [[ "$word" == */* ]]; then
+      # The version string is used to construct a path and we skip dubious values.
+      # This prevents issues such as path traversal (CVE-2022-35861).
+      continue
+    fi
+    versions=("${versions[@]}" "$word")
+  done
 fi
 
 if [ ! -n "$versions" ]; then
