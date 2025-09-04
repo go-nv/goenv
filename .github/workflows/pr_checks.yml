@@ -17,7 +17,7 @@ jobs:
         goenv_native_ext: ["", "1"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Remove golang
         run: sudo rm -rf $(which go)
       - name: Run Unit Tests
