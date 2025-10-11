@@ -32,12 +32,12 @@ func runInstalled(cmd *cobra.Command, args []string) error {
 
 	// Handle completion
 	if installedFlags.complete {
-		cmd.Println("latest")
-		cmd.Println("system")
+		fmt.Fprintln(cmd.OutOrStdout(), "latest")
+		fmt.Fprintln(cmd.OutOrStdout(), "system")
 		versions, err := mgr.ListInstalledVersions()
 		if err == nil {
 			for _, v := range versions {
-				cmd.Println(v)
+				fmt.Fprintln(cmd.OutOrStdout(), v)
 			}
 		}
 		return nil
@@ -52,22 +52,15 @@ func runInstalled(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		versionSpec = args[0]
 	} else {
-		// No argument given - use current version from .go-version or global
-		if !hasInstalledVersions {
-			return fmt.Errorf("goenv: no versions installed")
-		}
-		version, _, err := mgr.GetCurrentVersion()
-		if err != nil {
-			return fmt.Errorf("goenv: no versions installed")
-		}
-		versionSpec = version
+		// No argument given - default to "latest" installed version (matching bash behavior)
+		versionSpec = "latest"
 	}
 
 	// Handle "system" version
 	if versionSpec == "system" {
 		// Check if system go exists
 		if mgr.HasSystemGo() {
-			cmd.Println("system")
+			fmt.Fprintln(cmd.OutOrStdout(), "system")
 			return nil
 		}
 		return fmt.Errorf("goenv: system version not found in PATH")
@@ -89,6 +82,6 @@ func runInstalled(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("goenv: version '%s' not installed", versionSpec)
 	}
 
-	cmd.Println(resolvedVersion)
+	fmt.Fprintln(cmd.OutOrStdout(), resolvedVersion)
 	return nil
 }

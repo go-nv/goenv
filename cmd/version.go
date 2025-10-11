@@ -4,19 +4,22 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show the current Go version",
-	Long:  "Display the currently active Go version and how it was set",
-	RunE:  runVersion,
+	Use:                "version",
+	Short:              "Show the current Go version",
+	Long:               "Display the currently active Go version and how it was set",
+	RunE:               runVersion,
+	DisableFlagParsing: true, // Prevent --version from being treated as a flag
 }
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	helptext.SetCommandHelp(versionCmd)
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
@@ -54,7 +57,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 				if source != "" {
 					cmd.Printf("%s (set by %s)\n", v, source)
 				} else {
-					cmd.Println(v)
+					fmt.Fprintln(cmd.OutOrStdout(), v)
 				}
 			}
 		}
@@ -67,7 +70,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 		if source != "" {
 			cmd.Printf("%s (set by %s)\n", version, source)
 		} else {
-			cmd.Println(version)
+			fmt.Fprintln(cmd.OutOrStdout(), version)
 		}
 	}
 

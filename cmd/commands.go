@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +33,7 @@ func init() {
 	commandsCmd.Flags().Lookup("complete").Hidden = true
 
 	rootCmd.AddCommand(commandsCmd)
+	helptext.SetCommandHelp(commandsCmd)
 }
 
 func runCommands(cmd *cobra.Command, args []string) error {
@@ -96,6 +99,10 @@ func runCommands(cmd *cobra.Command, args []string) error {
 	// Deduplicate and sort
 	commandSet := make(map[string]bool)
 	for _, c := range commands {
+		// Skip Cobra built-in commands that don't exist in bash version
+		if c == "completion" {
+			continue
+		}
 		commandSet[c] = true
 	}
 
@@ -106,21 +113,33 @@ func runCommands(cmd *cobra.Command, args []string) error {
 	sort.Strings(commands)
 
 	// Filter based on flags
+	// In bash version, --sh filters commands that have goenv-sh-* executables
+	// These are: rehash (has both goenv-rehash and goenv-sh-rehash), shell
+	// Note: rehash appears in BOTH --sh and --no-sh because it has both implementations
+	shOnlyCommands := map[string]bool{
+		"shell": true,
+	}
+	bothCommands := map[string]bool{
+		"rehash": true, // Has both regular and sh- versions
+	}
+
 	var filtered []string
 	for _, c := range commands {
-		containsSh := strings.Contains(c, "sh")
-		if commandsSh && !containsSh {
+		isSh := shOnlyCommands[c] || bothCommands[c]
+		isRegular := !shOnlyCommands[c] // Everything except shell-only commands
+
+		if commandsSh && !isSh {
 			continue
 		}
-		if commandsNoSh && containsSh {
+		if commandsNoSh && !isRegular {
 			continue
 		}
 		filtered = append(filtered, c)
 	}
 
-	// Print commands
+	// Print commands to stdout (not stderr)
 	for _, c := range filtered {
-		cmd.Println(c)
+		fmt.Fprintln(cmd.OutOrStdout(), c)
 	}
 
 	return nil

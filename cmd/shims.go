@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/spf13/cobra"
@@ -30,8 +31,18 @@ var whichCmd = &cobra.Command{
 	Use:   "which <command>",
 	Short: "Display the full path to an executable",
 	Long:  "Shows the full path to the executable that goenv will invoke for the given command",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runWhich,
+	Args: func(cmd *cobra.Command, args []string) error {
+		// Handle completion mode
+		if whichFlags.complete {
+			return nil
+		}
+		if len(args) == 0 {
+			fmt.Fprintln(cmd.OutOrStderr(), "Usage: goenv which <command>")
+			os.Exit(1)
+		}
+		return nil
+	},
+	RunE: runWhich,
 }
 
 var whichFlags struct {
@@ -42,8 +53,18 @@ var whenceCmd = &cobra.Command{
 	Use:   "whence <command>",
 	Short: "List all Go versions that contain the given executable",
 	Long:  "Display which installed Go versions have the specified command available",
-	Args:  cobra.MaximumNArgs(2),
-	RunE:  runWhence,
+	Args: func(cmd *cobra.Command, args []string) error {
+		// Handle completion mode
+		if whenceFlags.complete {
+			return nil
+		}
+		if len(args) == 0 {
+			fmt.Fprintln(cmd.OutOrStderr(), "Usage: goenv whence [--path] <command>")
+			os.Exit(1)
+		}
+		return nil
+	},
+	RunE: runWhence,
 }
 
 var whenceFlags struct {
@@ -67,6 +88,12 @@ func init() {
 	_ = shimsCmd.Flags().MarkHidden("complete")
 	whichCmd.Flags().BoolVar(&whichFlags.complete, "complete", false, "Show completion options")
 	_ = whichCmd.Flags().MarkHidden("complete")
+
+	// Apply custom help text
+	helptext.SetCommandHelp(rehashCmd)
+	helptext.SetCommandHelp(shimsCmd)
+	helptext.SetCommandHelp(whichCmd)
+	helptext.SetCommandHelp(whenceCmd)
 	whenceCmd.Flags().BoolVar(&whenceFlags.path, "path", false, "Show full paths to executables")
 	whenceCmd.Flags().BoolVar(&whenceFlags.complete, "complete", false, "Show completion options")
 	_ = whenceCmd.Flags().MarkHidden("complete")
@@ -77,10 +104,10 @@ func runRehash(cmd *cobra.Command, args []string) error {
 	shimMgr := shims.NewShimManager(cfg)
 
 	if cfg.Debug {
-		cmd.Println("Debug: Rehashing goenv shims...")
+		fmt.Fprintln(cmd.OutOrStdout(), "Debug: Rehashing goenv shims...")
 	}
 
-	cmd.Println("Rehashing...")
+	fmt.Fprintln(cmd.OutOrStdout(), "Rehashing...")
 	if err := shimMgr.Rehash(); err != nil {
 		return fmt.Errorf("failed to rehash shims: %w", err)
 	}
@@ -97,7 +124,7 @@ func runRehash(cmd *cobra.Command, args []string) error {
 func runShims(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if shimsFlags.complete {
-		cmd.Println("--short")
+		fmt.Fprintln(cmd.OutOrStdout(), "--short")
 		return nil
 	}
 
@@ -111,9 +138,9 @@ func runShims(cmd *cobra.Command, args []string) error {
 
 	for _, shim := range shimList {
 		if shimsFlags.short {
-			cmd.Println(shim)
+			fmt.Fprintln(cmd.OutOrStdout(), shim)
 		} else {
-			cmd.Println(filepath.Join(cfg.ShimsDir(), shim))
+			fmt.Fprintln(cmd.OutOrStdout(), filepath.Join(cfg.ShimsDir(), shim))
 		}
 	}
 
@@ -126,11 +153,6 @@ func runWhich(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Require command argument
-	if len(args) == 0 {
-		return fmt.Errorf("Usage: goenv which <command>")
-	}
-
 	commandName := args[0]
 	cfg := config.Load()
 
@@ -138,7 +160,7 @@ func runWhich(cmd *cobra.Command, args []string) error {
 	shimMgr := shims.NewShimManager(cfg)
 	binaryPath, err := shimMgr.WhichBinary(commandName)
 	if err == nil {
-		cmd.Println(binaryPath)
+		fmt.Fprintln(cmd.OutOrStdout(), binaryPath)
 		return nil
 	}
 
@@ -149,13 +171,8 @@ func runWhich(cmd *cobra.Command, args []string) error {
 func runWhence(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if whenceFlags.complete {
-		cmd.Println("--path")
+		fmt.Fprintln(cmd.OutOrStdout(), "--path")
 		return nil
-	}
-
-	// Require command argument
-	if len(args) == 0 {
-		return fmt.Errorf("Usage: goenv whence [--path] <command>")
 	}
 
 	commandName := args[0]
@@ -168,9 +185,9 @@ func runWhence(cmd *cobra.Command, args []string) error {
 		for _, version := range versions {
 			if whenceFlags.path {
 				versionPath := filepath.Join(cfg.VersionsDir(), version, "bin", commandName)
-				cmd.Println(versionPath)
+				fmt.Fprintln(cmd.OutOrStdout(), versionPath)
 			} else {
-				cmd.Println(version)
+				fmt.Fprintln(cmd.OutOrStdout(), version)
 			}
 		}
 		return nil
@@ -209,7 +226,7 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 			// Look for command in PATH, excluding GOENV_ROOT/shims
 			commandPath, err := findInSystemPath(commandName, cfg.Root)
 			if err == nil {
-				cmd.Println(commandPath)
+				fmt.Fprintln(cmd.OutOrStdout(), commandPath)
 				return nil
 			}
 			continue
@@ -223,7 +240,7 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 
 		commandPath := filepath.Join(versionPath, "bin", commandName)
 		if _, err := os.Stat(commandPath); err == nil {
-			cmd.Println(commandPath)
+			fmt.Fprintln(cmd.OutOrStdout(), commandPath)
 			return nil
 		}
 	}
@@ -354,9 +371,9 @@ func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config)
 			if info.Mode()&0111 != 0 {
 				foundAny = true
 				if whenceFlags.path {
-					cmd.Println(commandPath)
+					fmt.Fprintln(cmd.OutOrStdout(), commandPath)
 				} else {
-					cmd.Println(version)
+					fmt.Fprintln(cmd.OutOrStdout(), version)
 				}
 			}
 		}

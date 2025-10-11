@@ -33,8 +33,26 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		// If no command is provided, show help
-		cmd.Help()
+		// If no command is provided, show simple help message matching bash version
+		fmt.Printf("goenv %s\n", appVersion)
+		fmt.Println(`Usage: goenv <command> [<args>]
+
+Some useful goenv commands are:
+   commands    List all available commands of goenv
+   local       Set or show the local application-specific Go version
+   global      Set or show the global Go version
+   shell       Set or show the shell-specific Go version
+   install     Install a Go version using go-build
+   uninstall   Uninstall a specific Go version
+   rehash      Rehash goenv shims (run this after installing executables)
+   version     Show the current Go version and its origin
+   versions    List all Go versions available to goenv
+   which       Display the full path to an executable
+   whence      List all Go versions that contain the given executable
+
+See 'goenv help <command>' for information on a specific command.
+For full documentation, see: https://github.com/go-nv/goenv#readme`)
+		os.Exit(1)
 	},
 }
 
@@ -56,9 +74,8 @@ func init() {
 	// Override the default version behavior
 	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
 		if showVersion {
-			fmt.Printf("goenv version %s\n", appVersion)
-			fmt.Printf("  commit: %s\n", appCommit)
-			fmt.Printf("  built: %s\n", appBuildTime)
+			// Simple format for --version flag (matches bash version)
+			fmt.Printf("goenv %s\n", appVersion)
 			os.Exit(0)
 		}
 		return nil

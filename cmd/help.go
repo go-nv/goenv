@@ -1,13 +1,9 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/spf13/cobra"
 )
 
@@ -52,130 +48,54 @@ For full documentation, see: https://github.com/go-nv/goenv#readme`)
 
 	commandName := args[0]
 
-	// Try to find the command script
-	cfg := config.Load()
-	var commandPath string
-
-	// Check PATH first
-	pathEnv := os.Getenv("PATH")
-	for _, dir := range filepath.SplitList(pathEnv) {
-		candidate := filepath.Join(dir, "goenv-"+commandName)
-		if info, err := os.Stat(candidate); err == nil && info.Mode()&0111 != 0 {
-			commandPath = candidate
-			break
+	// Handle special aliases: shell and rehash have both regular and sh- versions
+	// For help purposes, treat them as the regular command names
+	lookupName := commandName
+	if commandName == "shell" || commandName == "rehash" {
+		// Check if help text exists in registry first
+		if helptext.Get(commandName) != nil {
+			lookupName = commandName // Use original name for help lookup
 		}
 	}
 
-	// Check libexec
-	if commandPath == "" {
-		libexecDir := filepath.Join(cfg.Root, "libexec")
-		candidate := filepath.Join(libexecDir, "goenv-"+commandName)
-		if info, err := os.Stat(candidate); err == nil && info.Mode()&0111 != 0 {
-			commandPath = candidate
+	// Find the Cobra command
+	targetCmd, _, err := cmd.Root().Find([]string{lookupName})
+	if err != nil || targetCmd == cmd.Root() {
+		// For shell/rehash, check if we have help text even if command not found
+		if helptext.Get(commandName) != nil {
+			// We have help text, use it directly
+			if helpUsage {
+				help := helptext.Get(commandName)
+				if help != nil && help.Usage != "" {
+					cmd.Println("Usage: " + help.Usage)
+				}
+				return nil
+			}
+			cmd.Println(helptext.Get(commandName).Format())
+			return nil
 		}
-	}
-
-	if commandPath == "" {
-		return fmt.Errorf("goenv: no such command `%s'", commandName)
-	}
-
-	// Parse help from script comments
-	help, err := parseHelpFromScript(commandPath)
-	if err != nil {
-		return err
+		// Command not found
+		fmt.Fprintf(cmd.ErrOrStderr(), "goenv: no such command `%s'\n", commandName)
+		return nil // Return nil to exit with code 0
 	}
 
 	if helpUsage {
-		// Only show usage
-		if help.Usage != "" {
-			cmd.Println(help.Usage)
+		// Show only usage line
+		help := helptext.Get(commandName)
+		if help != nil && help.Usage != "" {
+			cmd.Println("Usage: " + help.Usage)
+		} else {
+			cmd.Println(targetCmd.UseLine())
 		}
 		return nil
 	}
 
-	// Show full help
-	if help.Usage != "" {
-		cmd.Println(help.Usage)
-		if help.Help != "" {
-			cmd.Println()
-			cmd.Println(help.Help)
-		} else if help.Summary != "" {
-			cmd.Println()
-			cmd.Println(help.Summary)
-		}
+	// Show help using our registry first, fall back to Cobra
+	help := helptext.Get(commandName)
+	if help != nil {
+		cmd.Println(help.Format())
+	} else {
+		targetCmd.Help()
 	}
-
 	return nil
-}
-
-type commandHelp struct {
-	Usage   string
-	Summary string
-	Help    string
-}
-
-func parseHelpFromScript(scriptPath string) (*commandHelp, error) {
-	file, err := os.Open(scriptPath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	help := &commandHelp{}
-	scanner := bufio.NewScanner(file)
-
-	var usageLines []string
-	var helpLines []string
-	inHelp := false
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Stop at first non-comment line
-		if !strings.HasPrefix(line, "#") {
-			break
-		}
-
-		// Remove leading "# " or "#"
-		content := strings.TrimPrefix(line, "#")
-		content = strings.TrimPrefix(content, " ")
-
-		if strings.HasPrefix(line, "# Usage:") || strings.HasPrefix(line, "#Usage:") {
-			usageLines = append(usageLines, strings.TrimPrefix(content, "Usage:"))
-			usageLines[len(usageLines)-1] = strings.TrimSpace(usageLines[len(usageLines)-1])
-			inHelp = false
-		} else if strings.HasPrefix(line, "#        ") || strings.HasPrefix(line, "#\t") {
-			// Continuation of usage line
-			if len(usageLines) > 0 {
-				usageLines = append(usageLines, strings.TrimSpace(content))
-			}
-		} else if strings.HasPrefix(line, "# Summary:") {
-			help.Summary = strings.TrimPrefix(content, "Summary:")
-			help.Summary = strings.TrimSpace(help.Summary)
-			inHelp = true
-		} else if inHelp && strings.HasPrefix(line, "#") {
-			// Extended help text
-			if content == "" {
-				helpLines = append(helpLines, "")
-			} else {
-				helpLines = append(helpLines, content)
-			}
-		}
-	}
-
-	// Format usage
-	if len(usageLines) > 0 {
-		help.Usage = "Usage: " + usageLines[0]
-		for i := 1; i < len(usageLines); i++ {
-			help.Usage += "\n       " + usageLines[i]
-		}
-	}
-
-	// Format help
-	if len(helpLines) > 0 {
-		help.Help = strings.Join(helpLines, "\n")
-		help.Help = strings.TrimSpace(help.Help)
-	}
-
-	return help, scanner.Err()
 }

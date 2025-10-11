@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
+	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionOriginCmd = &cobra.Command{
@@ -19,6 +21,7 @@ var versionOriginCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionOriginCmd)
+	helptext.SetCommandHelp(versionOriginCmd)
 }
 
 func runVersionOrigin(cmd *cobra.Command, args []string) error {
@@ -27,7 +30,7 @@ func runVersionOrigin(cmd *cobra.Command, args []string) error {
 
 	// Check if GOENV_VERSION_ORIGIN is set (from hooks) - highest precedence
 	if origin := os.Getenv("GOENV_VERSION_ORIGIN"); origin != "" {
-		cmd.Println(origin)
+		fmt.Fprintln(cmd.OutOrStdout(), origin)
 		return nil
 	}
 
@@ -35,29 +38,29 @@ func runVersionOrigin(cmd *cobra.Command, args []string) error {
 	_, source, err := mgr.GetCurrentVersion()
 	if err != nil {
 		// No version set, return default global version file path
-		cmd.Println(cfg.GlobalVersionFile())
+		fmt.Fprintln(cmd.OutOrStdout(), cfg.GlobalVersionFile())
 		return nil
 	}
 
 	// Convert source to full path if needed
 	switch source {
 	case "GOENV_VERSION environment variable":
-		cmd.Println("GOENV_VERSION environment variable")
+		fmt.Fprintln(cmd.OutOrStdout(), "GOENV_VERSION environment variable")
 	case "global":
 		// Return the actual global version file path
-		cmd.Println(cfg.GlobalVersionFile())
+		fmt.Fprintln(cmd.OutOrStdout(), cfg.GlobalVersionFile())
 	default:
 		// It's a file path (local .go-version or go.mod)
 		// Make it absolute if not already
 		if !filepath.IsAbs(source) {
 			absPath, err := filepath.Abs(source)
 			if err != nil {
-				cmd.Println(source)
+				fmt.Fprintln(cmd.OutOrStdout(), source)
 			} else {
-				cmd.Println(absPath)
+				fmt.Fprintln(cmd.OutOrStdout(), absPath)
 			}
 		} else {
-			cmd.Println(source)
+			fmt.Fprintln(cmd.OutOrStdout(), source)
 		}
 	}
 

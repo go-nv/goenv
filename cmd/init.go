@@ -405,10 +405,11 @@ func getInstallRoot() string {
 
 // Helper commands for shell integration
 var shShellCmd = &cobra.Command{
-	Use:    "sh-shell [version]",
-	Short:  "Set or show the shell-specific Go version",
-	Hidden: true,
-	RunE:   runShShell,
+	Use:                "sh-shell [version]",
+	Short:              "Set or show the shell-specific Go version",
+	Hidden:             true,
+	DisableFlagParsing: true, // Allow --unset as argument not flag
+	RunE:               runShShell,
 }
 
 func init() {

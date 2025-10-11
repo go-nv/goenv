@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
@@ -16,23 +17,30 @@ var execCmd = &cobra.Command{
 	Use:   "exec <command> [args...]",
 	Short: "Execute a command with the selected Go version",
 	Long:  "Runs an executable by first preparing PATH so that the selected Go version's bin directory is at the front",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  runExec,
+	Args: func(cmd *cobra.Command, args []string) error {
+		// Handle -- separator (skip it if present)
+		actualArgs := args
+		if len(args) > 0 && args[0] == "--" {
+			actualArgs = args[1:]
+		}
+		if len(actualArgs) == 0 {
+			fmt.Fprintln(cmd.OutOrStderr(), "Usage: goenv exec <command> [arg1 arg2...]")
+			os.Exit(1)
+		}
+		return nil
+	},
+	RunE: runExec,
 }
 
 func init() {
 	rootCmd.AddCommand(execCmd)
+	helptext.SetCommandHelp(execCmd)
 }
 
 func runExec(cmd *cobra.Command, args []string) error {
 	// Handle -- separator (skip it if present)
 	if len(args) > 0 && args[0] == "--" {
 		args = args[1:]
-	}
-
-	// Validate arguments
-	if len(args) == 0 {
-		return fmt.Errorf("Usage: goenv exec <command> [arg1 arg2...]")
 	}
 
 	cfg := config.Load()

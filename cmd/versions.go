@@ -6,6 +6,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
+	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionsCmd = &cobra.Command{
@@ -27,13 +28,14 @@ func init() {
 	versionsCmd.Flags().BoolVar(&versionsFlags.skipAliases, "skip-aliases", false, "Skip aliases")
 	versionsCmd.Flags().BoolVar(&versionsFlags.complete, "complete", false, "Internal flag for shell completions")
 	_ = versionsCmd.Flags().MarkHidden("complete")
+	helptext.SetCommandHelp(versionsCmd)
 }
 
 func runVersions(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if versionsFlags.complete {
-		cmd.Println("--bare")
-		cmd.Println("--skip-aliases")
+		fmt.Fprintln(cmd.OutOrStdout(), "--bare")
+		fmt.Fprintln(cmd.OutOrStdout(), "--skip-aliases")
 		return nil
 	}
 
@@ -104,7 +106,7 @@ func runVersions(cmd *cobra.Command, args []string) error {
 	// Display installed versions
 	for _, version := range versions {
 		if versionsFlags.bare {
-			cmd.Println(version)
+			fmt.Fprintln(cmd.OutOrStdout(), version)
 		} else {
 			prefix := "  "
 			suffix := ""

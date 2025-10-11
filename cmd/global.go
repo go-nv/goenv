@@ -6,6 +6,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
+	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var globalCmd = &cobra.Command{
@@ -17,6 +18,7 @@ var globalCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(globalCmd)
+	helptext.SetCommandHelp(globalCmd)
 }
 
 func runGlobal(cmd *cobra.Command, args []string) error {

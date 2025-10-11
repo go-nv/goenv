@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/spf13/cobra"
 )
 
@@ -21,27 +23,35 @@ var hooksCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(hooksCmd)
 	hooksCmd.Flags().Bool("complete", false, "Show completion options")
+	helptext.SetCommandHelp(hooksCmd)
 }
 
 func runHooks(cmd *cobra.Command, args []string) error {
 	// Handle completion flag
 	if complete, _ := cmd.Flags().GetBool("complete"); complete {
 		// List commands that support hooks
-		cmd.Println("exec")
-		cmd.Println("rehash")
-		cmd.Println("version-name")
-		cmd.Println("version-origin")
-		cmd.Println("which")
+		fmt.Fprintln(cmd.OutOrStdout(), "exec")
+		fmt.Fprintln(cmd.OutOrStdout(), "rehash")
+		fmt.Fprintln(cmd.OutOrStdout(), "version-name")
+		fmt.Fprintln(cmd.OutOrStdout(), "version-origin")
+		fmt.Fprintln(cmd.OutOrStdout(), "which")
 		return nil
 	}
 
 	commandName := args[0]
 
-	// Get GOENV_HOOK_PATH
+	// Get GOENV_HOOK_PATH, default to $GOENV_ROOT/goenv.d
 	hookPath := os.Getenv("GOENV_HOOK_PATH")
 	if hookPath == "" {
-		// No hooks configured
-		return nil
+		goenvRoot := os.Getenv("GOENV_ROOT")
+		if goenvRoot == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return nil
+			}
+			goenvRoot = filepath.Join(home, ".goenv")
+		}
+		hookPath = filepath.Join(goenvRoot, "goenv.d")
 	}
 
 	var hooks []string
@@ -90,7 +100,7 @@ func runHooks(cmd *cobra.Command, args []string) error {
 
 	// Print hooks
 	for _, hook := range hooks {
-		cmd.Println(hook)
+		fmt.Fprintln(cmd.OutOrStdout(), hook)
 	}
 
 	return nil

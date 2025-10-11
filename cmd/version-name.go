@@ -6,6 +6,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
+	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionNameCmd = &cobra.Command{
@@ -18,6 +19,7 @@ var versionNameCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionNameCmd)
+	helptext.SetCommandHelp(versionNameCmd)
 }
 
 func runVersionName(cmd *cobra.Command, args []string) error {
@@ -54,7 +56,7 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 		// Then print successfully installed versions
 		for _, v := range versions {
 			if mgr.IsVersionInstalled(v) || v == "system" {
-				cmd.Println(v)
+				fmt.Fprintln(cmd.OutOrStdout(), v)
 			}
 		}
 
@@ -67,7 +69,7 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 			_, source, _ := mgr.GetCurrentVersion()
 			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", version, source)
 		}
-		cmd.Println(version)
+		fmt.Fprintln(cmd.OutOrStdout(), version)
 	}
 
 	return nil

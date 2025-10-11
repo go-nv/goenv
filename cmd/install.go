@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/version"
 	"github.com/spf13/cobra"
@@ -37,6 +38,9 @@ func init() {
 	installCmd.Flags().BoolVarP(&installFlags.ipv4, "ipv4", "4", false, "Resolve names to IPv4 addresses only")
 	installCmd.Flags().BoolVarP(&installFlags.ipv6, "ipv6", "6", false, "Resolve names to IPv6 addresses only")
 	installCmd.Flags().BoolVarP(&installFlags.debug, "debug", "g", false, "Enable debug output")
+
+	// Apply custom help text to match bash version
+	helptext.SetCommandHelp(installCmd)
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {

@@ -22,7 +22,8 @@ func DefaultRoot() string {
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return filepath.Join("/tmp", ".goenv") // fallback
+		// Fallback to OS temp directory (works on Windows, macOS, Linux)
+		return filepath.Join(os.TempDir(), ".goenv")
 	}
 
 	return filepath.Join(home, ".goenv")

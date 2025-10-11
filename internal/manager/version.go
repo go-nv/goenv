@@ -166,7 +166,9 @@ func (m *Manager) GetCurrentVersion() (string, string, error) {
 	// Check global version file
 	globalVersion, err := m.getGlobalVersion()
 	if err == nil && globalVersion != "" {
-		return globalVersion, "global", nil
+		// Return the actual file path for compatibility with bash version
+		globalFile := m.config.GlobalVersionFile()
+		return globalVersion, globalFile, nil
 	}
 
 	return "", "", fmt.Errorf("no version set")

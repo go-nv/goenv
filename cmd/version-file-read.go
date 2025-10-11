@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
+	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionFileReadCmd = &cobra.Command{
@@ -17,6 +19,7 @@ var versionFileReadCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionFileReadCmd)
+	helptext.SetCommandHelp(versionFileReadCmd)
 }
 
 func runVersionFileRead(cmd *cobra.Command, args []string) error {
@@ -29,6 +32,6 @@ func runVersionFileRead(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cmd.Println(version)
+	fmt.Fprintln(cmd.OutOrStdout(), version)
 	return nil
 }

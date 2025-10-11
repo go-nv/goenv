@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,6 @@ func init() {
 
 func runGoenvRoot(cmd *cobra.Command, args []string) error {
 	cfg := config.Load()
-	cmd.Println(cfg.Root)
+	fmt.Fprintln(cmd.OutOrStdout(), cfg.Root)
 	return nil
 }

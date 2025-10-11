@@ -9,10 +9,11 @@ import (
 )
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all available Go versions from the official repository",
-	Long:  "Fetches and displays all available Go versions from the official Go website",
-	RunE:  runList,
+	Use:    "list",
+	Short:  "List all available Go versions from the official repository",
+	Long:   "Fetches and displays all available Go versions from the official Go website",
+	RunE:   runList,
+	Hidden: true, // Hidden from commands list to match bash version
 }
 
 var listFlags struct {

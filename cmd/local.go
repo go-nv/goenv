@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,7 @@ func init() {
 	rootCmd.AddCommand(localCmd)
 	localCmd.SilenceUsage = true
 	localCmd.Flags().BoolVar(&localFlags.unset, "unset", false, "Unset the local Go version")
+	helptext.SetCommandHelp(localCmd)
 }
 
 func runLocal(cmd *cobra.Command, args []string) error {
@@ -46,7 +48,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("goenv: no local version configured for this directory")
 		}
-		cmd.Println(version)
+		fmt.Fprintln(cmd.OutOrStdout(), version)
 		return nil
 	}
 

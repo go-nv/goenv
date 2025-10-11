@@ -7,6 +7,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
+	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionFileWriteCmd = &cobra.Command{
@@ -20,6 +21,7 @@ var versionFileWriteCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionFileWriteCmd)
+	helptext.SetCommandHelp(versionFileWriteCmd)
 }
 
 func runVersionFileWrite(cmd *cobra.Command, args []string) error {

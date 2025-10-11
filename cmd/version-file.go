@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
+	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionFileCmd = &cobra.Command{
@@ -17,6 +19,7 @@ var versionFileCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionFileCmd)
+	helptext.SetCommandHelp(versionFileCmd)
 }
 
 func runVersionFile(cmd *cobra.Command, args []string) error {
@@ -35,9 +38,9 @@ func runVersionFile(cmd *cobra.Command, args []string) error {
 
 	if versionFile == "" {
 		// No version file found, return global version file path
-		cmd.Println(cfg.GlobalVersionFile())
+		fmt.Fprintln(cmd.OutOrStdout(), cfg.GlobalVersionFile())
 	} else {
-		cmd.Println(versionFile)
+		fmt.Fprintln(cmd.OutOrStdout(), versionFile)
 	}
 
 	return nil

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var completionsCmd = &cobra.Command{
@@ -22,6 +24,7 @@ var completionsCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(completionsCmd)
+	helptext.SetCommandHelp(completionsCmd)
 }
 
 func runCompletions(cmd *cobra.Command, args []string) error {
@@ -29,7 +32,7 @@ func runCompletions(cmd *cobra.Command, args []string) error {
 	completionArgs := args[1:]
 
 	// Always print --help as first option
-	cmd.Println("--help")
+	fmt.Fprintln(cmd.OutOrStdout(), "--help")
 
 	// Try to find the command
 	cfg := config.Load()
