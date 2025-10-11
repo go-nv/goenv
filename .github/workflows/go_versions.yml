@@ -16,13 +16,21 @@ jobs:
           fetch-depth: 0
           ref: master
           token: ${{ secrets.GH_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
       - name: Install JQ
         run: sudo apt install jq
-      - name: Remove golang
-        run: sudo rm -rf $(which go)
+      - name: Remove system golang
+        run: sudo rm -rf $(which go) || true
+      - name: Build goenv
+        run: make build
+      - name: Create bin directory for backward compatibility
+        run: make bin/goenv
       - name: Add goenv to PATH
-        run: export PATH="$PATH:./bin/goenv"
+        run: echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
       - name: Check latest version of Go against Goenv
-        run: ./scripts/latest_version.sh
+        run: ./.github/scripts/latest_version.sh
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

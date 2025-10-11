@@ -28,10 +28,10 @@ jobs:
         run: |
           if [[ "${{ github.event.inputs.debug }}" == "true" ]]; then
             echo "Debug mode enabled"
-            ./scripts/update_app_version.sh 2>&1 | tee -a debug.log
+            ./.github/scripts/update_app_version.sh 2>&1 | tee -a debug.log
             cat debug.log
           else
-            ./scripts/update_app_version.sh
+            ./.github/scripts/update_app_version.sh
           fi
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
