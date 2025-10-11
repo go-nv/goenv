@@ -2,6 +2,7 @@ package install
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"crypto/sha256"
 	"fmt"
@@ -120,9 +121,15 @@ func (i *Installer) Install(goVersion string, force bool) error {
 		defer os.Remove(tempFile)
 	}
 
-	// Extract the archive
-	if err := i.extractTarGz(tempFile, versionDir); err != nil {
-		return fmt.Errorf("failed to extract: %w", err)
+	// Extract the archive (ZIP for Windows, tar.gz for others)
+	if strings.HasSuffix(file.Filename, ".zip") {
+		if err := i.extractZip(tempFile, versionDir); err != nil {
+			return fmt.Errorf("failed to extract: %w", err)
+		}
+	} else {
+		if err := i.extractTarGz(tempFile, versionDir); err != nil {
+			return fmt.Errorf("failed to extract: %w", err)
+		}
 	}
 
 	fmt.Printf("Successfully installed Go %s to %s\n", targetRelease.Version, versionDir)
@@ -257,6 +264,72 @@ func (i *Installer) extractTarGz(tarGzPath, destDir string) error {
 				return fmt.Errorf("failed to extract file %s: %w", target, err)
 			}
 			f.Close()
+		}
+	}
+
+	if !i.Quiet {
+		fmt.Println("Extraction completed")
+	}
+	return nil
+}
+
+// extractZip extracts a ZIP file to the specified directory (Windows support)
+func (i *Installer) extractZip(zipPath, destDir string) error {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return fmt.Errorf("failed to open ZIP archive: %w", err)
+	}
+	defer r.Close()
+
+	if !i.Quiet {
+		fmt.Println("Extracting archive...")
+	}
+
+	for _, f := range r.File {
+		// Remove "go/" or "go\" prefix from paths
+		path := strings.TrimPrefix(f.Name, "go/")
+		path = strings.TrimPrefix(path, "go\\")
+		if path == "" || path == "go" {
+			continue // Skip the root "go/" directory
+		}
+
+		target := filepath.Join(destDir, path)
+
+		// Security check: prevent zip slip
+		if !strings.HasPrefix(filepath.Clean(target), filepath.Clean(destDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("illegal file path in ZIP: %s", f.Name)
+		}
+
+		if f.FileInfo().IsDir() {
+			// Create directory
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", target, err)
+			}
+		} else {
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory: %w", err)
+			}
+
+			// Extract file
+			outFile, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return fmt.Errorf("failed to create file %s: %w", target, err)
+			}
+
+			rc, err := f.Open()
+			if err != nil {
+				outFile.Close()
+				return fmt.Errorf("failed to open file in ZIP: %w", err)
+			}
+
+			_, err = io.Copy(outFile, rc)
+			rc.Close()
+			outFile.Close()
+
+			if err != nil {
+				return fmt.Errorf("failed to extract file %s: %w", target, err)
+			}
 		}
 	}
 

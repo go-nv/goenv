@@ -44,7 +44,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	cfg := config.Load()
 
 	if initFlags.complete {
-		for _, option := range []string{"-", "--no-rehash", "bash", "fish", "ksh", "zsh"} {
+		for _, option := range []string{"-", "--no-rehash", "bash", "fish", "ksh", "zsh", "powershell", "cmd"} {
 			cmd.Println(option)
 		}
 		return nil
@@ -101,6 +101,16 @@ func resolveShell(explicit string, dashMode bool) string {
 }
 
 func detectEnvShell() string {
+	// On Windows, detect PowerShell or cmd
+	if runtime.GOOS == "windows" {
+		// Check if running in PowerShell
+		if psVersion := os.Getenv("PSModulePath"); psVersion != "" {
+			return "powershell"
+		}
+		// Default to cmd on Windows
+		return "cmd"
+	}
+
 	shellPath := os.Getenv("SHELL")
 	if shellPath != "" {
 		if base := filepath.Base(shellPath); base != "" {
@@ -143,9 +153,14 @@ func renderUsageSnippet(shell string) string {
 	builder.WriteString("# Load goenv automatically by appending\n")
 	builder.WriteString(fmt.Sprintf("# the following to %s:\n\n", profile))
 
-	if shell == "fish" {
+	switch shell {
+	case "fish":
 		builder.WriteString("status --is-interactive; and source (goenv init -|psub)\n")
-	} else {
+	case "powershell":
+		builder.WriteString("Invoke-Expression (goenv init - | Out-String)\n")
+	case "cmd":
+		builder.WriteString("FOR /f \"tokens=*\" %%i IN ('goenv init -') DO @%%i\n")
+	default:
 		builder.WriteString("eval \"$(goenv init -)\"\n")
 	}
 
@@ -173,6 +188,10 @@ func determineProfilePath(shell string) string {
 		return "~/.profile"
 	case "fish":
 		return "~/.config/fish/config.fish"
+	case "powershell":
+		return "$PROFILE"
+	case "cmd":
+		return "%USERPROFILE%\\autorun.cmd"
 	default:
 		return fmt.Sprintf("<unknown shell: %s, replace with your profile path>", shell)
 	}
@@ -198,6 +217,40 @@ func renderInitScript(shell string, cfg *config.Config, noRehash bool) string {
 		builder.WriteString("    set -gx PATH $PATH $GOENV_ROOT/shims\n")
 		builder.WriteString("  end\n")
 		builder.WriteString("end\n")
+	case "powershell":
+		fmt.Fprintf(&builder, "$env:GOENV_SHELL = \"%s\"\n", shell)
+		fmt.Fprintf(&builder, "$env:GOENV_ROOT = \"%s\"\n", cfg.Root)
+		builder.WriteString("if (-not $env:GOENV_RC_FILE) {\n")
+		builder.WriteString("  $env:GOENV_RC_FILE = Join-Path $env:USERPROFILE \".goenvrc.ps1\"\n")
+		builder.WriteString("}\n")
+		builder.WriteString("if (Test-Path $env:GOENV_RC_FILE) {\n")
+		builder.WriteString("  . $env:GOENV_RC_FILE\n")
+		builder.WriteString("}\n")
+		shimsDir := filepath.Join(cfg.Root, "shims")
+		builder.WriteString(fmt.Sprintf("if ($env:PATH -notlike '*%s*') {\n", shimsDir))
+		builder.WriteString("  if ($env:GOENV_PATH_ORDER -eq 'front') {\n")
+		builder.WriteString(fmt.Sprintf("    $env:PATH = \"%s;$env:PATH\"\n", shimsDir))
+		builder.WriteString("  } else {\n")
+		builder.WriteString(fmt.Sprintf("    $env:PATH = \"$env:PATH;%s\"\n", shimsDir))
+		builder.WriteString("  }\n")
+		builder.WriteString("}\n")
+	case "cmd":
+		fmt.Fprintf(&builder, "SET GOENV_SHELL=%s\n", shell)
+		fmt.Fprintf(&builder, "SET GOENV_ROOT=%s\n", cfg.Root)
+		builder.WriteString("IF NOT DEFINED GOENV_RC_FILE (\n")
+		builder.WriteString("  SET GOENV_RC_FILE=%USERPROFILE%\\.goenvrc.cmd\n")
+		builder.WriteString(")\n")
+		builder.WriteString("IF EXIST \"%GOENV_RC_FILE%\" (\n")
+		builder.WriteString("  CALL \"%GOENV_RC_FILE%\"\n")
+		builder.WriteString(")\n")
+		shimsDir := filepath.Join(cfg.Root, "shims")
+		builder.WriteString(fmt.Sprintf("IF \"%%PATH:%s=%%\" == \"%%PATH%%\" (\n", shimsDir))
+		builder.WriteString("  IF \"%GOENV_PATH_ORDER%\" == \"front\" (\n")
+		builder.WriteString(fmt.Sprintf("    SET PATH=%s;%%PATH%%\n", shimsDir))
+		builder.WriteString("  ) ELSE (\n")
+		builder.WriteString(fmt.Sprintf("    SET PATH=%%PATH%%;%s\n", shimsDir))
+		builder.WriteString("  )\n")
+		builder.WriteString(")\n")
 	default:
 		fmt.Fprintf(&builder, "export GOENV_SHELL=%s\n", shell)
 		fmt.Fprintf(&builder, "export GOENV_ROOT=%s\n", cfg.Root)
@@ -250,6 +303,26 @@ func renderShellFunction(shell string) string {
 		builder.WriteString("    command goenv \"$command\" $argv\n")
 		builder.WriteString("  end\n")
 		builder.WriteString("end\n")
+	case "powershell":
+		builder.WriteString("function goenv {\n")
+		builder.WriteString("  $command = $args[0]\n")
+		builder.WriteString("  $restArgs = $args[1..($args.Length)]\n\n")
+		builder.WriteString("  switch ($command) {\n")
+		for _, cmd := range specialCommands {
+			builder.WriteString(fmt.Sprintf("    \"%s\" {\n", cmd))
+			builder.WriteString(fmt.Sprintf("      Invoke-Expression (& goenv sh-%s @restArgs | Out-String)\n", cmd))
+			builder.WriteString("    }\n")
+		}
+		builder.WriteString("    default {\n")
+		builder.WriteString("      & goenv $command @restArgs\n")
+		builder.WriteString("    }\n")
+		builder.WriteString("  }\n")
+		builder.WriteString("}\n")
+	case "cmd":
+		// cmd.exe doesn't support functions like bash/PowerShell
+		// Users will need to use goenv.bat shim directly
+		builder.WriteString("REM cmd.exe does not support functions\n")
+		builder.WriteString("REM Use goenv commands directly\n")
 	case "ksh":
 		builder.WriteString("function goenv {\n")
 		builder.WriteString("  typeset command\n")

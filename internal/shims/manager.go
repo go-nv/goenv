@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
@@ -52,7 +53,12 @@ func (s *ShimManager) Rehash() error {
 
 		for _, entry := range entries {
 			if !entry.IsDir() && isExecutable(filepath.Join(versionBinDir, entry.Name())) {
-				binaries[entry.Name()] = true
+				binaryName := entry.Name()
+				// On Windows, strip .exe extension from shim name
+				if runtime.GOOS == "windows" && filepath.Ext(binaryName) == ".exe" {
+					binaryName = binaryName[:len(binaryName)-4]
+				}
+				binaries[binaryName] = true
 			}
 		}
 	}
@@ -106,13 +112,32 @@ func (s *ShimManager) WhichBinary(command string) (string, error) {
 
 	// Look in version's bin directory
 	versionBinDir := filepath.Join(s.config.VersionsDir(), version, "bin")
-	binaryPath := filepath.Join(versionBinDir, command)
+	binaryPath := s.findBinary(versionBinDir, command)
 
-	if _, err := os.Stat(binaryPath); err == nil {
-		return binaryPath, nil
+	if binaryPath == "" {
+		return "", fmt.Errorf("command not found: %s", command)
 	}
 
-	return "", fmt.Errorf("command not found: %s", command)
+	return binaryPath, nil
+}
+
+// findBinary searches for a binary, adding .exe on Windows if needed
+func (s *ShimManager) findBinary(binDir, command string) string {
+	// Try exact name first
+	binaryPath := filepath.Join(binDir, command)
+	if _, err := os.Stat(binaryPath); err == nil {
+		return binaryPath
+	}
+
+	// On Windows, try adding .exe extension
+	if runtime.GOOS == "windows" {
+		exePath := filepath.Join(binDir, command+".exe")
+		if _, err := os.Stat(exePath); err == nil {
+			return exePath
+		}
+	}
+
+	return ""
 }
 
 // WhenceVersions returns all versions that contain the specified command
@@ -127,9 +152,9 @@ func (s *ShimManager) WhenceVersions(command string) ([]string, error) {
 
 	for _, version := range allVersions {
 		versionBinDir := filepath.Join(s.config.VersionsDir(), version, "bin")
-		binaryPath := filepath.Join(versionBinDir, command)
+		binaryPath := s.findBinary(versionBinDir, command)
 
-		if _, err := os.Stat(binaryPath); err == nil {
+		if binaryPath != "" {
 			versionsWithCommand = append(versionsWithCommand, version)
 		}
 	}
@@ -162,6 +187,14 @@ func (s *ShimManager) clearShims() error {
 
 // createShim creates a shim file for the specified binary
 func (s *ShimManager) createShim(binaryName string) error {
+	if runtime.GOOS == "windows" {
+		return s.createWindowsShim(binaryName)
+	}
+	return s.createUnixShim(binaryName)
+}
+
+// createUnixShim creates a Unix/bash shim script
+func (s *ShimManager) createUnixShim(binaryName string) error {
 	shimPath := filepath.Join(s.config.ShimsDir(), binaryName)
 
 	// Create the shim script
@@ -193,6 +226,40 @@ fi
 	return nil
 }
 
+// createWindowsShim creates a Windows batch file shim
+func (s *ShimManager) createWindowsShim(binaryName string) error {
+	shimPath := filepath.Join(s.config.ShimsDir(), binaryName+".bat")
+
+	// Create the batch file shim
+	shimContent := fmt.Sprintf(`@echo off
+REM goenv shim for %s
+setlocal
+
+if "%%GOENV_DEBUG%%"=="1" (
+  echo on
+)
+
+REM Get the script name without path
+for %%%%I in ("%%~f0") do set "program=%%%%~nI"
+
+if "%%program%%"=="goenv" (
+  if "%%1"=="" (
+    echo goenv: no command specified >&2
+    exit /b 1
+  )
+  goenv exec %%*
+) else (
+  goenv exec "%%program%%" %%*
+)
+`, binaryName)
+
+	if err := os.WriteFile(shimPath, []byte(shimContent), 0666); err != nil {
+		return fmt.Errorf("failed to write shim file: %w", err)
+	}
+
+	return nil
+}
+
 // isExecutable checks if a file is executable
 func isExecutable(path string) bool {
 	info, err := os.Stat(path)
@@ -200,5 +267,12 @@ func isExecutable(path string) bool {
 		return false
 	}
 
-	return info.Mode()&0111 != 0 // Check if any execute bit is set
+	// On Windows, check file extension
+	if runtime.GOOS == "windows" {
+		ext := filepath.Ext(path)
+		return ext == ".exe" || ext == ".bat" || ext == ".cmd" || ext == ".com"
+	}
+
+	// On Unix, check execute bit
+	return info.Mode()&0111 != 0
 }

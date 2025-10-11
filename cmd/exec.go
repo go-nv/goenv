@@ -105,10 +105,9 @@ func runExec(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		versionCommandPath := filepath.Join(versionPath, "bin", command)
-		if _, err := os.Stat(versionCommandPath); err == nil {
-			commandPath = versionCommandPath
-		} else {
+		versionBinDir := filepath.Join(versionPath, "bin")
+		commandPath = findBinaryInDir(versionBinDir, command)
+		if commandPath == "" {
 			return fmt.Errorf("goenv: %s: command not found", command)
 		}
 	} else {
@@ -155,4 +154,23 @@ func prependToPath(env []string, dir string) []string {
 	}
 	// PATH not found, add it
 	return append(env, pathPrefix+dir)
+}
+
+// findBinaryInDir searches for a binary in a directory, handling .exe on Windows
+func findBinaryInDir(binDir, command string) string {
+	// Try exact name first
+	binaryPath := filepath.Join(binDir, command)
+	if _, err := os.Stat(binaryPath); err == nil {
+		return binaryPath
+	}
+
+	// On Windows, try adding .exe extension
+	if filepath.Ext(command) == "" {
+		exePath := filepath.Join(binDir, command+".exe")
+		if _, err := os.Stat(exePath); err == nil {
+			return exePath
+		}
+	}
+
+	return ""
 }
