@@ -17,6 +17,23 @@ var rootCmd = &cobra.Command{
 - Manage Go installations with ease`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
+			// Check if GOENV_AUTO_INSTALL is enabled
+			if os.Getenv("GOENV_AUTO_INSTALL") == "1" {
+				// Run install command with GOENV_AUTO_INSTALL_FLAGS if set
+				installArgs := []string{}
+				if flags := os.Getenv("GOENV_AUTO_INSTALL_FLAGS"); flags != "" {
+					// Split flags by space (simple implementation)
+					installArgs = append(installArgs, flags)
+				}
+
+				// Find the install command and run it
+				installCmd, _, err := cmd.Root().Find(append([]string{"install"}, installArgs...))
+				if err == nil {
+					installCmd.Run(installCmd, installArgs)
+					return
+				}
+			}
+
 			// If no command is provided, show help
 			cmd.Help()
 		}
