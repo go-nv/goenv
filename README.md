@@ -49,7 +49,7 @@ The following snippet can be inserted in your buildspec.yml (or buildspec defini
 **Side Note:** if you use the below steps, please unset your golang version in the buildspec and run the installer manually.
 
 ```yaml
-- (cd /root/.goenv/plugins/go-build/../.. && git pull)
+- (cd /root/.goenv && git pull)
 ```
 
 ---

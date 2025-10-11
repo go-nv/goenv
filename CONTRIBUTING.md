@@ -8,10 +8,12 @@ Please feel free to submit pull requests and file bugs on the [issue tracker](ht
 ## Prerequisites
 
 ### Required
+
 - **Go 1.21+** - For building and testing goenv
 - **Git** - For cloning and contributing
 
 ### Platform-Specific
+
 - **Linux/macOS**: Any shell (`bash`, `zsh`, `fish`, etc.)
 - **Windows**: PowerShell 5.1+ or Command Prompt (cmd.exe)
 
@@ -20,12 +22,14 @@ Please feel free to submit pull requests and file bugs on the [issue tracker](ht
 ### Unix/Linux/macOS
 
 1. **Clone the repository**:
+
    ```bash
    git clone https://github.com/go-nv/goenv.git
    cd goenv
    ```
 
 2. **Build**:
+
    ```bash
    make build
    ```
@@ -40,6 +44,7 @@ Please feel free to submit pull requests and file bugs on the [issue tracker](ht
 goenv provides **three ways** to build on Windows:
 
 #### Option 1: PowerShell (Recommended)
+
 ```powershell
 # Build
 .\build.ps1 build
@@ -52,6 +57,7 @@ goenv provides **three ways** to build on Windows:
 ```
 
 #### Option 2: Batch Script (cmd.exe)
+
 ```batch
 REM Build
 build.bat build
@@ -64,12 +70,14 @@ build.bat help
 ```
 
 #### Option 3: Make (if installed via WSL, Cygwin, or MSYS2)
+
 ```bash
 make build
 make test
 ```
 
 #### Option 4: Visual Studio Code
+
 Press `Ctrl+Shift+B` to run build tasks, or use the Command Palette (`Ctrl+Shift+P`) and search for "Run Task".
 
 ## Common Commands
@@ -77,17 +85,19 @@ Press `Ctrl+Shift+B` to run build tasks, or use the Command Palette (`Ctrl+Shift
 ### Building
 
 **Unix/macOS:**
+
 ```bash
-make build              # Build goenv binary
-make bin/goenv          # Build and create bin/ directory
+make build              # Build goenv binary in root directory
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 .\build.ps1 build       # Build goenv.exe
 ```
 
 **Windows (Batch):**
+
 ```batch
 build.bat build         # Build goenv.exe
 ```
@@ -95,16 +105,19 @@ build.bat build         # Build goenv.exe
 ### Testing
 
 **Unix/macOS:**
+
 ```bash
 make test               # Run all Go tests
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 .\build.ps1 test        # Run all Go tests
 ```
 
 **Windows (Batch):**
+
 ```batch
 build.bat test          # Run all Go tests
 ```
@@ -112,16 +125,19 @@ build.bat test          # Run all Go tests
 ### Cleaning
 
 **Unix/macOS:**
+
 ```bash
 make clean              # Remove built binaries
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 .\build.ps1 clean       # Remove built binaries
 ```
 
 **Windows (Batch):**
+
 ```batch
 build.bat clean         # Remove built binaries
 ```
@@ -129,12 +145,14 @@ build.bat clean         # Remove built binaries
 ### Installing Locally
 
 **Unix/macOS:**
+
 ```bash
 make install            # Install to /usr/local (default)
 PREFIX=$HOME/.local make install  # Custom location
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 .\build.ps1 install     # Install to %LOCALAPPDATA%\goenv
 $env:PREFIX = "C:\tools\goenv"; .\build.ps1 install  # Custom location
@@ -143,25 +161,27 @@ $env:PREFIX = "C:\tools\goenv"; .\build.ps1 install  # Custom location
 ### Cross-Compilation
 
 **Unix/macOS:**
+
 ```bash
 make cross-build        # Build for all platforms
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 .\build.ps1 cross-build # Build for all platforms
 ```
 
 ## Build Scripts Reference
 
-| Feature | Makefile (Unix) | build.ps1 (PowerShell) | build.bat (Batch) |
-|---------|----------------|------------------------|-------------------|
-| Build | ✅ | ✅ | ✅ |
-| Test | ✅ | ✅ | ✅ |
-| Clean | ✅ | ✅ | ✅ |
-| Install | ✅ | ✅ | ❌ (use PS) |
-| Cross-build | ✅ | ✅ | ❌ (use PS) |
-| Version info | ✅ | ✅ | ✅ |
+| Feature      | Makefile (Unix) | build.ps1 (PowerShell) | build.bat (Batch) |
+| ------------ | --------------- | ---------------------- | ----------------- |
+| Build        | ✅              | ✅                     | ✅                |
+| Test         | ✅              | ✅                     | ✅                |
+| Clean        | ✅              | ✅                     | ✅                |
+| Install      | ✅              | ✅                     | ❌ (use PS)       |
+| Cross-build  | ✅              | ✅                     | ❌ (use PS)       |
+| Version info | ✅              | ✅                     | ✅                |
 
 ## IDE Support
 

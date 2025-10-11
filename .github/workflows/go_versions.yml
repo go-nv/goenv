@@ -19,17 +19,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: "stable"
       - name: Install JQ
         run: sudo apt install jq
       - name: Remove system golang
         run: sudo rm -rf $(which go) || true
       - name: Build goenv
         run: make build
-      - name: Create bin directory for backward compatibility
-        run: make bin/goenv
       - name: Add goenv to PATH
-        run: echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
+        run: echo "${GITHUB_WORKSPACE}" >> $GITHUB_PATH
       - name: Check latest version of Go against Goenv
         run: ./.github/scripts/latest_version.sh
         env:

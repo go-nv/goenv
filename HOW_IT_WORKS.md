@@ -5,40 +5,72 @@ executables injected into your `PATH`, determines which Go version
 has been specified by your application, and passes your commands along
 to the correct Go installation.
 
+**Note:** goenv is now written in Go (migrated from shell scripts), providing better cross-platform support including native Windows compatibility!
+
 ## Understanding PATH
 
-When you run all the variety of Go commands using  `go`, your operating system
+When you run all the variety of Go commands using `go`, your operating system
 searches through a list of directories to find an executable file with
 that name. This list of directories lives in an environment variable
-called `PATH`, with each directory in the list separated by a colon:
+called `PATH`, with each directory in the list separated by a platform-specific separator:
 
-    /usr/local/bin:/usr/bin:/bin
+**Unix/Linux/macOS:**
+
+```
+/usr/local/bin:/usr/bin:/bin
+```
+
+(Directories separated by colons `:`)
+
+**Windows:**
+
+```
+C:\Program Files\Go\bin;C:\Windows\System32;C:\Windows
+```
+
+(Directories separated by semicolons `;`)
 
 Directories in `PATH` are searched from left to right, so a matching
 executable in a directory at the beginning of the list takes
-precedence over another one at the end. In this example, the
+precedence over another one at the end. In the Unix example above, the
 `/usr/local/bin` directory will be searched first, then `/usr/bin`,
 then `/bin`.
 
 ## Understanding Shims
 
-goenv works by inserting a directory of _shims_ at the end of your
-`PATH`, so if you have `go` in `/usr/bin` it will be found first:
+goenv works by inserting a directory of _shims_ at the front of your
+`PATH`:
 
-    /usr/local/bin:/usr/bin:/bin:~/.goenv/shims
+**Unix/Linux/macOS:**
+```
+~/.goenv/shims:/usr/local/bin:/usr/bin:/bin
+```
+
+**Windows:**
+```
+%USERPROFILE%\.goenv\shims;C:\Program Files\Go\bin;C:\Windows\System32
+```
 
 Through a process called _rehashing_, goenv maintains shims in that
 directory to match every `go` command across every installed version
 of Go.
 
-Shims are lightweight executables that simply pass your command along
-to goenv. So with goenv installed, when you run `go` your
-operating system will do the following:
+### Shim Implementation
 
-* Search your `PATH` for an executable file named `go`
-* Find the goenv shim named `go` at the beginning of your `PATH`
-* Run the shim named `go`, which in turn passes the command along to
-  goenv
+Shims are lightweight executables that simply pass your command along
+to goenv:
+
+- **Unix/Linux/macOS**: Bash scripts (`go`, `gofmt`, `godoc`, etc.)
+- **Windows**: Batch files (`go.bat`, `gofmt.bat`, `godoc.bat`, etc.)
+
+The goenv binary (written in Go) then determines which Go version to use and executes the appropriate command.
+
+So with goenv installed, when you run `go` your operating system will do the following:
+
+- Search your `PATH` for an executable file named `go` (or `go.bat` on Windows)
+- Find the goenv shim named `go` at the beginning of your `PATH`
+- Run the shim, which calls `goenv exec go <your-args>`
+- goenv determines the version and runs the correct Go binary
 
 ## Choosing the Go Version
 
@@ -72,14 +104,48 @@ Once goenv has determined which version of Go your application has
 specified, it passes the command along to the corresponding Go
 installation.
 
-Each Go version is installed into its own directory under
-`~/.goenv/versions`.
+Each Go version is installed into its own directory under the goenv root:
 
-For example, you might have these versions installed:
+**Unix/Linux/macOS:**
+```
+~/.goenv/versions/1.21.0/
+~/.goenv/versions/1.22.0/
+```
 
-* `~/.goenv/versions/1.6.1/`
-* `~/.goenv/versions/1.6.2/`
+**Windows:**
+```
+%USERPROFILE%\.goenv\versions\1.21.0\
+%USERPROFILE%\.goenv\versions\1.22.0\
+```
+
+Each version directory contains:
+```
+versions/1.21.0/
+├── bin/           # Go binaries (go, gofmt, etc.)
+├── src/           # Go source code
+├── pkg/           # Compiled packages
+└── ...
+```
 
 As far as goenv is concerned, version names are simply the directories in
-`~/.goenv/versions`.
+the versions directory.
 
+## Implementation
+
+goenv is written in Go and consists of:
+
+- **Main binary**: `goenv` (or `goenv.exe` on Windows)
+  - Handles version resolution
+  - Manages installations
+  - Executes commands with the correct Go version
+
+- **Shims**: Platform-specific lightweight executables
+  - Unix: Bash scripts that call `goenv exec`
+  - Windows: Batch files that call `goenv.exe exec`
+
+- **Configuration files**:
+  - `~/.goenv/version` - Global version setting
+  - `.go-version` - Per-directory version setting
+  - `GOENV_VERSION` - Environment variable override
+
+For more details on the Go-based implementation and Windows support, see [WINDOWS_SUPPORT.md](./WINDOWS_SUPPORT.md).
