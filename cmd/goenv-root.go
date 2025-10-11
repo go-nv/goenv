@@ -1,0 +1,25 @@
+package cmd
+
+import (
+	"github.com/go-nv/goenv/internal/config"
+	"github.com/spf13/cobra"
+)
+
+var goenvRootCmd = &cobra.Command{
+	Use:          "root",
+	Short:        "Display the root directory where versions are installed",
+	Long:         "Print the value of GOENV_ROOT, the directory where Go versions are installed",
+	Args:         cobra.NoArgs,
+	RunE:         runGoenvRoot,
+	SilenceUsage: true,
+}
+
+func init() {
+	rootCmd.AddCommand(goenvRootCmd)
+}
+
+func runGoenvRoot(cmd *cobra.Command, args []string) error {
+	cfg := config.Load()
+	cmd.Println(cfg.Root)
+	return nil
+}

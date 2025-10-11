@@ -1,0 +1,127 @@
+package cmd
+
+import (
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/go-nv/goenv/internal/config"
+	"github.com/spf13/cobra"
+)
+
+var (
+	commandsSh   bool
+	commandsNoSh bool
+)
+
+var commandsCmd = &cobra.Command{
+	Use:          "commands",
+	Short:        "List all available goenv commands",
+	Long:         "List all goenv commands including installed versions",
+	Args:         cobra.NoArgs,
+	RunE:         runCommands,
+	SilenceUsage: true,
+}
+
+func init() {
+	commandsCmd.Flags().BoolVar(&commandsSh, "sh", false, "List only commands containing 'sh'")
+	commandsCmd.Flags().BoolVar(&commandsNoSh, "no-sh", false, "List commands not containing 'sh'")
+	commandsCmd.Flags().Bool("complete", false, "Show completion options")
+	commandsCmd.Flags().Lookup("complete").Hidden = true
+
+	rootCmd.AddCommand(commandsCmd)
+}
+
+func runCommands(cmd *cobra.Command, args []string) error {
+	// Handle completion flag
+	if complete, _ := cmd.Flags().GetBool("complete"); complete {
+		cmd.Println("--sh")
+		cmd.Println("--no-sh")
+		return nil
+	}
+
+	cfg := config.Load()
+	commands := []string{}
+
+	// Add installed versions
+	versionsDir := filepath.Join(cfg.Root, "versions")
+	if entries, err := os.ReadDir(versionsDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				commands = append(commands, entry.Name())
+			}
+		}
+	}
+
+	// Add Cobra registered commands
+	for _, subCmd := range rootCmd.Commands() {
+		if subCmd.Use != "" && !subCmd.Hidden {
+			commands = append(commands, subCmd.Name())
+		}
+	}
+
+	// Add standard goenv commands that might not be registered yet
+	standardCommands := []string{
+		"commands", "completions", "exec", "global", "help", "hooks",
+		"init", "install", "installed", "latest", "local", "prefix",
+		"rehash", "root", "shell", "shims", "system", "uninstall",
+		"version", "version-file", "version-file-read", "version-file-write",
+		"version-name", "version-origin", "versions", "whence", "which",
+	}
+	commands = append(commands, standardCommands...)
+
+	// Check PATH for additional goenv commands
+	pathEnv := os.Getenv("PATH")
+	for _, dir := range filepath.SplitList(pathEnv) {
+		if entries, err := os.ReadDir(dir); err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					name := entry.Name()
+					if strings.HasPrefix(name, "goenv-") {
+						cmdName := strings.TrimPrefix(name, "goenv-")
+						// Check if executable
+						fullPath := filepath.Join(dir, name)
+						if info, err := os.Stat(fullPath); err == nil {
+							if info.Mode()&0111 != 0 {
+								commands = append(commands, cmdName)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Deduplicate and sort
+	commandSet := make(map[string]bool)
+	for _, c := range commands {
+		commandSet[c] = true
+	}
+
+	commands = make([]string, 0, len(commandSet))
+	for c := range commandSet {
+		commands = append(commands, c)
+	}
+	sort.Strings(commands)
+
+	// Filter based on flags
+	var filtered []string
+	for _, c := range commands {
+		containsSh := strings.Contains(c, "sh")
+		if commandsSh && !containsSh {
+			continue
+		}
+		if commandsNoSh && containsSh {
+			continue
+		}
+		filtered = append(filtered, c)
+	}
+
+	// Print commands
+	for _, c := range filtered {
+		cmd.Println(c)
+	}
+
+	return nil
+}

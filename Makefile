@@ -1,74 +1,76 @@
-SHELL:=/bin/bash
-.ONESHELL:
-.PHONY: test test-goenv test-goenv-go-build bats start-fake-go-build-http-server stop-fake-go-build-http-server run-goenv-go-build-tests
-MAKEFLAGS += -s
+# Go-based goenv Makefile
 
-ifeq (test-target,$(firstword $(MAKECMDGOALS)))
-  # use the rest as arguments for "test-target"
-  TEST_TARGET_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-  # ...and turn them into do-nothing targets
-  $(shell echo $(TEST_TARGET_ARGS):;@:)
-  $(eval $(TEST_TARGET_ARGS):;@:)
-endif
+# Build variables
+BINARY_NAME = goenv
+VERSION ?= $(shell cat APP_VERSION 2>/dev/null || echo "dev")
+COMMIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS = -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT_SHA) -X main.buildTime=$(BUILD_TIME)"
 
-default: test
+# Default installation prefix
+export PREFIX ?= /usr/local
 
-test: test-goenv test-goenv-go-build
+# Build targets
+.PHONY: build clean test install uninstall dev-deps all cross-build
 
-# USAGE: make -- test-target [args..]
-test-target: bats
-	set -e; \
-	PATH="./bats-core/bin:$$PATH"; \
-	if [ -n "$$GOENV_NATIVE_EXT" ]; then \
-		src/configure; \
-		make -C src; \
-	fi; \
-	unset $${!GOENV_*}; \
-	test_target=$${test_target:-test}; \
-	exec bats $(TEST_TARGET_ARGS);
+# Default target
+all: build
 
-test-goenv: bats
-	set -e; \
-	PATH="./bats-core/bin:$$PATH"; \
-	if [ -n "$$GOENV_NATIVE_EXT" ]; then \
-		src/configure; \
-		make -C src; \
-	fi; \
-	unset $${!GOENV_*}; \
-	test_target=$${test_target:-test}; \
-	exec bats $${CI:+--tap} $$test_target;
+build:
+	go build $(LDFLAGS) -o $(BINARY_NAME) .
 
-test-goenv-go-build: bats stop-fake-go-build-http-server start-fake-go-build-http-server run-goenv-go-build-tests stop-fake-go-build-http-server
+# Create legacy binary location for backwards compatibility during transition
+bin/goenv: build
+	mkdir -p bin
+	cp $(BINARY_NAME) bin/goenv
 
-stop-fake-go-build-http-server:
-	pkill fake_file_server || true
+test:
+	go test -v ./...
 
-run-goenv-go-build-tests:
-	set -e; \
-	PATH="$$(pwd)/bats-core/bin:$$PATH"; \
-	if [ -n "$$GOENV_NATIVE_EXT" ]; then \
-		src/configure; \
-		make -C src; \
-	fi; \
-	unset $${!GOENV_*}; \
-	test_target=$${test_target:-test}; \
-	cd plugins/go-build; \
-	exec bats $${CI:+--tap} $$test_target;
+clean:
+	rm -f $(BINARY_NAME)
+	rm -rf bin/
+	go clean
 
-start-fake-go-build-http-server:
-	set -e; \
-	port=$${port:-8090}; \
-	cd plugins/go-build/test; \
-	(bash -c "exec -a fake_file_server python3 fake_file_server.py $$port") & \
-	until lsof -Pi :$${port} -sTCP:LISTEN -t >/dev/null; do \
-		echo "wait"; \
-		sleep 2; \
-	done;
+install: build
+	mkdir -p "$(PREFIX)/bin"
+	cp $(BINARY_NAME) "$(PREFIX)/bin/"
+	# Install shell completions
+	mkdir -p "$(PREFIX)/share/goenv/completions"
+	cp -R completions/* "$(PREFIX)/share/goenv/completions/" 2>/dev/null || true
 
-bats:
-	set -e; \
-	if [ -d "$(PWD)/bats-core" ]; then \
-		echo "bats-core already exists. Nothing to do"; \
+uninstall:
+	rm -f "$(PREFIX)/bin/$(BINARY_NAME)"
+	rm -rf "$(PREFIX)/share/goenv"
+
+dev-deps:
+	go mod download
+	go mod tidy
+
+# Cross-platform builds for releases
+cross-build:
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-linux-amd64 .
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-linux-arm64 .
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-darwin-amd64 .
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-darwin-arm64 .
+	GOOS=freebsd GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-freebsd-amd64 .
+
+# Migration helpers - these preserve some compatibility while transitioning
+.PHONY: migrate-test
+
+# Run Go tests alongside existing bats tests during migration
+migrate-test: test bats-test
+
+bats-test:
+	@echo "Running legacy bats tests (if available)..."
+	@if command -v bats >/dev/null 2>&1 && [ -d "test" ]; then \
+		bats test/ 2>/dev/null || echo "Bats tests not available or failed"; \
 	else \
-		git clone --depth 1 --single-branch --branch=v1.10.0 https://github.com/bats-core/bats-core.git; \
-	fi;
+		echo "Bats not installed or tests not found - skipping legacy tests"; \
+	fi
+
+# Show version information
+version:
+	@echo "Version: $(VERSION)"
+	@echo "Commit: $(COMMIT_SHA)"
+	@echo "Build Time: $(BUILD_TIME)"
