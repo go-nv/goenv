@@ -11,3 +11,9 @@
 /bats-core/
 .idea
 plugins/go-build/test/tmp/
+
+# Go build artifacts
+/bin/
+/goenv
+goenv-*
+*.exe

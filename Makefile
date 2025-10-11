@@ -19,17 +19,12 @@ all: build
 build:
 	go build $(LDFLAGS) -o $(BINARY_NAME) .
 
-# Create legacy binary location for backwards compatibility during transition
-bin/goenv: build
-	mkdir -p bin
-	cp $(BINARY_NAME) bin/goenv
-
 test:
 	go test -v ./...
 
 clean:
 	rm -f $(BINARY_NAME)
-	rm -rf bin/
+	rm -rf bin/ dist/
 	go clean
 
 install: build

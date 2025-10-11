@@ -21,14 +21,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: "stable"
       - name: Remove system golang (Unix)
         if: runner.os != 'Windows'
         run: sudo rm -rf $(which go) || true
       - name: Build goenv
         run: make build
-      - name: Create bin directory for backward compatibility
-        run: make bin/goenv
       - name: Run Unit Tests
         run: make test
         env:
