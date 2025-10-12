@@ -18,8 +18,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "stable"
-      - name: Remove system golang
-        run: sudo rm -rf $(which go) || true
       - name: Build goenv
         run: make build
       - name: Add goenv to PATH
