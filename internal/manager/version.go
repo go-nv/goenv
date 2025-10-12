@@ -304,21 +304,23 @@ func (m *Manager) ReadVersionFile(filename string) (string, error) {
 
 		if isGoMod {
 			// Parse go.mod file
+			// Use Fields to split by any whitespace (spaces, tabs, etc.)
+			parts := strings.Fields(line)
+			if len(parts) == 0 {
+				continue
+			}
+
 			// Look for "toolchain go1.11.4" first (takes precedence)
-			if strings.HasPrefix(line, "toolchain ") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 && strings.HasPrefix(parts[1], "go") {
+			if parts[0] == "toolchain" && len(parts) >= 2 {
+				if strings.HasPrefix(parts[1], "go") {
 					version := strings.TrimPrefix(parts[1], "go")
 					return version, nil
 				}
 			}
 			// Look for "go 1.11" line
-			if strings.HasPrefix(line, "go ") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					// Store but continue looking for toolchain
-					versions = append(versions, parts[1])
-				}
+			if parts[0] == "go" && len(parts) >= 2 {
+				// Store but continue looking for toolchain
+				versions = append(versions, parts[1])
 			}
 		} else {
 			// Regular version file - skip relative path traversal
