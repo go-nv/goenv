@@ -31,33 +31,35 @@ func runList(cmd *cobra.Command, args []string) error {
 		fmt.Println("Debug: Fetching available Go versions...")
 	}
 
-	fetcher := version.NewFetcherWithOptions(version.FetcherOptions{Debug: cfg.Debug})
-	releases, err := fetcher.FetchWithFallback(cfg.Root)
+	// Create fetcher with cache directory
+	fetcher := version.NewFetcherWithCache(cfg.Root)
+	fetcher.SetDebug(cfg.Debug)
+
+	// Fetch all versions (from cache or Railway API)
+	versions, err := fetcher.FetchAllVersions()
 	if err != nil {
 		return fmt.Errorf("failed to fetch versions: %w", err)
 	}
 
 	// Filter stable versions if requested
 	if listFlags.stable {
-		var stableReleases []version.GoRelease
-		for _, release := range releases {
-			if release.Stable {
-				stableReleases = append(stableReleases, release)
+		var stableVersions []string
+		for _, v := range versions {
+			// Versions without beta, rc, or other pre-release markers are stable
+			if !version.IsPrerelease(v) {
+				stableVersions = append(stableVersions, v)
 			}
 		}
-		releases = stableReleases
+		versions = stableVersions
 	}
 
-	// Sort versions (newest first)
-	version.SortVersions(releases)
-
 	// Display versions
-	for _, release := range releases {
+	for _, v := range versions {
 		status := ""
-		if !release.Stable {
+		if version.IsPrerelease(v) {
 			status = " (unstable)"
 		}
-		fmt.Printf("%s%s\n", release.Version, status)
+		fmt.Printf("%s%s\n", v, status)
 	}
 
 	return nil

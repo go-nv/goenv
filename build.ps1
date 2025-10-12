@@ -20,7 +20,7 @@
 
 param(
     [Parameter(Position=0)]
-    [ValidateSet('build', 'test', 'clean', 'install', 'uninstall', 'dev-deps', 'cross-build', 'version', 'help')]
+    [ValidateSet('build', 'test', 'clean', 'install', 'uninstall', 'dev-deps', 'cross-build', 'generate-embedded', 'test-windows', 'version', 'help')]
     [string]$Task = 'build'
 )
 
@@ -44,15 +44,17 @@ goenv Build Script for Windows
 Usage: .\build.ps1 [TASK]
 
 Tasks:
-  build         Build the goenv binary (default)
-  test          Run all tests
-  clean         Remove built binaries and clean build artifacts
-  install       Install goenv to PREFIX (default: %LOCALAPPDATA%\goenv)
-  uninstall     Uninstall goenv from PREFIX
-  dev-deps      Download and tidy Go module dependencies
-  cross-build   Build for multiple platforms (Linux, macOS, FreeBSD, Windows)
-  version       Show version information
-  help          Show this help message
+  build              Build the goenv binary (default)
+  test               Run all tests
+  test-windows       Test Windows compatibility
+  clean              Remove built binaries and clean build artifacts
+  install            Install goenv to PREFIX (default: %LOCALAPPDATA%\goenv)
+  generate-embedded  Generate embedded versions from go.dev API
+  uninstall          Uninstall goenv from PREFIX
+  dev-deps           Download and tidy Go module dependencies
+  cross-build        Build for multiple platforms (Linux, macOS, FreeBSD, Windows)
+  version            Show version information
+  help               Show this help message
 
 Environment Variables:
   PREFIX        Installation prefix (default: %LOCALAPPDATA%\goenv)
@@ -92,6 +94,17 @@ function Test {
         Write-Host "Tests passed!" -ForegroundColor Green
     } else {
         Write-Host "Tests failed!" -ForegroundColor Red
+        exit 1
+    }
+}
+
+function Test-Windows {
+    Write-Host "Testing Windows compatibility..." -ForegroundColor Cyan
+    go run scripts/test_windows_compatibility/main.go
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Windows compatibility verified!" -ForegroundColor Green
+    } else {
+        Write-Host "Windows compatibility test failed!" -ForegroundColor Red
         exit 1
     }
 }
@@ -178,8 +191,24 @@ function Dev-Deps {
     Write-Host "Dependencies updated!" -ForegroundColor Green
 }
 
+function Generate-Embedded {
+    Write-Host "Generating embedded versions from go.dev API..." -ForegroundColor Cyan
+    go run scripts/generate_embedded_versions/main.go
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✓ Embedded versions generated successfully" -ForegroundColor Green
+    } else {
+        Write-Host "✗ Failed to generate embedded versions" -ForegroundColor Red
+        exit 1
+    }
+}
+
 function Cross-Build {
     Write-Host "Building for multiple platforms..." -ForegroundColor Cyan
+
+    # Generate embedded versions first
+    Generate-Embedded
+    Write-Host ""
 
     if (-not (Test-Path "dist")) {
         New-Item -ItemType Directory -Path "dist" | Out-Null
@@ -233,14 +262,16 @@ function Show-Version {
 
 # Main execution
 switch ($Task) {
-    'build'       { Build }
-    'test'        { Test }
-    'clean'       { Clean }
-    'install'     { Install }
-    'uninstall'   { Uninstall }
-    'dev-deps'    { Dev-Deps }
-    'cross-build' { Cross-Build }
-    'version'     { Show-Version }
-    'help'        { Show-Help }
-    default       { Show-Help }
+    'build'             { Build }
+    'test'              { Test }
+    'test-windows'      { Test-Windows }
+    'clean'             { Clean }
+    'install'           { Install }
+    'uninstall'         { Uninstall }
+    'dev-deps'          { Dev-Deps }
+    'cross-build'       { Cross-Build }
+    'generate-embedded' { Generate-Embedded }
+    'version'           { Show-Version }
+    'help'              { Show-Help }
+    default             { Show-Help }
 }

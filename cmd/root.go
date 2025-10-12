@@ -44,6 +44,7 @@ Some useful goenv commands are:
    shell       Set or show the shell-specific Go version
    install     Install a Go version using go-build
    uninstall   Uninstall a specific Go version
+   refresh     Clear caches and fetch fresh version data
    rehash      Rehash goenv shims (run this after installing executables)
    version     Show the current Go version and its origin
    versions    List all Go versions available to goenv

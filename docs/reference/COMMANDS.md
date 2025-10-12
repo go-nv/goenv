@@ -1,35 +1,38 @@
 # Command Reference
 
 Like `git`, the `goenv` command delegates to subcommands based on its
-first argument. 
+first argument.
 
 All subcommands are:
 
-* [`goenv commands`](#goenv-commands)
-* [`goenv completions`](#goenv-completions)
-* [`goenv exec`](#goenv-exec)
-* [`goenv global`](#goenv-global)
-* [`goenv help`](#goenv-help)
-* [`goenv hooks`](#goenv-hooks)
-* [`goenv init`](#goenv-init)
-* [`goenv install`](#goenv-install)
-* [`goenv local`](#goenv-local)
-* [`goenv prefix`](#goenv-prefix)
-* [`goenv rehash`](#goenv-rehash)
-* [`goenv root`](#goenv-root)
-* [`goenv shell`](#goenv-shell)
-* [`goenv shims`](#goenv-shims)
-* [`goenv uninstall`](#goenv-uninstall)
-* [`goenv version`](#goenv-version)
-* [`goenv --version`](#goenv---version)
-* [`goenv version-file`](#goenv-version-file)
-* [`goenv version-file-read`](#goenv-version-file-read)
-* [`goenv version-file-write`](#goenv-version-file-write)
-* [`goenv version-name`](#goenv-version-name)
-* [`goenv version-origin`](#goenv-version-origin)
-* [`goenv versions`](#goenv-versions)
-* [`goenv whence`](#goenv-whence)
-* [`goenv which`](#goenv-which)
+- [Command Reference](#command-reference)
+  - [`goenv commands`](#goenv-commands)
+  - [`goenv completions`](#goenv-completions)
+  - [`goenv exec`](#goenv-exec)
+  - [`goenv global`](#goenv-global)
+  - [`goenv help`](#goenv-help)
+  - [`goenv hooks`](#goenv-hooks)
+  - [`goenv init`](#goenv-init)
+  - [`goenv install`](#goenv-install)
+  - [`goenv local`](#goenv-local)
+    - [`goenv local` (advanced)](#goenv-local-advanced)
+  - [`goenv prefix`](#goenv-prefix)
+  - [`goenv refresh`](#goenv-refresh)
+  - [`goenv rehash`](#goenv-rehash)
+  - [`goenv root`](#goenv-root)
+  - [`goenv shell`](#goenv-shell)
+  - [`goenv shims`](#goenv-shims)
+  - [`goenv uninstall`](#goenv-uninstall)
+  - [`goenv version`](#goenv-version)
+  - [`goenv --version`](#goenv---version)
+  - [`goenv version-file`](#goenv-version-file)
+  - [`goenv version-file-read`](#goenv-version-file-read)
+  - [`goenv version-file-write`](#goenv-version-file-write)
+  - [`goenv version-name`](#goenv-version-name)
+  - [`goenv version-origin`](#goenv-version-origin)
+  - [`goenv versions`](#goenv-versions)
+  - [`goenv whence`](#goenv-whence)
+  - [`goenv which`](#goenv-which)
 
 ## `goenv commands`
 
@@ -43,8 +46,8 @@ Provides auto-completion for itself and other commands by calling them with `--c
 
 Run an executable with the selected Go version.
 
-Assuming there's an already installed golang by e.g `goenv install 1.11.1` and 
-  selected by e.g `goenv global 1.11.1`,
+Assuming there's an already installed golang by e.g `goenv install 1.11.1` and
+selected by e.g `goenv global 1.11.1`,
 
 ```shell
 > goenv exec go run main.go
@@ -87,7 +90,6 @@ that has a `Summary:` or `Usage:` section. Usage instructions can
 span multiple lines as long as subsequent lines are indented.
 The remainder of the comment block is displayed as extended
 documentation.
-
 
 ```shell
 > goenv help help
@@ -145,7 +147,6 @@ command.
 When run without a version number, `goenv local` reports the currently
 configured local version. You can also unset the local version:
 
-
 ```shell
 > goenv local --unset
 ```
@@ -157,7 +158,7 @@ read a local version specified in an `.goenv-version` file, but a
 
 ### `goenv local` (advanced)
 
-You can specify local Go version. 
+You can specify local Go version.
 
 ```shell
 > goenv local 1.5.4
@@ -185,6 +186,37 @@ currently selected version.
 > goenv prefix
 /home/go-nv/.goenv/versions/1.11.1
 ```
+
+## `goenv refresh`
+
+Clears all cached version data and forces a fresh fetch from the official Go API on the next version-related command.
+
+```shell
+> goenv refresh
+✓ Cache cleared! Removed 2 cache file(s).
+Next version fetch will retrieve fresh data from go.dev
+
+# With verbose output
+> goenv refresh --verbose
+✓ Removed versions-cache.json
+✓ Removed releases-cache.json
+✓ Cache cleared! Removed 2 cache file(s).
+Next version fetch will retrieve fresh data from go.dev
+```
+
+This removes:
+
+- `versions-cache.json` - Version list cache
+- `releases-cache.json` - Full release metadata cache
+
+Use this command when:
+
+- A new Go version was just released and you want it immediately
+- You suspect cached data is stale or corrupted
+- Testing version fetching behavior
+- Troubleshooting version-related issues
+
+The next time you run `goenv install --list` or similar commands, goenv will fetch fresh data from go.dev.
 
 ## `goenv rehash`
 
@@ -268,7 +300,6 @@ Show version of `goenv` in format of `goenv <version>`.
 
 Detect the file that sets the current goenv version
 
-
 ```shell
 > goenv version-file
 /home/syndbg/work/go-nv/goenv/.go-version
@@ -279,7 +310,7 @@ Detect the file that sets the current goenv version
 Reads specified version file if it exists
 
 ```shell
-> goenv version-file-read ./go-version 
+> goenv version-file-read ./go-version
 1.11.1
 ```
 

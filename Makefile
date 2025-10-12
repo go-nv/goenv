@@ -11,16 +11,26 @@ LDFLAGS = -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT_SHA) -X m
 export PREFIX ?= /usr/local
 
 # Build targets
-.PHONY: build clean test install uninstall dev-deps all cross-build
+.PHONY: build clean test install uninstall dev-deps all cross-build generate-embedded test-windows
 
 # Default target
 all: build
+
+# Generate embedded versions from API (run before releases)
+generate-embedded:
+	@echo "Generating embedded versions from go.dev API..."
+	go run scripts/generate_embedded_versions/main.go
 
 build:
 	go build $(LDFLAGS) -o $(BINARY_NAME) .
 
 test:
 	go test -v ./...
+
+# Test Windows compatibility (can run on any OS)
+test-windows:
+	@echo "Testing Windows compatibility..."
+	go run scripts/test_windows_compatibility/main.go
 
 clean:
 	rm -f $(BINARY_NAME)
@@ -43,7 +53,8 @@ dev-deps:
 	go mod tidy
 
 # Cross-platform builds for releases
-cross-build:
+cross-build: generate-embedded
+	mkdir -p dist
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-linux-amd64 .
 	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-linux-arm64 .
 	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-darwin-amd64 .

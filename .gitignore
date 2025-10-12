@@ -16,3 +16,7 @@
 /goenv
 goenv-*
 *.exe
+
+// No docs at root
+/*.md
+

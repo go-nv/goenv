@@ -3,7 +3,6 @@ package version
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -22,7 +21,8 @@ type CachedData struct {
 
 // NewCache creates a new cache instance
 func NewCache(goenvRoot string) *Cache {
-	cachePath := filepath.Join(goenvRoot, "cache", "versions.json")
+	// Use consistent cache location with fetcher.go
+	cachePath := filepath.Join(goenvRoot, "releases-cache.json")
 	return &Cache{cachePath: cachePath}
 }
 
@@ -66,40 +66,21 @@ func (c *CachedData) IsStale(maxAge time.Duration) bool {
 	return time.Since(c.LastUpdated) > maxAge
 }
 
-// EmbeddedVersions contains a fallback list of Go versions
-// This is updated at build time or manually when needed
-var EmbeddedVersions = []GoRelease{
-	{
-		Version: "go1.25.2",
-		Stable:  true,
-		Files: []GoFile{
-			{Filename: "go1.25.2.darwin-amd64.tar.gz", OS: "darwin", Arch: "amd64", Kind: "archive", SHA256: "placeholder"},
-			{Filename: "go1.25.2.darwin-arm64.tar.gz", OS: "darwin", Arch: "arm64", Kind: "archive", SHA256: "placeholder"},
-			{Filename: "go1.25.2.linux-amd64.tar.gz", OS: "linux", Arch: "amd64", Kind: "archive", SHA256: "placeholder"},
-			{Filename: "go1.25.2.linux-arm64.tar.gz", OS: "linux", Arch: "arm64", Kind: "archive", SHA256: "placeholder"},
-			{Filename: "go1.25.2.freebsd-amd64.tar.gz", OS: "freebsd", Arch: "amd64", Kind: "archive", SHA256: "placeholder"},
-		},
-	},
-	{
-		Version: "go1.24.8",
-		Stable:  true,
-		Files: []GoFile{
-			{Filename: "go1.24.8.darwin-amd64.tar.gz", OS: "darwin", Arch: "amd64", Kind: "archive", SHA256: "placeholder"},
-			{Filename: "go1.24.8.darwin-arm64.tar.gz", OS: "darwin", Arch: "arm64", Kind: "archive", SHA256: "placeholder"},
-			{Filename: "go1.24.8.linux-amd64.tar.gz", OS: "linux", Arch: "amd64", Kind: "archive", SHA256: "placeholder"},
-			{Filename: "go1.24.8.linux-arm64.tar.gz", OS: "linux", Arch: "arm64", Kind: "archive", SHA256: "placeholder"},
-			{Filename: "go1.24.8.freebsd-amd64.tar.gz", OS: "freebsd", Arch: "amd64", Kind: "archive", SHA256: "placeholder"},
-		},
-	},
-	// Add more versions as needed...
-}
-
-// FetchWithFallback tries to fetch versions online, falls back to cache, then embedded data
+// FetchWithFallback tries to fetch all versions online, falls back to cache, then embedded data
 func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 	cache := NewCache(goenvRoot)
 
-	// Try to fetch online first
-	releases, err := f.FetchAvailableVersions()
+	// Check if offline mode is enabled
+	if os.Getenv("GOENV_OFFLINE") == "1" {
+		if f.debug {
+			fmt.Println("Debug: GOENV_OFFLINE=1, skipping online fetch and using embedded versions")
+		}
+		// Skip cache entirely in offline mode and go straight to embedded
+		return EmbeddedVersions, nil
+	}
+
+	// Try to fetch ALL versions online first (using FetchAllReleases)
+	releases, err := f.FetchAllReleases()
 	if err == nil {
 		// Success! Cache the result for future offline use
 		if cacheErr := cache.Set(releases); cacheErr != nil && f.debug {
@@ -110,6 +91,10 @@ func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 	}
 
 	// Online fetch failed, try cache
+	if f.debug {
+		fmt.Printf("Debug: Online fetch failed (%v), trying cache...\n", err)
+	}
+
 	cached, cacheErr := cache.Get()
 	if cacheErr == nil && !cached.IsStale(24*time.Hour) {
 		if f.debug {
@@ -118,29 +103,20 @@ func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 		return cached.Releases, nil
 	}
 
-	// Cache is stale or missing, use embedded data
+	// Cache is also stale or missing, but try it anyway if available (better than nothing)
+	if cacheErr == nil {
+		if f.debug {
+			fmt.Printf("Debug: Using stale cache (last updated: %s)\n", cached.LastUpdated.Format(time.RFC3339))
+		}
+		return cached.Releases, nil
+	}
+
+	// No cache available, use embedded data as last resort
 	if f.debug {
 		fmt.Printf("Debug: Using embedded fallback versions\n")
 	}
 
+	// EmbeddedVersions is defined in embedded_versions.go (generated at build time)
+	// To regenerate: go run scripts/generate_embedded_versions.go
 	return EmbeddedVersions, nil
 }
-
-// Add debug field to Fetcher
-type FetcherOptions struct {
-	Debug bool
-}
-
-// NewFetcherWithOptions creates a new version fetcher with options
-func NewFetcherWithOptions(opts FetcherOptions) *Fetcher {
-	return &Fetcher{
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		baseURL: "https://go.dev/dl/",
-		debug:   opts.Debug,
-	}
-}
-
-// Update the Fetcher struct to include debug field
-// (This would be added to the existing struct in the same file)

@@ -54,11 +54,17 @@ The following snippet can be inserted in your buildspec.yml (or buildspec defini
 
 ---
 
-## Links
+## 📖 Documentation
 
-- **[How It Works](./HOW_IT_WORKS.md)**
-- **[Installation](./INSTALL.md)**
-- **[Command Reference](./COMMANDS.md)**
-- **[Environment variables](./ENVIRONMENT_VARIABLES.md)**
-- **[Contributing](./CONTRIBUTING.md)**
-- **[Code-of-Conduct](./CODE_OF_CONDUCT.md)**
+**[📚 Complete Documentation](./docs/)** - Comprehensive guides and references
+
+### Quick Links
+
+- **[Installation Guide](./docs/user-guide/INSTALL.md)** - Get started with goenv
+- **[How It Works](./docs/user-guide/HOW_IT_WORKS.md)** - Understanding goenv's internals
+- **[Command Reference](./docs/reference/COMMANDS.md)** - Complete CLI documentation
+- **[Environment Variables](./docs/reference/ENVIRONMENT_VARIABLES.md)** - Configuration options
+- **[Smart Caching](./docs/advanced/SMART_CACHING.md)** - Intelligent version caching
+- **[Contributing](./docs/CONTRIBUTING.md)** - How to contribute
+- **[Code of Conduct](./docs/CODE_OF_CONDUCT.md)** - Community guidelines
+- **[Changelog](./docs/CHANGELOG.md)** - Version history

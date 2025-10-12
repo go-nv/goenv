@@ -27,8 +27,10 @@ REM Check for command argument
 if "%1"=="" goto build
 if /i "%1"=="build" goto build
 if /i "%1"=="test" goto test
+if /i "%1"=="test-windows" goto test-windows
 if /i "%1"=="clean" goto clean
 if /i "%1"=="dev-deps" goto dev-deps
+if /i "%1"=="generate-embedded" goto generate-embedded
 if /i "%1"=="version" goto version
 if /i "%1"=="help" goto help
 if /i "%1"=="/?" goto help
@@ -60,6 +62,16 @@ goto help
     echo Tests passed!
     goto end
 
+:test-windows
+    echo Testing Windows compatibility...
+    go run scripts/test_windows_compatibility/main.go
+    if %ERRORLEVEL% NEQ 0 (
+        echo Windows compatibility test failed!
+        exit /b 1
+    )
+    echo Windows compatibility verified!
+    goto end
+
 :clean
     echo Cleaning build artifacts...
     if exist %BINARY_NAME% del /F %BINARY_NAME%
@@ -77,6 +89,16 @@ goto help
     echo Dependencies updated!
     goto end
 
+:generate-embedded
+    echo Generating embedded versions from go.dev API...
+    go run scripts/generate_embedded_versions/main.go
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to generate embedded versions!
+        exit /b 1
+    )
+    echo Embedded versions generated successfully!
+    goto end
+
 :version
     echo goenv Build Information
     echo   Version:    !VERSION!
@@ -91,12 +113,14 @@ goto help
     echo Usage: build.bat [TASK]
     echo.
     echo Tasks:
-    echo   build      Build the goenv binary (default)
-    echo   test       Run all tests
-    echo   clean      Remove built binaries and clean build artifacts
-    echo   dev-deps   Download and tidy Go module dependencies
-    echo   version    Show version information
-    echo   help       Show this help message
+    echo   build              Build the goenv binary (default)
+    echo   test               Run all tests
+    echo   test-windows       Test Windows compatibility
+    echo   clean              Remove built binaries and clean build artifacts
+    echo   dev-deps           Download and tidy Go module dependencies
+    echo   generate-embedded  Generate embedded versions from go.dev API
+    echo   version            Show version information
+    echo   help               Show this help message
     echo.
     echo For advanced features (install, cross-build), use build.ps1 (PowerShell):
     echo   powershell -ExecutionPolicy Bypass -File build.ps1 [TASK]
