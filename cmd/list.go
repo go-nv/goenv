@@ -59,7 +59,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		if version.IsPrerelease(v) {
 			status = " (unstable)"
 		}
-		fmt.Printf("%s%s\n", v, status)
+		fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", v, status)
 	}
 
 	return nil
