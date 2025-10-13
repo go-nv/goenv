@@ -154,12 +154,13 @@ func (m *Manager) GetCurrentVersion() (string, string, error) {
 		return envVersion, "GOENV_VERSION environment variable", nil
 	}
 
-	// Check local version file
-	localVersion, err := m.getLocalVersion()
-	if err == nil && localVersion != "" {
-		localFile := m.findLocalVersionFile()
-		if localFile != "" {
-			return localVersion, localFile, nil
+	// Check for local version file (including go.mod if enabled)
+	localFile, err := m.FindVersionFile("")
+	if err == nil && localFile != "" {
+		// Read version from the found file
+		version, err := m.ReadVersionFile(localFile)
+		if err == nil && version != "" {
+			return version, localFile, nil
 		}
 	}
 
@@ -177,11 +178,6 @@ func (m *Manager) GetCurrentVersion() (string, string, error) {
 // GetLocalVersion reads version from local .go-version file
 func (m *Manager) GetLocalVersion() (string, error) {
 	return m.readVersionFile(m.findLocalVersionFile())
-}
-
-// getLocalVersion reads version from local .go-version file (internal helper)
-func (m *Manager) getLocalVersion() (string, error) {
-	return m.GetLocalVersion()
 }
 
 // GetGlobalVersion reads version from global version file

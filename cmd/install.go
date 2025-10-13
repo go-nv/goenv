@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
@@ -18,19 +20,21 @@ var installCmd = &cobra.Command{
 }
 
 var installFlags struct {
-	force   bool
-	list    bool
-	keep    bool
-	verbose bool
-	quiet   bool
-	ipv4    bool
-	ipv6    bool
-	debug   bool
+	force        bool
+	skipExisting bool
+	list         bool
+	keep         bool
+	verbose      bool
+	quiet        bool
+	ipv4         bool
+	ipv6         bool
+	debug        bool
 }
 
 func init() {
 	rootCmd.AddCommand(installCmd)
 	installCmd.Flags().BoolVarP(&installFlags.force, "force", "f", false, "Force installation even if already installed")
+	installCmd.Flags().BoolVarP(&installFlags.skipExisting, "skip-existing", "s", false, "Skip if the version appears to be installed already")
 	installCmd.Flags().BoolVarP(&installFlags.list, "list", "l", false, "List all available versions")
 	installCmd.Flags().BoolVarP(&installFlags.keep, "keep", "k", false, "Keep downloaded files after installation")
 	installCmd.Flags().BoolVarP(&installFlags.verbose, "verbose", "v", false, "Verbose mode: print detailed installation info")
@@ -95,6 +99,16 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	if cfg.Debug {
 		fmt.Printf("Debug: Installing Go version %s\n", goVersion)
+	}
+
+	// Handle --skip-existing flag
+	if installFlags.skipExisting {
+		// Check if version is already installed
+		versionPath := filepath.Join(cfg.VersionsDir(), goVersion)
+		if _, err := os.Stat(versionPath); err == nil {
+			// Already installed, skip silently
+			return nil
+		}
 	}
 
 	return installer.Install(goVersion, installFlags.force)

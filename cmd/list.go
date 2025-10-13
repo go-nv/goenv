@@ -58,13 +58,24 @@ func runList(cmd *cobra.Command, args []string) error {
 		versions = stableVersions
 	}
 
-	// Display versions
-	for _, v := range versions {
-		status := ""
-		if version.IsPrerelease(v) {
-			status = " (unstable)"
+	// Match bash goenv install --list format:
+	// - Header "Available versions:"
+	// - Two-space indentation
+	// - Strip "go" prefix from version numbers
+	// - Reverse order (oldest first, like bash does)
+	fmt.Fprintln(cmd.OutOrStdout(), "Available versions:")
+
+	// Reverse the slice to show oldest first
+	for i := len(versions) - 1; i >= 0; i-- {
+		v := versions[i]
+		// Strip "go" prefix if present
+		displayVersion := v
+		if len(v) > 2 && v[:2] == "go" {
+			displayVersion = v[2:]
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", v, status)
+
+		// Display with two-space indentation (no unstable marker for install --list)
+		fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", displayVersion)
 	}
 
 	return nil
