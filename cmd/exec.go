@@ -10,6 +10,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/spf13/cobra"
 )
 
@@ -73,6 +74,17 @@ func runExec(cmd *cobra.Command, args []string) error {
 	// Prepare environment
 	env := os.Environ()
 
+	// Expand GOPATH early if it needs expansion (handles $HOME, ~/, etc.)
+	// This ensures Go doesn't error on shell metacharacters or variables
+	gopath := os.Getenv("GOPATH")
+	if gopath != "" {
+		expanded := pathutil.ExpandPath(gopath)
+		if expanded != gopath {
+			gopath = expanded
+			env = setEnvVar(env, "GOPATH", expanded)
+		}
+	}
+
 	if currentVersion != "system" {
 		versionPath, err := mgr.GetVersionPath(currentVersion)
 		if err != nil {
@@ -90,13 +102,13 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 		// Set GOPATH if not disabled
 		if os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
-			gopath := os.Getenv("GOPATH")
 			if gopath == "" {
 				// Set default GOPATH
 				homeDir, _ := os.UserHomeDir()
 				gopath = filepath.Join(homeDir, "go", currentVersion)
-				env = setEnvVar(env, "GOPATH", gopath)
 			}
+			// gopath was already expanded above if it came from environment
+			env = setEnvVar(env, "GOPATH", gopath)
 		}
 	}
 

@@ -31,12 +31,19 @@ func runGlobal(cmd *cobra.Command, args []string) error {
 	mgr := manager.NewManager(cfg)
 
 	if len(args) == 0 {
-		// Show current global version
-		version, err := mgr.GetGlobalVersion()
+		// Show current global version(s) - read raw file to preserve multi-line format
+		globalFile := cfg.GlobalVersionFile()
+		version, err := mgr.ReadVersionFile(globalFile)
 		if err != nil {
-			return fmt.Errorf("no global version set")
+			// If file doesn't exist or is empty, default to system
+			version = "system"
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), version)
+		// Convert colon-separated to newline-separated for display
+		// (ReadVersionFile joins multiple lines with colons)
+		versions := splitVersions(version)
+		for _, v := range versions {
+			fmt.Fprintln(cmd.OutOrStdout(), v)
+		}
 		return nil
 	}
 
