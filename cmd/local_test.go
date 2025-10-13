@@ -304,3 +304,49 @@ func TestLocalCommand(t *testing.T) {
 func ptr[T any](value T) *T {
 	return &value
 }
+
+func TestLocalCommandRejectsExtraArguments(t *testing.T) {
+	testRoot, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	// Setup test versions
+	createTestVersion(t, testRoot, "1.21.5")
+	createTestVersion(t, testRoot, "1.22.2")
+
+	// Create a temp directory for the test
+	workDir, err := os.MkdirTemp("", "goenv_local_test_")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(workDir)
+
+	// Change to work directory
+	oldDir, _ := os.Getwd()
+	defer os.Chdir(oldDir)
+	os.Chdir(workDir)
+
+	// Try to set local with extra arguments
+	cmd := &cobra.Command{
+		Use: "local",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runLocal(cmd, args)
+		},
+	}
+
+	output := &strings.Builder{}
+	cmd.SetOut(output)
+	cmd.SetErr(output)
+	cmd.SetArgs([]string{"1.21.5", "extra"})
+
+	err = cmd.Execute()
+
+	// Should error with usage message
+	if err == nil {
+		t.Error("Expected error when extra arguments provided, got nil")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "Usage: goenv local [<version>]") {
+		t.Errorf("Expected usage error, got: %v", err)
+	}
+}

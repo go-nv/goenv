@@ -23,6 +23,11 @@ func init() {
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
+	// Validate: version command takes no arguments
+	if len(args) > 0 {
+		return fmt.Errorf("Usage: goenv version")
+	}
+
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 

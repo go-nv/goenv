@@ -32,6 +32,11 @@ func init() {
 }
 
 func runRefresh(cmd *cobra.Command, args []string) error {
+	// Validate: refresh command takes no positional arguments (only --verbose flag)
+	if len(args) > 0 {
+		return fmt.Errorf("Usage: goenv refresh [--verbose]")
+	}
+
 	cfg := config.Load()
 
 	cacheFiles := []string{

@@ -26,6 +26,11 @@ func init() {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
+	// Validate: list command takes no positional arguments (only --stable flag)
+	if len(args) > 0 {
+		return fmt.Errorf("Usage: goenv list [--stable]")
+	}
+
 	cfg := config.Load()
 	if cfg.Debug {
 		fmt.Println("Debug: Fetching available Go versions...")

@@ -243,3 +243,42 @@ func TestVersionWithMissingVersions(t *testing.T) {
 		t.Errorf("Expected output to mention installed version '1.11.1'")
 	}
 }
+
+func TestVersionCommandRejectsExtraArguments(t *testing.T) {
+	testRoot, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	// Setup a test version
+	createTestVersion(t, testRoot, "1.21.5")
+
+	// Set global version
+	globalFile := filepath.Join(testRoot, "version")
+	err := os.WriteFile(globalFile, []byte("1.21.5"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to set global version: %v", err)
+	}
+
+	// Create command with extra arguments
+	cmd := &cobra.Command{
+		Use:                "version",
+		RunE:               runVersion,
+		DisableFlagParsing: true,
+	}
+
+	output := &strings.Builder{}
+	cmd.SetOut(output)
+	cmd.SetErr(output)
+	cmd.SetArgs([]string{"extra"})
+
+	err = cmd.Execute()
+
+	// Should error with usage message
+	if err == nil {
+		t.Error("Expected error when extra arguments provided, got nil")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "Usage: goenv version") {
+		t.Errorf("Expected usage error, got: %v", err)
+	}
+}

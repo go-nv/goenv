@@ -28,6 +28,11 @@ func init() {
 }
 
 func runLocal(cmd *cobra.Command, args []string) error {
+	// Validate: local command takes 0 or 1 argument (not including --unset flag)
+	if len(args) > 1 {
+		return fmt.Errorf("Usage: goenv local [<version>]")
+	}
+
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 

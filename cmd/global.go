@@ -22,6 +22,11 @@ func init() {
 }
 
 func runGlobal(cmd *cobra.Command, args []string) error {
+	// Validate: global command takes 0 or 1 argument
+	if len(args) > 1 {
+		return fmt.Errorf("Usage: goenv global [version]")
+	}
+
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 

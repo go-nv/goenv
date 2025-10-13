@@ -273,3 +273,37 @@ func TestGlobalWithLocalOverride(t *testing.T) {
 		t.Errorf("Global command should show global version '1.21.5', got '%s'", got)
 	}
 }
+
+func TestGlobalCommandRejectsExtraArguments(t *testing.T) {
+	testRoot, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	// Setup test versions
+	createTestVersion(t, testRoot, "1.21.5")
+	createTestVersion(t, testRoot, "1.22.2")
+
+	// Try to set global with extra arguments
+	cmd := &cobra.Command{
+		Use: "global",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runGlobal(cmd, args)
+		},
+	}
+
+	output := &strings.Builder{}
+	cmd.SetOut(output)
+	cmd.SetErr(output)
+	cmd.SetArgs([]string{"1.21.5", "extra"})
+
+	err := cmd.Execute()
+
+	// Should error with usage message
+	if err == nil {
+		t.Error("Expected error when extra arguments provided, got nil")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "Usage: goenv global [version]") {
+		t.Errorf("Expected usage error, got: %v", err)
+	}
+}

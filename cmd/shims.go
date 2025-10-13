@@ -40,6 +40,9 @@ var whichCmd = &cobra.Command{
 			fmt.Fprintln(cmd.OutOrStderr(), "Usage: goenv which <command>")
 			os.Exit(1)
 		}
+		if len(args) > 1 {
+			return fmt.Errorf("Usage: goenv which <command>")
+		}
 		return nil
 	},
 	RunE: runWhich,
@@ -61,6 +64,9 @@ var whenceCmd = &cobra.Command{
 		if len(args) == 0 {
 			fmt.Fprintln(cmd.OutOrStderr(), "Usage: goenv whence [--path] <command>")
 			os.Exit(1)
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("Usage: goenv whence [--path] <command>")
 		}
 		return nil
 	},
@@ -100,6 +106,11 @@ func init() {
 }
 
 func runRehash(cmd *cobra.Command, args []string) error {
+	// Validate: rehash command takes no arguments
+	if len(args) > 0 {
+		return fmt.Errorf("Usage: goenv rehash")
+	}
+
 	cfg := config.Load()
 	shimMgr := shims.NewShimManager(cfg)
 
@@ -126,6 +137,11 @@ func runShims(cmd *cobra.Command, args []string) error {
 	if shimsFlags.complete {
 		fmt.Fprintln(cmd.OutOrStdout(), "--short")
 		return nil
+	}
+
+	// Validate: shims command takes no positional arguments (only --short flag)
+	if len(args) > 0 {
+		return fmt.Errorf("Usage: goenv shims [--short]")
 	}
 
 	cfg := config.Load()

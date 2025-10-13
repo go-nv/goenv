@@ -9,10 +9,11 @@ import (
 )
 
 var rootCmd2 = &cobra.Command{
-	Use:   "root",
-	Short: "Display the root directory where goenv stores its data",
-	Long:  "Show the GOENV_ROOT directory path",
-	RunE:  runRoot,
+	Use:                "root",
+	Short:              "Display the root directory where goenv stores its data",
+	Long:               "Show the GOENV_ROOT directory path",
+	DisableFlagParsing: true,
+	RunE:               runRoot,
 }
 
 var prefixCmd = &cobra.Command{
@@ -34,12 +35,22 @@ func init() {
 }
 
 func runRoot(cmd *cobra.Command, args []string) error {
+	// Validate: root command takes no arguments
+	if len(args) > 0 {
+		return fmt.Errorf("Usage: goenv root")
+	}
+
 	cfg := config.Load()
 	fmt.Fprintln(cmd.OutOrStdout(), cfg.Root)
 	return nil
 }
 
 func runPrefix(cmd *cobra.Command, args []string) error {
+	// Validate: prefix command takes 0 or 1 argument
+	if len(args) > 1 {
+		return fmt.Errorf("Usage: goenv prefix [version]")
+	}
+
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 

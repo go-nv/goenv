@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
-	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionOriginCmd = &cobra.Command{
@@ -25,6 +25,11 @@ func init() {
 }
 
 func runVersionOrigin(cmd *cobra.Command, args []string) error {
+	// Validate: version-origin command takes no arguments
+	if len(args) > 0 {
+		return fmt.Errorf("Usage: goenv version-origin")
+	}
+
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 

@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
-	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionNameCmd = &cobra.Command{
@@ -23,6 +23,11 @@ func init() {
 }
 
 func runVersionName(cmd *cobra.Command, args []string) error {
+	// Validate: version-name command takes no arguments
+	if len(args) > 0 {
+		return fmt.Errorf("Usage: goenv version-name")
+	}
+
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 
