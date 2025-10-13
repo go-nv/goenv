@@ -50,13 +50,13 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 			}
 			removed++
 			if refreshFlags.verbose {
-				fmt.Printf("✓ Removed %s\n", filepath.Base(cacheFile))
+				fmt.Fprintf(cmd.OutOrStdout(), "✓ Removed %s\n", filepath.Base(cacheFile))
 			}
 		} else if os.IsNotExist(err) {
 			// File doesn't exist
 			notFound++
 			if refreshFlags.verbose {
-				fmt.Printf("• %s not found (already clean)\n", filepath.Base(cacheFile))
+				fmt.Fprintf(cmd.OutOrStdout(), "• %s not found (already clean)\n", filepath.Base(cacheFile))
 			}
 		} else {
 			// Other error (permissions, etc.)
@@ -66,10 +66,10 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 
 	// Summary
 	if removed > 0 {
-		fmt.Printf("✓ Cache cleared! Removed %d cache file(s).\n", removed)
-		fmt.Println("Next version fetch will retrieve fresh data from go.dev")
+		fmt.Fprintf(cmd.OutOrStdout(), "✓ Cache cleared! Removed %d cache file(s).\n", removed)
+		fmt.Fprintln(cmd.OutOrStdout(), "Next version fetch will retrieve fresh data from go.dev")
 	} else if notFound == len(cacheFiles) {
-		fmt.Println("Cache is already clean (no cache files found)")
+		fmt.Fprintln(cmd.OutOrStdout(), "Cache is already clean (no cache files found)")
 	}
 
 	return nil

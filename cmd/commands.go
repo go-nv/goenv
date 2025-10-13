@@ -39,8 +39,8 @@ func init() {
 func runCommands(cmd *cobra.Command, args []string) error {
 	// Handle completion flag
 	if complete, _ := cmd.Flags().GetBool("complete"); complete {
-		cmd.Println("--sh")
-		cmd.Println("--no-sh")
+		fmt.Fprintln(cmd.OutOrStdout(), "--sh")
+		fmt.Fprintln(cmd.OutOrStdout(), "--no-sh")
 		return nil
 	}
 

@@ -35,7 +35,7 @@ func init() {
 
 func runRoot(cmd *cobra.Command, args []string) error {
 	cfg := config.Load()
-	fmt.Println(cfg.Root)
+	fmt.Fprintln(cmd.OutOrStdout(), cfg.Root)
 	return nil
 }
 
@@ -47,10 +47,10 @@ func runPrefix(cmd *cobra.Command, args []string) error {
 	if prefixFlags.complete {
 		versions, err := mgr.ListInstalledVersions()
 		if err == nil {
-			cmd.Println("latest")
-			cmd.Println("system")
+			fmt.Fprintln(cmd.OutOrStdout(), "latest")
+			fmt.Fprintln(cmd.OutOrStdout(), "system")
 			for _, v := range versions {
-				cmd.Println(v)
+				fmt.Fprintln(cmd.OutOrStdout(), v)
 			}
 		}
 		return nil
@@ -86,7 +86,7 @@ func runPrefix(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("goenv: system version not found in PATH")
 			}
-			cmd.Println(systemGoDir)
+			fmt.Fprintln(cmd.OutOrStdout(), systemGoDir)
 			return nil
 		}
 
@@ -106,7 +106,7 @@ func runPrefix(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("goenv: system version not found in PATH")
 		}
-		cmd.Println(systemGoDir)
+		fmt.Fprintln(cmd.OutOrStdout(), systemGoDir)
 		return nil
 	}
 
@@ -119,6 +119,6 @@ func runPrefix(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("goenv: version '%s' not installed", version)
 	}
 
-	cmd.Println(versionPath)
+	fmt.Fprintln(cmd.OutOrStdout(), versionPath)
 	return nil
 }

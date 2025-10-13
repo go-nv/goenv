@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
-	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var globalCmd = &cobra.Command{
@@ -31,7 +31,7 @@ func runGlobal(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("no global version set")
 		}
-		cmd.Println(version)
+		fmt.Fprintln(cmd.OutOrStdout(), version)
 		return nil
 	}
 

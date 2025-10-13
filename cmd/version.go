@@ -55,7 +55,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 		for _, v := range versions {
 			if mgr.IsVersionInstalled(v) || v == "system" {
 				if source != "" {
-					cmd.Printf("%s (set by %s)\n", v, source)
+					fmt.Fprintf(cmd.OutOrStdout(), "%s (set by %s)\n", v, source)
 				} else {
 					fmt.Fprintln(cmd.OutOrStdout(), v)
 				}
@@ -68,7 +68,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 	} else {
 		// Single version
 		if source != "" {
-			cmd.Printf("%s (set by %s)\n", version, source)
+			fmt.Fprintf(cmd.OutOrStdout(), "%s (set by %s)\n", version, source)
 		} else {
 			fmt.Fprintln(cmd.OutOrStdout(), version)
 		}

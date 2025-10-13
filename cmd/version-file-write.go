@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
-	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionFileWriteCmd = &cobra.Command{
@@ -48,7 +48,7 @@ func runVersionFileWrite(cmd *cobra.Command, args []string) error {
 
 		// Print success message with context about what was replaced
 		if oldVersion != "" {
-			cmd.Printf("goenv: using system version instead of %s now\n", oldVersion)
+			fmt.Fprintf(cmd.OutOrStdout(), "goenv: using system version instead of %s now\n", oldVersion)
 		}
 		return nil
 	}

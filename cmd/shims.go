@@ -117,7 +117,7 @@ func runRehash(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to list shims: %w", err)
 	}
 
-	cmd.Printf("Rehashed %d shims\n", len(shimList))
+	fmt.Fprintf(cmd.OutOrStdout(), "Rehashed %d shims\n", len(shimList))
 	return nil
 }
 

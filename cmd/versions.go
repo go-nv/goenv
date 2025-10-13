@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
-	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var versionsCmd = &cobra.Command{
@@ -72,7 +72,7 @@ func runVersions(cmd *cobra.Command, args []string) error {
 
 		// Show system version with source info
 		globalVersionFile := cfg.GlobalVersionFile()
-		cmd.Printf("* system (set by %s)\n", globalVersionFile)
+		fmt.Fprintf(cmd.OutOrStdout(), "* system (set by %s)\n", globalVersionFile)
 		return nil
 	}
 
@@ -100,7 +100,7 @@ func runVersions(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		cmd.Printf("%ssystem%s\n", prefix, suffix)
+		fmt.Fprintf(cmd.OutOrStdout(), "%ssystem%s\n", prefix, suffix)
 	}
 
 	// Display installed versions
@@ -118,7 +118,7 @@ func runVersions(cmd *cobra.Command, args []string) error {
 				}
 			}
 
-			cmd.Printf("%s%s%s\n", prefix, version, suffix)
+			fmt.Fprintf(cmd.OutOrStdout(), "%s%s%s\n", prefix, version, suffix)
 		}
 	}
 
