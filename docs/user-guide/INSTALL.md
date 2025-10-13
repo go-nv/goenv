@@ -43,14 +43,43 @@ easy to fork and contribute any changes back upstream.
 
        exec $SHELL
 
-5. **Install Go versions into `$GOENV_ROOT/versions`.**
+5. **(Optional) Enable tab completion for faster command-line usage.**
+   goenv includes built-in shell completion scripts that enable tab completion for commands, flags, and Go versions.
+
+   **Quick Install (Recommended):**
+   ```bash
+   goenv completion --install
+   ```
+   
+   This will:
+   - Auto-detect your shell (bash/zsh/fish/powershell)
+   - Install the completion script to the appropriate location
+   - Display activation instructions
+   
+   **Manual Install:**
+   ```bash
+   # Output the completion script and add to your shell config manually
+   goenv completion >> ~/.bashrc  # or ~/.zshrc, ~/.config/fish/config.fish, etc.
+   ```
+   
+   **Restart your shell** to activate completions:
+   ```bash
+   exec $SHELL
+   ```
+   
+   After setup, you can use tab completion:
+   - `goenv <TAB>` - See all available commands
+   - `goenv install <TAB>` - See available Go versions
+   - `goenv global <TAB>` - See installed versions
+
+6. **Install Go versions into `$GOENV_ROOT/versions`.**
    For example, to download and install Go 1.12.0, run:
 
        goenv install 1.12.0
 
    **NOTE:** It downloads and places the prebuilt Go binaries provided by Google.
 
-6. **Set goenv global version.**
+7. **Set goenv global version.**
    For example, to set the version to Go 1.12.0, run:
 
        goenv global 1.12.0

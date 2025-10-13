@@ -24,6 +24,7 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
 - Allow you to **override the Go version** with an environment
   variable.
 - Search commands from **multiple versions of Go at a time**.
+- Provide **tab completion** for bash, zsh, fish, and PowerShell.
 
 ### goenv compared to others:
 
@@ -54,7 +55,36 @@ The following snippet can be inserted in your buildspec.yml (or buildspec defini
 
 ---
 
-## 📖 Documentation
+## � Quick Start
+
+```bash
+# 1. Clone goenv
+git clone https://github.com/go-nv/goenv.git ~/.goenv
+
+# 2. Add to your shell config (~/.bashrc, ~/.zshrc, etc.)
+export GOENV_ROOT="$HOME/.goenv"
+export PATH="$GOENV_ROOT/bin:$PATH"
+eval "$(goenv init -)"
+
+# 3. Enable tab completion (optional but recommended)
+goenv completion --install
+
+# 4. Restart your shell
+exec $SHELL
+
+# 5. Install a Go version
+goenv install 1.22.0
+
+# 6. Set it as global
+goenv global 1.22.0
+
+# 7. Verify
+go version
+```
+
+---
+
+## �📖 Documentation
 
 **[📚 Complete Documentation](./docs/)** - Comprehensive guides and references
 
