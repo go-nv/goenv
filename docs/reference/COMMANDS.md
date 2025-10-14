@@ -36,7 +36,35 @@ All subcommands are:
 
 ## `goenv commands`
 
-Lists all available goenv commands.
+Lists all available goenv commands, including built-in commands and plugin commands.
+
+**Plugin discovery:**
+
+In addition to built-in commands, `goenv commands` automatically discovers and lists plugin commands. Plugins are executables located in:
+- `$GOENV_ROOT/plugins/*/bin/goenv-*`
+
+For example, if you have a plugin structure like:
+```
+$GOENV_ROOT/plugins/
+  my-plugin/
+    bin/
+      goenv-my-command
+```
+
+Then `goenv my-command` will be available and listed in `goenv commands`.
+
+**Filtering commands:**
+
+```shell
+# List all commands
+> goenv commands
+
+# List only shell commands (sh-*)
+> goenv commands --sh
+
+# List only non-shell commands
+> goenv commands --no-sh
+```
 
 ## `goenv completions`
 
@@ -101,10 +129,39 @@ documentation.
 
 ## `goenv hooks`
 
-List hook scripts for a given goenv command
+List hook scripts for a given goenv command. Hooks are bash scripts that execute at specific points during goenv command execution, allowing you to customize behavior.
 
 ```shell
 > goenv hooks uninstall
+```
+
+**Available hook points:**
+- `exec` - Runs before executing a Go command (e.g., `goenv exec go run`)
+- `rehash` - Runs after regenerating shims
+- `which` - Runs before finding a binary location
+- `version-name` - Runs when determining the version name
+- `version-origin` - Runs when determining where the version was set
+- `install` - Runs before installing a Go version
+- `uninstall` - Runs before uninstalling a Go version
+
+**Hook environment variables:**
+
+Hooks receive environment variables depending on the command:
+- `GOENV_VERSION` - The version being operated on (install, uninstall, exec, etc.)
+- `GOENV_COMMAND` - The command being executed (for exec hooks)
+- `GOENV_FILE_ARG` - Path to file argument when executing `go*` commands with file paths
+- `GOENV_VERSION_ORIGIN` - Can be set by version-origin hooks to override the origin
+
+**Hook locations:**
+
+Hooks are searched in directories specified by `GOENV_HOOK_PATH` (colon-separated). Each hook is a bash script named `<command>.bash` (e.g., `exec.bash`, `install.bash`).
+
+Example hook structure:
+```bash
+# ~/.goenv/hooks/exec.bash
+#!/usr/bin/env bash
+# This runs before every `goenv exec` command
+echo "Executing: $GOENV_COMMAND with version $GOENV_VERSION"
 ```
 
 ## `goenv init`
@@ -176,6 +233,23 @@ You can specify local Go version.
 go version go1.5.4 darwin/amd64
 ```
 
+**Version shorthand syntax:**
+
+You can use a shorthand syntax to set the local version by specifying the version directly as the first argument:
+
+```shell
+# These are equivalent:
+> goenv 1.21.0
+> goenv local 1.21.0
+
+# Works with various version formats:
+> goenv 1.22.5        # Full version
+> goenv latest        # Latest installed version
+> goenv system        # System Go
+```
+
+This shorthand automatically routes to the `local` command, making it faster to switch versions in your current directory.
+
 ## `goenv prefix`
 
 Displays the directory where a Go version is installed. If no
@@ -220,13 +294,39 @@ The next time you run `goenv install --list` or similar commands, goenv will fet
 
 ## `goenv rehash`
 
-Installs shims for all Go binaries known to goenv (i.e.,
-`~/.goenv/versions/*/bin/*`).
-Run this command after you install a new
-version of Go, or install a package that provides binaries.
+Installs shims for all Go binaries known to goenv. This includes:
+- Go version binaries: `~/.goenv/versions/*/bin/*`
+- GOPATH binaries: `$GOENV_GOPATH_PREFIX/<version>/bin/*` (unless `GOENV_DISABLE_GOPATH=1`)
+
+Run this command after you install a new version of Go, or install a package that provides binaries.
 
 ```shell
 > goenv rehash
+```
+
+**GOPATH binary support:**
+
+By default, goenv also creates shims for binaries in your GOPATH. This allows tools installed with `go install` to work seamlessly with version switching:
+
+```shell
+# Install a tool with the current Go version
+> go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Rehash to create shims
+> goenv rehash
+
+# The tool is now available via shim
+> golangci-lint version
+```
+
+To disable GOPATH binary scanning:
+```shell
+export GOENV_DISABLE_GOPATH=1
+```
+
+To customize the GOPATH location:
+```shell
+export GOENV_GOPATH_PREFIX=/custom/path  # Default: $HOME/go
 ```
 
 ## `goenv root`
@@ -363,9 +463,10 @@ the currently active version.
 
 ## `goenv whence`
 
-Lists all Go versions with the given command installed.
+Lists all Go versions with the given command installed. Searches both version bin directories and GOPATH bin directories (unless `GOENV_DISABLE_GOPATH=1`).
 
 ```shell
+# List versions with the 'go' command
 > goenv whence go
 1.3.0
 1.3.1
@@ -383,14 +484,32 @@ Lists all Go versions with the given command installed.
 1.6.0
 1.6.1
 1.6.2
+
+# List versions with a GOPATH-installed tool
+> goenv whence golangci-lint
+1.21.5
+1.22.5
+```
+
+Use the `--path` flag to show full paths instead of version names:
+
+```shell
+> goenv whence --path golangci-lint
+/home/go-nv/go/1.21.5/bin/golangci-lint
+/home/go-nv/go/1.22.5/bin/golangci-lint
 ```
 
 ## `goenv which`
 
 Displays the full path to the executable that goenv will invoke when
-you run the given command.
+you run the given command. Searches both version bin directories and GOPATH bin directories (unless `GOENV_DISABLE_GOPATH=1`).
 
 ```shell
+# Find a Go core binary
 > goenv which gofmt
 /home/go-nv/.goenv/versions/1.6.1/bin/gofmt
+
+# Find a GOPATH-installed tool
+> goenv which golangci-lint
+/home/go-nv/go/1.22.5/bin/golangci-lint
 ```

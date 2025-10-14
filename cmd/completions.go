@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -67,7 +68,8 @@ func runCompletions(cmd *cobra.Command, args []string) error {
 	pathEnv := os.Getenv("PATH")
 	for _, dir := range filepath.SplitList(pathEnv) {
 		candidate := filepath.Join(dir, "goenv-"+commandName)
-		if info, err := os.Stat(candidate); err == nil && info.Mode()&0111 != 0 {
+		// On Windows, all files are "executable"; on Unix, check the executable bit
+		if info, err := os.Stat(candidate); err == nil && (runtime.GOOS == "windows" || info.Mode()&0111 != 0) {
 			commandPath = candidate
 			break
 		}
@@ -77,7 +79,8 @@ func runCompletions(cmd *cobra.Command, args []string) error {
 	if commandPath == "" {
 		libexecDir := filepath.Join(cfg.Root, "libexec")
 		candidate := filepath.Join(libexecDir, "goenv-"+commandName)
-		if info, err := os.Stat(candidate); err == nil && info.Mode()&0111 != 0 {
+		// On Windows, all files are "executable"; on Unix, check the executable bit
+		if info, err := os.Stat(candidate); err == nil && (runtime.GOOS == "windows" || info.Mode()&0111 != 0) {
 			commandPath = candidate
 		}
 	}

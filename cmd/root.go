@@ -19,18 +19,20 @@ var rootCmd = &cobra.Command{
 		// Check if GOENV_AUTO_INSTALL is enabled
 		if os.Getenv("GOENV_AUTO_INSTALL") == "1" {
 			// Run install command with GOENV_AUTO_INSTALL_FLAGS if set
-			installArgs := []string{}
+			installArgs := []string{"install"}
 			if flags := os.Getenv("GOENV_AUTO_INSTALL_FLAGS"); flags != "" {
 				// Split flags by space (simple implementation)
+				// TODO: Improve this to handle quoted arguments properly
 				installArgs = append(installArgs, flags)
 			}
 
-			// Find the install command and run it
-			installCmd, _, err := cmd.Root().Find(append([]string{"install"}, installArgs...))
-			if err == nil {
-				installCmd.Run(installCmd, installArgs)
-				return
+			// Set args and execute the install command
+			cmd.Root().SetArgs(installArgs)
+			if err := cmd.Root().Execute(); err != nil {
+				fmt.Fprintf(os.Stderr, "goenv: install failed: %v\n", err)
+				os.Exit(1)
 			}
+			return
 		}
 
 		// If no command is provided, show simple help message matching bash version
@@ -58,10 +60,50 @@ For full documentation, see: https://github.com/go-nv/goenv#readme`)
 }
 
 func Execute() {
+	// Check for version shorthand syntax before executing
+	// If first arg looks like a version number, route to local command
+	if len(os.Args) > 1 {
+		arg := os.Args[1]
+		if isVersionLike(arg) {
+			// Rewrite args to call local command
+			os.Args = append([]string{os.Args[0], "local"}, os.Args[1:]...)
+		}
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// isVersionLike checks if a string looks like a version number
+func isVersionLike(s string) bool {
+	// Match patterns like: 1.21.0, 1.21, 1, latest, system
+	if s == "latest" || s == "system" {
+		return true
+	}
+
+	// Check for version pattern: digits.digits[.digits]
+	// Simple regex-like check
+	parts := 0
+	for i, c := range s {
+		if c >= '0' && c <= '9' {
+			continue
+		} else if c == '.' {
+			if i == 0 || i == len(s)-1 {
+				return false // can't start or end with dot
+			}
+			parts++
+			if parts > 2 {
+				return false // max 3 parts (x.y.z)
+			}
+		} else {
+			return false // non-digit, non-dot character
+		}
+	}
+
+	// Must have at least one digit
+	return len(s) > 0
 }
 
 func init() {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -126,6 +127,11 @@ func runRehash(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to list shims: %w", err)
 	}
 
+	// Execute rehash hooks after rehashing
+	if err := executeHooks("rehash", nil); err != nil && cfg.Debug {
+		fmt.Fprintf(os.Stderr, "goenv: rehash hooks failed: %v\n", err)
+	}
+
 	fmt.Fprintf(cmd.OutOrStdout(), "Rehashed %d shims\n", len(shimList))
 	return nil
 }
@@ -173,6 +179,14 @@ func runWhich(cmd *cobra.Command, args []string) error {
 
 	commandName := args[0]
 	cfg := config.Load()
+
+	// Execute which hooks
+	hookEnv := []string{
+		"GOENV_COMMAND=" + commandName,
+	}
+	if err := executeHooks("which", hookEnv); err != nil && cfg.Debug {
+		fmt.Fprintf(os.Stderr, "goenv: which hooks failed: %v\n", err)
+	}
 
 	// Try using shim manager first (if available)
 	shimMgr := shims.NewShimManager(cfg)
@@ -358,7 +372,8 @@ func findInSystemPath(commandName string, goenvRoot string) (string, error) {
 		info, err := os.Stat(commandPath)
 		if err == nil && !info.IsDir() {
 			// Check if executable
-			if info.Mode()&0111 != 0 {
+			// On Windows, all files are "executable"; on Unix, check the executable bit
+			if runtime.GOOS == "windows" || info.Mode()&0111 != 0 {
 				return commandPath, nil
 			}
 		}
@@ -390,7 +405,8 @@ func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config)
 		info, err := os.Stat(commandPath)
 		if err == nil && !info.IsDir() {
 			// Check if executable
-			if info.Mode()&0111 != 0 {
+			// On Windows, all files are "executable"; on Unix, check the executable bit
+			if runtime.GOOS == "windows" || info.Mode()&0111 != 0 {
 				foundAny = true
 				if whenceFlags.path {
 					fmt.Fprintln(cmd.OutOrStdout(), commandPath)

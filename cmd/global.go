@@ -16,12 +16,32 @@ var globalCmd = &cobra.Command{
 	RunE:  runGlobal,
 }
 
+var globalFlags struct {
+	complete bool
+}
+
 func init() {
 	rootCmd.AddCommand(globalCmd)
+	globalCmd.Flags().BoolVar(&globalFlags.complete, "complete", false, "Internal flag for shell completions")
+	_ = globalCmd.Flags().MarkHidden("complete")
 	helptext.SetCommandHelp(globalCmd)
 }
 
 func runGlobal(cmd *cobra.Command, args []string) error {
+	// Handle completion mode
+	if globalFlags.complete {
+		cfg := config.Load()
+		mgr := manager.NewManager(cfg)
+		versions, err := mgr.ListInstalledVersions()
+		if err == nil {
+			for _, v := range versions {
+				fmt.Fprintln(cmd.OutOrStdout(), v)
+			}
+		}
+		fmt.Fprintln(cmd.OutOrStdout(), "system")
+		return nil
+	}
+
 	// Validate: global command takes 0 or 1 argument
 	if len(args) > 1 {
 		return fmt.Errorf("Usage: goenv global [version]")

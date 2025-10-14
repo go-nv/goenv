@@ -45,6 +45,7 @@ func (s *ShimManager) Rehash() error {
 	binaries := make(map[string]bool)
 
 	for _, version := range versions {
+		// Scan version's bin directory
 		versionBinDir := filepath.Join(s.config.VersionsDir(), version, "bin")
 		entries, err := os.ReadDir(versionBinDir)
 		if err != nil {
@@ -59,6 +60,24 @@ func (s *ShimManager) Rehash() error {
 					binaryName = binaryName[:len(binaryName)-4]
 				}
 				binaries[binaryName] = true
+			}
+		}
+
+		// Scan GOPATH binaries if not disabled
+		if os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+			gopathBinDir := s.getGopathBinDir(version)
+			gopathEntries, err := os.ReadDir(gopathBinDir)
+			if err == nil {
+				for _, entry := range gopathEntries {
+					if !entry.IsDir() && isExecutable(filepath.Join(gopathBinDir, entry.Name())) {
+						binaryName := entry.Name()
+						// On Windows, strip .exe extension from shim name
+						if runtime.GOOS == "windows" && filepath.Ext(binaryName) == ".exe" {
+							binaryName = binaryName[:len(binaryName)-4]
+						}
+						binaries[binaryName] = true
+					}
+				}
 			}
 		}
 	}
@@ -110,15 +129,24 @@ func (s *ShimManager) WhichBinary(command string) (string, error) {
 		return command, nil
 	}
 
-	// Look in version's bin directory
+	// Look in version's bin directory first
 	versionBinDir := filepath.Join(s.config.VersionsDir(), version, "bin")
 	binaryPath := s.findBinary(versionBinDir, command)
 
-	if binaryPath == "" {
-		return "", fmt.Errorf("command not found: %s", command)
+	if binaryPath != "" {
+		return binaryPath, nil
 	}
 
-	return binaryPath, nil
+	// If not found and GOPATH not disabled, check GOPATH
+	if os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+		gopathBinDir := s.getGopathBinDir(version)
+		binaryPath = s.findBinary(gopathBinDir, command)
+		if binaryPath != "" {
+			return binaryPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("command not found: %s", command)
 }
 
 // findBinary searches for a binary, adding .exe on Windows if needed
@@ -151,10 +179,26 @@ func (s *ShimManager) WhenceVersions(command string) ([]string, error) {
 	var versionsWithCommand []string
 
 	for _, version := range allVersions {
+		found := false
+
+		// Check version's bin directory
 		versionBinDir := filepath.Join(s.config.VersionsDir(), version, "bin")
 		binaryPath := s.findBinary(versionBinDir, command)
 
 		if binaryPath != "" {
+			found = true
+		}
+
+		// If not found and GOPATH not disabled, check GOPATH
+		if !found && os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+			gopathBinDir := s.getGopathBinDir(version)
+			binaryPath = s.findBinary(gopathBinDir, command)
+			if binaryPath != "" {
+				found = true
+			}
+		}
+
+		if found {
 			versionsWithCommand = append(versionsWithCommand, version)
 		}
 	}
@@ -204,6 +248,22 @@ set -e
 [ -n "$GOENV_DEBUG" ] && set -x
 
 program="${0##*/}"
+
+# For go commands, detect file arguments
+if [[ "$program" = "go"* ]]; then
+  for arg; do
+    case "$arg" in
+    -c* | -- ) break ;;
+    */* )
+      if [ -f "$arg" ]; then
+        export GOENV_FILE_ARG="$arg"
+        break
+      fi
+      ;;
+    esac
+  done
+fi
+
 if [ "$program" = "goenv" ]; then
   case "$1" in
   "" )
@@ -242,6 +302,17 @@ if "%%GOENV_DEBUG%%"=="1" (
 REM Get the script name without path
 for %%%%I in ("%%~f0") do set "program=%%%%~nI"
 
+REM For go commands, detect file arguments (simplified for batch)
+if "%%program:~0,2%%"=="go" (
+  for %%%%a in (%%*) do (
+    if exist "%%%%a" (
+      set "GOENV_FILE_ARG=%%%%a"
+      goto :found_file
+    )
+  )
+  :found_file
+)
+
 if "%%program%%"=="goenv" (
   if "%%1"=="" (
     echo goenv: no command specified >&2
@@ -258,6 +329,25 @@ if "%%program%%"=="goenv" (
 	}
 
 	return nil
+}
+
+// getGopathBinDir returns the GOPATH bin directory for a version
+func (s *ShimManager) getGopathBinDir(version string) string {
+	// Check if GOENV_GOPATH_PREFIX is set
+	gopathPrefix := os.Getenv("GOENV_GOPATH_PREFIX")
+
+	if gopathPrefix != "" {
+		// Use custom GOPATH prefix
+		return filepath.Join(gopathPrefix, version, "bin")
+	}
+
+	// Default to $HOME/go/$version/bin
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	return filepath.Join(home, "go", version, "bin")
 }
 
 // isExecutable checks if a file is executable

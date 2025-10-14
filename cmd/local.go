@@ -17,17 +17,34 @@ var localCmd = &cobra.Command{
 }
 
 var localFlags struct {
-	unset bool
+	unset    bool
+	complete bool
 }
 
 func init() {
 	rootCmd.AddCommand(localCmd)
 	localCmd.SilenceUsage = true
 	localCmd.Flags().BoolVar(&localFlags.unset, "unset", false, "Unset the local Go version")
+	localCmd.Flags().BoolVar(&localFlags.complete, "complete", false, "Internal flag for shell completions")
+	_ = localCmd.Flags().MarkHidden("complete")
 	helptext.SetCommandHelp(localCmd)
 }
 
 func runLocal(cmd *cobra.Command, args []string) error {
+	// Handle completion mode
+	if localFlags.complete {
+		cfg := config.Load()
+		mgr := manager.NewManager(cfg)
+		versions, err := mgr.ListInstalledVersions()
+		if err == nil {
+			for _, v := range versions {
+				fmt.Fprintln(cmd.OutOrStdout(), v)
+			}
+		}
+		fmt.Fprintln(cmd.OutOrStdout(), "system")
+		return nil
+	}
+
 	// Validate: local command takes 0 or 1 argument (not including --unset flag)
 	if len(args) > 1 {
 		return fmt.Errorf("Usage: goenv local [<version>]")

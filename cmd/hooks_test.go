@@ -23,7 +23,7 @@ func TestHooksCommand(t *testing.T) {
 			name:           "completion support",
 			args:           []string{"exec"},
 			flags:          []string{"--complete"},
-			expectedOutput: "exec\nrehash\nversion-name\nversion-origin\nwhich\n",
+			expectedOutput: "exec\nrehash\nversion-name\nversion-origin\nwhich\ninstall\nuninstall\n",
 		},
 		{
 			name: "prints list of hooks for given command",
@@ -54,13 +54,13 @@ func TestHooksCommand(t *testing.T) {
 			expectedContains: []string{"hello.bash", "ahoy.bash"},
 		},
 		{
-			name: "only includes bash files",
+			name: "includes all valid hook file types",
 			args: []string{"exec"},
 			setupHooks: map[string][]string{
-				"exec": {"valid.bash", "invalid.sh", "nope.txt"},
+				"exec": {"hook.bash", "hook.sh", "hook.ps1", "hook.cmd", "hook.bat", "nope.txt"},
 			},
 			hookPaths:        []string{"goenv.d"},
-			expectedContains: []string{"valid.bash"},
+			expectedContains: []string{"hook.bash", "hook.sh", "hook.ps1", "hook.cmd", "hook.bat"},
 		},
 		{
 			name:           "returns nothing when no hooks exist",

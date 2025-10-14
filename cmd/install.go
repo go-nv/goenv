@@ -29,6 +29,7 @@ var installFlags struct {
 	ipv4         bool
 	ipv6         bool
 	debug        bool
+	complete     bool
 }
 
 func init() {
@@ -42,12 +43,27 @@ func init() {
 	installCmd.Flags().BoolVarP(&installFlags.ipv4, "ipv4", "4", false, "Resolve names to IPv4 addresses only")
 	installCmd.Flags().BoolVarP(&installFlags.ipv6, "ipv6", "6", false, "Resolve names to IPv6 addresses only")
 	installCmd.Flags().BoolVarP(&installFlags.debug, "debug", "g", false, "Enable debug output")
+	installCmd.Flags().BoolVar(&installFlags.complete, "complete", false, "Internal flag for shell completions")
+	_ = installCmd.Flags().MarkHidden("complete")
 
 	// Apply custom help text to match bash version
 	helptext.SetCommandHelp(installCmd)
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
+	// Handle completion mode
+	if installFlags.complete {
+		cfg := config.Load()
+		fetcher := version.NewFetcherWithOptions(version.FetcherOptions{Debug: false})
+		releases, err := fetcher.FetchWithFallback(cfg.Root)
+		if err == nil {
+			for _, r := range releases {
+				fmt.Fprintln(cmd.OutOrStdout(), r.Version)
+			}
+		}
+		return nil
+	}
+
 	cfg := config.Load()
 
 	// Validate flags
@@ -109,6 +125,14 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			// Already installed, skip silently
 			return nil
 		}
+	}
+
+	// Execute install hooks before installation
+	hookEnv := []string{
+		"GOENV_VERSION=" + goVersion,
+	}
+	if err := executeHooks("install", hookEnv); err != nil && cfg.Debug {
+		fmt.Fprintf(os.Stderr, "goenv: install hooks failed: %v\n", err)
 	}
 
 	return installer.Install(goVersion, installFlags.force)
