@@ -25,8 +25,7 @@ var execCmd = &cobra.Command{
 			actualArgs = args[1:]
 		}
 		if len(actualArgs) == 0 {
-			fmt.Fprintln(cmd.OutOrStderr(), "Usage: goenv exec <command> [arg1 arg2...]")
-			os.Exit(1)
+			return fmt.Errorf("Usage: goenv exec <command> [arg1 arg2...]")
 		}
 		return nil
 	},
@@ -113,6 +112,9 @@ func runExec(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute the command
+	if len(args) == 0 {
+		return fmt.Errorf("Usage: goenv exec <command> [arg1 arg2...]")
+	}
 	command := args[0]
 	commandArgs := args[1:]
 

@@ -41,8 +41,8 @@ func runVersionOrigin(cmd *cobra.Command, args []string) error {
 
 	// Get the current version and source
 	_, source, err := mgr.GetCurrentVersion()
-	if err != nil {
-		// No version set, return default global version file path
+	if err != nil || source == "" {
+		// No version set or default fallback, return default global version file path
 		fmt.Fprintln(cmd.OutOrStdout(), cfg.GlobalVersionFile())
 		return nil
 	}

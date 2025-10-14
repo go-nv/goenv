@@ -37,11 +37,21 @@ func setupTestEnv(t *testing.T) (string, func()) {
 	os.MkdirAll(testHome, 0755)
 	os.MkdirAll(filepath.Join(testRoot, "versions"), 0755)
 
+	// Change to testHome to avoid picking up any .go-version files from the repository
+	oldDir, _ := os.Getwd()
+	os.Chdir(testHome)
+
+	// Also set GOENV_DIR to testHome to prevent any directory traversal finding repo .go-version
+	oldGoenvDir := os.Getenv("GOENV_DIR")
+	os.Setenv("GOENV_DIR", testHome)
+
 	// Cleanup function
 	cleanup := func() {
+		os.Chdir(oldDir)
 		os.Setenv("GOENV_ROOT", oldGoenvRoot)
 		os.Setenv("HOME", oldHome)
 		os.Setenv("PATH", oldPath)
+		os.Setenv("GOENV_DIR", oldGoenvDir)
 		if oldGoenvVersion != "" {
 			os.Setenv("GOENV_VERSION", oldGoenvVersion)
 		}

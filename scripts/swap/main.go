@@ -20,11 +20,11 @@ const (
 )
 
 var (
-	scriptDir   string
-	goBinary    string
-	backupDir   string
-	goenvPath   string
-	useColor    = true
+	scriptDir string
+	goBinary  string
+	backupDir string
+	goenvPath string
+	useColor  = true
 )
 
 func init() {
@@ -103,8 +103,8 @@ func detectGoenv() (string, error) {
 	// Method 2: Check Homebrew
 	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
 		brewPaths := []string{
-			"/opt/homebrew/bin/goenv",        // ARM Mac
-			"/usr/local/bin/goenv",           // Intel Mac / Linux Homebrew
+			"/opt/homebrew/bin/goenv",              // ARM Mac
+			"/usr/local/bin/goenv",                 // Intel Mac / Linux Homebrew
 			"/home/linuxbrew/.linuxbrew/bin/goenv", // Linux Homebrew
 		}
 

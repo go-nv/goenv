@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/go-nv/goenv/internal/helptext"
 )
 
 var completionsCmd = &cobra.Command{

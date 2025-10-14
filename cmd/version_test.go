@@ -22,8 +22,8 @@ func TestVersionCommand(t *testing.T) {
 	}{
 		{
 			name:             "system version when no versions installed",
-			expectedOutput:   "system (set by ",
-			checkOutputMatch: true,
+			expectedOutput:   "system",
+			checkOutputMatch: false,
 		},
 		{
 			name:           "version from GOENV_VERSION environment variable",

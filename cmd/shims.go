@@ -37,8 +37,7 @@ var whichCmd = &cobra.Command{
 			return nil
 		}
 		if len(args) == 0 {
-			fmt.Fprintln(cmd.OutOrStderr(), "Usage: goenv which <command>")
-			os.Exit(1)
+			return fmt.Errorf("Usage: goenv which <command>")
 		}
 		if len(args) > 1 {
 			return fmt.Errorf("Usage: goenv which <command>")
@@ -62,8 +61,7 @@ var whenceCmd = &cobra.Command{
 			return nil
 		}
 		if len(args) == 0 {
-			fmt.Fprintln(cmd.OutOrStderr(), "Usage: goenv whence [--path] <command>")
-			os.Exit(1)
+			return fmt.Errorf("Usage: goenv whence [--path] <command>")
 		}
 		if len(args) > 1 {
 			return fmt.Errorf("Usage: goenv whence [--path] <command>")
@@ -169,6 +167,10 @@ func runWhich(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if len(args) == 0 {
+		return fmt.Errorf("Usage: goenv which <command>")
+	}
+
 	commandName := args[0]
 	cfg := config.Load()
 
@@ -189,6 +191,10 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	if whenceFlags.complete {
 		fmt.Fprintln(cmd.OutOrStdout(), "--path")
 		return nil
+	}
+
+	if len(args) == 0 {
+		return fmt.Errorf("Usage: goenv whence [--path] <command>")
 	}
 
 	commandName := args[0]

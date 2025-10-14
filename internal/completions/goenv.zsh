@@ -1,5 +1,8 @@
 #compdef goenv
 # Zsh completion for goenv
+# This script is embedded in the goenv binary
+# Install with: goenv completion zsh --install
+# Or manually: goenv completion zsh >> ~/.zshrc
 
 _goenv() {
     local -a completions

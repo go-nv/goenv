@@ -1,6 +1,7 @@
 # PowerShell completion for goenv
-# Installation: Add to your PowerShell $PROFILE
-#   . $env:GOENV_ROOT\completions\goenv.ps1
+# This script is embedded in the goenv binary
+# Install with: goenv completion powershell --install
+# Or manually: goenv completion powershell >> $PROFILE
 
 Register-ArgumentCompleter -CommandName goenv -ScriptBlock {
     param(

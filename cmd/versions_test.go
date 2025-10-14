@@ -31,6 +31,14 @@ func TestVersionsCommand(t *testing.T) {
 			args:           []string{},
 			setupVersions:  []string{"1.21.5", "1.22.2"},
 			expectSystemGo: true,
+			expectedOutput: []string{"* system", "  1.21.5", "  1.22.2"},
+		},
+		{
+			name:           "list with system explicitly set in global file",
+			args:           []string{},
+			setupVersions:  []string{"1.21.5", "1.22.2"},
+			globalVersion:  "system",
+			expectSystemGo: true,
 			expectedOutput: []string{"* system (set by global)", "  1.21.5", "  1.22.2"},
 		},
 		{
@@ -343,9 +351,9 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 	}
 
 	got := strings.TrimSpace(output.String())
-	expectedPattern := "* system (set by"
+	expected := "* system"
 
-	if !strings.Contains(got, expectedPattern) {
-		t.Errorf("Expected output to contain '%s', got '%s'", expectedPattern, got)
+	if got != expected {
+		t.Errorf("Expected output '%s', got '%s'", expected, got)
 	}
 }

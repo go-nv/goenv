@@ -167,8 +167,31 @@ func (m *Manager) GetCurrentVersion() (string, string, error) {
 	// Check global version file
 	globalVersion, err := m.getGlobalVersion()
 	if err == nil && globalVersion != "" {
-		// Return the actual file path for compatibility with bash version
+		// Check if a global version file actually exists
 		globalFile := m.config.GlobalVersionFile()
+		if _, statErr := os.Stat(globalFile); statErr == nil {
+			// Global file exists, return its path
+			return globalVersion, globalFile, nil
+		}
+
+		// Try legacy files
+		globalLegacyFile := filepath.Join(m.config.Root, "global")
+		if _, statErr := os.Stat(globalLegacyFile); statErr == nil {
+			return globalVersion, globalLegacyFile, nil
+		}
+
+		defaultFile := filepath.Join(m.config.Root, "default")
+		if _, statErr := os.Stat(defaultFile); statErr == nil {
+			return globalVersion, defaultFile, nil
+		}
+
+		// No file exists, this is a default fallback to "system"
+		// Return empty source to indicate default behavior
+		if globalVersion == "system" {
+			return "system", "", nil
+		}
+
+		// Shouldn't reach here, but return the global file path for compatibility
 		return globalVersion, globalFile, nil
 	}
 

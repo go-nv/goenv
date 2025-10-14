@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Bash completion for goenv
+# This script is embedded in the goenv binary
+# Install with: goenv completion bash --install
+# Or manually: goenv completion bash >> ~/.bashrc
 
 _goenv() {
     COMPREPLY=()

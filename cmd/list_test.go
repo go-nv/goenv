@@ -115,26 +115,27 @@ func TestListCommand(t *testing.T) {
 
 		result := output.String()
 
-		// Count how many 1.21.x versions we have (using "go1.21." prefix)
-		count121 := strings.Count(result, "go1.21.")
+		// Count how many 1.21.x versions we have (without "go" prefix in Go implementation)
+		// Looking for lines like "  1.21.0", "  1.21.1", etc.
+		count121 := strings.Count(result, "  1.21.")
 
 		// The bug was showing only latest 2 versions per minor line
 		// 1.21 has 13+ patch versions (1.21.0 through 1.21.13)
 		if count121 < 3 {
-			t.Errorf("CRITICAL: Expected at least 3 versions of go1.21.x, got %d. The 'latest 2 versions' bug may have returned!", count121)
+			t.Errorf("CRITICAL: Expected at least 3 versions of 1.21.x, got %d. The 'latest 2 versions' bug may have returned!", count121)
 		}
 
 		// Also check 1.20.x (has 14+ versions: 1.20.0 through 1.20.14)
-		count120 := strings.Count(result, "go1.20.")
+		count120 := strings.Count(result, "  1.20.")
 		if count120 < 3 {
-			t.Errorf("CRITICAL: Expected at least 3 versions of go1.20.x, got %d", count120)
+			t.Errorf("CRITICAL: Expected at least 3 versions of 1.20.x, got %d", count120)
 		}
 
 		t.Logf("✅ Found %d versions of 1.21.x (not just latest 2)", count121)
 		t.Logf("✅ Found %d versions of 1.20.x (not just latest 2)", count120)
 	})
 
-	t.Run("versions include unstable marker", func(t *testing.T) {
+	t.Run("versions include unstable versions", func(t *testing.T) {
 		_, cleanup := setupTestEnv(t)
 		defer cleanup()
 
@@ -156,25 +157,15 @@ func TestListCommand(t *testing.T) {
 
 		result := output.String()
 
-		// Beta and RC versions should be marked as unstable
-		lines := strings.Split(result, "\n")
-		foundUnstableMarker := false
-		for _, line := range lines {
-			if strings.Contains(line, "beta") || strings.Contains(line, "rc") {
-				if strings.Contains(line, "(unstable)") {
-					foundUnstableMarker = true
-					break
-				}
-			}
-		}
-
-		// Only check if we found beta/rc versions (may not always be present)
+		// Verify beta and RC versions are included in the list
+		// Note: The Go implementation doesn't add "(unstable)" markers by design
+		// (see comment in list.go: "no unstable marker for install --list")
 		hasBetaOrRC := strings.Contains(result, "beta") || strings.Contains(result, "rc")
-		if hasBetaOrRC && !foundUnstableMarker {
-			t.Error("Beta/RC versions should be marked with (unstable)")
+		if !hasBetaOrRC {
+			t.Error("Expected to find beta or rc versions in the list")
 		}
 
-		t.Log("✅ Unstable versions properly marked")
+		t.Log("✅ Unstable versions (beta/rc) are included in list")
 	})
 
 	t.Run("returns reasonable version count", func(t *testing.T) {

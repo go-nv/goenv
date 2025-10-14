@@ -31,6 +31,20 @@ func init() {
 	helptext.SetCommandHelp(versionsCmd)
 }
 
+// simplifySource returns a simplified display name for the version source
+func simplifySource(source string, cfg *config.Config) string {
+	if source == "" {
+		return ""
+	}
+
+	globalVersionFile := cfg.GlobalVersionFile()
+	if source == globalVersionFile {
+		return "global"
+	}
+
+	return source
+}
+
 func runVersions(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if versionsFlags.complete {
@@ -70,9 +84,17 @@ func runVersions(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
+		// Get current version to determine source
+		_, versionSource, _ := mgr.GetCurrentVersion()
+
 		// Show system version with source info
-		globalVersionFile := cfg.GlobalVersionFile()
-		fmt.Fprintf(cmd.OutOrStdout(), "* system (set by %s)\n", globalVersionFile)
+		displaySource := simplifySource(versionSource, cfg)
+		if displaySource == "" {
+			// Empty source means default behavior (no version file exists)
+			fmt.Fprintf(cmd.OutOrStdout(), "* system\n")
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "* system (set by %s)\n", displaySource)
+		}
 		return nil
 	}
 
@@ -92,11 +114,10 @@ func runVersions(cmd *cobra.Command, args []string) error {
 
 		if currentVersion == "system" {
 			prefix = "* "
-			if source != "" {
-				suffix = fmt.Sprintf(" (set by %s)", source)
-			} else {
-				globalVersionFile := cfg.GlobalVersionFile()
-				suffix = fmt.Sprintf(" (set by %s)", globalVersionFile)
+			displaySource := simplifySource(source, cfg)
+			if displaySource != "" {
+				// Only show source if a file actually set it
+				suffix = fmt.Sprintf(" (set by %s)", displaySource)
 			}
 		}
 
@@ -113,8 +134,9 @@ func runVersions(cmd *cobra.Command, args []string) error {
 
 			if version == currentVersion {
 				prefix = "* "
-				if source != "" {
-					suffix = fmt.Sprintf(" (set by %s)", source)
+				displaySource := simplifySource(source, cfg)
+				if displaySource != "" {
+					suffix = fmt.Sprintf(" (set by %s)", displaySource)
 				}
 			}
 
