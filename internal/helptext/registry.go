@@ -250,10 +250,6 @@ compilation, see: https://github.com/go-nv/goenv#readme`,
 		Usage:   "goenv shims [--short]",
 		Summary: "List existing goenv shims",
 	},
-	"hooks": {
-		Usage:   "goenv hooks <command>",
-		Summary: "List hook scripts for a given goenv command",
-	},
 	"init": {
 		Usage:       "eval \"$(goenv init - [--no-rehash] [<shell>])\"",
 		Description: "Configure the shell environment for goenv",

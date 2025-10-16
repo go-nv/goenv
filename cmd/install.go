@@ -127,13 +127,5 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Execute install hooks before installation
-	hookEnv := []string{
-		"GOENV_VERSION=" + goVersion,
-	}
-	if err := executeHooks("install", hookEnv); err != nil && cfg.Debug {
-		fmt.Fprintf(os.Stderr, "goenv: install hooks failed: %v\n", err)
-	}
-
 	return installer.Install(goVersion, installFlags.force)
 }

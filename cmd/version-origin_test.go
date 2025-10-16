@@ -43,14 +43,6 @@ func TestVersionOriginCommand(t *testing.T) {
 			expectedOutput: ".go-version", // Will be made absolute in test
 		},
 		{
-			name:           "GOENV_VERSION_ORIGIN from hook overrides everything",
-			setupVersions:  []string{"1.11.1"},
-			localVersion:   "1.10.3",
-			envVersion:     "1.11.1",
-			envOrigin:      "plugin",
-			expectedOutput: "plugin",
-		},
-		{
 			name:           "GOENV_VERSION_ORIGIN not inherited if not explicitly set",
 			expectedOutput: "version", // Will be joined with GOENV_ROOT in test
 		},

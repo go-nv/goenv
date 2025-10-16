@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -33,22 +32,8 @@ func runVersionOrigin(cmd *cobra.Command, args []string) error {
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 
-	// Get the current version first for hooks
-	version, source, err := mgr.GetCurrentVersion()
-
-	// Execute version-origin hooks
-	hookEnv := []string{
-		"GOENV_VERSION=" + version,
-	}
-	if err := executeHooks("version-origin", hookEnv); err != nil && cfg.Debug {
-		fmt.Fprintf(cmd.ErrOrStderr(), "goenv: version-origin hooks failed: %v\n", err)
-	}
-
-	// Check if GOENV_VERSION_ORIGIN is set (from hooks) - highest precedence
-	if origin := os.Getenv("GOENV_VERSION_ORIGIN"); origin != "" {
-		fmt.Fprintln(cmd.OutOrStdout(), origin)
-		return nil
-	}
+	// Get the current version
+	_, source, err := mgr.GetCurrentVersion()
 
 	// Use the source we got earlier
 	if err != nil || source == "" {

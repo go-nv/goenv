@@ -21,9 +21,7 @@ Welcome to the goenv documentation! This directory contains comprehensive docume
 - **[Advanced Configuration](advanced/ADVANCED_CONFIGURATION.md)** - Advanced setup and customization options
 - **[Smart Caching](advanced/SMART_CACHING.md)** - Understanding goenv's intelligent caching system
 - **[Embedded Versions](advanced/EMBEDDED_VERSIONS.md)** - How offline mode and embedded versions work
-- **[Hooks Guide](advanced/HOOKS.md)** - Extending goenv with custom hooks
 - **[GOPATH Integration](advanced/GOPATH_INTEGRATION.md)** - Managing GOPATH binaries per version
-- **[Plugins Guide](advanced/PLUGINS.md)** - Creating and using goenv plugins
 
 ### Contributing
 
@@ -74,9 +72,7 @@ docs/
 │   ├── ADVANCED_CONFIGURATION.md # Advanced configuration
 │   ├── SMART_CACHING.md        # Caching internals
 │   ├── EMBEDDED_VERSIONS.md    # Offline mode details
-│   ├── HOOKS.md                # Hook system guide
-│   ├── GOPATH_INTEGRATION.md   # GOPATH management
-│   └── PLUGINS.md              # Plugin development
+│   └── GOPATH_INTEGRATION.md   # GOPATH management
 ├── CONTRIBUTING.md              # Contribution guidelines
 ├── CODE_OF_CONDUCT.md          # Community guidelines
 ├── CHANGELOG.md                 # Version history

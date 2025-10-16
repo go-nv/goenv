@@ -387,7 +387,6 @@ tools:
 
 1. **Rehash is fast** - typically < 100ms even with many versions
 2. **Rehash on demand** - only run when you install new tools
-3. **Automatic rehash** - consider using hooks to auto-rehash after `go install`
 
 ### GOPATH Size
 

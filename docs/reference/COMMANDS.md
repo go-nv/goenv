@@ -11,7 +11,6 @@ All subcommands are:
   - [`goenv exec`](#goenv-exec)
   - [`goenv global`](#goenv-global)
   - [`goenv help`](#goenv-help)
-  - [`goenv hooks`](#goenv-hooks)
   - [`goenv init`](#goenv-init)
   - [`goenv install`](#goenv-install)
   - [`goenv local`](#goenv-local)
@@ -36,22 +35,7 @@ All subcommands are:
 
 ## `goenv commands`
 
-Lists all available goenv commands, including built-in commands and plugin commands.
-
-**Plugin discovery:**
-
-In addition to built-in commands, `goenv commands` automatically discovers and lists plugin commands. Plugins are executables located in:
-- `$GOENV_ROOT/plugins/*/bin/goenv-*`
-
-For example, if you have a plugin structure like:
-```
-$GOENV_ROOT/plugins/
-  my-plugin/
-    bin/
-      goenv-my-command
-```
-
-Then `goenv my-command` will be available and listed in `goenv commands`.
+Lists all available goenv commands.
 
 **Filtering commands:**
 
@@ -125,43 +109,6 @@ documentation.
 
 ```shell
 > goenv help install
-```
-
-## `goenv hooks`
-
-List hook scripts for a given goenv command. Hooks are bash scripts that execute at specific points during goenv command execution, allowing you to customize behavior.
-
-```shell
-> goenv hooks uninstall
-```
-
-**Available hook points:**
-- `exec` - Runs before executing a Go command (e.g., `goenv exec go run`)
-- `rehash` - Runs after regenerating shims
-- `which` - Runs before finding a binary location
-- `version-name` - Runs when determining the version name
-- `version-origin` - Runs when determining where the version was set
-- `install` - Runs before installing a Go version
-- `uninstall` - Runs before uninstalling a Go version
-
-**Hook environment variables:**
-
-Hooks receive environment variables depending on the command:
-- `GOENV_VERSION` - The version being operated on (install, uninstall, exec, etc.)
-- `GOENV_COMMAND` - The command being executed (for exec hooks)
-- `GOENV_FILE_ARG` - Path to file argument when executing `go*` commands with file paths
-- `GOENV_VERSION_ORIGIN` - Can be set by version-origin hooks to override the origin
-
-**Hook locations:**
-
-Hooks are searched in directories specified by `GOENV_HOOK_PATH` (colon-separated). Each hook is a bash script named `<command>.bash` (e.g., `exec.bash`, `install.bash`).
-
-Example hook structure:
-```bash
-# ~/.goenv/hooks/exec.bash
-#!/usr/bin/env bash
-# This runs before every `goenv exec` command
-echo "Executing: $GOENV_COMMAND with version $GOENV_VERSION"
 ```
 
 ## `goenv init`

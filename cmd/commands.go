@@ -67,7 +67,7 @@ func runCommands(cmd *cobra.Command, args []string) error {
 
 	// Add standard goenv commands that might not be registered yet
 	standardCommands := []string{
-		"commands", "completions", "exec", "global", "help", "hooks",
+		"commands", "completions", "exec", "global", "help",
 		"init", "install", "installed", "latest", "local", "prefix",
 		"rehash", "root", "shell", "shims", "system", "uninstall",
 		"version", "version-file", "version-file-read", "version-file-write",
@@ -90,34 +90,6 @@ func runCommands(cmd *cobra.Command, args []string) error {
 							// On Windows, all files are "executable"; on Unix, check the executable bit
 							if runtime.GOOS == "windows" || info.Mode()&0111 != 0 {
 								commands = append(commands, cmdName)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Check for plugin commands in $GOENV_ROOT/plugins/*/bin
-	pluginsDir := filepath.Join(cfg.Root, "plugins")
-	if pluginEntries, err := os.ReadDir(pluginsDir); err == nil {
-		for _, pluginEntry := range pluginEntries {
-			if pluginEntry.IsDir() {
-				pluginBinDir := filepath.Join(pluginsDir, pluginEntry.Name(), "bin")
-				if binEntries, err := os.ReadDir(pluginBinDir); err == nil {
-					for _, binEntry := range binEntries {
-						if !binEntry.IsDir() {
-							name := binEntry.Name()
-							if strings.HasPrefix(name, "goenv-") {
-								cmdName := strings.TrimPrefix(name, "goenv-")
-								// Check if executable
-								fullPath := filepath.Join(pluginBinDir, name)
-								if info, err := os.Stat(fullPath); err == nil {
-									// On Windows, all files are "executable"; on Unix, check the executable bit
-									if runtime.GOOS == "windows" || info.Mode()&0111 != 0 {
-										commands = append(commands, cmdName)
-									}
-								}
 							}
 						}
 					}

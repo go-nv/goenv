@@ -127,11 +127,6 @@ func runRehash(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to list shims: %w", err)
 	}
 
-	// Execute rehash hooks after rehashing
-	if err := executeHooks("rehash", nil); err != nil && cfg.Debug {
-		fmt.Fprintf(os.Stderr, "goenv: rehash hooks failed: %v\n", err)
-	}
-
 	fmt.Fprintf(cmd.OutOrStdout(), "Rehashed %d shims\n", len(shimList))
 	return nil
 }
@@ -179,14 +174,6 @@ func runWhich(cmd *cobra.Command, args []string) error {
 
 	commandName := args[0]
 	cfg := config.Load()
-
-	// Execute which hooks
-	hookEnv := []string{
-		"GOENV_COMMAND=" + commandName,
-	}
-	if err := executeHooks("which", hookEnv); err != nil && cfg.Debug {
-		fmt.Fprintf(os.Stderr, "goenv: which hooks failed: %v\n", err)
-	}
 
 	// Try using shim manager first (if available)
 	shimMgr := shims.NewShimManager(cfg)

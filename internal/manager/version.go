@@ -333,18 +333,27 @@ func (m *Manager) ReadVersionFile(filename string) (string, error) {
 			if parts[0] == "toolchain" && len(parts) >= 2 {
 				if strings.HasPrefix(parts[1], "go") {
 					version := strings.TrimPrefix(parts[1], "go")
+					// Validate version string for path traversal attacks
+					if err := validateVersionString(version); err != nil {
+						continue // Skip invalid versions
+					}
 					return version, nil
 				}
 			}
 			// Look for "go 1.11" line
 			if parts[0] == "go" && len(parts) >= 2 {
+				// Validate version string for path traversal attacks
+				if err := validateVersionString(parts[1]); err != nil {
+					continue // Skip invalid versions
+				}
 				// Store but continue looking for toolchain
 				versions = append(versions, parts[1])
 			}
 		} else {
-			// Regular version file - skip relative path traversal
-			if strings.HasPrefix(line, "..") || strings.Contains(line, "./") {
-				continue
+			// Regular version file - validate for path traversal attacks
+			// This provides defense-in-depth beyond the basic checks
+			if err := validateVersionString(line); err != nil {
+				continue // Skip invalid versions
 			}
 			versions = append(versions, line)
 		}
@@ -416,6 +425,63 @@ func (m *Manager) SetLocalVersion(version string) error {
 
 	localFile := filepath.Join(m.workingDir(), m.config.LocalVersionFile())
 	return m.writeVersionFile(localFile, version)
+}
+
+// validateVersionString checks if a version string is safe from path traversal attacks
+// This provides defense-in-depth protection against CVE-2022-35861 and similar vulnerabilities
+func validateVersionString(version string) error {
+	if version == "" {
+		return fmt.Errorf("version string cannot be empty")
+	}
+
+	// Allow "system" and "latest" as special cases
+	if version == "system" || version == "latest" {
+		return nil
+	}
+
+	// Check for path traversal attempts
+	if strings.Contains(version, "..") {
+		return fmt.Errorf("version string contains path traversal (..): %s", version)
+	}
+
+	// Check for absolute paths (Unix and Windows)
+	if strings.HasPrefix(version, "/") || strings.HasPrefix(version, "\\") {
+		return fmt.Errorf("version string cannot be an absolute path: %s", version)
+	}
+
+	// Check for Windows drive letters (C:, D:, etc.)
+	if len(version) >= 2 && version[1] == ':' && ((version[0] >= 'A' && version[0] <= 'Z') || (version[0] >= 'a' && version[0] <= 'z')) {
+		return fmt.Errorf("version string cannot contain drive letter: %s", version)
+	}
+
+	// Check for directory separators (should be a simple version string, not a path)
+	if strings.Contains(version, "/") || strings.Contains(version, "\\") {
+		return fmt.Errorf("version string cannot contain path separators: %s", version)
+	}
+
+	// Check for null bytes (path truncation attack)
+	if strings.Contains(version, "\x00") {
+		return fmt.Errorf("version string contains null byte")
+	}
+
+	// Check for hidden files (starting with .)
+	if strings.HasPrefix(version, ".") {
+		return fmt.Errorf("version string cannot start with dot: %s", version)
+	}
+
+	// Check for excessive length (prevent buffer overflow style attacks)
+	if len(version) > 255 {
+		return fmt.Errorf("version string too long (max 255 characters): %s", version)
+	}
+
+	// Check for control characters and spaces (spaces can cause parsing issues)
+	for _, ch := range version {
+		if ch <= 32 || ch == 127 {
+			return fmt.Errorf("version string contains invalid character: %s", version)
+		}
+	}
+
+	return nil
 }
 
 // ResolveVersionSpec resolves a user-provided version specifier to an installed version
@@ -493,6 +559,11 @@ func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 
 // ValidateVersion checks if a version is installed or is "system"
 func (m *Manager) ValidateVersion(version string) error {
+	// First validate the version string for path traversal attacks (defense-in-depth)
+	if err := validateVersionString(version); err != nil {
+		return err
+	}
+
 	if version == "system" {
 		return nil // "system" is always valid
 	}

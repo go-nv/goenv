@@ -141,15 +141,6 @@ func runExec(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Execute exec hooks before running the command
-	hookEnv := []string{
-		"GOENV_VERSION=" + currentVersion,
-		"GOENV_COMMAND=" + command,
-	}
-	if err := executeHooks("exec", hookEnv); err != nil && cfg.Debug {
-		fmt.Fprintf(os.Stderr, "goenv: exec hooks failed: %v\n", err)
-	}
-
 	// Execute with the modified environment
 	execCmd := exec.Command(commandPath, commandArgs...)
 	execCmd.Env = env

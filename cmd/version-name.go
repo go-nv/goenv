@@ -36,14 +36,6 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no version set: %w", err)
 	}
 
-	// Execute version-name hooks
-	hookEnv := []string{
-		"GOENV_VERSION=" + version,
-	}
-	if err := executeHooks("version-name", hookEnv); err != nil && cfg.Debug {
-		fmt.Fprintf(cmd.ErrOrStderr(), "goenv: version-name hooks failed: %v\n", err)
-	}
-
 	// Handle multiple versions separated by ':'
 	versions := splitVersions(version)
 

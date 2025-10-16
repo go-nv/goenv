@@ -26,11 +26,8 @@ The Go implementation of goenv maintains full backward compatibility with the ba
 ### Enhanced Features
 
 1. **Smart caching & offline mode** - 10-50x faster version lists with intelligent caching
-2. **Hook system now functional** - Hooks actually execute (previously only listed)
-3. **GOPATH integration** - Automatic management of GOPATH binaries
-4. **Plugin discovery** - Automatic discovery of plugin commands
-5. **Version shorthand** - Use `goenv 1.22.5` instead of `goenv local 1.22.5`
-6. **File argument detection** - `GOENV_FILE_ARG` automatically set in shims
+2. **GOPATH integration** - Automatic management of GOPATH binaries
+3. **Version shorthand** - Use `goenv 1.22.5` instead of `goenv local 1.22.5`
 
 ## New Features
 
@@ -65,29 +62,7 @@ goenv refresh
 
 **See:** [Smart Caching Guide](advanced/SMART_CACHING.md)
 
-### 2. Functional Hook System
-
-**What's New:**
-- Hooks now actually execute during command operations
-- Support for 7 hook points: exec, rehash, which, version-name, version-origin, install, uninstall
-- Hooks receive environment variables for context
-
-**Migration Impact:** LOW
-- If you had hooks in bash version, they will now execute
-- Review existing hooks to ensure they're ready for execution
-- See [Hooks Guide](advanced/HOOKS.md) for details
-
-**Example:**
-```bash
-# Create a hook that logs exec commands
-mkdir -p ~/.goenv/hooks
-cat > ~/.goenv/hooks/exec.bash << 'EOF'
-#!/usr/bin/env bash
-echo "$(date): Executing $GOENV_COMMAND with Go $GOENV_VERSION" >> ~/.goenv/exec.log
-EOF
-chmod +x ~/.goenv/hooks/exec.bash
-
-export GOENV_HOOK_PATH="$HOME/.goenv/hooks"
+### 2. GOPATH Integration
 ```
 
 ### 2. GOPATH Binary Integration
@@ -118,30 +93,7 @@ export GOENV_DISABLE_GOPATH=1
 
 **See:** [GOPATH Integration Guide](advanced/GOPATH_INTEGRATION.md)
 
-### 3. Plugin Discovery
-
-**What's New:**
-- Plugins in `$GOENV_ROOT/plugins/*/bin/` are automatically discovered
-- No need to manually add plugins to PATH
-- Plugins appear in `goenv commands` output
-
-**Migration Impact:** LOW
-- Existing plugins work without changes
-- Plugins are now discoverable via `goenv commands`
-
-**Example:**
-```bash
-# Install a plugin
-git clone https://github.com/user/goenv-plugin.git \
-  "$(goenv root)/plugins/plugin-name"
-
-# Plugin commands are automatically available
-goenv commands | grep plugin
-```
-
-**See:** [Plugins Guide](advanced/PLUGINS.md)
-
-### 4. Version Shorthand Syntax
+### 3. Version Shorthand Syntax
 
 **What's New:**
 - Use `goenv <version>` as shorthand for `goenv local <version>`

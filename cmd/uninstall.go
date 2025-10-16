@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/install"
@@ -54,14 +53,6 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 
 	if cfg.Debug {
 		fmt.Printf("Debug: Uninstalling Go version %s\n", goVersion)
-	}
-
-	// Execute uninstall hooks before uninstallation
-	hookEnv := []string{
-		"GOENV_VERSION=" + goVersion,
-	}
-	if err := executeHooks("uninstall", hookEnv); err != nil && cfg.Debug {
-		fmt.Fprintf(os.Stderr, "goenv: uninstall hooks failed: %v\n", err)
 	}
 
 	return installer.Uninstall(goVersion)
