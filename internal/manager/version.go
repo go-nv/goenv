@@ -409,7 +409,15 @@ func (m *Manager) UnsetVersionFile(filename string) error {
 }
 
 // SetGlobalVersion sets the global Go version
+// Resolves aliases to their target versions before writing
 func (m *Manager) SetGlobalVersion(version string) error {
+	// Resolve alias if applicable
+	resolved, err := m.ResolveAlias(version)
+	if err != nil {
+		return err
+	}
+	version = resolved
+
 	if err := m.ValidateVersion(version); err != nil {
 		return err
 	}
@@ -418,7 +426,15 @@ func (m *Manager) SetGlobalVersion(version string) error {
 }
 
 // SetLocalVersion sets the local Go version for current directory
+// Resolves aliases to their target versions before writing
 func (m *Manager) SetLocalVersion(version string) error {
+	// Resolve alias if applicable
+	resolved, err := m.ResolveAlias(version)
+	if err != nil {
+		return err
+	}
+	version = resolved
+
 	if err := m.ValidateVersion(version); err != nil {
 		return err
 	}
@@ -485,10 +501,18 @@ func validateVersionString(version string) error {
 }
 
 // ResolveVersionSpec resolves a user-provided version specifier to an installed version
+// This handles aliases, "latest", "system", and version prefix matching
 func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 	if spec == "" {
 		return "", fmt.Errorf("goenv: version '%s' not installed", spec)
 	}
+
+	// Resolve aliases first
+	resolved, err := m.ResolveAlias(spec)
+	if err != nil {
+		return "", err
+	}
+	spec = resolved
 
 	if spec == "system" {
 		return "system", nil
@@ -558,11 +582,19 @@ func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 }
 
 // ValidateVersion checks if a version is installed or is "system"
+// This also resolves aliases before checking
 func (m *Manager) ValidateVersion(version string) error {
 	// First validate the version string for path traversal attacks (defense-in-depth)
 	if err := validateVersionString(version); err != nil {
 		return err
 	}
+
+	// Resolve aliases
+	resolved, err := m.ResolveAlias(version)
+	if err != nil {
+		return err
+	}
+	version = resolved
 
 	if version == "system" {
 		return nil // "system" is always valid
@@ -764,4 +796,192 @@ func (m *Manager) GetSystemGoDir() (string, error) {
 	}
 
 	return "", fmt.Errorf("system go not found in PATH")
+}
+
+// ListAliases returns all defined aliases as a map of name -> version
+func (m *Manager) ListAliases() (map[string]string, error) {
+	aliasesFile := m.config.AliasesFile()
+
+	file, err := os.Open(aliasesFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return make(map[string]string), nil // No aliases file yet
+		}
+		return nil, fmt.Errorf("failed to read aliases file: %w", err)
+	}
+	defer file.Close()
+
+	aliases := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		name := strings.TrimSpace(parts[0])
+		version := strings.TrimSpace(parts[1])
+
+		if name != "" && version != "" {
+			aliases[name] = version
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading aliases file: %w", err)
+	}
+
+	return aliases, nil
+}
+
+// ResolveAlias resolves an alias to its target version
+// Returns the input if it's not an alias
+func (m *Manager) ResolveAlias(nameOrVersion string) (string, error) {
+	aliases, err := m.ListAliases()
+	if err != nil {
+		return "", err
+	}
+
+	if target, exists := aliases[nameOrVersion]; exists {
+		return target, nil
+	}
+
+	// Not an alias, return as-is
+	return nameOrVersion, nil
+}
+
+// SetAlias creates or updates an alias
+func (m *Manager) SetAlias(name, version string) error {
+	if name == "" {
+		return fmt.Errorf("alias name cannot be empty")
+	}
+
+	if version == "" {
+		return fmt.Errorf("alias version cannot be empty")
+	}
+
+	// Validate alias name (no special characters, path separators, etc.)
+	if err := validateAliasName(name); err != nil {
+		return err
+	}
+
+	// Validate target version string
+	if err := validateVersionString(version); err != nil {
+		return fmt.Errorf("invalid alias target: %w", err)
+	}
+
+	// Read existing aliases
+	aliases, err := m.ListAliases()
+	if err != nil {
+		return err
+	}
+
+	// Update/add the alias
+	aliases[name] = version
+
+	// Write back to file
+	return m.writeAliasesFile(aliases)
+}
+
+// DeleteAlias removes an alias
+func (m *Manager) DeleteAlias(name string) error {
+	if name == "" {
+		return fmt.Errorf("alias name cannot be empty")
+	}
+
+	// Read existing aliases
+	aliases, err := m.ListAliases()
+	if err != nil {
+		return err
+	}
+
+	// Check if alias exists
+	if _, exists := aliases[name]; !exists {
+		return fmt.Errorf("alias '%s' not found", name)
+	}
+
+	// Remove the alias
+	delete(aliases, name)
+
+	// Write back to file
+	return m.writeAliasesFile(aliases)
+}
+
+// writeAliasesFile writes the aliases map to the aliases file
+func (m *Manager) writeAliasesFile(aliases map[string]string) error {
+	aliasesFile := m.config.AliasesFile()
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(aliasesFile), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	file, err := os.Create(aliasesFile)
+	if err != nil {
+		return fmt.Errorf("failed to create aliases file: %w", err)
+	}
+	defer file.Close()
+
+	// Write header comment
+	fmt.Fprintln(file, "# goenv aliases")
+	fmt.Fprintln(file, "# Format: alias_name=target_version")
+
+	// Write aliases (sorted for deterministic output)
+	var names []string
+	for name := range aliases {
+		names = append(names, name)
+	}
+
+	// Simple sort (bubble sort for small lists)
+	for i := 0; i < len(names); i++ {
+		for j := i + 1; j < len(names); j++ {
+			if names[i] > names[j] {
+				names[i], names[j] = names[j], names[i]
+			}
+		}
+	}
+
+	for _, name := range names {
+		fmt.Fprintf(file, "%s=%s\n", name, aliases[name])
+	}
+
+	return nil
+}
+
+// validateAliasName checks if an alias name is valid
+func validateAliasName(name string) error {
+	if name == "" {
+		return fmt.Errorf("alias name cannot be empty")
+	}
+
+	// Reserve special keywords
+	reserved := []string{"system", "latest"}
+	for _, r := range reserved {
+		if name == r {
+			return fmt.Errorf("alias name '%s' is reserved", name)
+		}
+	}
+
+	// Check for invalid characters
+	if strings.ContainsAny(name, "=/\\:;\"'` \t\n\r") {
+		return fmt.Errorf("alias name contains invalid characters")
+	}
+
+	// Check for path traversal
+	if strings.Contains(name, "..") || strings.HasPrefix(name, ".") {
+		return fmt.Errorf("invalid alias name: %s", name)
+	}
+
+	// Check length
+	if len(name) > 64 {
+		return fmt.Errorf("alias name too long (max 64 characters)")
+	}
+
+	return nil
 }

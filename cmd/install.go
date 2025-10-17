@@ -6,8 +6,11 @@ import (
 	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/defaulttools"
 	"github.com/go-nv/goenv/internal/helptext"
+	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/install"
+	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -127,5 +130,55 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return installer.Install(goVersion, installFlags.force)
+	// Execute pre-install hooks
+	executeHooks(hooks.PreInstall, map[string]string{
+		"version": goVersion,
+	})
+
+	// Perform the actual installation
+	err := installer.Install(goVersion, installFlags.force)
+
+	// Execute post-install hooks (even if installation failed, for logging)
+	executeHooks(hooks.PostInstall, map[string]string{
+		"version": goVersion,
+	})
+
+	// Install default tools if installation succeeded
+	if err == nil {
+		installDefaultTools(cmd, goVersion)
+
+		// Auto-rehash to update shims for new Go version and installed tools
+		if cfg.Debug {
+			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after installation")
+		}
+		shimMgr := shims.NewShimManager(cfg)
+		_ = shimMgr.Rehash() // Don't fail the install if rehash fails
+	}
+
+	return err
+}
+
+// installDefaultTools installs configured default tools after a successful Go installation
+func installDefaultTools(cmd *cobra.Command, goVersion string) {
+	cfg := config.Load()
+	configPath := defaulttools.ConfigPath(cfg.Root)
+
+	// Load config (skip if file doesn't exist or has errors)
+	toolConfig, err := defaulttools.LoadConfig(configPath)
+	if err != nil || !toolConfig.Enabled || len(toolConfig.Tools) == 0 {
+		return // Silently skip if not configured or disabled
+	}
+
+	// Show message if verbose or not quiet
+	if !installFlags.quiet {
+		fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing default tools...\n")
+	}
+
+	// Install tools (non-verbose to avoid clutter)
+	if err := defaulttools.InstallTools(toolConfig, goVersion, cfg.Root, !installFlags.quiet); err != nil {
+		// Don't fail the whole install if default tools fail
+		if !installFlags.quiet {
+			fmt.Fprintf(cmd.OutOrStderr(), "⚠️  Some default tools failed to install: %v\n", err)
+		}
+	}
 }

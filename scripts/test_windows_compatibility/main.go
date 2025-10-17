@@ -3,9 +3,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/version"
 )
@@ -13,6 +16,7 @@ import (
 var (
 	passed = 0
 	failed = 0
+	warnings = 0
 )
 
 func main() {
@@ -28,6 +32,12 @@ func main() {
 	testWindowsArchitectures()
 	testWindowsFileExtensions()
 
+	// Static code analysis tests
+	testPathSeparators()
+	testHomeEnvVar()
+	testUnixCommands()
+	testShellRedirection()
+
 	// Summary
 	fmt.Println()
 	fmt.Println("==================================================")
@@ -35,7 +45,7 @@ func main() {
 	fmt.Println("==================================================")
 
 	total := passed + failed
-	if failed == 0 {
+	if failed == 0 && warnings == 0 {
 		fmt.Printf("✅ All %d tests passed!\n", total)
 		fmt.Println()
 		fmt.Println("Windows support verified:")
@@ -43,6 +53,10 @@ func main() {
 		fmt.Println("  ✓ GetFileForPlatform works for Windows")
 		fmt.Println("  ✓ All Windows architectures supported (386, amd64, arm64)")
 		fmt.Println("  ✓ Correct file extensions (.zip for Windows)")
+		fmt.Println("  ✓ No hardcoded path separators")
+		fmt.Println("  ✓ No HOME env var issues")
+		fmt.Println("  ✓ No Unix-only commands")
+		fmt.Println("  ✓ No Unix-specific shell redirection")
 		fmt.Println()
 		fmt.Println("Recommendations:")
 		fmt.Println("  1. Test actual installation on Windows")
@@ -50,8 +64,15 @@ func main() {
 		fmt.Println("  3. Test with Windows path separators (backslashes)")
 		fmt.Println("  4. Verify shim .exe creation works")
 	} else {
-		fmt.Printf("❌ %d/%d tests failed\n", failed, total)
-		os.Exit(1)
+		if failed > 0 {
+			fmt.Printf("❌ %d/%d tests failed\n", failed, total)
+		}
+		if warnings > 0 {
+			fmt.Printf("⚠️  %d warnings (non-critical issues)\n", warnings)
+		}
+		if failed > 0 {
+			os.Exit(1)
+		}
 	}
 
 	fmt.Println("==================================================")
@@ -244,6 +265,273 @@ func testWindowsFileExtensions() {
 		failed++
 	} else {
 		fmt.Println("✗ FAIL: No Windows files found")
+		failed++
+	}
+	fmt.Println()
+}
+
+func testPathSeparators() {
+	fmt.Println("Test 6: No Hardcoded Path Separators")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" || info.Name() == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+
+			// Check for hardcoded colon in path list separators
+			if regexp.MustCompile(`\+\s*":"\s*\+`).MatchString(line) &&
+				!strings.Contains(line, "os.PathListSeparator") &&
+				!strings.Contains(line, "http") &&
+				!strings.Contains(line, "//") {
+				issues = append(issues, fmt.Sprintf("%s:%d: %s", path, lineNum, strings.TrimSpace(line)))
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: No hardcoded path separator issues found")
+		passed++
+	} else {
+		fmt.Printf("✗ FAIL: Found %d hardcoded path separator issues\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		if len(issues) > 3 {
+			fmt.Printf("  ... and %d more\n", len(issues)-3)
+		}
+		failed++
+	}
+	fmt.Println()
+}
+
+func testHomeEnvVar() {
+	fmt.Println("Test 7: No HOME Environment Variable Usage")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+
+			if regexp.MustCompile(`os\.Getenv\("HOME"\)`).MatchString(line) &&
+				!strings.Contains(line, "//") &&
+				!strings.Contains(line, "Fallback") {
+				issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: No HOME environment variable issues found")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d HOME env var usages (should use os.UserHomeDir)\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		if len(issues) > 3 {
+			fmt.Printf("  ... and %d more\n", len(issues)-3)
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testUnixCommands() {
+	fmt.Println("Test 8: No Unix-Only Commands Without Platform Checks")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		hasWindowsCheck := false
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+
+			// Track if file has Windows checks
+			if strings.Contains(line, "runtime.GOOS") && strings.Contains(line, "windows") {
+				hasWindowsCheck = true
+			}
+
+			// Check for ps command
+			if strings.Contains(line, `exec.Command`) && strings.Contains(line, `"ps"`) &&
+				!strings.Contains(line, "//") {
+				if !hasWindowsCheck {
+					issues = append(issues, fmt.Sprintf("%s:%d: ps command", path, lineNum))
+				}
+			}
+
+			// Check for hash -r
+			if strings.Contains(line, "hash -r") && !strings.Contains(line, "//") {
+				if !hasWindowsCheck {
+					issues = append(issues, fmt.Sprintf("%s:%d: hash -r", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: No Unix-only command issues found")
+		passed++
+	} else {
+		fmt.Printf("✗ FAIL: Found %d Unix-only commands without platform checks\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		if len(issues) > 3 {
+			fmt.Printf("  ... and %d more\n", len(issues)-3)
+		}
+		failed++
+	}
+	fmt.Println()
+}
+
+func testShellRedirection() {
+	fmt.Println("Test 9: No Unix-Specific Shell Redirection")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		hasShellCheck := false
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+
+			// Track if section has shell checks
+			if strings.Contains(line, "shell") && (strings.Contains(line, "powershell") || strings.Contains(line, "cmd")) {
+				hasShellCheck = true
+			}
+
+			if regexp.MustCompile(`2>/dev/null|>/dev/null`).MatchString(line) &&
+				!strings.Contains(line, "//") &&
+				!hasShellCheck {
+				issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: No Unix shell redirection issues found")
+		passed++
+	} else {
+		fmt.Printf("✗ FAIL: Found %d Unix shell redirection issues\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		if len(issues) > 3 {
+			fmt.Printf("  ... and %d more\n", len(issues)-3)
+		}
 		failed++
 	}
 	fmt.Println()

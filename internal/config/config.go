@@ -82,6 +82,11 @@ func (c *Config) LocalVersionFile() string {
 	return ".go-version"
 }
 
+// AliasesFile returns the path to the aliases file
+func (c *Config) AliasesFile() string {
+	return filepath.Join(c.Root, "aliases")
+}
+
 // EnsureDirectories creates necessary directories if they don't exist
 func (c *Config) EnsureDirectories() error {
 	dirs := []string{

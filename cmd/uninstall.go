@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
@@ -55,5 +56,18 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Debug: Uninstalling Go version %s\n", goVersion)
 	}
 
-	return installer.Uninstall(goVersion)
+	// Execute pre-uninstall hooks
+	executeHooks(hooks.PreUninstall, map[string]string{
+		"version": goVersion,
+	})
+
+	// Perform the actual uninstallation
+	err := installer.Uninstall(goVersion)
+
+	// Execute post-uninstall hooks (even if uninstall failed, for logging)
+	executeHooks(hooks.PostUninstall, map[string]string{
+		"version": goVersion,
+	})
+
+	return err
 }

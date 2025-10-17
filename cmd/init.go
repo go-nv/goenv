@@ -121,6 +121,11 @@ func detectEnvShell() string {
 }
 
 func detectParentShell() string {
+	// On Windows, ps command doesn't exist - rely on detectEnvShell instead
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+
 	ppid := os.Getppid()
 	cmd := exec.Command("ps", "-p", strconv.Itoa(ppid), "-o", "args=")
 	output, err := cmd.Output()
@@ -171,7 +176,10 @@ func renderUsageSnippet(shell string) string {
 func determineProfilePath(shell string) string {
 	switch shell {
 	case "bash":
-		home := os.Getenv("HOME")
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			home = os.Getenv("HOME") // Fallback
+		}
 		if home != "" {
 			bashrc := filepath.Join(home, ".bashrc")
 			bashProfile := filepath.Join(home, ".bash_profile")
@@ -270,11 +278,22 @@ func renderInitScript(shell string, cfg *config.Config, noRehash bool) string {
 	}
 
 	if completion := findCompletionPath(shell); completion != "" {
-		fmt.Fprintf(&builder, "source '%s'\n", completion)
+		// Completion sourcing only for Unix shells
+		if shell != "powershell" && shell != "cmd" {
+			fmt.Fprintf(&builder, "source '%s'\n", completion)
+		}
 	}
 
 	if !noRehash {
-		builder.WriteString("command goenv rehash 2>/dev/null\n")
+		// Rehash with shell-appropriate error redirection
+		switch shell {
+		case "powershell":
+			builder.WriteString("goenv rehash 2>$null\n")
+		case "cmd":
+			builder.WriteString("goenv rehash 2>NUL\n")
+		default:
+			builder.WriteString("command goenv rehash 2>/dev/null\n")
+		}
 	}
 
 	builder.WriteString(renderShellFunction(shell))

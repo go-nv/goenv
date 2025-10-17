@@ -25,6 +25,13 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
   variable.
 - Search commands from **multiple versions of Go at a time**.
 - Provide **tab completion** for bash, zsh, fish, and PowerShell.
+- **Automatically rehash** after `go install` - tools available immediately
+- **Diagnostic tool** (`goenv doctor`) for troubleshooting installation issues
+- **Self-update capability** (`goenv update`) for both git and binary installations
+- **Default tools** (`goenv default-tools`) - auto-install common tools with new Go versions
+- **Update tools** (`goenv update-tools`) - keep all installed Go tools current
+- **Migrate tools** (`goenv migrate-tools`) - copy tools when upgrading Go versions
+- **Version aliases** (`goenv alias`) - create convenient shorthand names for versions
 
 ### goenv compared to others:
 
@@ -38,6 +45,7 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
 - **Offline support** - Works without internet via intelligent caching
 - **Better performance** - Native Go binary vs bash scripts
 - **Cross-platform** - Single binary for all supported platforms
+- **Auto-rehash** - Installed tools work immediately without manual intervention
 
 ---
 
@@ -84,7 +92,63 @@ go version
 
 ---
 
-## �📖 Documentation
+## 🪝 Hooks System
+
+goenv includes a powerful hooks system that lets you automate actions at key points in the goenv lifecycle. Hooks are **declarative**, **safe**, and **cross-platform**.
+
+### Quick Example
+
+```bash
+# Generate configuration template
+goenv hooks init
+
+# Edit ~/.goenv/hooks.yaml
+# Set enabled: true and acknowledged_risks: true
+
+# Example: Log installations and send Slack notifications
+hooks:
+  post_install:
+    - action: log_to_file
+      params:
+        path: ~/.goenv/install.log
+        message: "Installed Go {version} at {timestamp}"
+    
+    - action: http_webhook
+      params:
+        url: https://hooks.slack.com/services/YOUR/WEBHOOK
+        body: '{"text": "✅ Go {version} installed"}'
+```
+
+### Available Actions
+
+- **`log_to_file`** - Write audit logs and track installations
+- **`http_webhook`** - Send notifications to Slack, Discord, or custom APIs
+- **`notify_desktop`** - Display native desktop notifications
+- **`check_disk_space`** - Verify sufficient space before operations
+- **`set_env`** - Set environment variables dynamically
+
+### Hook Points
+
+Execute actions at 8 different lifecycle points:
+- `pre_install` / `post_install` - Before/after installing Go versions
+- `pre_uninstall` / `post_uninstall` - Before/after removing Go versions
+- `pre_exec` / `post_exec` - Before/after executing Go commands
+- `pre_rehash` / `post_rehash` - Before/after regenerating shims
+
+### Commands
+
+```bash
+goenv hooks init       # Generate configuration template
+goenv hooks list       # Show available actions and hook points
+goenv hooks validate   # Check configuration for errors
+goenv hooks test       # Dry-run hooks without executing
+```
+
+**[📖 Complete Hooks Documentation](./docs/HOOKS.md)** - Examples, use cases, and detailed guides
+
+---
+
+## 📖 Documentation
 
 **[📚 Complete Documentation](./docs/)** - Comprehensive guides and references
 
@@ -94,6 +158,7 @@ go version
 - **[How It Works](./docs/user-guide/HOW_IT_WORKS.md)** - Understanding goenv's internals
 - **[Command Reference](./docs/reference/COMMANDS.md)** - Complete CLI documentation
 - **[Environment Variables](./docs/reference/ENVIRONMENT_VARIABLES.md)** - Configuration options
+- **[Hooks System](./docs/HOOKS.md)** - Automate actions with declarative hooks
 - **[Smart Caching](./docs/advanced/SMART_CACHING.md)** - Intelligent version caching
 - **[Contributing](./docs/CONTRIBUTING.md)** - How to contribute
 - **[Code of Conduct](./docs/CODE_OF_CONDUCT.md)** - Community guidelines

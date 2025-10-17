@@ -70,16 +70,20 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	// Build GOPATH value
 	var gopathValue string
 	if gopathPrefix == "" {
-		gopathValue = filepath.Join(os.Getenv("HOME"), "go", currentVersion)
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			home = os.Getenv("HOME") // Fallback
+		}
+		gopathValue = filepath.Join(home, "go", currentVersion)
 	} else {
 		gopathValue = filepath.Join(gopathPrefix, currentVersion)
 	}
 
 	// Handle GOPATH appending/prepending
 	if existingGopath != "" && appendGopath {
-		gopathValue = gopathValue + ":" + existingGopath
+		gopathValue = gopathValue + string(os.PathListSeparator) + existingGopath
 	} else if existingGopath != "" && prependGopath {
-		gopathValue = existingGopath + ":" + gopathValue
+		gopathValue = existingGopath + string(os.PathListSeparator) + gopathValue
 	}
 
 	// Build GOROOT value (version install path)
@@ -97,6 +101,28 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 		}
 
 		// Fish doesn't support hash -r
+	} else if shell == "powershell" {
+		// PowerShell
+		if !disableGoroot {
+			fmt.Fprintf(cmd.OutOrStdout(), "$env:GOROOT = \"%s\"\n", gorootValue)
+		}
+
+		if !disableGopath {
+			fmt.Fprintf(cmd.OutOrStdout(), "$env:GOPATH = \"%s\"\n", gopathValue)
+		}
+
+		// PowerShell doesn't need hash -r equivalent
+	} else if shell == "cmd" {
+		// CMD
+		if !disableGoroot {
+			fmt.Fprintf(cmd.OutOrStdout(), "set GOROOT=%s\n", gorootValue)
+		}
+
+		if !disableGopath {
+			fmt.Fprintf(cmd.OutOrStdout(), "set GOPATH=%s\n", gopathValue)
+		}
+
+		// CMD doesn't need hash -r equivalent
 	} else {
 		// Bash, zsh, ksh, etc.
 		if !disableGoroot {
@@ -107,7 +133,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(cmd.OutOrStdout(), "export GOPATH=\"%s\"\n", gopathValue)
 		}
 
-		// Rehash binaries
+		// Rehash binaries (Unix shells only)
 		fmt.Fprintln(cmd.OutOrStdout(), "hash -r 2>/dev/null || true")
 	}
 

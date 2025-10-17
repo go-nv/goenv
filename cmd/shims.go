@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
+	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/spf13/cobra"
@@ -117,6 +118,9 @@ func runRehash(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(cmd.OutOrStdout(), "Debug: Rehashing goenv shims...")
 	}
 
+	// Execute pre-rehash hooks
+	executeHooks(hooks.PreRehash, nil)
+
 	fmt.Fprintln(cmd.OutOrStdout(), "Rehashing...")
 	if err := shimMgr.Rehash(); err != nil {
 		return fmt.Errorf("failed to rehash shims: %w", err)
@@ -128,6 +132,10 @@ func runRehash(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Rehashed %d shims\n", len(shimList))
+
+	// Execute post-rehash hooks
+	executeHooks(hooks.PostRehash, nil)
+
 	return nil
 }
 

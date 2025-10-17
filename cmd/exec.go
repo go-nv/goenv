@@ -9,15 +9,19 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
+	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/shims"
 	"github.com/spf13/cobra"
 )
 
 var execCmd = &cobra.Command{
 	Use:   "exec <command> [args...]",
 	Short: "Execute a command with the selected Go version",
-	Long:  "Runs an executable by first preparing PATH so that the selected Go version's bin directory is at the front",
+	Long: `Runs an executable by first preparing PATH so that the selected Go version's bin directory is at the front.
+
+goenv automatically rehashes after successful 'go install' commands, so installed tools are immediately available without running 'goenv rehash' manually.`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		// Handle -- separator (skip it if present)
 		actualArgs := args
@@ -118,6 +122,12 @@ func runExec(cmd *cobra.Command, args []string) error {
 	command := args[0]
 	commandArgs := args[1:]
 
+	// Execute pre-exec hooks
+	executeHooks(hooks.PreExec, map[string]string{
+		"version": currentVersion,
+		"command": command,
+	})
+
 	var commandPath string
 
 	if currentVersion != "system" {
@@ -148,7 +158,51 @@ func runExec(cmd *cobra.Command, args []string) error {
 	execCmd.Stdout = cmd.OutOrStdout()
 	execCmd.Stderr = cmd.ErrOrStderr()
 
-	return execCmd.Run()
+	err = execCmd.Run()
+
+	// Execute post-exec hooks
+	executeHooks(hooks.PostExec, map[string]string{
+		"version": currentVersion,
+		"command": command,
+	})
+
+	// Auto-rehash after successful 'go install' command
+	if err == nil && shouldAutoRehash(command, commandArgs) {
+		if cfg.Debug {
+			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after go install")
+		}
+		// Run rehash silently - don't fail if it errors
+		_ = runRehashSilent(cfg)
+	}
+
+	return err
+}
+
+// shouldAutoRehash determines if we should automatically rehash after command execution
+func shouldAutoRehash(command string, args []string) bool {
+	// Check if command is 'go' and first arg is 'install'
+	if command != "go" && !strings.HasSuffix(command, "/go") && !strings.HasSuffix(command, "\\go.exe") {
+		return false
+	}
+
+	// Check if 'install' is in the arguments
+	for _, arg := range args {
+		if arg == "install" {
+			return true
+		}
+		// Stop at first non-flag argument
+		if !strings.HasPrefix(arg, "-") {
+			break
+		}
+	}
+
+	return false
+}
+
+// runRehashSilent runs rehash without printing output
+func runRehashSilent(cfg *config.Config) error {
+	shimMgr := shims.NewShimManager(cfg)
+	return shimMgr.Rehash()
 }
 
 // setEnvVar sets or updates an environment variable

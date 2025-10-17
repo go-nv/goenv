@@ -6,6 +6,7 @@ first argument.
 All subcommands are:
 
 - [Command Reference](#command-reference)
+  - [`goenv alias`](#goenv-alias)
   - [`goenv commands`](#goenv-commands)
   - [`goenv completions`](#goenv-completions)
   - [`goenv exec`](#goenv-exec)
@@ -21,6 +22,7 @@ All subcommands are:
   - [`goenv root`](#goenv-root)
   - [`goenv shell`](#goenv-shell)
   - [`goenv shims`](#goenv-shims)
+  - [`goenv unalias`](#goenv-unalias)
   - [`goenv uninstall`](#goenv-uninstall)
   - [`goenv version`](#goenv-version)
   - [`goenv --version`](#goenv---version)
@@ -32,6 +34,66 @@ All subcommands are:
   - [`goenv versions`](#goenv-versions)
   - [`goenv whence`](#goenv-whence)
   - [`goenv which`](#goenv-which)
+
+## `goenv alias`
+
+Create and manage version aliases. Aliases provide convenient shorthand names for Go versions, making it easier to reference commonly used versions.
+
+**Usage:**
+
+```shell
+# List all aliases
+> goenv alias
+
+# Show specific alias
+> goenv alias stable
+1.23.0
+
+# Create or update an alias
+> goenv alias stable 1.23.0
+> goenv alias dev latest
+> goenv alias lts 1.22.5
+```
+
+**Using aliases:**
+
+Once created, aliases can be used anywhere a version number is expected:
+
+```shell
+# Set global version using alias
+> goenv global stable
+
+# Set local version using alias
+> goenv local dev
+
+# Aliases are resolved to their target versions
+> goenv version
+1.23.0 (set by /home/go-nv/.goenv/version)
+```
+
+**Alias features:**
+
+- Aliases are stored in `~/.goenv/aliases` and persist across sessions
+- Alias names cannot conflict with reserved keywords (`system`, `latest`)
+- Aliases must contain only alphanumeric characters, hyphens, and underscores
+- Aliases are automatically resolved when setting versions with `global` or `local`
+- You can create aliases that point to special versions like `latest` or `system`
+
+**Common use cases:**
+
+```shell
+# Track LTS versions
+> goenv alias lts 1.22.5
+> goenv global lts
+
+# Maintain development and stable versions
+> goenv alias stable 1.23.0
+> goenv alias dev 1.24rc1
+
+# Quick version names
+> goenv alias prod 1.23.2
+> goenv alias staging 1.23.0
+```
 
 ## `goenv commands`
 
@@ -319,6 +381,40 @@ List existing goenv shims
 /home/go-nv/.goenv/shims/go
 /home/go-nv/.goenv/shims/godoc
 /home/go-nv/.goenv/shims/gofmt
+```
+
+## `goenv unalias`
+
+Remove a version alias.
+
+**Usage:**
+
+```shell
+# Remove an alias
+> goenv unalias stable
+
+# List remaining aliases
+> goenv alias
+dev -> 1.24rc1
+lts -> 1.22.5
+```
+
+This command removes the specified alias from the `~/.goenv/aliases` file. The target version remains installed and can still be used directly by its version number.
+
+**Example workflow:**
+
+```shell
+# Create an alias
+> goenv alias temp 1.23.0
+
+# Use it
+> goenv local temp
+
+# Remove it when no longer needed
+> goenv unalias temp
+
+# Version still works directly
+> goenv local 1.23.0
 ```
 
 ## `goenv uninstall`
