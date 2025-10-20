@@ -25,7 +25,7 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
   variable.
 - Search commands from **multiple versions of Go at a time**.
 - Provide **tab completion** for bash, zsh, fish, and PowerShell.
-- **Automatically rehash** after `go install` - tools available immediately
+- **Automatically rehash** after `go install` - tools available immediately (can be disabled with `--no-rehash` flag)
 - **Diagnostic tool** (`goenv doctor`) for troubleshooting installation issues
 - **Self-update capability** (`goenv update`) for both git and binary installations
 - **Default tools** (`goenv default-tools`) - auto-install common tools with new Go versions
@@ -45,7 +45,7 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
 - **Offline support** - Works without internet via intelligent caching
 - **Better performance** - Native Go binary vs bash scripts
 - **Cross-platform** - Single binary for all supported platforms
-- **Auto-rehash** - Installed tools work immediately without manual intervention
+- **Auto-rehash** - Installed tools work immediately without manual intervention (configurable for CI/CD)
 
 ---
 
