@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
@@ -24,7 +25,7 @@ var versionsFlags struct {
 
 func init() {
 	rootCmd.AddCommand(versionsCmd)
-	versionsCmd.Flags().BoolVar(&versionsFlags.bare, "bare", false, "Display bare version numbers only")
+	versionsCmd.Flags().BoolVarP(&versionsFlags.bare, "bare", "b", false, "Display bare version numbers only")
 	versionsCmd.Flags().BoolVar(&versionsFlags.skipAliases, "skip-aliases", false, "Skip aliases")
 	versionsCmd.Flags().BoolVar(&versionsFlags.complete, "complete", false, "Internal flag for shell completions")
 	_ = versionsCmd.Flags().MarkHidden("complete")
@@ -141,6 +142,38 @@ func runVersions(cmd *cobra.Command, args []string) error {
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "%s%s%s\n", prefix, version, suffix)
+		}
+	}
+
+	// Display aliases (unless --skip-aliases or --bare)
+	if !versionsFlags.skipAliases && !versionsFlags.bare {
+		aliases, err := mgr.ListAliases()
+		if err != nil {
+			return fmt.Errorf("failed to list aliases: %w", err)
+		}
+
+		if len(aliases) > 0 {
+			// Sort alias names for consistent output
+			aliasNames := make([]string, 0, len(aliases))
+			for name := range aliases {
+				aliasNames = append(aliasNames, name)
+			}
+			sort.Strings(aliasNames)
+
+			// Display aliases section
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), "Aliases:")
+			for _, name := range aliasNames {
+				targetVersion := aliases[name]
+				prefix := "  "
+
+				// Check if this alias points to the current version
+				if targetVersion == currentVersion {
+					prefix = "* "
+				}
+
+				fmt.Fprintf(cmd.OutOrStdout(), "%s%s -> %s\n", prefix, name, targetVersion)
+			}
 		}
 	}
 

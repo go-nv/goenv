@@ -28,7 +28,7 @@ var refreshFlags struct {
 
 func init() {
 	rootCmd.AddCommand(refreshCmd)
-	refreshCmd.Flags().BoolVarP(&refreshFlags.verbose, "verbose", "v", false, "Show detailed output")
+	refreshCmd.Flags().BoolVar(&refreshFlags.verbose, "verbose", false, "Show detailed output")
 }
 
 func runRefresh(cmd *cobra.Command, args []string) error {

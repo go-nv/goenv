@@ -80,6 +80,23 @@ func createTestVersion(t *testing.T, root, version string) {
 	}
 }
 
+func createTestAlias(t *testing.T, root, name, target string) {
+	aliasesFile := filepath.Join(root, "aliases")
+
+	// Read existing aliases if file exists
+	var content string
+	if data, err := os.ReadFile(aliasesFile); err == nil {
+		content = string(data)
+	}
+
+	// Append new alias
+	content += name + "=" + target + "\n"
+
+	if err := os.WriteFile(aliasesFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create alias: %v", err)
+	}
+}
+
 func TestGlobalCommand(t *testing.T) {
 	tests := []struct {
 		name           string

@@ -21,9 +21,10 @@ This command checks all tools installed in the current Go version's GOPATH
 and updates them to the latest available versions from the Go module proxy.
 
 Examples:
-  goenv update-tools                    # Update all tools
+  goenv update-tools                    # Update all tools to latest
   goenv update-tools --check            # Check for updates without installing
   goenv update-tools --tool gopls       # Update only gopls
+  goenv update-tools --version v0.12.0  # Update to specific version
   goenv update-tools --dry-run          # Show what would be updated`,
 	RunE: runUpdateTools,
 }
@@ -36,9 +37,9 @@ var updateToolsFlags struct {
 }
 
 func init() {
-	updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "Check for updates without installing")
-	updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "Update only the specified tool")
-	updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "Show what would be updated without actually updating")
+	updateToolsCmd.Flags().BoolVarP(&updateToolsFlags.check, "check", "c", false, "Check for updates without installing")
+	updateToolsCmd.Flags().StringVarP(&updateToolsFlags.tool, "tool", "t", "", "Update only the specified tool")
+	updateToolsCmd.Flags().BoolVarP(&updateToolsFlags.dryRun, "dry-run", "n", false, "Show what would be updated without actually updating")
 	updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "Target version (default: latest)")
 	rootCmd.AddCommand(updateToolsCmd)
 }
@@ -154,8 +155,14 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(cmd.OutOrStdout())
 		fmt.Fprintln(cmd.OutOrStdout(), "🔍 Dry run - would update:")
 		for _, update := range updates {
+			// Determine target version
+			targetVersion := updateToolsFlags.version
+			if targetVersion == "" || targetVersion == "latest" {
+				targetVersion = update.LatestVersion
+			}
+
 			fmt.Fprintf(cmd.OutOrStdout(), "  • %s: %s → %s\n",
-				update.Tool.Name, update.Tool.Version, update.LatestVersion)
+				update.Tool.Name, update.Tool.Version, targetVersion)
 		}
 		return nil
 	}
@@ -175,8 +182,14 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 	for _, update := range updates {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Updating %s...", update.Tool.Name)
 
-		// Build package reference with version
-		pkg := update.Tool.PackagePath + "@" + update.LatestVersion
+		// Determine target version: use flag value or latest
+		targetVersion := updateToolsFlags.version
+		if targetVersion == "" || targetVersion == "latest" {
+			targetVersion = update.LatestVersion
+		}
+
+		// Build package reference with target version
+		pkg := update.Tool.PackagePath + "@" + targetVersion
 
 		// Run go install
 		installCmd := exec.Command(goBin, "install", pkg)

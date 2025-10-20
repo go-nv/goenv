@@ -100,7 +100,7 @@ func init() {
 	helptext.SetCommandHelp(shimsCmd)
 	helptext.SetCommandHelp(whichCmd)
 	helptext.SetCommandHelp(whenceCmd)
-	whenceCmd.Flags().BoolVar(&whenceFlags.path, "path", false, "Show full paths to executables")
+	whenceCmd.Flags().BoolVarP(&whenceFlags.path, "path", "p", false, "Show full paths to executables")
 	whenceCmd.Flags().BoolVar(&whenceFlags.complete, "complete", false, "Show completion options")
 	_ = whenceCmd.Flags().MarkHidden("complete")
 }

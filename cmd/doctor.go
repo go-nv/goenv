@@ -80,6 +80,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 10: Network connectivity (optional)
 	results = append(results, checkNetwork())
 
+	// Check 11: VS Code integration
+	results = append(results, checkVSCodeIntegration(cfg))
+
 	// Print results
 	fmt.Fprintln(cmd.OutOrStdout(), "📋 Diagnostic Results:")
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -545,5 +548,85 @@ func checkNetwork() checkResult {
 		name:    "Network connectivity",
 		status:  "ok",
 		message: "Can reach golang.org",
+	}
+}
+
+func checkVSCodeIntegration(cfg *config.Config) checkResult {
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		// Can't check, but not critical
+		return checkResult{
+			name:    "VS Code integration",
+			status:  "ok",
+			message: "Unable to check (not in a project directory)",
+		}
+	}
+
+	vscodeDir := filepath.Join(cwd, ".vscode")
+	settingsFile := filepath.Join(vscodeDir, "settings.json")
+
+	// Check if .vscode directory exists
+	if _, err := os.Stat(vscodeDir); os.IsNotExist(err) {
+		// No .vscode directory - this is fine, just informational
+		return checkResult{
+			name:    "VS Code integration",
+			status:  "ok",
+			message: "No .vscode directory found",
+			advice:  "Run 'goenv vscode init' to set up VS Code integration",
+		}
+	}
+
+	// Check if settings.json exists
+	if _, err := os.Stat(settingsFile); os.IsNotExist(err) {
+		return checkResult{
+			name:    "VS Code integration",
+			status:  "warning",
+			message: "Found .vscode directory but no settings.json",
+			advice:  "Run 'goenv vscode init' to configure Go extension",
+		}
+	}
+
+	// Check if settings.json contains go.goroot configuration
+	data, err := os.ReadFile(settingsFile)
+	if err != nil {
+		return checkResult{
+			name:    "VS Code integration",
+			status:  "warning",
+			message: fmt.Sprintf("Cannot read settings.json: %v", err),
+			advice:  "Ensure .vscode/settings.json is readable",
+		}
+	}
+
+	content := string(data)
+	hasGoroot := strings.Contains(content, "go.goroot")
+	hasGopath := strings.Contains(content, "go.gopath")
+
+	if !hasGoroot && !hasGopath {
+		return checkResult{
+			name:    "VS Code integration",
+			status:  "warning",
+			message: "settings.json exists but missing Go configuration",
+			advice:  "Run 'goenv vscode init' to add goenv configuration",
+		}
+	}
+
+	// Check if it's using environment variables (recommended)
+	usesEnvVars := strings.Contains(content, "${env:GOROOT}") || strings.Contains(content, "${env:GOPATH}")
+
+	if usesEnvVars {
+		return checkResult{
+			name:    "VS Code integration",
+			status:  "ok",
+			message: "VS Code configured to use goenv environment variables",
+		}
+	}
+
+	// Has go.goroot but not using env vars - might be hardcoded
+	return checkResult{
+		name:    "VS Code integration",
+		status:  "warning",
+		message: "VS Code has Go configuration but may not use goenv",
+		advice:  "Consider using '${env:GOROOT}' in settings.json. Run 'goenv vscode init --force' to update.",
 	}
 }

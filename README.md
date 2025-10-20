@@ -156,6 +156,7 @@ goenv hooks test       # Dry-run hooks without executing
 
 - **[Installation Guide](./docs/user-guide/INSTALL.md)** - Get started with goenv
 - **[How It Works](./docs/user-guide/HOW_IT_WORKS.md)** - Understanding goenv's internals
+- **[VS Code Integration](./docs/user-guide/VSCODE_INTEGRATION.md)** - Setting up VS Code with goenv
 - **[Command Reference](./docs/reference/COMMANDS.md)** - Complete CLI documentation
 - **[Environment Variables](./docs/reference/ENVIRONMENT_VARIABLES.md)** - Configuration options
 - **[Hooks System](./docs/HOOKS.md)** - Automate actions with declarative hooks

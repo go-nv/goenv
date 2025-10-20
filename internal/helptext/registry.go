@@ -217,7 +217,7 @@ selected. To obtain only the version string, use ` + "`goenv version-name'." + `
   -k/--keep          Keep source tree in $GOENV_BUILD_ROOT after installation
                      (defaults to $GOENV_ROOT/sources)
   -p/--patch         Apply a patch from stdin before building
-  -v/--verbose       Verbose mode: print compilation status to stdout
+  --verbose          Verbose mode: print compilation status to stdout
   -q/--quiet         Disable Progress Bar
   --version          Show version of go-build
   -g/--debug         Build a debug version

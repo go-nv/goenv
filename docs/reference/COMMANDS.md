@@ -36,6 +36,8 @@ All subcommands are:
     - [Installation Methods](#installation-methods)
   - [`goenv update-tools`](#goenv-update-tools)
     - [Options](#options-3)
+  - [`goenv vscode`](#goenv-vscode)
+    - [`goenv vscode init`](#goenv-vscode-init)
   - [`goenv version`](#goenv-version)
   - [`goenv --version`](#goenv---version)
   - [`goenv version-file`](#goenv-version-file)
@@ -364,6 +366,19 @@ configured local version. You can also unset the local version:
 > goenv local --unset
 ```
 
+**NEW:** Automatically set up VS Code integration when setting a local version:
+
+```shell
+> goenv local 1.22.0 --vscode
+
+Initializing VS Code workspace...
+✓ Created/updated .vscode/settings.json
+✓ Created/updated .vscode/extensions.json
+✨ VS Code workspace configured for goenv!
+```
+
+The `--vscode` flag creates `.vscode/settings.json` and `.vscode/extensions.json` files configured to use goenv. This makes it easy to set up new projects with proper IDE integration in one command.
+
 Previous versions of goenv stored local version specifications in a
 file named `.goenv-version`. For backwards compatibility, goenv will
 read a local version specified in an `.goenv-version` file, but a
@@ -670,6 +685,102 @@ Update installed Go tools to their latest versions.
 - `--version <version>` - Target version (default: latest)
 
 This command updates tools installed with `go install` in your current Go version's GOPATH.
+
+## `goenv vscode`
+
+Manage Visual Studio Code integration with goenv.
+
+```shell
+> goenv vscode
+Commands to configure and manage Visual Studio Code integration with goenv
+
+Available Commands:
+  init        Initialize VS Code workspace for goenv
+```
+
+### `goenv vscode init`
+
+Initialize VS Code workspace with goenv configuration.
+
+This command creates or updates `.vscode/settings.json` and `.vscode/extensions.json` in the current directory to ensure VS Code uses the correct Go version from goenv.
+
+**Usage:**
+
+```shell
+> goenv vscode init
+✓ Created/updated /path/to/project/.vscode/settings.json
+✓ Created/updated /path/to/project/.vscode/extensions.json
+
+✨ VS Code workspace configured for goenv!
+```
+
+**Flags:**
+
+- `--force` - Overwrite existing settings instead of merging
+- `--template <name>` - Use specific template (basic, advanced, monorepo)
+
+**Templates:**
+
+| Template | Description |
+|----------|-------------|
+| `basic` | Go configuration with goenv env vars (default) |
+| `advanced` | Includes gopls settings, format on save, organize imports |
+| `monorepo` | Configured for large repositories with multiple modules |
+
+**Examples:**
+
+```shell
+# Basic setup (default)
+> goenv vscode init
+
+# Advanced setup with gopls configuration
+> goenv vscode init --template advanced
+
+# Force overwrite existing settings
+> goenv vscode init --force
+
+# Monorepo setup
+> goenv vscode init --template monorepo
+```
+
+**What it does:**
+
+1. Creates `.vscode/settings.json` with:
+   - `go.goroot: ${env:GOROOT}` - Uses goenv's GOROOT
+   - `go.gopath: ${env:GOPATH}` - Uses goenv's GOPATH
+   - `go.toolsGopath` - Shared location for Go tools
+   - Optional gopls and editor settings (advanced template)
+
+2. Creates `.vscode/extensions.json` with:
+   - Recommendation for the official Go extension (`golang.go`)
+
+3. Merges with existing settings (unless `--force` is used)
+
+**Integration with goenv local:**
+
+You can also automatically set up VS Code when setting a local Go version:
+
+```shell
+> goenv local 1.22.0 --vscode
+
+Initializing VS Code workspace...
+✓ Created/updated .vscode/settings.json
+✓ Created/updated .vscode/extensions.json
+✨ VS Code workspace configured for goenv!
+```
+
+**Doctor integration:**
+
+The `goenv doctor` command checks your VS Code integration:
+
+```shell
+> goenv doctor
+...
+✅ VS Code integration
+   VS Code configured to use goenv environment variables
+```
+
+See the [VS Code Integration Guide](../user-guide/VSCODE_INTEGRATION.md) for detailed setup instructions and troubleshooting.
 
 ## `goenv version`
 

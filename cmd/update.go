@@ -39,8 +39,8 @@ var (
 )
 
 func init() {
-	updateCmd.Flags().BoolVar(&updateCheckOnly, "check", false, "Check for updates without installing")
-	updateCmd.Flags().BoolVar(&updateForce, "force", false, "Force update even if already up-to-date")
+	updateCmd.Flags().BoolVarP(&updateCheckOnly, "check", "c", false, "Check for updates without installing")
+	updateCmd.Flags().BoolVarP(&updateForce, "force", "f", false, "Force update even if already up-to-date")
 	rootCmd.AddCommand(updateCmd)
 }
 

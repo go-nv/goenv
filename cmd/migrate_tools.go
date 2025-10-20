@@ -39,7 +39,7 @@ var migrateToolsFlags struct {
 }
 
 func init() {
-	migrateToolsCmd.Flags().BoolVar(&migrateToolsFlags.dryRun, "dry-run", false, "Show what would be migrated without actually migrating")
+	migrateToolsCmd.Flags().BoolVarP(&migrateToolsFlags.dryRun, "dry-run", "n", false, "Show what would be migrated without actually migrating")
 	migrateToolsCmd.Flags().StringVar(&migrateToolsFlags.select_, "select", "", "Comma-separated list of tools to migrate (e.g., gopls,delve)")
 	migrateToolsCmd.Flags().StringVar(&migrateToolsFlags.exclude, "exclude", "", "Comma-separated list of tools to exclude from migration")
 	rootCmd.AddCommand(migrateToolsCmd)

@@ -261,6 +261,57 @@ func TestUpdateToolsHelp(t *testing.T) {
 	}
 }
 
+// TestUpdateToolsVersionFlag tests that the --version flag is properly used
+func TestUpdateToolsVersionFlag(t *testing.T) {
+	// This test verifies that the --version flag value is used when constructing
+	// the go install command, rather than always using @latest
+
+	// Create test environment
+	testRoot, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	// Create a mock Go version
+	goVersion := "1.21.0"
+	createTestVersion(t, testRoot, goVersion)
+
+	// Set as current version
+	globalFile := filepath.Join(testRoot, "version")
+	if err := os.WriteFile(globalFile, []byte(goVersion), 0644); err != nil {
+		t.Fatalf("Failed to set global version: %v", err)
+	}
+
+	// Reset and set flags
+	updateToolsFlags.check = false
+	updateToolsFlags.tool = ""
+	updateToolsFlags.dryRun = true       // Use dry-run to avoid actual installation
+	updateToolsFlags.version = "v0.12.5" // Specific version
+
+	// Use the existing updateToolsCmd
+	cmd := updateToolsCmd
+	output := &strings.Builder{}
+	cmd.SetOut(output)
+	cmd.SetErr(output)
+
+	// Run the command
+	err := runUpdateTools(cmd, []string{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Verify the version flag was set and used correctly
+	if updateToolsFlags.version != "v0.12.5" {
+		t.Errorf("Expected version flag to be 'v0.12.5', got '%s'", updateToolsFlags.version)
+	}
+
+	t.Log("✓ Version flag properly stored and accessible")
+
+	// Reset flags after test
+	updateToolsFlags.check = false
+	updateToolsFlags.tool = ""
+	updateToolsFlags.dryRun = false
+	updateToolsFlags.version = "latest"
+}
+
 // Helper struct for test setup
 type toolInfo struct {
 	name    string

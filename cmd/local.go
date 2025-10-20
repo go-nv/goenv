@@ -17,14 +17,18 @@ var localCmd = &cobra.Command{
 }
 
 var localFlags struct {
-	unset    bool
-	complete bool
+	unset          bool
+	complete       bool
+	vscode         bool
+	vscodeAbsolute bool
 }
 
 func init() {
 	rootCmd.AddCommand(localCmd)
 	localCmd.SilenceUsage = true
-	localCmd.Flags().BoolVar(&localFlags.unset, "unset", false, "Unset the local Go version")
+	localCmd.Flags().BoolVarP(&localFlags.unset, "unset", "u", false, "Unset the local Go version")
+	localCmd.Flags().BoolVar(&localFlags.vscode, "vscode", false, "Also initialize VS Code workspace settings")
+	localCmd.Flags().BoolVarP(&localFlags.vscodeAbsolute, "vscode-absolute", "a", false, "Use absolute paths in VS Code settings (allows reload without restart)")
 	localCmd.Flags().BoolVar(&localFlags.complete, "complete", false, "Internal flag for shell completions")
 	_ = localCmd.Flags().MarkHidden("complete")
 	helptext.SetCommandHelp(localCmd)
@@ -87,6 +91,40 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 	if err := mgr.SetLocalVersion(resolvedVersion); err != nil {
 		return err
+	}
+
+	// Automatically initialize VS Code if --vscode or --vscode-absolute flag is set
+	if localFlags.vscode || localFlags.vscodeAbsolute {
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), "Initializing VS Code workspace...")
+
+		// Set the absolute path flag if requested
+		if localFlags.vscodeAbsolute {
+			vscodeInitFlags.absolutePath = true
+		}
+
+		// Call vscode init functionality
+		if err := initializeVSCodeWorkspace(cmd); err != nil {
+			// Don't fail the whole command if VS Code init fails
+			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: VS Code initialization failed: %v\n", err)
+			fmt.Fprintln(cmd.OutOrStdout(), "   You can manually run: goenv vscode init")
+		}
+
+		// Reset the flag
+		vscodeInitFlags.absolutePath = false
+
+		// Important note about environment refresh (only if not using absolute paths)
+		if !localFlags.vscodeAbsolute {
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), "⚠️  Important: To use Go "+resolvedVersion+" in VS Code:")
+			fmt.Fprintln(cmd.OutOrStdout(), "   1. Close VS Code completely")
+			fmt.Fprintln(cmd.OutOrStdout(), "   2. Reopen from terminal:  code .")
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), "   This ensures VS Code inherits the updated GOROOT environment variable.")
+			fmt.Fprintln(cmd.OutOrStdout(), "   (Reloading the window won't work - VS Code needs to restart)")
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), "💡 Tip: Use --vscode-absolute flag for reload without restart")
+		}
 	}
 
 	return nil

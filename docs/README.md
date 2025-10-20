@@ -8,6 +8,7 @@ Welcome to the goenv documentation! This directory contains comprehensive docume
 
 - **[Installation Guide](user-guide/INSTALL.md)** - Complete installation instructions for all platforms
 - **[How It Works](user-guide/HOW_IT_WORKS.md)** - Understanding goenv's architecture and workflow
+- **[VS Code Integration](user-guide/VSCODE_INTEGRATION.md)** - Setting up VS Code with goenv
 - **[New Features](NEW_FEATURES.md)** - Summary of new features in Go implementation
 - **[Migration Guide](MIGRATION_GUIDE.md)** - Migrating from bash to Go implementation
 
@@ -64,7 +65,8 @@ docs/
 ├── README.md                    # This file - documentation index
 ├── user-guide/                  # User-facing documentation
 │   ├── INSTALL.md              # Installation instructions
-│   └── HOW_IT_WORKS.md         # Architecture overview
+│   ├── HOW_IT_WORKS.md         # Architecture overview
+│   └── VSCODE_INTEGRATION.md   # VS Code setup guide
 ├── reference/                   # Reference documentation
 │   ├── COMMANDS.md             # Command reference
 │   └── ENVIRONMENT_VARIABLES.md # Environment variable reference

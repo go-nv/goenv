@@ -42,7 +42,7 @@ func init() {
 	installCmd.Flags().BoolVarP(&installFlags.skipExisting, "skip-existing", "s", false, "Skip if the version appears to be installed already")
 	installCmd.Flags().BoolVarP(&installFlags.list, "list", "l", false, "List all available versions")
 	installCmd.Flags().BoolVarP(&installFlags.keep, "keep", "k", false, "Keep downloaded files after installation")
-	installCmd.Flags().BoolVarP(&installFlags.verbose, "verbose", "v", false, "Verbose mode: print detailed installation info")
+	installCmd.Flags().BoolVar(&installFlags.verbose, "verbose", false, "Verbose mode: print detailed installation info")
 	installCmd.Flags().BoolVarP(&installFlags.quiet, "quiet", "q", false, "Quiet mode: disable progress bar")
 	installCmd.Flags().BoolVarP(&installFlags.ipv4, "ipv4", "4", false, "Resolve names to IPv4 addresses only")
 	installCmd.Flags().BoolVarP(&installFlags.ipv6, "ipv6", "6", false, "Resolve names to IPv6 addresses only")

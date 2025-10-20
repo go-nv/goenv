@@ -14,6 +14,7 @@ func TestVersionsCommand(t *testing.T) {
 		name           string
 		args           []string
 		setupVersions  []string
+		setupAliases   map[string]string // alias name -> target version
 		globalVersion  string
 		expectSystemGo bool
 		expectedOutput []string
@@ -49,11 +50,28 @@ func TestVersionsCommand(t *testing.T) {
 			expectedOutput: []string{"1.21.5", "1.22.2"},
 		},
 		{
-			name:           "skip aliases flag (no change in Go version)",
+			name:           "list with aliases displayed",
+			args:           []string{},
+			setupVersions:  []string{"1.21.5", "1.22.2", "1.23.0"},
+			setupAliases:   map[string]string{"stable": "1.22.2", "dev": "1.23.0"},
+			globalVersion:  "1.22.2",
+			expectedOutput: []string{"  1.21.5", "* 1.22.2 (set by global)", "  1.23.0", "", "Aliases:", "  dev -> 1.23.0", "* stable -> 1.22.2"},
+		},
+		{
+			name:           "skip aliases flag hides aliases",
 			args:           []string{"--skip-aliases"},
 			setupVersions:  []string{"1.21.5", "1.22.2"},
+			setupAliases:   map[string]string{"stable": "1.22.2"},
 			globalVersion:  "1.21.5",
 			expectedOutput: []string{"* 1.21.5 (set by global)", "  1.22.2"},
+		},
+		{
+			name:           "bare mode hides aliases",
+			args:           []string{"--bare"},
+			setupVersions:  []string{"1.21.5", "1.22.2"},
+			setupAliases:   map[string]string{"stable": "1.22.2"},
+			globalVersion:  "1.21.5",
+			expectedOutput: []string{"1.21.5", "1.22.2"},
 		},
 		{
 			name:           "bare and skip aliases combined",
@@ -81,6 +99,11 @@ func TestVersionsCommand(t *testing.T) {
 			// Setup test versions
 			for _, version := range tt.setupVersions {
 				createTestVersion(t, testRoot, version)
+			}
+
+			// Setup test aliases if specified
+			for name, target := range tt.setupAliases {
+				createTestAlias(t, testRoot, name, target)
 			}
 
 			// Set global version if specified
