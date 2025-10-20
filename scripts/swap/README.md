@@ -55,4 +55,25 @@ The utility automatically:
 - Detects your goenv installation (Homebrew, manual, system)
 - Creates backups before swapping
 - Handles permissions (prompts for sudo if needed)
-- Verifies the swap was successful
+- Installs the Go binary successfully
+
+## Testing
+
+After swapping to the Go version:
+
+```bash
+# Reload shell's command hash
+hash -r
+
+# Test basic commands
+goenv --version        # Should show 3.0.0
+goenv version          # Should show current version
+goenv versions         # Should list installed versions
+goenv init -           # Should generate shell initialization
+```
+
+If you encounter any issues, swap back immediately:
+
+```bash
+./swap bash
+```

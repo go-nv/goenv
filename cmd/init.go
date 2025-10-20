@@ -285,22 +285,19 @@ func renderInitScript(shell string, cfg *config.Config, noRehash bool) string {
 	}
 
 	if !noRehash {
-		// Rehash with shell-appropriate error redirection
+		// Use sh-rehash with --only-manage-paths for faster initialization
+		// This updates GOPATH/GOROOT without rebuilding shims on every shell start
 		switch shell {
 		case "powershell":
-			builder.WriteString("goenv rehash 2>$null\n")
+			builder.WriteString("goenv sh-rehash --only-manage-paths 2>$null\n")
 		case "cmd":
-			builder.WriteString("goenv rehash 2>NUL\n")
+			builder.WriteString("goenv sh-rehash --only-manage-paths 2>NUL\n")
 		default:
-			builder.WriteString("command goenv rehash 2>/dev/null\n")
+			builder.WriteString("command goenv sh-rehash --only-manage-paths 2>/dev/null\n")
 		}
 	}
 
 	builder.WriteString(renderShellFunction(shell))
-
-	if !noRehash {
-		builder.WriteString("  goenv rehash --only-manage-paths\n")
-	}
 
 	return builder.String()
 }

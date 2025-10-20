@@ -22,6 +22,7 @@ var execCmd = &cobra.Command{
 	Long: `Runs an executable by first preparing PATH so that the selected Go version's bin directory is at the front.
 
 goenv automatically rehashes after successful 'go install' commands, so installed tools are immediately available without running 'goenv rehash' manually.`,
+	DisableFlagParsing: true, // Pass all flags through to the executed command
 	Args: func(cmd *cobra.Command, args []string) error {
 		// Handle -- separator (skip it if present)
 		actualArgs := args

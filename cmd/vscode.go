@@ -45,9 +45,9 @@ This makes VS Code automatically detect and use goenv-managed Go versions.`,
 }
 
 var vscodeInitFlags struct {
-	force        bool
-	template     string
-	absolutePath bool
+	force    bool
+	template string
+	envVars  bool
 }
 
 func init() {
@@ -56,7 +56,7 @@ func init() {
 
 	vscodeInitCmd.Flags().BoolVarP(&vscodeInitFlags.force, "force", "f", false, "Overwrite existing settings")
 	vscodeInitCmd.Flags().StringVarP(&vscodeInitFlags.template, "template", "t", "basic", "Configuration template (basic, advanced, monorepo)")
-	vscodeInitCmd.Flags().BoolVarP(&vscodeInitFlags.absolutePath, "absolute", "a", false, "Use absolute paths instead of environment variables (allows reload without restart)")
+	vscodeInitCmd.Flags().BoolVar(&vscodeInitFlags.envVars, "env-vars", false, "Use environment variables instead of absolute paths (requires launching VS Code from terminal)")
 
 	vscodeInitCmd.SilenceUsage = true
 	helptext.SetCommandHelp(vscodeInitCmd)
@@ -92,10 +92,11 @@ func initializeVSCodeWorkspace(cmd *cobra.Command) error {
 
 	// Use basic template for automatic initialization
 	template := "basic"
-	force := false
-	useAbsolutePaths := vscodeInitFlags.absolutePath
+	force := vscodeInitFlags.force
 
-	// If called from vscode init command, use flags
+	// Default to absolute paths for better UX (works when opened from GUI)
+	// unless user explicitly requests env vars
+	useAbsolutePaths := !vscodeInitFlags.envVars // If called from vscode init command, use flags
 	if vscodeInitFlags.template != "" && vscodeInitFlags.template != "basic" {
 		template = vscodeInitFlags.template
 	}
@@ -145,15 +146,13 @@ func initializeVSCodeWorkspace(cmd *cobra.Command) error {
 	// Merge or overwrite settings
 	finalSettings := settings
 	if existingSettings != nil && !force {
+		// Always override Go-related keys when switching modes or updating paths
+		// This ensures the command actually does what the user expects
+		finalSettings = mergeSettingsWithOverride(existingSettings, settings, []string{"go.goroot", "go.gopath", "go.toolsGopath"})
 		if useAbsolutePaths {
-			// When using absolute paths, we need to update Go-related keys
-			// Merge other settings, but force update go.goroot and go.gopath
-			finalSettings = mergeSettingsWithOverride(existingSettings, settings, []string{"go.goroot", "go.gopath", "go.toolsGopath"})
 			fmt.Fprintln(cmd.OutOrStdout(), "ℹ️  Updating Go paths with absolute values")
 		} else {
-			// Merge: add our settings but don't overwrite existing keys
-			finalSettings = mergeSettings(existingSettings, settings)
-			fmt.Fprintln(cmd.OutOrStdout(), "ℹ️  Merging with existing settings (use 'goenv vscode init --force' to overwrite)")
+			fmt.Fprintln(cmd.OutOrStdout(), "ℹ️  Updating Go paths with environment variables")
 		}
 	}
 
@@ -184,27 +183,29 @@ func initializeVSCodeWorkspace(cmd *cobra.Command) error {
 	if useAbsolutePaths {
 		fmt.Fprintf(cmd.OutOrStdout(), "  • go.goroot: %v (absolute path)\n", finalSettings["go.goroot"])
 		fmt.Fprintf(cmd.OutOrStdout(), "  • go.gopath: %v (absolute path)\n", finalSettings["go.gopath"])
-		fmt.Fprintf(cmd.OutOrStdout(), "  • Mode: Absolute paths (no restart required!)\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "  • Mode: Absolute paths (works when opened from GUI!)\n")
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "  • go.goroot: ${env:GOROOT}\n")
 		fmt.Fprintf(cmd.OutOrStdout(), "  • go.gopath: ${env:GOPATH}\n")
-		fmt.Fprintf(cmd.OutOrStdout(), "  • Mode: Environment variables\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "  • Mode: Environment variables (requires terminal launch)\n")
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "  • Template: %s\n", template)
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintln(cmd.OutOrStdout(), "Next steps:")
 	if useAbsolutePaths {
 		fmt.Fprintln(cmd.OutOrStdout(), "  1. Reload VS Code window (Cmd+Shift+P → 'Developer: Reload Window')")
-		fmt.Fprintln(cmd.OutOrStdout(), "  2. ✨ Changes take effect immediately - no restart needed!")
+		fmt.Fprintln(cmd.OutOrStdout(), "  2. ✨ Ready to use - works even when opened from GUI!")
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), "💡 Note: If you change Go versions, re-run 'goenv vscode init' to update paths")
 	} else {
 		fmt.Fprintln(cmd.OutOrStdout(), "  1. Close VS Code completely")
-		fmt.Fprintln(cmd.OutOrStdout(), "  2. Reopen from terminal: code .")
-		fmt.Fprintln(cmd.OutOrStdout(), "  3. (Or use --absolute flag for reload without restart)")
+		fmt.Fprintln(cmd.OutOrStdout(), "  2. Ensure 'eval \"$(goenv init -)\"' is in your shell config")
+		fmt.Fprintln(cmd.OutOrStdout(), "  3. Launch from terminal: code .")
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), "⚠️  Warning: Environment variable mode requires terminal launch")
+		fmt.Fprintln(cmd.OutOrStdout(), "   Consider using default --absolute mode for better UX")
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "")
-	if !useAbsolutePaths {
-		fmt.Fprintln(cmd.OutOrStdout(), "💡 Tip: Launch VS Code from terminal (code .) for best results")
-	}
 
 	return nil
 }

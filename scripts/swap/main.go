@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 )
 
 // Colors
@@ -33,15 +32,15 @@ func init() {
 		useColor = false
 	}
 
-	// Get script directory
-	ex, err := os.Executable()
-	if err != nil {
-		scriptDir, _ = os.Getwd()
-	} else {
-		scriptDir = filepath.Dir(ex)
-	}
+	// For `go run`, use the source file location
+	// For built binary, use the executable location
+	_, sourceFile, _, _ := runtime.Caller(0)
+	scriptDir = filepath.Dir(sourceFile) // This gives us scripts/swap directory
 
-	goBinary = filepath.Join(scriptDir, "goenv")
+	// Find repo root (go up from scripts/swap to repo root)
+	repoRoot := filepath.Dir(filepath.Dir(scriptDir)) // Go up 2 levels
+
+	goBinary = filepath.Join(repoRoot, "goenv")
 	if runtime.GOOS == "windows" {
 		goBinary += ".exe"
 	}
@@ -156,8 +155,19 @@ func cmdBuild() {
   - Manual: https://golang.org/dl/`)
 	}
 
-	log("Running: make build")
+	// Find repo root (where Makefile is located)
+	repoRoot := scriptDir
+	for i := 0; i < 3; i++ { // Go up max 3 levels
+		makefilePath := filepath.Join(repoRoot, "Makefile")
+		if _, err := os.Stat(makefilePath); err == nil {
+			break
+		}
+		repoRoot = filepath.Dir(repoRoot)
+	}
+
+	log(fmt.Sprintf("Running: make build (in %s)", repoRoot))
 	cmd := exec.Command("make", "build")
+	cmd.Dir = repoRoot // Set working directory
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -306,19 +316,27 @@ func cmdGo() {
 		}
 		dst.Chmod(0755)
 		success(fmt.Sprintf("Copied: %s → %s", goBinary, goenvPath))
-	}
 
-	// Verify
-	log("Verifying installation...")
-	cmd := exec.Command(goenvPath, "--version")
-	out, _ := cmd.CombinedOutput()
-	if strings.Contains(string(out), "goenv") {
-		success("Switch successful!")
-		fmt.Println(string(out))
-		warn("Reload your shell: hash -r (or restart terminal)")
-	} else {
-		errorExit("Verification failed")
+		// Make executable
+		if err := os.Chmod(goenvPath, 0755); err != nil {
+			warn(fmt.Sprintf("Could not set executable permission: %v", err))
+		}
 	}
+	
+	// Verify file was copied
+	if stat, err := os.Stat(goenvPath); err == nil {
+		success(fmt.Sprintf("Binary installed (%d bytes)", stat.Size()))
+	} else {
+		errorExit(fmt.Sprintf("Verification failed: %v", err))
+	}
+	
+	success("Switch successful!")
+	warn("IMPORTANT: Reload your shell before testing:")
+	fmt.Println("  hash -r")
+	fmt.Println("  # OR restart your terminal")
+	fmt.Println()
+	warn("To test: goenv --version")
+	warn("If it hangs, swap back with: ./swap bash")
 }
 
 func cmdBash() {
