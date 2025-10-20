@@ -149,7 +149,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 		versionBinDir := filepath.Join(versionPath, "bin")
 		commandPath = findBinaryInDir(versionBinDir, command)
-		
+
 		// If not found in version bin, check GOPATH bin (if GOPATH is enabled)
 		if commandPath == "" && os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
 			// Get the GOPATH from environment (already set above)
@@ -169,7 +169,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 				}
 			}
 		}
-		
+
 		if commandPath == "" {
 			return fmt.Errorf("goenv: %s: command not found", command)
 		}
