@@ -63,32 +63,83 @@ The following snippet can be inserted in your buildspec.yml (or buildspec defini
 
 ---
 
-## � Quick Start
+## 🚀 Quick Start
+
+### Option 1: Binary Installation (Recommended - No Go Required!)
+
+The fastest way to get started. Download a pre-built binary - no Go installation needed!
+
+```bash
+# Automatic install (Linux/macOS)
+curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
+
+# Or download manually from releases:
+# https://github.com/go-nv/goenv/releases/latest
+```
+
+```powershell
+# Automatic install (Windows)
+iwr -useb https://raw.githubusercontent.com/go-nv/goenv/master/install.ps1 | iex
+```
+
+Then add to your shell config:
+
+```bash
+# Bash (~/.bash_profile or ~/.bashrc)
+export GOENV_ROOT="$HOME/.goenv"
+export PATH="$GOENV_ROOT/bin:$PATH"
+eval "$(goenv init -)"
+```
+
+### Option 2: Package Manager (macOS)
+
+**Homebrew**:
+```bash
+brew install goenv
+```
+
+Then add to your shell config (see Option 1 above for shell configuration).
+
+### Option 3: Git Clone (Requires Go to Build)
+
+For contributors or those who want the latest development version:
 
 ```bash
 # 1. Clone goenv
 git clone https://github.com/go-nv/goenv.git ~/.goenv
 
-# 2. Add to your shell config (~/.bashrc, ~/.zshrc, etc.)
+# 2. Build (requires Go)
+cd ~/.goenv && make build
+
+# 3. Add to your shell config (~/.bashrc, ~/.zshrc, etc.)
 export GOENV_ROOT="$HOME/.goenv"
 export PATH="$GOENV_ROOT/bin:$PATH"
 eval "$(goenv init -)"
 
-# 3. Enable tab completion (optional but recommended)
-goenv completion --install
-
 # 4. Restart your shell
 exec $SHELL
+```
 
-# 5. Install a Go version
+### Next Steps (All Options)
+
+```bash
+# Enable tab completion (optional but recommended)
+goenv completion --install
+
+# Restart your shell
+exec $SHELL
+
+# Install a Go version
 goenv install 1.22.0
 
-# 6. Set it as global
+# Set it as global
 goenv global 1.22.0
 
-# 7. Verify
+# Verify
 go version
 ```
+
+See [Installation Guide](docs/user-guide/INSTALL.md) for more details.
 
 ---
 

@@ -11,7 +11,7 @@ LDFLAGS = -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT_SHA) -X m
 export PREFIX ?= /usr/local
 
 # Build targets
-.PHONY: build clean test install uninstall dev-deps all cross-build generate-embedded test-windows
+.PHONY: build clean test install uninstall dev-deps all cross-build generate-embedded test-windows release snapshot
 
 # Default target
 all: build
@@ -80,3 +80,20 @@ version:
 	@echo "Version: $(VERSION)"
 	@echo "Commit: $(COMMIT_SHA)"
 	@echo "Build Time: $(BUILD_TIME)"
+
+# GoReleaser targets
+release:
+	@echo "Creating release with GoReleaser..."
+	@if ! command -v goreleaser >/dev/null 2>&1; then \
+		echo "Error: goreleaser not found. Install with: go install github.com/goreleaser/goreleaser@latest"; \
+		exit 1; \
+	fi
+	goreleaser release --clean
+
+snapshot:
+	@echo "Creating snapshot build with GoReleaser..."
+	@if ! command -v goreleaser >/dev/null 2>&1; then \
+		echo "Error: goreleaser not found. Install with: go install github.com/goreleaser/goreleaser@latest"; \
+		exit 1; \
+	fi
+	goreleaser build --snapshot --clean
