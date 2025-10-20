@@ -10,16 +10,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	rootCmd.AddCommand(shRehashCmd)
-}
-
 var shRehashCmd = &cobra.Command{
 	Use:                "sh-rehash [--only-manage-paths]",
 	Short:              "Calls goenv-rehash to rehash shims, manages GOPATH/GOROOT and rehashes shell executable",
 	Hidden:             true,
 	DisableFlagParsing: true, // Treat --only-manage-paths as argument, not flag
 	RunE:               runShRehash,
+}
+
+func init() {
+	rootCmd.AddCommand(shRehashCmd)
 }
 
 func runShRehash(cmd *cobra.Command, args []string) error {

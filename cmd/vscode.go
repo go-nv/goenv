@@ -126,7 +126,15 @@ func initializeVSCodeWorkspace(cmd *cobra.Command) error {
 
 		// Convert environment variable references to absolute paths
 		goroot := filepath.Join(cfg.Root, "versions", version)
-		gopath := filepath.Join(homeDir, "go", version)
+
+		// Build GOPATH respecting GOENV_GOPATH_PREFIX (same as exec.go and sh-rehash.go)
+		gopathPrefix := os.Getenv("GOENV_GOPATH_PREFIX")
+		var gopath string
+		if gopathPrefix == "" {
+			gopath = filepath.Join(homeDir, "go", version)
+		} else {
+			gopath = filepath.Join(gopathPrefix, version)
+		}
 
 		settings["go.goroot"] = goroot
 		settings["go.gopath"] = gopath
