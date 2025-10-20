@@ -16,6 +16,7 @@ name | default | description
 `GOENV_GOMOD_VERSION_ENABLE` | | if `GOENV_GOMOD_VERSION_ENABLE` is set to 1, it will try to use the project's `go.mod` file to get the version.
 `GOENV_AUTO_INSTALL` | | if `GOENV_AUTO_INSTALL` is set to 1, it will automatically run install if no command arguments specified (just run `goenv`!)
 `GOENV_AUTO_INSTALL_FLAGS` | | (Note: only works if `GOENV_AUTO_INSTALL` is set to 1) Appends flags to the auto install command (see `goenv install --help` for all available flags)
+`GOENV_NO_AUTO_REHASH` | `0` | Disables automatic rehashing after `goenv install` and `goenv exec go install`.<br> Set this to `1` for batch operations or CI/CD pipelines where you want to manually control when rehashing occurs. Useful for installing multiple versions or tools before a single rehash at the end.
 `GOENV_OFFLINE` | `0` | Disables online version fetching and forces use of embedded versions only.<br> Set this to `1` to work completely offline without any network calls. Useful for air-gapped environments, CI/CD pipelines requiring reproducibility, or maximizing performance. See `SMART_CACHING.md` for details.
 `GOENV_RC_FILE` | `$HOME/.goenvrc` | If `GOENV_RC_FILE` is set, it will be modified accordingly.
 `GOENV_PATH_ORDER` | | If `GOENV_PATH_ORDER` is set to `front`, `$GOENV_ROOT/shims` will be prepended to the existing `PATH`.Set `GOENV_PATH_ORDER` to a configuration file named by `GOENV_RC_FILE`(e.g. `~/.goenvrc`), for example `GOENV_PATH_ORDER=front` in `~/.goenvrc`.

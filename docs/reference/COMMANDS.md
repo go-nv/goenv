@@ -9,13 +9,20 @@ All subcommands are:
   - [`goenv alias`](#goenv-alias)
   - [`goenv commands`](#goenv-commands)
   - [`goenv completions`](#goenv-completions)
+  - [`goenv default-tools`](#goenv-default-tools)
+  - [`goenv doctor`](#goenv-doctor)
   - [`goenv exec`](#goenv-exec)
   - [`goenv global`](#goenv-global)
   - [`goenv help`](#goenv-help)
   - [`goenv init`](#goenv-init)
   - [`goenv install`](#goenv-install)
+    - [Options](#options)
+    - [Auto-Rehash](#auto-rehash)
+  - [`goenv installed`](#goenv-installed)
   - [`goenv local`](#goenv-local)
     - [`goenv local` (advanced)](#goenv-local-advanced)
+  - [`goenv migrate-tools`](#goenv-migrate-tools)
+    - [Options](#options-1)
   - [`goenv prefix`](#goenv-prefix)
   - [`goenv refresh`](#goenv-refresh)
   - [`goenv rehash`](#goenv-rehash)
@@ -24,6 +31,11 @@ All subcommands are:
   - [`goenv shims`](#goenv-shims)
   - [`goenv unalias`](#goenv-unalias)
   - [`goenv uninstall`](#goenv-uninstall)
+  - [`goenv update`](#goenv-update)
+    - [Options](#options-2)
+    - [Installation Methods](#installation-methods)
+  - [`goenv update-tools`](#goenv-update-tools)
+    - [Options](#options-3)
   - [`goenv version`](#goenv-version)
   - [`goenv --version`](#goenv---version)
   - [`goenv version-file`](#goenv-version-file)
@@ -32,6 +44,7 @@ All subcommands are:
   - [`goenv version-name`](#goenv-version-name)
   - [`goenv version-origin`](#goenv-version-origin)
   - [`goenv versions`](#goenv-versions)
+    - [Options](#options-4)
   - [`goenv whence`](#goenv-whence)
   - [`goenv which`](#goenv-which)
 
@@ -116,6 +129,86 @@ Lists all available goenv commands.
 
 Provides auto-completion for itself and other commands by calling them with `--complete`.
 
+## `goenv default-tools`
+
+Manages the list of tools automatically installed with each new Go version.
+
+Default tools are specified in `~/.goenv/default-tools.yaml` and are automatically installed after each `goenv install` command completes successfully.
+
+**Subcommands:**
+
+```shell
+# List configured default tools
+> goenv default-tools list
+
+# Initialize default tools configuration with sensible defaults
+> goenv default-tools init
+
+# Enable automatic tool installation
+> goenv default-tools enable
+
+# Disable automatic tool installation
+> goenv default-tools disable
+
+# Install default tools for a specific Go version
+> goenv default-tools install 1.25.2
+```
+
+**Common use cases:**
+
+- Auto-install gopls, golangci-lint, staticcheck, delve
+- Ensure consistent development environment across Go versions
+- Reduce manual setup after installing new Go versions
+
+**Configuration file example (`~/.goenv/default-tools.yaml`):**
+
+```yaml
+enabled: true
+tools:
+  - golang.org/x/tools/gopls@latest
+  - github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+  - honnef.co/go/tools/cmd/staticcheck@latest
+  - github.com/go-delve/delve/cmd/dlv@latest
+```
+
+## `goenv doctor`
+
+Diagnose goenv installation and configuration issues.
+
+```shell
+> goenv doctor
+🔍 Checking goenv installation...
+
+✓ goenv binary
+  Location: /Users/user/.goenv/bin/goenv
+  
+✓ Shell configuration
+  Found eval in ~/.zshrc
+  
+✓ PATH setup
+  Shims directory is in PATH
+  
+✓ Shims directory
+  Location: /Users/user/.goenv/shims
+  Shim count: 12
+  
+✓ Go versions
+  3 version(s) installed
+  Current: 1.22.5
+  
+✓ Configuration complete
+```
+
+This command verifies:
+- goenv binary and paths
+- Shell configuration (init integration)
+- PATH setup (shims directory)
+- Shims directory existence
+- Installed Go versions
+- Common configuration problems
+
+Use this command to troubleshoot issues with goenv.
+
 ## `goenv exec`
 
 Run an executable with the selected Go version.
@@ -195,8 +288,62 @@ Install a Go version (using `go-build`). It's required that the version is a kno
 
 ```shell
 > goenv install 1.11.1
-
 ```
+
+### Options
+
+- `-f, --force` - Install even if the version appears to be installed already
+- `-s, --skip-existing` - Skip if the version appears to be installed already
+- `-l, --list` - List all available versions
+- `-k, --keep` - Keep source tree after installation
+- `-v, --verbose` - Verbose mode: print detailed installation info
+- `-q, --quiet` - Quiet mode: disable progress bar
+- `-4, --ipv4` - Resolve names to IPv4 addresses only
+- `-6, --ipv6` - Resolve names to IPv6 addresses only
+- `-g, --debug` - Enable debug output
+- `--no-rehash` - Skip automatic rehash after installation (advanced)
+
+### Auto-Rehash
+
+By default, goenv automatically rehashes shims after installation so that installed binaries are immediately available. For batch installations or CI/CD pipelines, you can disable this:
+
+```shell
+# Disable for single install
+> goenv install 1.21.0 --no-rehash
+
+# Batch install with single rehash at end
+> goenv install 1.21.0 --no-rehash
+> goenv install 1.22.0 --no-rehash
+> goenv rehash
+
+# Or use environment variable
+> export GOENV_NO_AUTO_REHASH=1
+> goenv install 1.21.0
+> goenv install 1.22.0
+> goenv rehash
+```
+
+## `goenv installed`
+
+Display an installed Go version, searching for shortcuts if necessary.
+
+**Usage:**
+
+```shell
+# Show the latest installed version
+> goenv installed latest
+1.23.2
+
+# Check if a specific version is installed
+> goenv installed 1.22.5
+1.22.5
+
+# With no arguments, shows current version
+> goenv installed
+1.22.5
+```
+
+This command is useful for scripting and automation to verify version installations.
 
 ## `goenv local`
 
@@ -258,6 +405,34 @@ You can use a shorthand syntax to set the local version by specifying the versio
 ```
 
 This shorthand automatically routes to the `local` command, making it faster to switch versions in your current directory.
+
+## `goenv migrate-tools`
+
+Migrate installed Go tools from one Go version to another.
+
+**Usage:**
+
+```shell
+# Migrate all tools from 1.24.1 to 1.25.2
+> goenv migrate-tools 1.24.1 1.25.2
+
+# Preview migration without actually installing
+> goenv migrate-tools 1.24.1 1.25.2 --dry-run
+
+# Migrate only specific tools
+> goenv migrate-tools 1.24.1 1.25.2 --select gopls,delve
+
+# Migrate all except specific tools
+> goenv migrate-tools 1.24.1 1.25.2 --exclude staticcheck
+```
+
+### Options
+
+- `--dry-run` - Show what would be migrated without actually migrating
+- `--select <tools>` - Comma-separated list of tools to migrate (e.g., gopls,delve)
+- `--exclude <tools>` - Comma-separated list of tools to exclude from migration
+
+This command is useful when upgrading Go versions and wanting to maintain your tool environment. It discovers all tools in the source version and reinstalls them in the target version.
 
 ## `goenv prefix`
 
@@ -425,6 +600,77 @@ Uninstalls the specified version if it exists, otherwise - error.
 > goenv uninstall 1.6.3
 ```
 
+## `goenv update`
+
+Update goenv to the latest version.
+
+**Usage:**
+
+```shell
+# Update goenv
+> goenv update
+🔄 Checking for goenv updates...
+
+✓ Updated to version 2.2.0
+
+# Check for updates without installing
+> goenv update --check
+Current version: 2.1.0
+Latest version: 2.2.0
+Update available!
+
+# Force update even if already up-to-date
+> goenv update --force
+```
+
+### Options
+
+- `--check` - Check for updates without installing
+- `--force` - Force update even if already up-to-date
+
+### Installation Methods
+
+**Git-based installations (recommended):**
+- Runs `git pull` in GOENV_ROOT directory
+- Shows changes and new version
+
+**Binary installations:**
+- Downloads latest release from GitHub
+- Replaces current binary
+- Requires write permission to binary location
+
+## `goenv update-tools`
+
+Update installed Go tools to their latest versions.
+
+**Usage:**
+
+```shell
+# Update all tools for current Go version
+> goenv update-tools
+
+# Check for updates without installing
+> goenv update-tools --check
+
+# Update only a specific tool
+> goenv update-tools --tool gopls
+
+# Show what would be updated (dry run)
+> goenv update-tools --dry-run
+
+# Update to specific version (default: latest)
+> goenv update-tools --version v1.2.3
+```
+
+### Options
+
+- `--check` - Check for updates without installing
+- `--tool <name>` - Update only the specified tool
+- `--dry-run` - Show what would be updated without actually updating
+- `--version <version>` - Target version (default: latest)
+
+This command updates tools installed with `go install` in your current Go version's GOPATH.
+
 ## `goenv version`
 
 Displays the currently active Go version, along with information on
@@ -502,7 +748,29 @@ the currently active version.
   1.6.0
 * 1.6.1 (set by /home/go-nv/.goenv/version)
   1.6.2
+
+# Display bare version numbers only (without current marker)
+> goenv versions --bare
+1.4.0
+1.4.1
+1.4.2
+1.5.0
+1.5.1
+1.6.0
+1.6.1
+1.6.2
+
+# Skip aliases in output
+> goenv versions --skip-aliases
+  1.4.0
+  1.5.0
+* 1.6.1 (set by /home/go-nv/.goenv/version)
 ```
+
+### Options
+
+- `--bare` - Display bare version numbers only (no current marker, one per line)
+- `--skip-aliases` - Skip aliases in the output
 
 ## `goenv whence`
 

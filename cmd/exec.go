@@ -167,7 +167,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 	})
 
 	// Auto-rehash after successful 'go install' command
-	if err == nil && shouldAutoRehash(command, commandArgs) {
+	// Skip if GOENV_NO_AUTO_REHASH environment variable is set
+	if err == nil && shouldAutoRehash(command, commandArgs) && os.Getenv("GOENV_NO_AUTO_REHASH") != "1" {
 		if cfg.Debug {
 			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after go install")
 		}

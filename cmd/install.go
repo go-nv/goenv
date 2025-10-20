@@ -33,6 +33,7 @@ var installFlags struct {
 	ipv6         bool
 	debug        bool
 	complete     bool
+	noRehash     bool
 }
 
 func init() {
@@ -46,6 +47,7 @@ func init() {
 	installCmd.Flags().BoolVarP(&installFlags.ipv4, "ipv4", "4", false, "Resolve names to IPv4 addresses only")
 	installCmd.Flags().BoolVarP(&installFlags.ipv6, "ipv6", "6", false, "Resolve names to IPv6 addresses only")
 	installCmd.Flags().BoolVarP(&installFlags.debug, "debug", "g", false, "Enable debug output")
+	installCmd.Flags().BoolVar(&installFlags.noRehash, "no-rehash", false, "Skip automatic rehash after installation")
 	installCmd.Flags().BoolVar(&installFlags.complete, "complete", false, "Internal flag for shell completions")
 	_ = installCmd.Flags().MarkHidden("complete")
 
@@ -148,11 +150,18 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		installDefaultTools(cmd, goVersion)
 
 		// Auto-rehash to update shims for new Go version and installed tools
-		if cfg.Debug {
-			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after installation")
+		// Skip if --no-rehash flag or GOENV_NO_AUTO_REHASH environment variable is set
+		shouldRehash := !installFlags.noRehash && os.Getenv("GOENV_NO_AUTO_REHASH") != "1"
+
+		if shouldRehash {
+			if cfg.Debug {
+				fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after installation")
+			}
+			shimMgr := shims.NewShimManager(cfg)
+			_ = shimMgr.Rehash() // Don't fail the install if rehash fails
+		} else if cfg.Debug {
+			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Skipping auto-rehash (disabled via flag or environment)")
 		}
-		shimMgr := shims.NewShimManager(cfg)
-		_ = shimMgr.Rehash() // Don't fail the install if rehash fails
 	}
 
 	return err
