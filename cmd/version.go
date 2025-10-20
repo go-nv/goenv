@@ -71,7 +71,37 @@ func runVersion(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("some versions are not installed")
 		}
 	} else {
-		// Single version
+		// Single version - check if it's installed
+		if version != "system" && !mgr.IsVersionInstalled(version) {
+			// Version not installed - show warning but still display info
+			cmd.PrintErrf("Warning: version '%s' is not installed (set by %s)\n", version, source)
+			cmd.PrintErrln("")
+			cmd.PrintErrln("To install this version:")
+			cmd.PrintErrf("  goenv install %s\n", version)
+			cmd.PrintErrln("")
+			cmd.PrintErrln("Or use a different version:")
+
+			// Get latest installed version if available
+			installed, err := mgr.ListInstalledVersions()
+			if err == nil && len(installed) > 0 {
+				// Find the latest installed version
+				latestInstalled := ""
+				for _, v := range installed {
+					if latestInstalled == "" {
+						latestInstalled = v
+					}
+				}
+				if latestInstalled != "" {
+					cmd.PrintErrf("  goenv local %s\n", latestInstalled)
+				}
+			}
+
+			cmd.PrintErrln("  goenv local system")
+			cmd.PrintErrln("  goenv local --unset")
+			cmd.PrintErrln("")
+		}
+
+		// Always display the version info
 		if source != "" {
 			fmt.Fprintf(cmd.OutOrStdout(), "%s (set by %s)\n", version, source)
 		} else {

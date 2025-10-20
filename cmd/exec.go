@@ -60,14 +60,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 	// Validate that the version is installed
 	if currentVersion != "system" {
 		if err := mgr.ValidateVersion(currentVersion); err != nil {
-			// Provide specific error message based on where version was set
-			if source == "GOENV_VERSION environment variable" {
-				return fmt.Errorf("goenv: version '%s' is not installed (set by GOENV_VERSION environment variable)", currentVersion)
-			} else if strings.Contains(source, ".go-version") || strings.Contains(source, "local") {
-				return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", currentVersion, source)
-			} else {
-				return fmt.Errorf("goenv: version '%s' is not installed", currentVersion)
-			}
+			// Provide enhanced error message with suggestions
+			return formatVersionNotInstalledError(currentVersion, source, mgr)
 		}
 	}
 
@@ -106,13 +100,28 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 		// Set GOPATH if not disabled
 		if os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
-			if gopath == "" {
-				// Set default GOPATH
+			// Check environment variables for GOPATH control
+			gopathPrefix := os.Getenv("GOENV_GOPATH_PREFIX")
+			appendGopath := os.Getenv("GOENV_APPEND_GOPATH") == "1"
+			prependGopath := os.Getenv("GOENV_PREPEND_GOPATH") == "1"
+
+			// Build version-specific GOPATH
+			var versionGopath string
+			if gopathPrefix == "" {
 				homeDir, _ := os.UserHomeDir()
-				gopath = filepath.Join(homeDir, "go", currentVersion)
+				versionGopath = filepath.Join(homeDir, "go", currentVersion)
+			} else {
+				versionGopath = filepath.Join(gopathPrefix, currentVersion)
 			}
-			// gopath was already expanded above if it came from environment
-			env = setEnvVar(env, "GOPATH", gopath)
+
+			// Handle GOPATH appending/prepending
+			if gopath != "" && appendGopath {
+				versionGopath = versionGopath + string(os.PathListSeparator) + gopath
+			} else if gopath != "" && prependGopath {
+				versionGopath = gopath + string(os.PathListSeparator) + versionGopath
+			}
+
+			env = setEnvVar(env, "GOPATH", versionGopath)
 		}
 	}
 
@@ -140,6 +149,27 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 		versionBinDir := filepath.Join(versionPath, "bin")
 		commandPath = findBinaryInDir(versionBinDir, command)
+		
+		// If not found in version bin, check GOPATH bin (if GOPATH is enabled)
+		if commandPath == "" && os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+			// Get the GOPATH from environment (already set above)
+			for _, envVar := range env {
+				if strings.HasPrefix(envVar, "GOPATH=") {
+					gopathValue := strings.TrimPrefix(envVar, "GOPATH=")
+					// Handle multiple GOPATH entries (colon-separated on Unix, semicolon on Windows)
+					gopaths := filepath.SplitList(gopathValue)
+					for _, gp := range gopaths {
+						gopathBinDir := filepath.Join(gp, "bin")
+						commandPath = findBinaryInDir(gopathBinDir, command)
+						if commandPath != "" {
+							break
+						}
+					}
+					break
+				}
+			}
+		}
+		
 		if commandPath == "" {
 			return fmt.Errorf("goenv: %s: command not found", command)
 		}

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
@@ -102,10 +103,7 @@ func runPrefix(cmd *cobra.Command, args []string) error {
 		}
 
 		// Check if it's an exact version that's not installed
-		if source != "" {
-			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", version, source)
-		}
-		return fmt.Errorf("goenv: version '%s' not installed", version)
+		return formatVersionNotInstalledError(version, source, mgr)
 	}
 
 	// Handle system version
@@ -124,12 +122,66 @@ func runPrefix(cmd *cobra.Command, args []string) error {
 	// Get version path
 	versionPath, err := mgr.GetVersionPath(resolvedVersion)
 	if err != nil {
-		if source != "" {
-			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", version, source)
-		}
-		return fmt.Errorf("goenv: version '%s' not installed", version)
+		return formatVersionNotInstalledError(resolvedVersion, source, mgr)
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout(), versionPath)
 	return nil
+}
+
+// formatVersionNotInstalledError creates an enhanced error message with helpful suggestions
+// for when a Go version is not installed
+func formatVersionNotInstalledError(version, source string, mgr *manager.Manager) error {
+	var sb strings.Builder
+
+	// Main error message
+	if source != "" {
+		sb.WriteString(fmt.Sprintf("goenv: version '%s' is not installed (set by %s)\n", version, source))
+	} else {
+		sb.WriteString(fmt.Sprintf("goenv: version '%s' is not installed\n", version))
+	}
+
+	sb.WriteString("\n")
+
+	// Suggest installation
+	sb.WriteString("To install this version:\n")
+	sb.WriteString(fmt.Sprintf("  goenv install %s\n", version))
+
+	sb.WriteString("\n")
+
+	// Suggest alternatives
+	sb.WriteString("Or use a different version:\n")
+
+	// Get latest installed version if available
+	installed, err := mgr.ListInstalledVersions()
+	if err == nil && len(installed) > 0 {
+		// Find the latest installed version
+		latestInstalled := ""
+		for _, v := range installed {
+			if latestInstalled == "" || compareGoVersionsSimple(v, latestInstalled) > 0 {
+				latestInstalled = v
+			}
+		}
+		if latestInstalled != "" {
+			sb.WriteString(fmt.Sprintf("  goenv local %s          # Use %s in this directory\n", latestInstalled, latestInstalled))
+		}
+	}
+
+	sb.WriteString("  goenv local system          # Use system Go\n")
+	sb.WriteString("  goenv local --unset         # Remove .go-version file\n")
+
+	// Return error without the trailing newline
+	return fmt.Errorf("%s", strings.TrimRight(sb.String(), "\n"))
+}
+
+// compareGoVersionsSimple is a simplified version comparison for error messages
+// Returns positive if v1 > v2, negative if v1 < v2, zero if equal
+func compareGoVersionsSimple(v1, v2 string) int {
+	// Simple comparison - good enough for displaying latest version
+	if v1 > v2 {
+		return 1
+	} else if v1 < v2 {
+		return -1
+	}
+	return 0
 }

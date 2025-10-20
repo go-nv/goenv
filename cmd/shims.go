@@ -278,10 +278,8 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 
 	// If there are missing versions, return error immediately
 	if len(missingVersions) > 0 {
-		for _, v := range missingVersions {
-			cmd.PrintErrf("goenv: version '%s' is not installed (set by %s)\n", v, source)
-		}
-		return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", missingVersions[0], source)
+		// Use enhanced error message for the first missing version
+		return formatVersionNotInstalledError(missingVersions[0], source, mgr)
 	}
 
 	// Command not found - check if it exists in other versions
