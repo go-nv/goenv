@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -81,11 +82,11 @@ func TestVersionCommand(t *testing.T) {
 
 			// Set environment version if specified
 			if tt.envVersion != "" {
-				oldEnv := os.Getenv("GOENV_VERSION")
-				os.Setenv("GOENV_VERSION", tt.envVersion)
+				oldEnv := utils.GoenvEnvVarVersion.UnsafeValue()
+				utils.GoenvEnvVarVersion.Set(tt.envVersion)
 				defer func() {
 					if oldEnv != "" {
-						os.Setenv("GOENV_VERSION", oldEnv)
+						utils.GoenvEnvVarVersion.Set(oldEnv)
 					} else {
 						os.Unsetenv("GOENV_VERSION")
 					}
@@ -199,11 +200,11 @@ func TestVersionWithMissingVersions(t *testing.T) {
 	createTestVersion(t, testRoot, "1.11.1")
 
 	// Set GOENV_VERSION with multiple versions, some missing
-	oldEnv := os.Getenv("GOENV_VERSION")
-	os.Setenv("GOENV_VERSION", "1.1:1.11.1:1.2")
+	oldEnv := utils.GoenvEnvVarVersion.UnsafeValue()
+	utils.GoenvEnvVarVersion.Set("1.1:1.11.1:1.2")
 	defer func() {
 		if oldEnv != "" {
-			os.Setenv("GOENV_VERSION", oldEnv)
+			utils.GoenvEnvVarVersion.Set(oldEnv)
 		} else {
 			os.Unsetenv("GOENV_VERSION")
 		}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -61,11 +62,11 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check environment variables for disabling GOROOT/GOPATH
-	disableGoroot := os.Getenv("GOENV_DISABLE_GOROOT") == "1"
-	disableGopath := os.Getenv("GOENV_DISABLE_GOPATH") == "1"
-	gopathPrefix := os.Getenv("GOENV_GOPATH_PREFIX")
-	appendGopath := os.Getenv("GOENV_APPEND_GOPATH") == "1"
-	prependGopath := os.Getenv("GOENV_PREPEND_GOPATH") == "1"
+	disableGoroot := utils.GoenvEnvVarDisableGoroot.UnsafeValue() == "1"
+	disableGopath := utils.GoenvEnvVarDisableGopath.UnsafeValue() == "1"
+	gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
+	appendGopath := utils.GoenvEnvVarAppendGopath.UnsafeValue() == "1"
+	prependGopath := utils.GoenvEnvVarPrependGopath.UnsafeValue() == "1"
 	existingGopath := os.Getenv("GOPATH")
 
 	// Build GOPATH value

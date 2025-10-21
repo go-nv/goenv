@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -17,15 +18,15 @@ func setupTestEnv(t *testing.T) (string, func()) {
 	}
 
 	// Set test environment variables
-	oldGoenvRoot := os.Getenv("GOENV_ROOT")
+	oldGoenvRoot := utils.GoenvEnvVarRoot.UnsafeValue()
 	oldHome := os.Getenv("HOME")
 	oldPath := os.Getenv("PATH")
-	oldGoenvVersion := os.Getenv("GOENV_VERSION")
+	oldGoenvVersion := utils.GoenvEnvVarVersion.UnsafeValue()
 
 	testRoot := filepath.Join(testDir, "root")
 	testHome := filepath.Join(testDir, "home")
 
-	os.Setenv("GOENV_ROOT", testRoot)
+	utils.GoenvEnvVarRoot.Set(testRoot)
 	os.Setenv("HOME", testHome)
 	// Clear PATH to ensure no system go is found unless explicitly added by test
 	os.Setenv("PATH", "/usr/bin:/bin")
@@ -42,18 +43,18 @@ func setupTestEnv(t *testing.T) (string, func()) {
 	os.Chdir(testHome)
 
 	// Also set GOENV_DIR to testHome to prevent any directory traversal finding repo .go-version
-	oldGoenvDir := os.Getenv("GOENV_DIR")
-	os.Setenv("GOENV_DIR", testHome)
+	oldGoenvDir := utils.GoenvEnvVarDir.UnsafeValue()
+	utils.GoenvEnvVarDir.Set(testHome)
 
 	// Cleanup function
 	cleanup := func() {
 		os.Chdir(oldDir)
-		os.Setenv("GOENV_ROOT", oldGoenvRoot)
+		utils.GoenvEnvVarRoot.Set(oldGoenvRoot)
 		os.Setenv("HOME", oldHome)
 		os.Setenv("PATH", oldPath)
-		os.Setenv("GOENV_DIR", oldGoenvDir)
+		utils.GoenvEnvVarDir.Set(oldGoenvDir)
 		if oldGoenvVersion != "" {
-			os.Setenv("GOENV_VERSION", oldGoenvVersion)
+			utils.GoenvEnvVarVersion.Set(oldGoenvVersion)
 		}
 		os.RemoveAll(testDir)
 	}

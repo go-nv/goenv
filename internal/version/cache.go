@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // Cache manages local caching of version information
@@ -71,7 +73,7 @@ func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 	cache := NewCache(goenvRoot)
 
 	// Check if offline mode is enabled
-	if os.Getenv("GOENV_OFFLINE") == "1" {
+	if utils.GoenvEnvVarOffline.IsTrue() {
 		if f.debug {
 			fmt.Println("Debug: GOENV_OFFLINE=1, skipping online fetch and using embedded versions")
 		}

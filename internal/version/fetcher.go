@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // GoRelease represents a Go release from the official API
@@ -289,7 +291,7 @@ func (r *GoRelease) GetFileForPlatform(goos, goarch string) (*GoFile, error) {
 // FetchAllVersions fetches all available Go versions from official API with caching
 func (f *Fetcher) FetchAllVersions() ([]string, error) {
 	// Check if offline mode is enabled
-	if os.Getenv("GOENV_OFFLINE") == "1" {
+	if utils.GoenvEnvVarOffline.IsTrue() {
 		if f.debug {
 			fmt.Println("Debug: GOENV_OFFLINE=1, using embedded versions only")
 		}

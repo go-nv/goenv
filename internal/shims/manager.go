@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // Manager handles shim operations
@@ -64,7 +65,7 @@ func (s *ShimManager) Rehash() error {
 		}
 
 		// Scan GOPATH binaries if not disabled
-		if os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+		if !utils.GoenvEnvVarDisableGopath.IsTrue() {
 			gopathBinDir := s.getGopathBinDir(version)
 			gopathEntries, err := os.ReadDir(gopathBinDir)
 			if err == nil {
@@ -138,7 +139,7 @@ func (s *ShimManager) WhichBinary(command string) (string, error) {
 	}
 
 	// If not found and GOPATH not disabled, check GOPATH
-	if os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+	if !utils.GoenvEnvVarDisableGopath.IsTrue() {
 		gopathBinDir := s.getGopathBinDir(version)
 		binaryPath = s.findBinary(gopathBinDir, command)
 		if binaryPath != "" {
@@ -190,7 +191,7 @@ func (s *ShimManager) WhenceVersions(command string) ([]string, error) {
 		}
 
 		// If not found and GOPATH not disabled, check GOPATH
-		if !found && os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+		if !found && !utils.GoenvEnvVarDisableGopath.IsTrue() {
 			gopathBinDir := s.getGopathBinDir(version)
 			binaryPath = s.findBinary(gopathBinDir, command)
 			if binaryPath != "" {
@@ -334,7 +335,7 @@ if "%%program%%"=="goenv" (
 // getGopathBinDir returns the GOPATH bin directory for a version
 func (s *ShimManager) getGopathBinDir(version string) string {
 	// Check if GOENV_GOPATH_PREFIX is set
-	gopathPrefix := os.Getenv("GOENV_GOPATH_PREFIX")
+	gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
 
 	if gopathPrefix != "" {
 		// Use custom GOPATH prefix

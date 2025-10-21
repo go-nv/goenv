@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -87,7 +88,7 @@ func resolveShell(explicit string, dashMode bool) string {
 	}
 
 	// Check GOENV_SHELL first (used by sh-shell command)
-	if goenvShell := os.Getenv("GOENV_SHELL"); goenvShell != "" {
+	if goenvShell := utils.GoenvEnvVarShell.UnsafeValue(); goenvShell != "" {
 		return goenvShell
 	}
 
@@ -393,7 +394,7 @@ var (
 
 func getInstallRoot() string {
 	installRootOnce.Do(func() {
-		if envRoot := os.Getenv("GOENV_INSTALL_ROOT"); envRoot != "" {
+		if envRoot := utils.GoenvEnvVarInstallRoot.UnsafeValue(); envRoot != "" {
 			installRoot = envRoot
 			return
 		}
@@ -453,7 +454,7 @@ func runShShell(cmd *cobra.Command, args []string) error {
 
 	// No arguments - print current GOENV_VERSION
 	if len(args) == 0 {
-		currentVersion := os.Getenv("GOENV_VERSION")
+		currentVersion := utils.GoenvEnvVarVersion.UnsafeValue()
 		if currentVersion == "" {
 			return fmt.Errorf("goenv: no shell-specific version configured")
 		}

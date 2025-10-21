@@ -10,6 +10,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
 )
@@ -145,7 +146,7 @@ func initializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 		goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
 		// Build GOPATH respecting GOENV_GOPATH_PREFIX (same as exec.go and sh-rehash.go)
-		gopathPrefix := os.Getenv("GOENV_GOPATH_PREFIX")
+		gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
 		var gopathAbs string
 		if gopathPrefix == "" {
 			gopathAbs = filepath.Join(homeDir, "go", version)

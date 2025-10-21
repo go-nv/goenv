@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/workflow"
 	"github.com/spf13/cobra"
 )
@@ -36,11 +37,11 @@ var rootCmd = &cobra.Command{
 			mgr := manager.NewManager(cfg)
 
 			// Check if GOENV_AUTO_INSTALL is enabled
-			autoInstall := os.Getenv("GOENV_AUTO_INSTALL") == "1"
+			autoInstall := utils.GoenvEnvVarAutoInstall.IsTrue()
 
 			if autoInstall {
 				// Use auto-install workflow
-				additionalFlags := os.Getenv("GOENV_AUTO_INSTALL_FLAGS")
+				additionalFlags := utils.GoenvEnvVarAutoInstallFlags.UnsafeValue()
 
 				setup := &workflow.AutoInstallSetup{
 					Config:          cfg,

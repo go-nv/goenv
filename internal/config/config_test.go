@@ -4,15 +4,17 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestDefaultRoot(t *testing.T) {
 	// Save original env var
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
+	originalRoot := utils.GoenvEnvVarRoot.UnsafeValue()
+	defer utils.GoenvEnvVarRoot.Set(originalRoot)
 
 	// Test with GOENV_ROOT set
-	os.Setenv("GOENV_ROOT", "/custom/root")
+	utils.GoenvEnvVarRoot.Set("/custom/root")
 	root := DefaultRoot()
 	if root != "/custom/root" {
 		t.Errorf("Expected /custom/root, got %s", root)

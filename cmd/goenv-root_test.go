@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"os"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -29,9 +29,9 @@ func TestGoenvRootCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set GOENV_ROOT
-			originalRoot := os.Getenv("GOENV_ROOT")
-			defer os.Setenv("GOENV_ROOT", originalRoot)
-			os.Setenv("GOENV_ROOT", tt.goenvRoot)
+			originalRoot := utils.GoenvEnvVarRoot.UnsafeValue()
+			defer utils.GoenvEnvVarRoot.Set(originalRoot)
+			utils.GoenvEnvVarRoot.Set(tt.goenvRoot)
 
 			// Execute command
 			cmd := &cobra.Command{

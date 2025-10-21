@@ -11,6 +11,7 @@ import (
 	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/shims"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -151,7 +152,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 		// Auto-rehash to update shims for new Go version and installed tools
 		// Skip if --no-rehash flag or GOENV_NO_AUTO_REHASH environment variable is set
-		shouldRehash := !installFlags.noRehash && os.Getenv("GOENV_NO_AUTO_REHASH") != "1"
+		shouldRehash := !installFlags.noRehash && !utils.GoenvEnvVarNoAutoRehash.IsTrue()
 
 		if shouldRehash {
 			if cfg.Debug {

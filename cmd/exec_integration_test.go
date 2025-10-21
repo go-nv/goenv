@@ -10,6 +10,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // TestExec_AutoRehashAfterGoInstall tests the end-to-end auto-rehash workflow
@@ -23,9 +24,9 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 
 	// Create a temporary GOENV_ROOT for testing
 	tempRoot := t.TempDir()
-	oldRoot := os.Getenv("GOENV_ROOT")
-	os.Setenv("GOENV_ROOT", tempRoot)
-	defer os.Setenv("GOENV_ROOT", oldRoot)
+	oldRoot := utils.GoenvEnvVarRoot.UnsafeValue()
+	utils.GoenvEnvVarRoot.Set(tempRoot)
+	defer utils.GoenvEnvVarRoot.Set(oldRoot)
 
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
@@ -48,7 +49,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	}
 
 	// Set this version as current
-	os.Setenv("GOENV_VERSION", testVersion)
+	utils.GoenvEnvVarVersion.Set(testVersion)
 
 	// Get the Go binary path
 	goBin := filepath.Join(cfg.Root, "versions", testVersion, "bin", "go")
@@ -93,7 +94,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	}
 
 	// Set GOENV_GOPATH_PREFIX to our test GOPATH
-	os.Setenv("GOENV_GOPATH_PREFIX", filepath.Join(tempRoot, "go"))
+	utils.GoenvEnvVarGopathPrefix.Set(filepath.Join(tempRoot, "go"))
 	defer os.Unsetenv("GOENV_GOPATH_PREFIX")
 
 	// Verify tool exists
@@ -141,13 +142,13 @@ func TestExec_AutoRehashCanBeDisabled(t *testing.T) {
 	}
 
 	// Test that GOENV_NO_AUTO_REHASH environment variable works
-	oldValue := os.Getenv("GOENV_NO_AUTO_REHASH")
-	os.Setenv("GOENV_NO_AUTO_REHASH", "1")
+	oldValue := utils.GoenvEnvVarNoAutoRehash.UnsafeValue()
+	utils.GoenvEnvVarNoAutoRehash.Set("1")
 	defer func() {
 		if oldValue == "" {
 			os.Unsetenv("GOENV_NO_AUTO_REHASH")
 		} else {
-			os.Setenv("GOENV_NO_AUTO_REHASH", oldValue)
+			utils.GoenvEnvVarNoAutoRehash.Set(oldValue)
 		}
 	}()
 
@@ -176,9 +177,9 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 
 	// Create a temporary GOENV_ROOT for testing
 	tempRoot := t.TempDir()
-	oldRoot := os.Getenv("GOENV_ROOT")
-	os.Setenv("GOENV_ROOT", tempRoot)
-	defer os.Setenv("GOENV_ROOT", oldRoot)
+	oldRoot := utils.GoenvEnvVarRoot.UnsafeValue()
+	utils.GoenvEnvVarRoot.Set(tempRoot)
+	defer utils.GoenvEnvVarRoot.Set(oldRoot)
 
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
@@ -203,7 +204,7 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 	}
 
 	// Set version
-	os.Setenv("GOENV_VERSION", testVersion)
+	utils.GoenvEnvVarVersion.Set(testVersion)
 
 	// Build goenv binary for testing
 	goenvBin := filepath.Join(tempRoot, "goenv-test")

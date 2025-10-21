@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // Manager handles version management operations
@@ -39,7 +40,7 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 		searchDir = targetDir
 	} else {
 		// No target - check GOENV_DIR first, then PWD
-		searchDir = os.Getenv("GOENV_DIR")
+		searchDir = utils.GoenvEnvVarDir.UnsafeValue()
 		if searchDir == "" {
 			var err error
 			searchDir, err = os.Getwd()
@@ -79,7 +80,7 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 	}
 
 	// If no target directory specified, try PWD if different from GOENV_DIR
-	if os.Getenv("GOENV_DIR") != "" {
+	if utils.GoenvEnvVarDir.UnsafeValue() != "" {
 		pwdDir, err := os.Getwd()
 		if err == nil && pwdDir != searchDir {
 			// Search from PWD
@@ -145,7 +146,7 @@ func (m *Manager) ListInstalledVersions() ([]string, error) {
 // GetCurrentVersion returns the currently active Go version
 func (m *Manager) GetCurrentVersion() (string, string, error) {
 	// Check GOENV_VERSION environment variable first (highest precedence)
-	if envVersion := os.Getenv("GOENV_VERSION"); envVersion != "" {
+	if envVersion := utils.GoenvEnvVarVersion.UnsafeValue(); envVersion != "" {
 		return envVersion, "GOENV_VERSION environment variable", nil
 	}
 

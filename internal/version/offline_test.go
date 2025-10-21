@@ -3,11 +3,13 @@ package version
 import (
 	"os"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestOfflineMode(t *testing.T) {
 	// Set offline mode
-	os.Setenv("GOENV_OFFLINE", "1")
+	utils.GoenvEnvVarOffline.Set("1")
 	defer os.Unsetenv("GOENV_OFFLINE")
 
 	// Create a fetcher
@@ -39,7 +41,7 @@ func TestOfflineMode(t *testing.T) {
 
 func TestOfflineModeFetchWithFallback(t *testing.T) {
 	// Set offline mode
-	os.Setenv("GOENV_OFFLINE", "1")
+	utils.GoenvEnvVarOffline.Set("1")
 	defer os.Unsetenv("GOENV_OFFLINE")
 
 	// Create a fetcher

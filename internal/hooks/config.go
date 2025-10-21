@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/go-nv/goenv/internal/utils"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -110,7 +111,7 @@ func LoadConfig(path string) (*Config, error) {
 		config.Settings.MaxActions = 10
 	}
 	if config.Settings.LogFile == "" {
-		goenvRoot := os.Getenv("GOENV_ROOT")
+		goenvRoot := utils.GoenvEnvVarRoot.UnsafeValue()
 		if goenvRoot == "" {
 			home, _ := os.UserHomeDir()
 			goenvRoot = filepath.Join(home, ".goenv")
@@ -144,12 +145,12 @@ func SaveConfig(path string, config *Config) error {
 // ConfigPath returns the path to the hooks configuration file
 func ConfigPath() string {
 	// Check for GOENV_HOOKS_CONFIG env var first
-	if path := os.Getenv("GOENV_HOOKS_CONFIG"); path != "" {
+	if path := utils.GoenvEnvVarHooksConfig.UnsafeValue(); path != "" {
 		return path
 	}
 
 	// Default to $GOENV_ROOT/hooks.yaml
-	goenvRoot := os.Getenv("GOENV_ROOT")
+	goenvRoot := utils.GoenvEnvVarRoot.UnsafeValue()
 	if goenvRoot == "" {
 		home, _ := os.UserHomeDir()
 		goenvRoot = filepath.Join(home, ".goenv")

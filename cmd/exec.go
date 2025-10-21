@@ -13,6 +13,7 @@ import (
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/shims"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -99,11 +100,11 @@ func runExec(cmd *cobra.Command, args []string) error {
 		env = prependToPath(env, goBinPath)
 
 		// Set GOPATH if not disabled
-		if os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+		if utils.GoenvEnvVarDisableGopath.UnsafeValue() != "1" {
 			// Check environment variables for GOPATH control
-			gopathPrefix := os.Getenv("GOENV_GOPATH_PREFIX")
-			appendGopath := os.Getenv("GOENV_APPEND_GOPATH") == "1"
-			prependGopath := os.Getenv("GOENV_PREPEND_GOPATH") == "1"
+			gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
+			appendGopath := utils.GoenvEnvVarAppendGopath.UnsafeValue() == "1"
+			prependGopath := utils.GoenvEnvVarPrependGopath.UnsafeValue() == "1"
 
 			// Build version-specific GOPATH
 			var versionGopath string
@@ -151,7 +152,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		commandPath = findBinaryInDir(versionBinDir, command)
 
 		// If not found in version bin, check GOPATH bin (if GOPATH is enabled)
-		if commandPath == "" && os.Getenv("GOENV_DISABLE_GOPATH") != "1" {
+		if commandPath == "" && utils.GoenvEnvVarDisableGopath.UnsafeValue() != "1" {
 			// Get the GOPATH from environment (already set above)
 			for _, envVar := range env {
 				if strings.HasPrefix(envVar, "GOPATH=") {
@@ -199,7 +200,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 	// Auto-rehash after successful 'go install' command
 	// Skip if GOENV_NO_AUTO_REHASH environment variable is set
-	if err == nil && shouldAutoRehash(command, commandArgs) && os.Getenv("GOENV_NO_AUTO_REHASH") != "1" {
+	if err == nil && shouldAutoRehash(command, commandArgs) && utils.GoenvEnvVarNoAutoRehash.UnsafeValue() != "1" {
 		if cfg.Debug {
 			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after go install")
 		}

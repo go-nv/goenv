@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // Config holds goenv configuration
@@ -18,7 +19,7 @@ type Config struct {
 
 // DefaultRoot returns the default goenv root directory
 func DefaultRoot() string {
-	if root := os.Getenv("GOENV_ROOT"); root != "" {
+	if root := utils.GoenvEnvVarRoot.UnsafeValue(); root != "" {
 		// Expand tilde and environment variables in GOENV_ROOT
 		root = pathutil.ExpandPath(root)
 		return filepath.Clean(root)
@@ -38,8 +39,8 @@ func Load() *Config {
 	cfg := &Config{
 		Root:       DefaultRoot(),
 		CurrentDir: getCurrentDir(),
-		Shell:      os.Getenv("GOENV_SHELL"),
-		Debug:      os.Getenv("GOENV_DEBUG") != "",
+		Shell:      utils.GoenvEnvVarShell.UnsafeValue(),
+		Debug:      utils.GoenvEnvVarDebug.UnsafeValue() != "",
 	}
 
 	return cfg
@@ -48,7 +49,7 @@ func Load() *Config {
 // getCurrentDir gets the current directory for version resolution
 func getCurrentDir() string {
 	// Check GOENV_DIR first (from shims)
-	if dir := os.Getenv("GOENV_DIR"); dir != "" {
+	if dir := utils.GoenvEnvVarDir.UnsafeValue(); dir != "" {
 		// Expand tilde and environment variables in GOENV_DIR
 		return pathutil.ExpandPath(dir)
 	}
