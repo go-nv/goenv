@@ -311,6 +311,26 @@ Install a Go version (using `go-build`). It's required that the version is a kno
 - `-g, --debug` - Enable debug output
 - `--no-rehash` - Skip automatic rehash after installation (advanced)
 
+### Using a Custom Mirror
+
+For corporate proxies, regional mirrors, or air-gapped environments, you can specify a custom download mirror:
+
+```shell
+# Use a custom mirror for one installation
+> GO_BUILD_MIRROR_URL=https://mirrors.example.com/golang/ goenv install 1.24.3
+
+# Set permanently for all installations
+> export GO_BUILD_MIRROR_URL=https://mirrors.example.com/golang/
+> goenv install 1.24.3
+```
+
+Common use cases:
+
+- **Corporate environments**: Use internal mirrors behind firewalls
+- **China regions**: Use faster regional mirrors
+- **Air-gapped networks**: Point to internal package repository
+- **Testing**: Use custom build servers
+
 ### Auto-Rehash
 
 By default, goenv automatically rehashes shims after installation so that installed binaries are immediately available. For batch installations or CI/CD pipelines, you can disable this:

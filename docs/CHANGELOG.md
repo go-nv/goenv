@@ -53,28 +53,65 @@ Change line format:
 
 ## Unreleased (master)
 
+### Added
+
+- **🩺 Doctor Command** - Comprehensive diagnostic tool with 12 health checks including VS Code integration, go.mod compatibility, cache validation, and PATH configuration
+- **⚡ Smart Caching System** - 10-50x faster version listing with intelligent cache validation, HTTP ETag support, and automatic freshness checking
+- **🔄 Cache Refresh Command** - `goenv refresh` command to clear cached data and force fresh fetch from go.dev API
+- **⚡ Hook System** - Fully functional hook execution at 8 lifecycle points (pre/post install, uninstall, exec, rehash) with 20+ built-in actions
+- **⚙️ Auto-Rehash Control** - Configurable automatic rehashing with `--no-rehash` flag and `GOENV_NO_AUTO_REHASH` environment variable
+- **🎯 VS Code Integration** - `goenv vscode init` command with templates (basic, advanced, monorepo) and smart settings merging
+- **📦 GOPATH Integration** - Automatic per-version GOPATH management and tool binary scanning during rehash
+- **⚡ Version Shorthand Support** - Install latest patch with `goenv install 1.22` or latest minor with `goenv install 1`
+- **🔄 Complete Tab Completion** - Enhanced completion for all commands including version lists, installed versions, and command options
+- **🌐 Offline Mode** - Complete offline operation with embedded version data via `GOENV_OFFLINE=1`
+- **🔍 go.mod Version Mismatch Detection** - Automatic detection and warnings when local Go version doesn't match go.mod requirements
+- **📊 Performance Monitoring** - Debug output and timing information for all operations
+- `GO_BUILD_MIRROR_URL` environment variable for custom download mirrors (documented)
+- Comprehensive version discovery and precedence documentation in COMMANDS.md
+
+### Changed
+
+- **⚡ Performance** - All version operations 10-50x faster through smart caching and optimized algorithms
+- **🔄 Rehash Behavior** - Now scans GOPATH binaries for installed tools in addition to Go version binaries
+- **📋 Commands Output** - `goenv commands` now includes `goenv-*` commands found in PATH
+- **🎯 Which/Whence Commands** - Now check GOPATH binaries in addition to version-specific binaries
+- **🎯 Local Command** - Added `--vscode` flag for automatic VS Code workspace configuration
+- **📦 Install Command** - Enhanced with completion, caching, and configurable auto-rehash behavior
+- go.mod version discovery is now always enabled (no longer requires `GOENV_GOMOD_VERSION_ENABLE=1`)
+- Smart version precedence: `.go-version` takes precedence when it satisfies or exceeds `go.mod` toolchain requirements
+
+### Removed
+
+- `GOENV_GOMOD_VERSION_ENABLE` environment variable (obsolete - go.mod support is now built-in)
+
 ## 2.1.4
 
 ### Added
+
 - Golang 1.21.0 (#335)
 - Support for FreeBSD ARM installers (#339)
 
 ## 2.1.3
+
 - Fix application version (#334)
 
 ## 2.1.2
 
 ### Added
+
 - Golang 1.19.12 and 1.20.7 (#333)
 
 ## 2.1.1
 
 ### Added
+
 - Fix Goenv Auto Installer bug (#330)
 
 ## 2.1.0
 
 ### Added
+
 - Silent install option (#327)
 - GOENV_AUTO_INSTALL support (#327)
 - Updated all stale references to the old repo organization

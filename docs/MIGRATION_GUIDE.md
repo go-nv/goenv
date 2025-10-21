@@ -34,17 +34,20 @@ The Go implementation of goenv maintains full backward compatibility with the ba
 ### 1. Smart Caching & Offline Mode
 
 **What's New:**
+
 - Version information cached locally with automatic ETag-based validation
 - `goenv install --list` is 10-50x faster after first run
 - Complete offline mode with 334+ embedded Go versions
 - New `goenv refresh` command to clear cache
 
 **Migration Impact:** NONE
+
 - Automatic and transparent
 - No configuration changes needed
 - Cache managed automatically
 
 **Benefits:**
+
 ```bash
 # First run - fetches and caches
 goenv install --list  # 1-2 seconds
@@ -63,7 +66,8 @@ goenv refresh
 **See:** [Smart Caching Guide](advanced/SMART_CACHING.md)
 
 ### 2. GOPATH Integration
-```
+
+````
 
 ### 2. GOPATH Binary Integration
 
@@ -89,21 +93,24 @@ goenv rehash
 
 # Option 2: Disable if you manage GOPATH manually
 export GOENV_DISABLE_GOPATH=1
-```
+````
 
 **See:** [GOPATH Integration Guide](advanced/GOPATH_INTEGRATION.md)
 
 ### 3. Version Shorthand Syntax
 
 **What's New:**
+
 - Use `goenv <version>` as shorthand for `goenv local <version>`
 - Works with version numbers, "latest", and "system"
 
 **Migration Impact:** NONE
+
 - New feature, doesn't affect existing workflows
 - Old syntax still works: `goenv local 1.22.5`
 
 **Example:**
+
 ```bash
 # Old way (still works)
 goenv local 1.22.5
@@ -117,15 +124,18 @@ goenv 1.22.5
 ### 5. File Argument Detection in Shims
 
 **What's New:**
+
 - Shims automatically detect file arguments in `go*` commands
 - Sets `GOENV_FILE_ARG` environment variable
 - Available to hooks for context-aware operations
 
 **Migration Impact:** NONE
+
 - Transparent feature for most users
 - Useful if you write hooks that need file context
 
 **Example:**
+
 ```bash
 # When running: go run main.go
 # Hook receives: GOENV_FILE_ARG=main.go
@@ -142,11 +152,13 @@ EOF
 ### 6. Improved Completion Support
 
 **What's New:**
+
 - All commands now support `--complete` flag
 - Better shell integration
 - Completion for `local`, `global`, `install`, `uninstall`
 
 **Migration Impact:** NONE
+
 - Completions work better automatically
 - No configuration changes needed
 
@@ -161,17 +173,20 @@ The Go implementation maintains full backward compatibility. However, be aware o
 **Issue:** If you had hooks configured in bash version, they were only listed but never executed.
 
 **Now:** Hooks actually execute, which could cause unexpected behavior if:
+
 - Hooks were written but never tested (they didn't run before)
 - Hooks have side effects you weren't aware of
 - Hooks are slow and now impact command performance
 
 **✅ Cross-Platform Support:** Hooks now support multiple script types:
+
 - **Unix/macOS/Linux**: `.bash`, `.sh` scripts, or shebang-based scripts
 - **Windows PowerShell**: `.ps1` scripts
 - **Windows CMD**: `.cmd`, `.bat` scripts
 - goenv automatically detects and uses the appropriate interpreter
 
 **Fix:**
+
 ```bash
 # Unix/macOS - Temporarily disable hooks to test
 unset GOENV_HOOK_PATH
@@ -198,6 +213,7 @@ $env:GOENV_HOOK_PATH="$env:USERPROFILE\.goenv\hooks"
 **Issue:** GOPATH structure changes from single global to per-version.
 
 **Before:**
+
 ```
 $HOME/go/
 ├── bin/
@@ -206,6 +222,7 @@ $HOME/go/
 ```
 
 **After:**
+
 ```
 $HOME/go/
 ├── 1.21.5/
@@ -219,6 +236,7 @@ $HOME/go/
 ```
 
 **Fix:**
+
 ```bash
 # Option 1: Keep old structure (disable GOPATH integration)
 export GOENV_DISABLE_GOPATH=1
@@ -299,12 +317,12 @@ mkdir -p "$GOENV_HOOK_PATH"
 for version in $(goenv versions --bare); do
   echo "Setting up tools for $version..."
   goenv local "$version"
-  
+
   # Reinstall your commonly used tools
   go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
   go install golang.org/x/tools/cmd/goimports@latest
   # ... other tools
-  
+
   goenv rehash
 done
 ```
@@ -329,18 +347,17 @@ GOENV_DEBUG=1 goenv exec go version
 
 ## Feature Comparison
 
-| Feature | Bash Version | Go Version | Notes |
-|---------|-------------|------------|-------|
-| Version switching | ✅ | ✅ | Faster in Go |
-| Installation | ✅ | ✅ | Better caching |
-| Hooks | ⚠️ Listed only | ✅ Functional | Hooks now execute |
-| GOPATH integration | ❌ | ✅ Optional | New feature |
-| Plugin discovery | ⚠️ Manual PATH | ✅ Automatic | Better integration |
-| Version shorthand | ❌ | ✅ | `goenv 1.22.5` |
-| File arg detection | ❌ | ✅ | `GOENV_FILE_ARG` |
-| Completion | ✅ | ✅ | More complete |
-| Performance | Good | Excellent | 10-50x faster |
-| Platform support | Unix-like | Unix-like + Windows | Better Windows support |
+| Feature            | Bash Version   | Go Version          | Notes                  |
+| ------------------ | -------------- | ------------------- | ---------------------- |
+| Version switching  | ✅             | ✅                  | Faster in Go           |
+| Installation       | ✅             | ✅                  | Better caching         |
+| Hooks              | ⚠️ Listed only | ✅ Functional       | Hooks now execute      |
+| GOPATH integration | ❌             | ✅ Optional         | New feature            |
+| Version shorthand  | ❌             | ✅                  | `goenv 1.22.5`         |
+| File arg detection | ❌             | ✅                  | `GOENV_FILE_ARG`       |
+| Completion         | ✅             | ✅                  | More complete          |
+| Performance        | Good           | Excellent           | 10-50x faster          |
+| Platform support   | Unix-like      | Unix-like + Windows | Better Windows support |
 
 ## Troubleshooting
 
@@ -349,6 +366,7 @@ GOENV_DEBUG=1 goenv exec go version
 **Symptom:** Hooks configured but not executing.
 
 **Solution:**
+
 ```bash
 # Check GOENV_HOOK_PATH is set
 echo $GOENV_HOOK_PATH
@@ -368,6 +386,7 @@ GOENV_DEBUG=1 goenv exec go version
 **Symptom:** Tools installed with `go install` not available.
 
 **Solution:**
+
 ```bash
 # Check if GOPATH integration is enabled
 echo $GOENV_DISABLE_GOPATH
@@ -386,6 +405,7 @@ goenv which golangci-lint
 **Symptom:** Commands slower than expected.
 
 **Solution:**
+
 ```bash
 # Check for slow hooks
 GOENV_DEBUG=1 goenv exec go version
@@ -403,6 +423,7 @@ goenv exec go version
 **Symptom:** `goenv local` doesn't affect `go version`.
 
 **Solution:**
+
 ```bash
 # Verify goenv init is in shell config
 grep 'goenv init' ~/.bashrc ~/.zshrc
@@ -426,8 +447,8 @@ which go
 
 ## Further Reading
 
-- [Hooks Guide](advanced/HOOKS.md)
+- [Hooks Guide](HOOKS.md)
 - [GOPATH Integration Guide](advanced/GOPATH_INTEGRATION.md)
-- [Plugins Guide](advanced/PLUGINS.md)
+- [Commands Reference](reference/COMMANDS.md)
 - [Environment Variables Reference](reference/ENVIRONMENT_VARIABLES.md)
 - [Command Reference](reference/COMMANDS.md)
