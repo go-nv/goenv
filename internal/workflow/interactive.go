@@ -222,3 +222,85 @@ func (s *InteractiveSetup) readInput() string {
 	}
 	return strings.TrimSpace(strings.ToLower(response))
 }
+
+// AutoInstallSetup handles automatic installation workflow (GOENV_AUTO_INSTALL=1)
+type AutoInstallSetup struct {
+	Config          *config.Config
+	Manager         *manager.Manager
+	Stdout          io.Writer
+	Stderr          io.Writer
+	WorkingDir      string
+	VSCodeUpdate    func(version string) error // Callback to update VS Code settings
+	InstallCallback func(version string) error // Callback to install a version
+	AdditionalFlags string                     // GOENV_AUTO_INSTALL_FLAGS
+}
+
+// AutoInstallResult represents the outcome of auto-install
+type AutoInstallResult struct {
+	VersionFound     bool
+	Version          string
+	VersionSource    manager.VersionSource
+	AlreadyInstalled bool
+	Installed        bool
+	VSCodeConfigured bool
+	UsedLatest       bool // True if no version discovered, installed latest
+}
+
+// Run executes the auto-install workflow
+func (s *AutoInstallSetup) Run() (*AutoInstallResult, error) {
+	result := &AutoInstallResult{}
+
+	// Discover version from .go-version or go.mod
+	discovered, err := manager.DiscoverVersion(s.WorkingDir)
+	if err == nil && discovered != nil {
+		// We found a version requirement
+		result.VersionFound = true
+		result.Version = discovered.Version
+		result.VersionSource = discovered.Source
+
+		if !s.Manager.IsVersionInstalled(discovered.Version) {
+			// Version not installed - auto-install it
+			fmt.Fprintf(s.Stdout, "Auto-installing Go %s (from %s)...\n", discovered.Version, discovered.Source)
+
+			if s.InstallCallback != nil {
+				if err := s.InstallCallback(discovered.Version); err != nil {
+					return nil, fmt.Errorf("auto-install failed: %w", err)
+				}
+			}
+			result.Installed = true
+
+			// After install, configure VS Code
+			if s.VSCodeUpdate != nil {
+				if err := s.VSCodeUpdate(discovered.Version); err == nil {
+					fmt.Fprintf(s.Stdout, "✅ Configured VS Code for Go %s\n", discovered.Version)
+					result.VSCodeConfigured = true
+				}
+			}
+		} else {
+			// Version already installed
+			result.AlreadyInstalled = true
+
+			// Just verify VS Code settings are correct
+			if s.VSCodeUpdate != nil {
+				if err := s.VSCodeUpdate(discovered.Version); err == nil {
+					fmt.Fprintf(s.Stdout, "✅ Go %s already installed and configured\n", discovered.Version)
+					result.VSCodeConfigured = true
+				}
+			}
+		}
+	} else {
+		// No version discovered - install latest with any additional flags
+		result.UsedLatest = true
+		fmt.Fprintf(s.Stdout, "No version file found, installing latest stable version...\n")
+
+		if s.InstallCallback != nil {
+			// Pass empty string to indicate "latest"
+			if err := s.InstallCallback(""); err != nil {
+				return nil, fmt.Errorf("auto-install latest failed: %w", err)
+			}
+		}
+		result.Installed = true
+	}
+
+	return result, nil
+}

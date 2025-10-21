@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
@@ -27,25 +28,6 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		// Check if GOENV_AUTO_INSTALL is enabled
-		if os.Getenv("GOENV_AUTO_INSTALL") == "1" {
-			// Run install command with GOENV_AUTO_INSTALL_FLAGS if set
-			installArgs := []string{"install"}
-			if flags := os.Getenv("GOENV_AUTO_INSTALL_FLAGS"); flags != "" {
-				// Split flags by space (simple implementation)
-				// TODO: Improve this to handle quoted arguments properly
-				installArgs = append(installArgs, flags)
-			}
-
-			// Set args and execute the install command
-			cmd.Root().SetArgs(installArgs)
-			if err := cmd.Root().Execute(); err != nil {
-				fmt.Fprintf(os.Stderr, "goenv: install failed: %v\n", err)
-				os.Exit(1)
-			}
-			return
-		}
-
 		// Smart version detection (tfswitch-like behavior)
 		// Check for .go-version or go.mod in current directory
 		cwd, err := os.Getwd()
@@ -53,7 +35,65 @@ var rootCmd = &cobra.Command{
 			cfg := config.Load()
 			mgr := manager.NewManager(cfg)
 
-			// Use the interactive workflow helper
+			// Check if GOENV_AUTO_INSTALL is enabled
+			autoInstall := os.Getenv("GOENV_AUTO_INSTALL") == "1"
+
+			if autoInstall {
+				// Use auto-install workflow
+				additionalFlags := os.Getenv("GOENV_AUTO_INSTALL_FLAGS")
+
+				setup := &workflow.AutoInstallSetup{
+					Config:          cfg,
+					Manager:         mgr,
+					Stdout:          cmd.OutOrStdout(),
+					Stderr:          cmd.OutOrStderr(),
+					WorkingDir:      cwd,
+					AdditionalFlags: additionalFlags,
+					VSCodeUpdate: func(version string) error {
+						return initializeVSCodeWorkspaceWithVersion(cmd, version)
+					},
+					InstallCallback: func(version string) error {
+						// Find install command
+						var installCmd *cobra.Command
+						for _, c := range cmd.Root().Commands() {
+							if c.Name() == "install" {
+								installCmd = c
+								break
+							}
+						}
+						if installCmd == nil {
+							return fmt.Errorf("install command not found")
+						}
+
+						// Set args based on version (empty = latest)
+						if version != "" {
+							installCmd.SetArgs([]string{version})
+						} else {
+							// Install latest with additional flags if provided
+							args := []string{}
+							if additionalFlags != "" {
+								// Simple space split - TODO: handle quoted args properly
+								args = append(args, strings.Fields(additionalFlags)...)
+							}
+							installCmd.SetArgs(args)
+						}
+
+						return installCmd.Execute()
+					},
+				}
+
+				_, err := setup.Run()
+				if err != nil {
+					fmt.Fprintf(cmd.OutOrStderr(), "Error: %v\n", err)
+					os.Exit(1)
+				}
+
+				fmt.Fprintf(cmd.OutOrStdout(), "\n")
+				showHelpMessage(cmd)
+				return
+			}
+
+			// Use interactive workflow (default)
 			setup := &workflow.InteractiveSetup{
 				Config:     cfg,
 				Manager:    mgr,
