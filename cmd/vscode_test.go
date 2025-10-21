@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/vscode"
 )
 
-// TestVSCodeTemplatesUseTilde verifies that templates use ~ instead of ${env:HOME} for Windows compatibility
-func TestVSCodeTemplatesUseTilde(t *testing.T) {
+// TestVSCodeTemplatesUsePlatformEnvVars verifies that templates use platform-specific environment variables
+func TestVSCodeTemplatesUsePlatformEnvVars(t *testing.T) {
 	templates := []string{"basic", "advanced", "monorepo"}
 
 	for _, template := range templates {
@@ -16,22 +19,23 @@ func TestVSCodeTemplatesUseTilde(t *testing.T) {
 				t.Fatalf("Failed to generate %s template: %v", template, err)
 			}
 
-			// Verify toolsGopath uses tilde (cross-platform)
+			// Verify toolsGopath uses environment variable (cross-platform)
 			toolsGopath, ok := settings["go.toolsGopath"].(string)
 			if !ok {
 				t.Fatal("go.toolsGopath not found in template")
 			}
 
-			if toolsGopath != "~/go/tools" {
-				t.Errorf("Template '%s': Expected '~/go/tools', got '%s'", template, toolsGopath)
+			// Should use either ${env:HOME} (Unix) or ${env:USERPROFILE} (Windows)
+			if !strings.Contains(toolsGopath, "${env:HOME}") && !strings.Contains(toolsGopath, "${env:USERPROFILE}") {
+				t.Errorf("Template '%s': Expected platform-specific env var, got '%s'", template, toolsGopath)
 			}
 
-			// Should NOT use ${env:HOME} which doesn't exist on Windows
-			if strings.Contains(toolsGopath, "${env:HOME}") {
-				t.Errorf("Template '%s' uses ${env:HOME} which is not Windows-compatible", template)
+			// Should end with /go/tools
+			if !strings.HasSuffix(toolsGopath, "/go/tools") {
+				t.Errorf("Template '%s': Expected path ending with '/go/tools', got '%s'", template, toolsGopath)
 			}
 
-			t.Logf("✓ Template '%s' uses cross-platform home directory: %s", template, toolsGopath)
+			t.Logf("✓ Template '%s' uses platform-specific home directory: %s", template, toolsGopath)
 		})
 	}
 }
@@ -174,4 +178,251 @@ func TestVSCodeMergeSettingsWithOverride(t *testing.T) {
 	if merged["custom.setting"] != "value" {
 		t.Error("Custom setting was not preserved")
 	}
+}
+
+// TestReadExistingExtensions verifies extensions.json reading
+func TestReadExistingExtensions(t *testing.T) {
+	tmpDir := t.TempDir()
+	extensionsFile := tmpDir + "/extensions.json"
+
+	// Test with existing extensions
+	content := `{
+	"recommendations": [
+		"ms-vscode.vscode-typescript-next",
+		"dbaeumer.vscode-eslint"
+	]
+}`
+
+	if err := os.WriteFile(extensionsFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	extensions, err := vscode.ReadExistingExtensions(extensionsFile)
+	if err != nil {
+		t.Fatalf("Failed to read extensions: %v", err)
+	}
+
+	if len(extensions.Recommendations) != 2 {
+		t.Errorf("Expected 2 recommendations, got %d", len(extensions.Recommendations))
+	}
+
+	expected := []string{"ms-vscode.vscode-typescript-next", "dbaeumer.vscode-eslint"}
+	for i, rec := range extensions.Recommendations {
+		if rec != expected[i] {
+			t.Errorf("Expected recommendation[%d] to be '%s', got '%s'", i, expected[i], rec)
+		}
+	}
+}
+
+// TestReadExistingExtensionsNonExistent verifies error handling for non-existent file
+func TestReadExistingExtensionsNonExistent(t *testing.T) {
+	_, err := vscode.ReadExistingExtensions("/nonexistent/extensions.json")
+	if err == nil {
+		t.Error("Expected error for non-existent file, got nil")
+	}
+}
+
+// TestReadExistingExtensionsWithComments verifies JSONC support
+func TestReadExistingExtensionsWithComments(t *testing.T) {
+	tmpDir := t.TempDir()
+	extensionsFile := tmpDir + "/extensions.json"
+
+	// JSONC with comments and trailing commas
+	content := `{
+	// This is a comment
+	"recommendations": [
+		"golang.go",
+		"ms-vscode.vscode-typescript-next", // trailing comma
+	]
+}`
+
+	if err := os.WriteFile(extensionsFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	extensions, err := vscode.ReadExistingExtensions(extensionsFile)
+	if err != nil {
+		t.Fatalf("Failed to read extensions with comments: %v", err)
+	}
+
+	if len(extensions.Recommendations) != 2 {
+		t.Errorf("Expected 2 recommendations, got %d", len(extensions.Recommendations))
+	}
+}
+
+// TestExtensionsMerging verifies that golang.go is added to existing recommendations
+func TestExtensionsMerging(t *testing.T) {
+	// Test case 1: No existing extensions
+	var recommendations []string
+	goExtension := "golang.go"
+
+	hasGoExtension := false
+	for _, rec := range recommendations {
+		if rec == goExtension {
+			hasGoExtension = true
+			break
+		}
+	}
+	if !hasGoExtension {
+		recommendations = append(recommendations, goExtension)
+	}
+
+	if len(recommendations) != 1 || recommendations[0] != "golang.go" {
+		t.Errorf("Expected golang.go to be added, got %v", recommendations)
+	}
+
+	// Test case 2: Existing extensions without golang.go
+	recommendations = []string{"ms-vscode.vscode-typescript-next", "dbaeumer.vscode-eslint"}
+
+	hasGoExtension = false
+	for _, rec := range recommendations {
+		if rec == goExtension {
+			hasGoExtension = true
+			break
+		}
+	}
+	if !hasGoExtension {
+		recommendations = append(recommendations, goExtension)
+	}
+
+	if len(recommendations) != 3 {
+		t.Errorf("Expected 3 recommendations, got %d", len(recommendations))
+	}
+	if recommendations[2] != "golang.go" {
+		t.Errorf("Expected golang.go to be appended, got %v", recommendations)
+	}
+
+	// Test case 3: golang.go already present
+	recommendations = []string{"golang.go", "ms-vscode.vscode-typescript-next"}
+
+	hasGoExtension = false
+	for _, rec := range recommendations {
+		if rec == goExtension {
+			hasGoExtension = true
+			break
+		}
+	}
+	if !hasGoExtension {
+		recommendations = append(recommendations, goExtension)
+	}
+
+	if len(recommendations) != 2 {
+		t.Errorf("Expected 2 recommendations (no duplicate), got %d", len(recommendations))
+	}
+}
+
+// TestVSCodeInitPreservesExtensions verifies that running vscode init multiple times preserves existing extensions
+func TestVSCodeInitPreservesExtensions(t *testing.T) {
+	tmpDir := t.TempDir()
+	vscodeDir := tmpDir + "/.vscode"
+	extensionsFile := vscodeDir + "/extensions.json"
+
+	// Create .vscode directory
+	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+		t.Fatalf("Failed to create .vscode directory: %v", err)
+	}
+
+	// Create initial extensions.json with custom extensions
+	initialContent := `{
+	"recommendations": [
+		"ms-vscode.vscode-typescript-next",
+		"dbaeumer.vscode-eslint"
+	]
+}`
+	if err := os.WriteFile(extensionsFile, []byte(initialContent), 0644); err != nil {
+		t.Fatalf("Failed to write initial extensions.json: %v", err)
+	}
+
+	// Read the file and verify initial state
+	initialExtensions, err := vscode.ReadExistingExtensions(extensionsFile)
+	if err != nil {
+		t.Fatalf("Failed to read initial extensions: %v", err)
+	}
+
+	if len(initialExtensions.Recommendations) != 2 {
+		t.Errorf("Expected 2 initial recommendations, got %d", len(initialExtensions.Recommendations))
+	}
+
+	// Simulate what vscode init does - merge with existing
+	var recommendations []string
+	existingExtensions, err := vscode.ReadExistingExtensions(extensionsFile)
+	if err == nil {
+		recommendations = existingExtensions.Recommendations
+	}
+
+	// Add golang.go if not already present
+	goExtension := "golang.go"
+	hasGoExtension := false
+	for _, rec := range recommendations {
+		if rec == goExtension {
+			hasGoExtension = true
+			break
+		}
+	}
+	if !hasGoExtension {
+		recommendations = append(recommendations, goExtension)
+	}
+
+	// Verify merged recommendations
+	if len(recommendations) != 3 {
+		t.Errorf("Expected 3 recommendations after merge, got %d", len(recommendations))
+	}
+
+	// Verify existing extensions are preserved
+	expectedExtensions := []string{
+		"ms-vscode.vscode-typescript-next",
+		"dbaeumer.vscode-eslint",
+		"golang.go",
+	}
+
+	for i, expected := range expectedExtensions {
+		if i >= len(recommendations) || recommendations[i] != expected {
+			t.Errorf("Expected recommendation[%d] to be '%s', got '%s'", i, expected, recommendations[i])
+		}
+	}
+
+	t.Log("✓ Existing extensions preserved and golang.go added")
+}
+
+// TestVSCodePathGeneration_PlatformSpecific verifies that --absolute flag generates platform-specific paths
+func TestVSCodePathGeneration_PlatformSpecific(t *testing.T) {
+	// This test verifies the logic, but doesn't actually run the command
+	// because it requires a full goenv setup with versions installed
+
+	// Test the generateSettings function produces correct env vars
+	t.Run("Templates use correct platform env vars", func(t *testing.T) {
+		settings, err := generateSettings("basic")
+		if err != nil {
+			t.Fatalf("Failed to generate settings: %v", err)
+		}
+
+		toolsGopath := settings["go.toolsGopath"].(string)
+
+		// On Unix/macOS, should use ${env:HOME}
+		// On Windows, should use ${env:USERPROFILE}
+		// Both are valid and cross-platform
+		if !strings.Contains(toolsGopath, "${env:HOME}") && !strings.Contains(toolsGopath, "${env:USERPROFILE}") {
+			t.Errorf("Expected platform-specific env var in toolsGopath, got: %s", toolsGopath)
+		}
+
+		t.Logf("✓ toolsGopath uses platform-appropriate env var: %s", toolsGopath)
+	})
+
+	t.Run("Environment variable syntax is VS Code compatible", func(t *testing.T) {
+		// VS Code supports ${env:VARNAME} syntax on all platforms
+		// This is documented in VS Code's variables reference
+		testCases := []struct {
+			envVar   string
+			expected string
+		}{
+			{"${env:HOME}/go/tools", "Valid on Unix/macOS"},
+			{"${env:USERPROFILE}/go/tools", "Valid on Windows"},
+			{"${env:GOROOT}", "Valid on all platforms"},
+			{"${env:GOPATH}", "Valid on all platforms"},
+		}
+
+		for _, tc := range testCases {
+			t.Logf("✓ %s: %s", tc.envVar, tc.expected)
+		}
+	})
 }

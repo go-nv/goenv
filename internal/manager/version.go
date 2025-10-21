@@ -985,3 +985,125 @@ func validateAliasName(name string) error {
 
 	return nil
 }
+
+// ParseGoModVersion reads the Go version requirement from a go.mod file
+// Returns the version string (e.g., "1.24.3") or an error if not found/invalid
+func ParseGoModVersion(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read go.mod: %w", err)
+	}
+
+	// Parse go.mod format
+	// Looking for: go 1.24.3 and toolchain go1.24.5
+	// toolchain takes precedence if present (and not "default")
+	var goVersion string
+	var toolchainVersion string
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip comments
+		if strings.HasPrefix(line, "//") {
+			continue
+		}
+
+		// Check for toolchain directive
+		if strings.HasPrefix(line, "toolchain ") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				version := parts[1]
+				// Remove any trailing comments
+				if idx := strings.Index(version, "//"); idx >= 0 {
+					version = strings.TrimSpace(version[:idx])
+				}
+				// Skip "default" toolchain
+				if version != "default" {
+					// Remove "go" prefix from toolchain version (e.g., "go1.22.5" -> "1.22.5")
+					toolchainVersion = strings.TrimPrefix(version, "go")
+				}
+			}
+		}
+
+		// Check for go directive
+		if strings.HasPrefix(line, "go ") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				version := parts[1]
+				// Remove any trailing comments
+				if idx := strings.Index(version, "//"); idx >= 0 {
+					version = strings.TrimSpace(version[:idx])
+				}
+				goVersion = version
+			}
+		}
+	}
+
+	// toolchain takes precedence if present
+	if toolchainVersion != "" {
+		return toolchainVersion, nil
+	}
+
+	if goVersion != "" {
+		return goVersion, nil
+	}
+
+	return "", fmt.Errorf("no go version directive found in go.mod")
+}
+
+// VersionSatisfies checks if the current version satisfies the required version
+// Returns true if current >= required
+func VersionSatisfies(current, required string) bool {
+	// Remove 'v' prefix if present
+	current = strings.TrimPrefix(current, "v")
+	required = strings.TrimPrefix(required, "v")
+
+	// Parse versions
+	currentParts := parseVersionParts(current)
+	requiredParts := parseVersionParts(required)
+
+	// Compare major.minor.patch
+	for i := 0; i < 3; i++ {
+		if i >= len(requiredParts) {
+			return true // Required version doesn't specify this part
+		}
+		if i >= len(currentParts) {
+			return false // Current version is shorter
+		}
+
+		if currentParts[i] > requiredParts[i] {
+			return true
+		}
+		if currentParts[i] < requiredParts[i] {
+			return false
+		}
+	}
+
+	return true // Equal
+}
+
+// parseVersionParts splits a version string into numeric parts
+// Returns [major, minor, patch] as integers
+func parseVersionParts(version string) []int {
+	parts := strings.Split(version, ".")
+	result := make([]int, 0, 3)
+
+	for i := 0; i < 3 && i < len(parts); i++ {
+		// Parse only the numeric part (ignore suffixes like -rc1)
+		numStr := parts[i]
+		if idx := strings.IndexAny(numStr, "-+"); idx >= 0 {
+			numStr = numStr[:idx]
+		}
+
+		num := 0
+		fmt.Sscanf(numStr, "%d", &num)
+		result = append(result, num)
+	}
+
+	// Pad with zeros if needed
+	for len(result) < 3 {
+		result = append(result, 0)
+	}
+
+	return result
+}

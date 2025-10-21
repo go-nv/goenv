@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
@@ -21,12 +23,16 @@ var localFlags struct {
 	complete      bool
 	vscode        bool
 	vscodeEnvVars bool
+	sync          bool
+	fromGoMod     bool
 }
 
 func init() {
 	rootCmd.AddCommand(localCmd)
 	localCmd.SilenceUsage = true
 	localCmd.Flags().BoolVarP(&localFlags.unset, "unset", "u", false, "Unset the local Go version")
+	localCmd.Flags().BoolVar(&localFlags.sync, "sync", false, "Ensure the version from .go-version is installed")
+	localCmd.Flags().BoolVar(&localFlags.fromGoMod, "from-gomod", false, "Set version from go.mod file (version must be installed)")
 	localCmd.Flags().BoolVar(&localFlags.vscode, "vscode", false, "Also initialize VS Code workspace settings (uses absolute paths by default)")
 	localCmd.Flags().BoolVar(&localFlags.vscodeEnvVars, "vscode-env-vars", false, "Use environment variables in VS Code settings (requires terminal launch)")
 	localCmd.Flags().BoolVar(&localFlags.complete, "complete", false, "Internal flag for shell completions")
@@ -49,9 +55,13 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Validate: local command takes 0 or 1 argument (not including --unset flag)
-	if len(args) > 1 {
+	// Validate: local command takes 0 or 1 argument (not including flags)
+	// Exception: with --from-gomod, takes 0 arguments
+	if !localFlags.fromGoMod && len(args) > 1 {
 		return fmt.Errorf("Usage: goenv local [<version>]")
+	}
+	if localFlags.fromGoMod && len(args) > 0 {
+		return fmt.Errorf("--from-gomod flag cannot be used with a version argument")
 	}
 
 	cfg := config.Load()
@@ -69,20 +79,87 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if len(args) == 0 {
+	if len(args) == 0 && !localFlags.fromGoMod {
 		version, err := mgr.GetLocalVersion()
 		if err != nil {
 			return fmt.Errorf("goenv: no local version configured for this directory")
 		}
+
+		// If --sync flag is set, ensure version is installed
+		if localFlags.sync {
+			fmt.Fprintf(cmd.OutOrStdout(), "Found .go-version: %s\n", version)
+
+			// Check if installed
+			if !mgr.IsVersionInstalled(version) {
+				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Go %s is not installed\n", version)
+				fmt.Fprintf(cmd.OutOrStdout(), "Installing Go %s...\n", version)
+
+				// Find and execute install command
+				installCmd := cmd.Root().Commands()[0]
+				for _, c := range cmd.Root().Commands() {
+					if c.Name() == "install" {
+						installCmd = c
+						break
+					}
+				}
+
+				// Execute install
+				installCmd.SetArgs([]string{version})
+				if err := installCmd.Execute(); err != nil {
+					return fmt.Errorf("installation failed: %w", err)
+				}
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "✓ Go %s is installed\n", version)
+			}
+
+			return nil
+		}
+
 		fmt.Fprintln(cmd.OutOrStdout(), version)
 		return nil
 	}
 
-	spec := args[0]
+	var spec string
+	var resolvedVersion string
 
-	resolvedVersion, err := mgr.ResolveVersionSpec(spec)
-	if err != nil {
-		return err
+	// If --from-gomod flag is set, try to read version from go.mod
+	if localFlags.fromGoMod {
+		cwd, _ := os.Getwd()
+		gomodPath := filepath.Join(cwd, "go.mod")
+
+		if _, err := os.Stat(gomodPath); os.IsNotExist(err) {
+			return fmt.Errorf("--from-gomod specified but no go.mod file found in current directory")
+		}
+
+		versionFromGoMod, err := manager.ParseGoModVersion(gomodPath)
+		if err != nil {
+			return fmt.Errorf("failed to read version from go.mod: %w", err)
+		}
+
+		spec = versionFromGoMod
+
+		// For --from-gomod, use the version directly (don't require it to be installed yet)
+		resolvedVersion = spec
+
+		// Check if version is installed
+		if !mgr.IsVersionInstalled(resolvedVersion) {
+			fmt.Fprintf(cmd.OutOrStdout(), "Go %s (from go.mod) is not installed\n", resolvedVersion)
+			fmt.Fprintf(cmd.OutOrStdout(), "\nTo install and set this version:\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  goenv install %s && goenv local %s\n", resolvedVersion, resolvedVersion)
+			return fmt.Errorf("version %s not installed", resolvedVersion)
+		}
+	} else {
+		if len(args) == 0 {
+			return fmt.Errorf("no version specified (use VERSION argument or --from-gomod flag)")
+		}
+		spec = args[0]
+
+		// For manual version spec, resolve and validate it's installed
+		var err error
+		resolvedVersion, err = mgr.ResolveVersionSpec(spec)
+		if err != nil {
+			return err
+		}
 	}
 
 	if cfg.Debug {
@@ -91,6 +168,24 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 	if err := mgr.SetLocalVersion(resolvedVersion); err != nil {
 		return err
+	}
+
+	// Check if go.mod exists and warn about version mismatch
+	cwd, _ := os.Getwd()
+	gomodPath := filepath.Join(cwd, "go.mod")
+	if _, err := os.Stat(gomodPath); err == nil {
+		// go.mod exists, check version compatibility
+		requiredVersion, err := manager.ParseGoModVersion(gomodPath)
+		if err == nil {
+			if !manager.VersionSatisfies(resolvedVersion, requiredVersion) {
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: go.mod requires Go %s but you set version to %s\n", requiredVersion, resolvedVersion)
+				fmt.Fprintln(cmd.OutOrStdout(), "   This may cause build errors.")
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintln(cmd.OutOrStdout(), "   To use the version from go.mod:")
+				fmt.Fprintf(cmd.OutOrStdout(), "   goenv local %s\n", requiredVersion)
+			}
+		}
 	}
 
 	// Automatically initialize VS Code if --vscode flag is set
@@ -105,8 +200,8 @@ func runLocal(cmd *cobra.Command, args []string) error {
 			vscodeInitFlags.envVars = false
 		}
 
-		// Call vscode init functionality
-		if err := initializeVSCodeWorkspace(cmd); err != nil {
+		// Call vscode init functionality with the resolved version
+		if err := initializeVSCodeWorkspaceWithVersion(cmd, resolvedVersion); err != nil {
 			// Don't fail the whole command if VS Code init fails
 			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: VS Code initialization failed: %v\n", err)
 			fmt.Fprintln(cmd.OutOrStdout(), "   You can manually run: goenv vscode init")

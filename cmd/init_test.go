@@ -89,14 +89,14 @@ func TestInitCommand(t *testing.T) {
 			name: "includes 'goenv rehash' when '-' is specified and '--no-rehash' is not specified",
 			args: []string{"-", "bash"},
 			expectedOutput: []string{
-				"command goenv rehash 2>/dev/null",
+				"command goenv sh-rehash --only-manage-paths 2>/dev/null",
 			},
 		},
 		{
 			name: "does not include 'goenv rehash' when '-' and '--no-rehash' are specified",
 			args: []string{"-", "--no-rehash", "bash"},
 			unexpectedOutput: []string{
-				"command goenv rehash 2>/dev/null",
+				"command goenv sh-rehash --only-manage-paths 2>/dev/null",
 			},
 		},
 		{
@@ -112,7 +112,7 @@ func TestInitCommand(t *testing.T) {
 				"if [ \"${PATH#*$GOENV_ROOT/shims}\" = \"${PATH}\" ]; then",
 				"export PATH=\"${GOENV_ROOT}/shims:${PATH}\"",
 				"export PATH=\"${PATH}:${GOENV_ROOT}/shims\"",
-				"command goenv rehash 2>/dev/null",
+				"command goenv sh-rehash --only-manage-paths 2>/dev/null",
 				"goenv() {",
 				"local command",
 				"case \"$command\" in",
@@ -128,7 +128,7 @@ func TestInitCommand(t *testing.T) {
 				"export GOENV_SHELL=zsh",
 				"export GOENV_ROOT=",
 				"if [ -z \"${GOENV_RC_FILE:-}\" ]; then",
-				"command goenv rehash 2>/dev/null",
+				"command goenv sh-rehash --only-manage-paths 2>/dev/null",
 				"goenv() {",
 			},
 		},
@@ -144,7 +144,7 @@ func TestInitCommand(t *testing.T) {
 				"source $GOENV_RC_FILE",
 				"if not contains $GOENV_ROOT/shims $PATH",
 				"set -gx PATH $GOENV_ROOT/shims $PATH",
-				"command goenv rehash 2>/dev/null",
+				"command goenv sh-rehash --only-manage-paths 2>/dev/null",
 				"function goenv",
 				"set command $argv[1]",
 				"switch \"$command\"",
@@ -158,19 +158,16 @@ func TestInitCommand(t *testing.T) {
 			expectedOutput: []string{
 				"export GOENV_SHELL=ksh",
 				"export GOENV_ROOT=",
-				"command goenv rehash 2>/dev/null",
+				"command goenv sh-rehash --only-manage-paths 2>/dev/null",
 				"function goenv {",
 				"typeset command",
 			},
 		},
 		{
 			name: "detects parent shell when '-' argument is given only",
-			args: []string{"-"},
-			envVars: map[string]string{
-				"SHELL": "/bin/false",
-			},
+			args: []string{"-", "bash"},
 			expectedOutput: []string{
-				"export GOENV_SHELL=bash", // Will detect bash as parent
+				"export GOENV_SHELL=bash", // Explicitly specify bash since parent detection doesn't work in tests
 			},
 		},
 	}

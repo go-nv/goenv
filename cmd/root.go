@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +19,14 @@ var rootCmd = &cobra.Command{
 - Automatically download the latest Go versions
 - Manage Go installations with ease`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Only run smart detection if no subcommands or flags were provided
+		// This prevents blocking on stdin when user runs "goenv --version" etc.
+		if cmd.Flags().NFlag() > 0 || len(args) > 0 {
+			// User provided flags or arguments, show help or let cobra handle it
+			cmd.Help()
+			return
+		}
+
 		// Check if GOENV_AUTO_INSTALL is enabled
 		if os.Getenv("GOENV_AUTO_INSTALL") == "1" {
 			// Run install command with GOENV_AUTO_INSTALL_FLAGS if set
@@ -35,9 +46,68 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		// If no command is provided, show simple help message matching bash version
-		fmt.Printf("goenv %s\n", appVersion)
-		fmt.Println(`Usage: goenv <command> [<args>]
+		// Smart version detection (tfswitch-like behavior)
+		// Check for .go-version or go.mod in current directory
+		cwd, err := os.Getwd()
+		if err == nil {
+			cfg := config.Load()
+			mgr := manager.NewManager(cfg)
+
+			// Use the interactive workflow helper
+			setup := &workflow.InteractiveSetup{
+				Config:     cfg,
+				Manager:    mgr,
+				Stdout:     cmd.OutOrStdout(),
+				Stderr:     cmd.OutOrStderr(),
+				Stdin:      os.Stdin,
+				WorkingDir: cwd,
+				VSCodeUpdate: func(version string) error {
+					return initializeVSCodeWorkspaceWithVersion(cmd, version)
+				},
+			}
+
+			result, err := setup.Run()
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStderr(), "Error: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Handle installation if requested
+			if result.InstallRequested {
+				fmt.Fprintf(cmd.OutOrStdout(), "Installing Go %s...\n", result.Version)
+				installCmd := cmd.Root().Commands()[0] // Find install command
+				for _, c := range cmd.Root().Commands() {
+					if c.Name() == "install" {
+						installCmd = c
+						break
+					}
+				}
+				installCmd.SetArgs([]string{result.Version})
+				if err := installCmd.Execute(); err != nil {
+					fmt.Fprintf(cmd.OutOrStderr(), "Installation failed: %v\n", err)
+					os.Exit(1)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "\n")
+			}
+
+			// If we found a version, show help and exit
+			if result.VersionFound {
+				fmt.Fprintf(cmd.OutOrStdout(), "\n")
+				showHelpMessage(cmd)
+				return
+			}
+		}
+
+		// If no command is provided and no .go-version, show simple help message matching bash version
+		showHelpMessage(cmd)
+		os.Exit(1)
+	},
+}
+
+// showHelpMessage displays the goenv help information
+func showHelpMessage(cmd *cobra.Command) {
+	fmt.Fprintf(cmd.OutOrStdout(), "goenv %s\n", appVersion)
+	fmt.Fprintln(cmd.OutOrStdout(), `Usage: goenv <command> [<args>]
 
 Some useful goenv commands are:
    commands    List all available commands of goenv
@@ -55,10 +125,7 @@ Some useful goenv commands are:
 
 See 'goenv help <command>' for information on a specific command.
 For full documentation, see: https://github.com/go-nv/goenv#readme`)
-		os.Exit(1)
-	},
 }
-
 func Execute() {
 	// Check for version shorthand syntax before executing
 	// If first arg looks like a version number, route to local command

@@ -366,7 +366,44 @@ configured local version. You can also unset the local version:
 > goenv local --unset
 ```
 
-**NEW:** Automatically set up VS Code integration when setting a local version:
+**NEW: tfswitch-like behavior** - `goenv` (with no arguments) now automatically detects `.go-version` files:
+
+```shell
+# When you run goenv with no arguments in a directory with .go-version
+> goenv
+Found .go-version: 1.23.2
+✓ Go 1.23.2 is installed
+
+# If the version isn't installed, offers to install it
+> goenv
+Found .go-version: 1.23.2
+⚠️  Go 1.23.2 is not installed
+Install now? (Y/n) y
+Installing Go 1.23.2...
+✓ Installed Go 1.23.2
+
+# Use --help to bypass detection and show help
+> goenv --help
+```
+
+**NEW: Sync flag** - Ensure the version from `.go-version` is installed:
+
+```shell
+> goenv local --sync
+Found .go-version: 1.23.2
+✓ Go 1.23.2 is installed
+
+# Or if not installed, automatically installs
+> goenv local --sync
+Found .go-version: 1.23.2
+⚠️  Go 1.23.2 is not installed
+Installing Go 1.23.2...
+✓ Installed Go 1.23.2
+```
+
+This makes it easy to ensure your project's Go version is ready to use, similar to how `tfswitch` works for Terraform versions.
+
+**Automatically set up VS Code integration when setting a local version:**
 
 ```shell
 > goenv local 1.22.0 --vscode

@@ -11,6 +11,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
 )
 
@@ -82,6 +83,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 11: VS Code integration
 	results = append(results, checkVSCodeIntegration(cfg))
+
+	// Check 12: go.mod version compatibility
+	results = append(results, checkGoModVersion(cfg))
 
 	// Print results
 	fmt.Fprintln(cmd.OutOrStdout(), "📋 Diagnostic Results:")
@@ -587,22 +591,23 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 		}
 	}
 
-	// Check if settings.json contains go.goroot configuration
-	data, err := os.ReadFile(settingsFile)
-	if err != nil {
+	// Get current Go version to validate against
+	mgr := manager.NewManager(cfg)
+	currentVersion, _, err := mgr.GetCurrentVersion()
+	if err != nil || currentVersion == "" {
+		// Can't determine current version - do basic check
 		return checkResult{
 			name:    "VS Code integration",
 			status:  "warning",
-			message: fmt.Sprintf("Cannot read settings.json: %v", err),
-			advice:  "Ensure .vscode/settings.json is readable",
+			message: "Cannot determine current Go version for validation",
+			advice:  "Set a Go version with 'goenv global' or 'goenv local' first",
 		}
 	}
 
-	content := string(data)
-	hasGoroot := strings.Contains(content, "go.goroot")
-	hasGopath := strings.Contains(content, "go.gopath")
+	// Use sophisticated VS Code settings check
+	result := vscode.CheckSettings(settingsFile, currentVersion)
 
-	if !hasGoroot && !hasGopath {
+	if !result.HasSettings {
 		return checkResult{
 			name:    "VS Code integration",
 			status:  "warning",
@@ -611,22 +616,106 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 		}
 	}
 
-	// Check if it's using environment variables (recommended)
-	usesEnvVars := strings.Contains(content, "${env:GOROOT}") || strings.Contains(content, "${env:GOPATH}")
-
-	if usesEnvVars {
+	if result.UsesEnvVars {
 		return checkResult{
 			name:    "VS Code integration",
 			status:  "ok",
-			message: "VS Code configured to use goenv environment variables",
+			message: "VS Code configured to use goenv environment variables (${env:GOROOT})",
 		}
 	}
 
-	// Has go.goroot but not using env vars - might be hardcoded
+	if result.Mismatch {
+		return checkResult{
+			name:    "VS Code integration",
+			status:  "warning",
+			message: fmt.Sprintf("VS Code settings use Go %s but current version is %s", result.ConfiguredVersion, currentVersion),
+			advice:  "Run 'goenv vscode init --force' to update VS Code settings to match current version",
+		}
+	}
+
+	if result.ConfiguredVersion != "" {
+		return checkResult{
+			name:    "VS Code integration",
+			status:  "ok",
+			message: fmt.Sprintf("VS Code configured with absolute path for Go %s", result.ConfiguredVersion),
+		}
+	}
+
+	// Has go.goroot but couldn't parse version
 	return checkResult{
 		name:    "VS Code integration",
 		status:  "warning",
-		message: "VS Code has Go configuration but may not use goenv",
-		advice:  "Consider using '${env:GOROOT}' in settings.json. Run 'goenv vscode init --force' to update.",
+		message: "VS Code has Go configuration but cannot determine version",
+		advice:  "Run 'goenv vscode init --force' to update settings",
+	}
+}
+
+func checkGoModVersion(cfg *config.Config) checkResult {
+	cwd, _ := os.Getwd()
+	gomodPath := filepath.Join(cwd, "go.mod")
+
+	// Only check if go.mod exists
+	if _, err := os.Stat(gomodPath); os.IsNotExist(err) {
+		return checkResult{
+			name:    "go.mod version",
+			status:  "ok",
+			message: "No go.mod file in current directory",
+		}
+	}
+
+	// Get current Go version
+	mgr := manager.NewManager(cfg)
+	currentVersion, _, err := mgr.GetCurrentVersion()
+	if err != nil {
+		return checkResult{
+			name:    "go.mod version",
+			status:  "error",
+			message: "Cannot determine current Go version",
+			advice:  "Ensure a Go version is set with 'goenv global' or 'goenv local'",
+		}
+	}
+
+	// Parse go.mod for required version
+	requiredVersion, err := manager.ParseGoModVersion(gomodPath)
+	if err != nil {
+		return checkResult{
+			name:    "go.mod version",
+			status:  "warning",
+			message: fmt.Sprintf("Cannot parse go.mod: %v", err),
+			advice:  "Ensure go.mod has a valid 'go' directive",
+		}
+	}
+
+	// Compare versions
+	if !manager.VersionSatisfies(currentVersion, requiredVersion) {
+		// Check if required version is installed
+		installedVersions, err := mgr.ListInstalledVersions()
+		isInstalled := false
+		if err == nil {
+			for _, v := range installedVersions {
+				if v == requiredVersion || "v"+v == requiredVersion || v == "v"+requiredVersion {
+					isInstalled = true
+					break
+				}
+			}
+		}
+
+		advice := fmt.Sprintf("Run: goenv local %s", requiredVersion)
+		if !isInstalled {
+			advice = fmt.Sprintf("Run: goenv install %s && goenv local %s", requiredVersion, requiredVersion)
+		}
+
+		return checkResult{
+			name:    "go.mod version",
+			status:  "error",
+			message: fmt.Sprintf("go.mod requires Go %s but current version is %s", requiredVersion, currentVersion),
+			advice:  advice,
+		}
+	}
+
+	return checkResult{
+		name:    "go.mod version",
+		status:  "ok",
+		message: fmt.Sprintf("Current Go %s satisfies go.mod requirement (>= %s)", currentVersion, requiredVersion),
 	}
 }

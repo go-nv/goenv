@@ -1,14 +1,16 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
 )
 
@@ -60,13 +62,10 @@ func init() {
 
 	vscodeInitCmd.SilenceUsage = true
 	helptext.SetCommandHelp(vscodeInitCmd)
-} // VSCodeSettings represents the VS Code settings.json structure
-type VSCodeSettings map[string]interface{}
-
-// VSCodeExtensions represents the VS Code extensions.json structure
-type VSCodeExtensions struct {
-	Recommendations []string `json:"recommendations"`
 }
+
+// VSCodeSettings represents the VS Code settings.json structure
+type VSCodeSettings map[string]interface{}
 
 func runVSCodeInit(cmd *cobra.Command, args []string) error {
 	return initializeVSCodeWorkspace(cmd)
@@ -75,6 +74,12 @@ func runVSCodeInit(cmd *cobra.Command, args []string) error {
 // initializeVSCodeWorkspace performs the actual VS Code initialization
 // This is exported so it can be called from other commands (e.g., goenv local --vscode)
 func initializeVSCodeWorkspace(cmd *cobra.Command) error {
+	return initializeVSCodeWorkspaceWithVersion(cmd, "")
+}
+
+// initializeVSCodeWorkspaceWithVersion initializes VS Code settings with a specific version
+// If version is empty, it uses the current active version
+func initializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) error {
 	// Get current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -107,15 +112,17 @@ func initializeVSCodeWorkspace(cmd *cobra.Command) error {
 		return err
 	}
 
-	// Convert to absolute paths if requested
+	// Convert to explicit paths if requested (using platform-specific env vars for portability)
 	if useAbsolutePaths {
 		cfg := config.Load()
 		mgr := manager.NewManager(cfg)
 
-		// Get current Go version
-		version, _, err := mgr.GetCurrentVersion()
-		if err != nil {
-			return fmt.Errorf("failed to get current Go version: %w", err)
+		// Get Go version - use provided version or current active version
+		if version == "" {
+			version, _, err = mgr.GetCurrentVersion()
+			if err != nil {
+				return fmt.Errorf("failed to get current Go version: %w", err)
+			}
 		}
 
 		// Get home directory (cross-platform)
@@ -124,60 +131,105 @@ func initializeVSCodeWorkspace(cmd *cobra.Command) error {
 			return fmt.Errorf("failed to get home directory: %w", err)
 		}
 
-		// Convert environment variable references to absolute paths
-		goroot := filepath.Join(cfg.Root, "versions", version)
+		// Use platform-specific environment variables for portability
+		// Windows: ${env:USERPROFILE}  Unix/macOS: ${env:HOME}
+		var homeEnvVar string
+		if runtime.GOOS == "windows" {
+			homeEnvVar = "${env:USERPROFILE}"
+		} else {
+			homeEnvVar = "${env:HOME}"
+		}
+
+		// Build paths using env var prefix for portability across users
+		gorootAbs := filepath.Join(cfg.Root, "versions", version)
+		goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
 		// Build GOPATH respecting GOENV_GOPATH_PREFIX (same as exec.go and sh-rehash.go)
 		gopathPrefix := os.Getenv("GOENV_GOPATH_PREFIX")
-		var gopath string
+		var gopathAbs string
 		if gopathPrefix == "" {
-			gopath = filepath.Join(homeDir, "go", version)
+			gopathAbs = filepath.Join(homeDir, "go", version)
 		} else {
-			gopath = filepath.Join(gopathPrefix, version)
+			gopathAbs = filepath.Join(gopathPrefix, version)
 		}
+		gopath := strings.Replace(gopathAbs, homeDir, homeEnvVar, 1)
 
 		settings["go.goroot"] = goroot
 		settings["go.gopath"] = gopath
 
-		// Update toolsGopath if it exists
+		// toolsGopath: use platform-specific env var
 		if _, ok := settings["go.toolsGopath"]; ok {
-			settings["go.toolsGopath"] = filepath.Join(homeDir, "go", "tools")
+			settings["go.toolsGopath"] = homeEnvVar + "/go/tools"
 		}
 	}
 
 	// Handle existing settings
-	existingSettings, err := readExistingSettings(settingsFile)
+	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read existing settings: %w", err)
 	}
 
-	// Merge or overwrite settings
-	finalSettings := settings
+	// Write settings.json
 	if existingSettings != nil && !force {
-		// Always override Go-related keys when switching modes or updating paths
-		// This ensures the command actually does what the user expects
-		finalSettings = mergeSettingsWithOverride(existingSettings, settings, []string{"go.goroot", "go.gopath", "go.toolsGopath"})
+		// File exists - update only the specific Go keys we care about
 		if useAbsolutePaths {
 			fmt.Fprintln(cmd.OutOrStdout(), "ℹ️  Updating Go paths with absolute values")
 		} else {
 			fmt.Fprintln(cmd.OutOrStdout(), "ℹ️  Updating Go paths with environment variables")
 		}
-	}
 
-	// Write settings.json
-	if err := writeJSON(settingsFile, finalSettings); err != nil {
-		return fmt.Errorf("failed to write settings.json: %w", err)
+		// Update only specific keys, not all settings
+		keysToUpdate := make(map[string]interface{})
+
+		// Only add keys that actually have values
+		if val, ok := settings["go.goroot"]; ok && val != nil {
+			keysToUpdate["go.goroot"] = val
+		}
+		if val, ok := settings["go.gopath"]; ok && val != nil {
+			keysToUpdate["go.gopath"] = val
+		}
+		if val, ok := settings["go.toolsGopath"]; ok && val != nil {
+			keysToUpdate["go.toolsGopath"] = val
+		}
+
+		if err := vscode.UpdateJSONKeys(settingsFile, keysToUpdate); err != nil {
+			return fmt.Errorf("failed to update settings.json: %w", err)
+		}
+	} else {
+		// No existing file or force mode - create new file
+		if err := vscode.WriteJSONFile(settingsFile, settings); err != nil {
+			return fmt.Errorf("failed to write settings.json: %w", err)
+		}
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "✓ Created/updated %s\n", settingsFile)
 
 	// Generate and write extensions.json
-	extensions := VSCodeExtensions{
-		Recommendations: []string{
-			"golang.go",
-		},
+	// Read existing extensions if file exists
+	var recommendations []string
+	existingExtensions, err := vscode.ReadExistingExtensions(extensionsFile)
+	if err == nil {
+		// File exists - merge with existing recommendations
+		recommendations = existingExtensions.Recommendations
 	}
 
-	if err := writeJSON(extensionsFile, extensions); err != nil {
+	// Add golang.go if not already present
+	goExtension := "golang.go"
+	hasGoExtension := false
+	for _, rec := range recommendations {
+		if rec == goExtension {
+			hasGoExtension = true
+			break
+		}
+	}
+	if !hasGoExtension {
+		recommendations = append(recommendations, goExtension)
+	}
+
+	extensions := vscode.Extensions{
+		Recommendations: recommendations,
+	}
+
+	if err := vscode.WriteJSONFile(extensionsFile, extensions); err != nil {
 		return fmt.Errorf("failed to write extensions.json: %w", err)
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "✓ Created/updated %s\n", extensionsFile)
@@ -189,8 +241,8 @@ func initializeVSCodeWorkspace(cmd *cobra.Command) error {
 	fmt.Fprintln(cmd.OutOrStdout(), "Configuration:")
 
 	if useAbsolutePaths {
-		fmt.Fprintf(cmd.OutOrStdout(), "  • go.goroot: %v (absolute path)\n", finalSettings["go.goroot"])
-		fmt.Fprintf(cmd.OutOrStdout(), "  • go.gopath: %v (absolute path)\n", finalSettings["go.gopath"])
+		fmt.Fprintf(cmd.OutOrStdout(), "  • go.goroot: %v (absolute path)\n", settings["go.goroot"])
+		fmt.Fprintf(cmd.OutOrStdout(), "  • go.gopath: %v (absolute path)\n", settings["go.gopath"])
 		fmt.Fprintf(cmd.OutOrStdout(), "  • Mode: Absolute paths (works when opened from GUI!)\n")
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "  • go.goroot: ${env:GOROOT}\n")
@@ -220,33 +272,39 @@ func initializeVSCodeWorkspace(cmd *cobra.Command) error {
 
 // generateSettings creates settings based on template
 func generateSettings(template string) (VSCodeSettings, error) {
+	// Determine platform-specific home environment variable
+	homeEnvVar := "${env:HOME}"
+	if runtime.GOOS == "windows" {
+		homeEnvVar = "${env:USERPROFILE}"
+	}
+
 	switch template {
 	case "basic":
 		return VSCodeSettings{
 			"go.goroot":            "${env:GOROOT}",
 			"go.gopath":            "${env:GOPATH}",
-			"go.toolsGopath":       "~/go/tools",
+			"go.toolsGopath":       homeEnvVar + "/go/tools",
 			"go.useLanguageServer": true,
 		}, nil
 
 	case "advanced":
 		return VSCodeSettings{
-			"go.goroot":                     "${env:GOROOT}",
-			"go.gopath":                     "${env:GOPATH}",
-			"go.toolsGopath":                "~/go/tools",
-			"go.useLanguageServer":          true,
-			"go.toolsManagement.autoUpdate": true,
-			"[go]": map[string]interface{}{
-				"editor.formatOnSave": true,
-				"editor.codeActionsOnSave": map[string]interface{}{
-					"source.organizeImports": "explicit",
-				},
-			},
+			"go.goroot":                         "${env:GOROOT}",
+			"go.gopath":                         "${env:GOPATH}",
+			"go.toolsGopath":                    homeEnvVar + "/go/tools",
+			"go.useLanguageServer":              true,
+			"go.toolsManagement.autoUpdate":     true,
+			"go.formatting.formatOnSave":        true,
+			"go.lintOnSave":                     true,
+			"go.testOnSave":                     false,
+			"go.coverOnSave":                    false,
+			"go.autocompleteUnimportedPackages": true,
 			"gopls": map[string]interface{}{
-				"ui.completion.usePlaceholders": true,
-				"ui.diagnostic.analyses": map[string]interface{}{
-					"unusedparams": true,
-					"shadow":       true,
+				"ui.diagnostic.annotations": map[string]interface{}{
+					"bounds": true,
+					"escape": true,
+					"inline": false,
+					"null":   true,
 				},
 			},
 		}, nil
@@ -255,38 +313,21 @@ func generateSettings(template string) (VSCodeSettings, error) {
 		return VSCodeSettings{
 			"go.goroot":            "${env:GOROOT}",
 			"go.gopath":            "${env:GOPATH}",
-			"go.toolsGopath":       "~/go/tools",
+			"go.toolsGopath":       homeEnvVar + "/go/tools",
 			"go.useLanguageServer": true,
 			"go.inferGopath":       false,
 			"gopls": map[string]interface{}{
 				"build.directoryFilters": []string{
-					"-node_modules",
 					"-vendor",
+					"-node_modules",
 				},
 			},
 		}, nil
 
 	default:
-		return nil, fmt.Errorf("unknown template: %s (choose: basic, advanced, monorepo)", template)
+		return nil, fmt.Errorf("unknown template: %s (choose: %s, %s, %s)", template, "basic", "advanced", "monorepo")
 	}
-}
-
-// readExistingSettings reads and parses existing settings.json
-func readExistingSettings(path string) (VSCodeSettings, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var settings VSCodeSettings
-	if err := json.Unmarshal(data, &settings); err != nil {
-		return nil, fmt.Errorf("invalid JSON in existing settings: %w", err)
-	}
-
-	return settings, nil
-}
-
-// mergeSettings merges new settings into existing, preserving existing keys
+} // mergeSettings merges new settings into existing, preserving existing keys
 func mergeSettings(existing, new VSCodeSettings) VSCodeSettings {
 	result := make(VSCodeSettings)
 
@@ -332,18 +373,4 @@ func mergeSettingsWithOverride(existing, new VSCodeSettings, overrideKeys []stri
 	}
 
 	return result
-}
-
-// writeJSON writes a JSON file with proper formatting
-func writeJSON(path string, data interface{}) error {
-	jsonData, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	if err := os.WriteFile(path, jsonData, 0644); err != nil {
-		return err
-	}
-
-	return nil
 }

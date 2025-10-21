@@ -20,3 +20,4 @@ goenv-*
 // No docs at root
 /*.md
 
+scripts/swap/swap
