@@ -37,7 +37,13 @@ type DiscoveredVersion struct {
 }
 
 // DiscoverVersion looks for a Go version in the current directory
-// It checks .go-version first, then go.mod (with toolchain precedence)
+// It checks both .go-version and go.mod, with special handling for toolchain directives.
+//
+// Precedence rules:
+// 1. If go.mod has a toolchain directive, it takes precedence (it's a hard requirement)
+// 2. If .go-version exists and is >= toolchain (or no toolchain), use .go-version
+// 3. If only one exists, use that
+//
 // Returns nil if no version is found
 func DiscoverVersion(dir string) (*DiscoveredVersion, error) {
 	if dir == "" {
@@ -48,37 +54,62 @@ func DiscoverVersion(dir string) (*DiscoveredVersion, error) {
 		}
 	}
 
-	// Check for .go-version first (explicit takes precedence)
+	// Check for .go-version
 	versionFile := filepath.Join(dir, ".go-version")
+	var goVersionFileVer string
 	if _, err := os.Stat(versionFile); err == nil {
 		content, err := os.ReadFile(versionFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read .go-version: %w", err)
 		}
-		version := parseVersionContent(string(content))
-		if version != "" {
-			return &DiscoveredVersion{
-				Version: version,
-				Source:  SourceGoVersion,
-				Path:    versionFile,
-			}, nil
-		}
+		goVersionFileVer = parseVersionContent(string(content))
 	}
 
 	// Check for go.mod (with toolchain precedence)
 	gomodPath := filepath.Join(dir, "go.mod")
+	var goModVer string
 	if _, err := os.Stat(gomodPath); err == nil {
-		version, err := ParseGoModVersion(gomodPath)
+		goModVer, err = ParseGoModVersion(gomodPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse go.mod: %w", err)
 		}
-		if version != "" {
+	}
+
+	// Decision logic based on what we found
+	if goModVer != "" && goVersionFileVer != "" {
+		// Both exist - go.mod toolchain takes precedence as it's a project requirement
+		// But if .go-version is explicitly newer, respect user's choice
+		if VersionSatisfies(goVersionFileVer, goModVer) {
+			// .go-version is same or newer - use it
 			return &DiscoveredVersion{
-				Version: version,
-				Source:  SourceGoMod,
-				Path:    gomodPath,
+				Version: goVersionFileVer,
+				Source:  SourceGoVersion,
+				Path:    versionFile,
 			}, nil
 		}
+		// .go-version is older than go.mod requirement - prefer go.mod
+		return &DiscoveredVersion{
+			Version: goModVer,
+			Source:  SourceGoMod,
+			Path:    gomodPath,
+		}, nil
+	}
+
+	// Only one exists (or neither)
+	if goVersionFileVer != "" {
+		return &DiscoveredVersion{
+			Version: goVersionFileVer,
+			Source:  SourceGoVersion,
+			Path:    versionFile,
+		}, nil
+	}
+
+	if goModVer != "" {
+		return &DiscoveredVersion{
+			Version: goModVer,
+			Source:  SourceGoMod,
+			Path:    gomodPath,
+		}, nil
 	}
 
 	return nil, nil // No version found

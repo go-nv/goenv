@@ -81,7 +81,8 @@ func (s *InteractiveSetup) Run() (*WorkflowResult, error) {
 	}
 
 	// Check for version mismatch between .go-version and go.mod
-	s.checkVersionMismatch()
+	// This may prompt the user to update .go-version
+	s.checkVersionMismatch(discovered)
 
 	// Check VS Code settings if version is or will be installed
 	needsUpdate := s.checkVSCodeSettings(discovered.Version, versionInstalled || result.InstallRequested)
@@ -120,17 +121,42 @@ func (s *InteractiveSetup) promptInstall(version string) bool {
 }
 
 // checkVersionMismatch warns if .go-version and go.mod have different versions
-func (s *InteractiveSetup) checkVersionMismatch() {
+// Returns true if the user chose to update .go-version
+func (s *InteractiveSetup) checkVersionMismatch(discoveredVersion *manager.DiscoveredVersion) bool {
 	mismatch, goVersionVer, goModVer, err := manager.DiscoverVersionMismatch(s.WorkingDir)
 	if err != nil || !mismatch {
-		return
+		return false
 	}
 
+	// If discovery chose go.mod over .go-version (because .go-version was older),
+	// prompt the user to update .go-version
+	if discoveredVersion.Source == manager.SourceGoMod && goVersionVer != "" {
+		fmt.Fprintf(s.Stdout, "\n⚠️  Your .go-version (%s) is older than go.mod's toolchain requirement (%s)\n", goVersionVer, goModVer)
+		fmt.Fprintf(s.Stdout, "   Using %s as required by go.mod\n\n", goModVer)
+
+		fmt.Fprintf(s.Stdout, "Update .go-version to %s to avoid this warning? (Y/n) ", goModVer)
+		response := s.readInput()
+
+		if response == "" || response == "y" || response == "yes" {
+			versionFile := filepath.Join(s.WorkingDir, ".go-version")
+			if err := os.WriteFile(versionFile, []byte(goModVer+"\n"), 0644); err != nil {
+				fmt.Fprintf(s.Stdout, "⚠️  Failed to update .go-version: %v\n", err)
+				return false
+			}
+			fmt.Fprintf(s.Stdout, "✅ Updated .go-version to %s\n\n", goModVer)
+			return true
+		}
+		fmt.Fprintln(s.Stdout)
+		return false
+	}
+
+	// Otherwise just show informational message
 	fmt.Fprintf(s.Stdout, "\n⚠️  Version mismatch detected:\n")
 	fmt.Fprintf(s.Stdout, "   .go-version: %s\n", goVersionVer)
 	fmt.Fprintf(s.Stdout, "   go.mod:      %s\n", goModVer)
 	fmt.Fprintf(s.Stdout, "\n💡 Consider updating .go-version to match go.mod:\n")
 	fmt.Fprintf(s.Stdout, "   goenv local %s\n\n", goModVer)
+	return false
 }
 
 // checkVSCodeSettings checks VS Code settings and returns true if they need updating

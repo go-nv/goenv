@@ -101,6 +101,39 @@ func TestDiscoverVersion(t *testing.T) {
 			expectedVer:    "1.22.5",
 			expectedSource: SourceGoMod,
 		},
+		{
+			name: "go.mod toolchain overrides older .go-version",
+			setupFiles: func(dir string) error {
+				if err := os.WriteFile(filepath.Join(dir, ".go-version"), []byte("1.23\n"), 0644); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test\n\ngo 1.22\n\ntoolchain go1.24.1\n"), 0644)
+			},
+			expectedVer:    "1.24.1",
+			expectedSource: SourceGoMod,
+		},
+		{
+			name: ".go-version used when equal to go.mod toolchain",
+			setupFiles: func(dir string) error {
+				if err := os.WriteFile(filepath.Join(dir, ".go-version"), []byte("1.24.1\n"), 0644); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test\n\ngo 1.22\n\ntoolchain go1.24.1\n"), 0644)
+			},
+			expectedVer:    "1.24.1",
+			expectedSource: SourceGoVersion, // User's explicit choice when versions match
+		},
+		{
+			name: ".go-version used when newer than go.mod toolchain",
+			setupFiles: func(dir string) error {
+				if err := os.WriteFile(filepath.Join(dir, ".go-version"), []byte("1.25\n"), 0644); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test\n\ngo 1.22\n\ntoolchain go1.24.1\n"), 0644)
+			},
+			expectedVer:    "1.25",
+			expectedSource: SourceGoVersion, // User explicitly wants newer version
+		},
 	}
 
 	for _, tt := range tests {
