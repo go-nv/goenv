@@ -21,6 +21,8 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
 
 - Let you **change the global Go version** on a per-user basis.
 - Provide support for **per-project Go versions**.
+- **Smart version discovery** - automatically detects versions from `.go-version` or `go.mod`
+- **Go.mod toolchain support** - respects Go 1.21+ toolchain directives with smart precedence
 - Allow you to **override the Go version** with an environment
   variable.
 - Search commands from **multiple versions of Go at a time**.
@@ -94,6 +96,7 @@ eval "$(goenv init -)"
 ### Option 2: Package Manager (macOS)
 
 **Homebrew**:
+
 ```bash
 brew install goenv
 ```
@@ -163,7 +166,7 @@ hooks:
       params:
         path: ~/.goenv/install.log
         message: "Installed Go {version} at {timestamp}"
-    
+
     - action: http_webhook
       params:
         url: https://hooks.slack.com/services/YOUR/WEBHOOK
@@ -181,6 +184,7 @@ hooks:
 ### Hook Points
 
 Execute actions at 8 different lifecycle points:
+
 - `pre_install` / `post_install` - Before/after installing Go versions
 - `pre_uninstall` / `post_uninstall` - Before/after removing Go versions
 - `pre_exec` / `post_exec` - Before/after executing Go commands

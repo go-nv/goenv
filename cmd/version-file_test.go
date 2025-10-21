@@ -200,7 +200,7 @@ func TestVersionFileCommand(t *testing.T) {
 			expectedError: "no version file found",
 		},
 		{
-			name: "detects go.mod when GOENV_GOMOD_VERSION_ENABLE is set",
+			name: "detects go.mod (always enabled)",
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create project directory with go.mod
 				projectDir := filepath.Join(goenvRoot, "test-project")
@@ -214,9 +214,6 @@ func TestVersionFileCommand(t *testing.T) {
 				if err := os.Chdir(projectDir); err != nil {
 					t.Fatalf("Failed to change directory: %v", err)
 				}
-			},
-			envVars: map[string]string{
-				"GOENV_GOMOD_VERSION_ENABLE": "1",
 			},
 			expectedOutput: "", // Will be computed as full path to go.mod
 		},
@@ -240,28 +237,7 @@ func TestVersionFileCommand(t *testing.T) {
 					t.Fatalf("Failed to change directory: %v", err)
 				}
 			},
-			envVars: map[string]string{
-				"GOENV_GOMOD_VERSION_ENABLE": "1",
-			},
 			expectedOutput: "", // Will be computed as full path to .go-version
-		},
-		{
-			name: "ignores go.mod when GOENV_GOMOD_VERSION_ENABLE is not set",
-			setup: func(t *testing.T, goenvRoot string) {
-				// Create project directory with go.mod only
-				projectDir := filepath.Join(goenvRoot, "test-project")
-				if err := os.MkdirAll(projectDir, 0755); err != nil {
-					t.Fatalf("Failed to create project directory: %v", err)
-				}
-				gomodFile := filepath.Join(projectDir, "go.mod")
-				if err := os.WriteFile(gomodFile, []byte("module test\n\ngo 1.11\n"), 0644); err != nil {
-					t.Fatalf("Failed to create go.mod: %v", err)
-				}
-				if err := os.Chdir(projectDir); err != nil {
-					t.Fatalf("Failed to change directory: %v", err)
-				}
-			},
-			expectedOutput: "", // Will output global version file path
 		},
 		{
 			name: "returns global version file when no local file found",
@@ -359,14 +335,14 @@ func TestVersionFileCommand(t *testing.T) {
 			if expectedOutput == "" && tt.expectedError == "" {
 				// Expected output is a path - check based on test case
 				switch tt.name {
-				case "in project without .go-version file", "ignores go.mod when GOENV_GOMOD_VERSION_ENABLE is not set",
+				case "in project without .go-version file",
 					"returns global version file when no local file found", "stops at filesystem root":
 					// Should output global version file path
 					expectedOutput = filepath.Join(goenvRoot, "version") + "\n"
 				case "in project with .go-version file", ".go-version takes precedence over go.mod":
 					// Should output project's .go-version
 					expectedOutput = filepath.Join(goenvRoot, "test-project", ".go-version") + "\n"
-				case "detects go.mod when GOENV_GOMOD_VERSION_ENABLE is set":
+				case "detects go.mod (always enabled)":
 					// Should output project's go.mod
 					expectedOutput = filepath.Join(goenvRoot, "test-project", "go.mod") + "\n"
 				case "detects .go-version file in parent directory":

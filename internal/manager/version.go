@@ -49,8 +49,6 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 		}
 	}
 
-	// Check for go.mod support
-	gomodEnabled := os.Getenv("GOENV_GOMOD_VERSION_ENABLE") == "1"
 	localFile := m.config.LocalVersionFile()
 
 	// Walk up the directory tree
@@ -62,12 +60,10 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 			return versionFile, nil
 		}
 
-		// Check for go.mod if enabled
-		if gomodEnabled {
-			gomodFile := filepath.Join(currentDir, "go.mod")
-			if _, err := os.Stat(gomodFile); err == nil {
-				return gomodFile, nil
-			}
+		// Check for go.mod (always enabled)
+		gomodFile := filepath.Join(currentDir, "go.mod")
+		if _, err := os.Stat(gomodFile); err == nil {
+			return gomodFile, nil
 		}
 
 		parent := filepath.Dir(currentDir)
@@ -94,11 +90,10 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 					return versionFile, nil
 				}
 
-				if gomodEnabled {
-					gomodFile := filepath.Join(currentDir, "go.mod")
-					if _, err := os.Stat(gomodFile); err == nil {
-						return gomodFile, nil
-					}
+				// Check for go.mod (always enabled)
+				gomodFile := filepath.Join(currentDir, "go.mod")
+				if _, err := os.Stat(gomodFile); err == nil {
+					return gomodFile, nil
 				}
 
 				parent := filepath.Dir(currentDir)

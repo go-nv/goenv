@@ -48,6 +48,11 @@ All subcommands are:
   - [`goenv versions`](#goenv-versions)
     - [Options](#options-4)
   - [`goenv whence`](#goenv-whence)
+  - [Version Discovery & Precedence](#version-discovery--precedence)
+    - [Version Sources](#version-sources)
+    - [Smart Precedence Rules](#smart-precedence-rules)
+    - [Examples](#examples)
+    - [Best Practices](#best-practices)
   - [`goenv which`](#goenv-which)
 
 ## `goenv alias`
@@ -183,25 +188,26 @@ Diagnose goenv installation and configuration issues.
 
 ✓ goenv binary
   Location: /Users/user/.goenv/bin/goenv
-  
+
 ✓ Shell configuration
   Found eval in ~/.zshrc
-  
+
 ✓ PATH setup
   Shims directory is in PATH
-  
+
 ✓ Shims directory
   Location: /Users/user/.goenv/shims
   Shim count: 12
-  
+
 ✓ Go versions
   3 version(s) installed
   Current: 1.22.5
-  
+
 ✓ Configuration complete
 ```
 
 This command verifies:
+
 - goenv binary and paths
 - Shell configuration (init integration)
 - PATH setup (shims directory)
@@ -421,6 +427,8 @@ file named `.goenv-version`. For backwards compatibility, goenv will
 read a local version specified in an `.goenv-version` file, but a
 `.go-version` file in the same directory will take precedence.
 
+**Note:** goenv automatically discovers versions from both `.go-version` and `go.mod` files with smart precedence rules. See the [Version Discovery](#version-discovery--precedence) section below for details.
+
 ### `goenv local` (advanced)
 
 You can specify local Go version.
@@ -531,6 +539,7 @@ The next time you run `goenv install --list` or similar commands, goenv will fet
 ## `goenv rehash`
 
 Installs shims for all Go binaries known to goenv. This includes:
+
 - Go version binaries: `~/.goenv/versions/*/bin/*`
 - GOPATH binaries: `$GOENV_GOPATH_PREFIX/<version>/bin/*` (unless `GOENV_DISABLE_GOPATH=1`)
 
@@ -556,11 +565,13 @@ By default, goenv also creates shims for binaries in your GOPATH. This allows to
 ```
 
 To disable GOPATH binary scanning:
+
 ```shell
 export GOENV_DISABLE_GOPATH=1
 ```
 
 To customize the GOPATH location:
+
 ```shell
 export GOENV_GOPATH_PREFIX=/custom/path  # Default: $HOME/go
 ```
@@ -683,10 +694,12 @@ Update available!
 ### Installation Methods
 
 **Git-based installations (recommended):**
+
 - Runs `git pull` in GOENV_ROOT directory
 - Shows changes and new version
 
 **Binary installations:**
+
 - Downloads latest release from GitHub
 - Replaces current binary
 - Requires write permission to binary location
@@ -758,11 +771,11 @@ This command creates or updates `.vscode/settings.json` and `.vscode/extensions.
 
 **Templates:**
 
-| Template | Description |
-|----------|-------------|
-| `basic` | Go configuration with goenv env vars (default) |
+| Template   | Description                                               |
+| ---------- | --------------------------------------------------------- |
+| `basic`    | Go configuration with goenv env vars (default)            |
 | `advanced` | Includes gopls settings, format on save, organize imports |
-| `monorepo` | Configured for large repositories with multiple modules |
+| `monorepo` | Configured for large repositories with multiple modules   |
 
 **Examples:**
 
@@ -783,12 +796,14 @@ This command creates or updates `.vscode/settings.json` and `.vscode/extensions.
 **What it does:**
 
 1. Creates `.vscode/settings.json` with:
+
    - `go.goroot: ${env:GOROOT}` - Uses goenv's GOROOT
    - `go.gopath: ${env:GOPATH}` - Uses goenv's GOPATH
    - `go.toolsGopath` - Shared location for Go tools
    - Optional gopls and editor settings (advanced template)
 
 2. Creates `.vscode/extensions.json` with:
+
    - Recommendation for the official Go extension (`golang.go`)
 
 3. Merges with existing settings (unless `--force` is used)
@@ -972,3 +987,172 @@ you run the given command. Searches both version bin directories and GOPATH bin 
 > goenv which golangci-lint
 /home/go-nv/go/1.22.5/bin/golangci-lint
 ```
+
+---
+
+## Version Discovery & Precedence
+
+goenv automatically discovers the required Go version from multiple sources. When you run `goenv` or other commands, it searches for version information in this order:
+
+### Version Sources
+
+1. **GOENV_VERSION environment variable** (highest priority)
+
+   - Set explicitly in your current shell
+   - Example: `GOENV_VERSION=1.24.1 goenv version`
+
+2. **.go-version file** (project-specific)
+
+   - Simple text file with version number
+   - Created with `goenv local <version>`
+   - Searched from current directory up to root
+
+3. **go.mod file** (Go module projects)
+
+   - Uses `toolchain` directive (preferred)
+   - Falls back to `go` directive if no toolchain
+   - Standard Go toolchain mechanism
+
+4. **~/.goenv/version** (global fallback)
+   - Your default Go version
+   - Set with `goenv global <version>`
+
+### Smart Precedence Rules
+
+When **both** `.go-version` and `go.mod` exist in the same directory:
+
+| Scenario                                              | Result          | Reason                                      |
+| ----------------------------------------------------- | --------------- | ------------------------------------------- |
+| `.go-version = 1.25.0`<br>`go.mod toolchain = 1.24.1` | Uses **1.25.0** | User's explicit choice to use newer version |
+| `.go-version = 1.24.1`<br>`go.mod toolchain = 1.24.1` | Uses **1.24.1** | Versions match (prefers user's file)        |
+| `.go-version = 1.23.0`<br>`go.mod toolchain = 1.24.1` | Uses **1.24.1** | go.mod toolchain is project requirement     |
+
+**Key principle:** go.mod's `toolchain` directive specifies the **minimum required version**. If your `.go-version` is older, goenv will use the go.mod version to ensure builds work correctly.
+
+#### Interactive Mode
+
+When goenv detects that `.go-version` is older than go.mod's toolchain, it will prompt:
+
+```
+⚠️  Your .go-version (1.23.0) is older than go.mod's toolchain requirement (1.24.1)
+   Using 1.24.1 as required by go.mod
+
+Update .go-version to 1.24.1 to avoid this warning? (Y/n)
+```
+
+This helps keep your version files in sync.
+
+### Examples
+
+**Example 1: Only .go-version exists**
+
+```shell
+> cat .go-version
+1.24.1
+
+> goenv version
+1.24.1 (set by /path/to/project/.go-version)
+```
+
+**Example 2: Only go.mod exists**
+
+```shell
+> cat go.mod
+module myproject
+
+go 1.22
+toolchain go1.24.1
+
+> goenv version
+1.24.1 (set by /path/to/project/go.mod)
+```
+
+**Example 3: Both exist, .go-version is newer**
+
+```shell
+> cat .go-version
+1.25.0
+
+> cat go.mod
+module myproject
+go 1.22
+toolchain go1.24.1
+
+> goenv version
+1.25.0 (set by /path/to/project/.go-version)
+# Uses .go-version because 1.25.0 >= 1.24.1 (requirement satisfied)
+```
+
+**Example 4: Both exist, .go-version is older**
+
+```shell
+> cat .go-version
+1.23.0
+
+> cat go.mod
+module myproject
+go 1.22
+toolchain go1.24.1
+
+> goenv
+Found go.mod: 1.24.1
+⚠️  Your .go-version (1.23.0) is older than go.mod's toolchain requirement (1.24.1)
+   Using 1.24.1 as required by go.mod
+
+Update .go-version to 1.24.1 to avoid this warning? (Y/n)
+```
+
+### Best Practices
+
+#### For Go Module Projects
+
+1. **Rely on go.mod** - It's the standard way to specify Go version requirements
+2. **Optional .go-version** - Only create if you need to pin a specific version
+3. **Keep in sync** - If you create .go-version, keep it >= go.mod toolchain
+
+```shell
+# Let go.mod manage version
+go mod edit -toolchain=go1.24.1
+
+# OR pin explicitly with .go-version
+goenv local 1.24.1  # Creates .go-version
+```
+
+#### For Scripts/Non-Module Projects
+
+Use `.go-version` as your primary version specification:
+
+```shell
+goenv local 1.24.1  # Creates .go-version
+```
+
+#### For CI/CD
+
+Set `GOENV_AUTO_INSTALL=1` to automatically install the discovered version:
+
+```yaml
+# GitHub Actions example
+env:
+  GOENV_AUTO_INSTALL: 1
+
+steps:
+  - run: goenv # Auto-discovers and installs version from .go-version or go.mod
+```
+
+### Troubleshooting
+
+**Q: Why is goenv using a different version than my .go-version?**
+
+A: Check if you have a go.mod with a newer toolchain requirement. Run `goenv doctor` to see what version is discovered and why.
+
+**Q: How do I force goenv to use my .go-version?**
+
+A: Make sure your .go-version is >= the go.mod toolchain requirement. Update it with:
+
+```shell
+goenv local $(grep toolchain go.mod | awk '{print $2}' | sed 's/go//')
+```
+
+**Q: Can I disable go.mod version checking?**
+
+A: No, this is intentional. Go's toolchain directive is a hard requirement for builds to work correctly. If you want to use a specific version, set it in .go-version to be >= the toolchain requirement.
