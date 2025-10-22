@@ -16,84 +16,57 @@ export PREFIX ?= /usr/local
 # Default target
 all: build
 
-# Generate embedded versions from API (run before releases)
+# Generate embedded versions from API (run before releases) 
 generate-embedded:
-	@echo "Generating embedded versions from go.dev API..."
-	go run scripts/generate_embedded_versions/main.go
+	go run scripts/build-tool/main.go -task=generate-embedded
 
 build:
-	go build $(LDFLAGS) -o $(BINARY_NAME) .
+	go run scripts/build-tool/main.go -task=build
 
 test:
-	go test -v ./...
+	go run scripts/build-tool/main.go -task=test
 
 # Test Windows compatibility (can run on any OS)
 test-windows:
-	@echo "Testing Windows compatibility..."
-	go run scripts/test_windows_compatibility/main.go
+	go run scripts/build-tool/main.go -task=test-windows
 
 clean:
-	rm -f $(BINARY_NAME)
-	rm -rf bin/ dist/
-	go clean
+	go run scripts/build-tool/main.go -task=clean
 
 install: build
-	mkdir -p "$(PREFIX)/bin"
-	cp $(BINARY_NAME) "$(PREFIX)/bin/"
-	# Install shell completions
-	mkdir -p "$(PREFIX)/share/goenv/completions"
-	cp -R completions/* "$(PREFIX)/share/goenv/completions/" 2>/dev/null || true
+	go run scripts/build-tool/main.go -task=install
 
 uninstall:
-	rm -f "$(PREFIX)/bin/$(BINARY_NAME)"
-	rm -rf "$(PREFIX)/share/goenv"
+	go run scripts/build-tool/main.go -task=uninstall
 
 dev-deps:
-	go mod download
-	go mod tidy
+	go run scripts/build-tool/main.go -task=dev-deps
 
 # Cross-platform builds for releases
 cross-build: generate-embedded
-	mkdir -p dist
-	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-linux-amd64 .
-	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-linux-arm64 .
-	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-darwin-amd64 .
-	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-darwin-arm64 .
-	GOOS=freebsd GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-freebsd-amd64 .
+	go run scripts/build-tool/main.go -task=cross-build
 
 # Migration helpers - these preserve some compatibility while transitioning
 .PHONY: migrate-test
 
 # Run Go tests alongside existing bats tests during migration
-migrate-test: test bats-test
+migrate-test:
+	go run scripts/build-tool/main.go -task=migrate-test
 
 bats-test:
-	@echo "Running legacy bats tests (if available)..."
-	@if command -v bats >/dev/null 2>&1 && [ -d "test" ]; then \
-		bats test/ 2>/dev/null || echo "Bats tests not available or failed"; \
-	else \
-		echo "Bats not installed or tests not found - skipping legacy tests"; \
-	fi
+	go run scripts/build-tool/main.go -task=bats-test
 
 # Show version information
 version:
-	@echo "Version: $(VERSION)"
-	@echo "Commit: $(COMMIT_SHA)"
-	@echo "Build Time: $(BUILD_TIME)"
+	go run scripts/build-tool/main.go -task=version
+
+# Cross-platform build tool (delegates to Go-based tool)
+build-tool:
+	go run scripts/build-tool/main.go -task=$(TASK)
 
 # GoReleaser targets
 release:
-	@echo "Creating release with GoReleaser..."
-	@if ! command -v goreleaser >/dev/null 2>&1; then \
-		echo "Error: goreleaser not found. Install with: go install github.com/goreleaser/goreleaser@latest"; \
-		exit 1; \
-	fi
-	goreleaser release --clean
+	go run scripts/build-tool/main.go -task=release
 
 snapshot:
-	@echo "Creating snapshot build with GoReleaser..."
-	@if ! command -v goreleaser >/dev/null 2>&1; then \
-		echo "Error: goreleaser not found. Install with: go install github.com/goreleaser/goreleaser@latest"; \
-		exit 1; \
-	fi
-	goreleaser build --snapshot --clean
+	go run scripts/build-tool/main.go -task=snapshot
