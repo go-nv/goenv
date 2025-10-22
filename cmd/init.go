@@ -78,7 +78,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to prepare goenv directories: %w", err)
 	}
 
-	cmd.Print(renderInitScript(shell, cfg, initFlags.noRehash))
+	fmt.Print(renderInitScript(shell, cfg, initFlags.noRehash))
 	return nil
 }
 
@@ -294,7 +294,7 @@ func renderInitScript(shell string, cfg *config.Config, noRehash bool) string {
 		case "cmd":
 			builder.WriteString("goenv sh-rehash --only-manage-paths 2>NUL\n")
 		default:
-			builder.WriteString("command goenv sh-rehash --only-manage-paths 2>/dev/null\n")
+			builder.WriteString("eval \"$(command goenv sh-rehash --only-manage-paths 2>/dev/null)\"\n")
 		}
 	}
 
