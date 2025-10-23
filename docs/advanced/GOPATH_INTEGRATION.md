@@ -46,6 +46,7 @@ $HOME/go/
 ### Shim Creation
 
 When you run `goenv rehash`, goenv scans both:
+
 - Version binaries: `$GOENV_ROOT/versions/{version}/bin/*`
 - GOPATH binaries: `$GOENV_GOPATH_PREFIX/{version}/bin/*`
 
@@ -55,7 +56,7 @@ This creates shims for all discovered binaries, making them available via `goenv
 
 ```bash
 # Switch to Go 1.22.5
-$ goenv local 1.22.5
+$ goenv use 1.22.5
 
 # Install a tool
 $ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
@@ -69,7 +70,7 @@ $ golangci-lint version
 golangci-lint has version 1.55.2
 
 # Switch to Go 1.21.5
-$ goenv local 1.21.5
+$ goenv use 1.21.5
 
 # The tool from 1.22.5's GOPATH is no longer accessible
 $ golangci-lint version
@@ -88,10 +89,10 @@ golangci-lint has version 1.55.2
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GOENV_DISABLE_GOPATH` | `0` | Set to `1` to disable GOPATH integration entirely |
-| `GOENV_GOPATH_PREFIX` | `$HOME/go` | Base directory for version-specific GOPATHs |
+| Variable               | Default    | Description                                       |
+| ---------------------- | ---------- | ------------------------------------------------- |
+| `GOENV_DISABLE_GOPATH` | `0`        | Set to `1` to disable GOPATH integration entirely |
+| `GOENV_GOPATH_PREFIX`  | `$HOME/go` | Base directory for version-specific GOPATHs       |
 
 ### Disabling GOPATH Integration
 
@@ -126,7 +127,7 @@ Install development tools per Go version:
 
 ```bash
 # Development with Go 1.22.5
-$ goenv local 1.22.5
+$ goenv use 1.22.5
 $ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 $ go install golang.org/x/tools/cmd/goimports@latest
 $ go install github.com/cosmtrek/air@latest
@@ -141,13 +142,13 @@ Test tools with different Go versions:
 
 ```bash
 # Test with Go 1.21.5
-$ goenv local 1.21.5
+$ goenv use 1.21.5
 $ go install ./cmd/mytool
 $ mytool --version
 mytool version 1.0.0 (go1.21.5)
 
 # Test with Go 1.22.5
-$ goenv local 1.22.5
+$ goenv use 1.22.5
 $ go install ./cmd/mytool
 $ mytool --version
 mytool version 1.0.0 (go1.22.5)
@@ -160,13 +161,13 @@ Each project can have its own tool versions:
 ```bash
 # Project A uses Go 1.21.5 and golangci-lint v1.54
 $ cd ~/projects/project-a
-$ goenv local 1.21.5
+$ goenv use 1.21.5
 $ go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
 $ goenv rehash
 
 # Project B uses Go 1.22.5 and golangci-lint v1.55
 $ cd ~/projects/project-b
-$ goenv local 1.22.5
+$ goenv use 1.22.5
 $ go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 $ goenv rehash
 
@@ -187,10 +188,10 @@ Ensure consistent tool versions in CI:
 steps:
   - name: Set up Go
     run: |
-      goenv local 1.22.5
+      goenv use 1.22.5
       go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
       goenv rehash
-  
+
   - name: Lint
     run: golangci-lint run
 ```
@@ -202,6 +203,7 @@ steps:
 **Problem:** Installed tool with `go install` but it's not available.
 
 **Solution:**
+
 ```bash
 # Ensure you've rehashed after installation
 $ goenv rehash
@@ -219,6 +221,7 @@ $ echo $GOENV_DISABLE_GOPATH
 **Problem:** Running tool from wrong Go version.
 
 **Solution:**
+
 ```bash
 # Check which version is active
 $ goenv version
@@ -235,6 +238,7 @@ $ ls -la $GOENV_GOPATH_PREFIX/*/bin/golangci-lint
 **Problem:** Tools from different versions are mixing.
 
 **Solution:**
+
 ```bash
 # Verify GOENV_GOPATH_PREFIX is set correctly
 $ echo $GOENV_GOPATH_PREFIX
@@ -253,6 +257,7 @@ $ grep 'goenv init' ~/.bashrc ~/.zshrc
 **Problem:** Tools from old versions still showing up.
 
 **Solution:**
+
 ```bash
 # Clean up old shims
 $ goenv rehash
@@ -297,6 +302,7 @@ import (
 ```
 
 Then install all tools:
+
 ```bash
 $ cat tools.go | grep _ | awk '{print $2}' | xargs -L1 go install
 $ goenv rehash
@@ -412,8 +418,8 @@ $ cp -r $GOPATH $GOPATH.backup
 $ unset GOENV_DISABLE_GOPATH
 
 # 3. Reinstall tools for each Go version
-$ for version in $(goenv versions --bare); do
-    goenv local $version
+$ for version in $(goenv list --bare); do
+    goenv use $version
     go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
     # ... other tools
   done

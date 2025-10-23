@@ -31,7 +31,7 @@ export GOENV_OFFLINE=1
 
 # Now all version commands use embedded data (no network calls)
 goenv install --list
-goenv versions --all
+goenv list --remote
 ```
 
 **When to use offline mode:**

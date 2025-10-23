@@ -52,7 +52,7 @@ source ~/.bashrc
 goenv install 1.25.2
 
 # Set it as your global version
-goenv global 1.25.2
+goenv use 1.25.2 --global
 
 # Verify
 go version
@@ -84,35 +84,45 @@ docs/
 ## 🔍 Key Features
 
 ### Multi-Version Management
+
 Install and manage multiple Go versions simultaneously:
+
 ```bash
 goenv install 1.25.2
 goenv install 1.24.8
-goenv versions
+goenv list  # Show installed versions
 ```
 
 ### Per-Project Versions
+
 Set different Go versions for different projects:
+
 ```bash
 cd my-project
-goenv local 1.24.8
+goenv use 1.24.8  # Creates .go-version file
 ```
 
 ### Smart Caching
+
 Intelligent version caching with three-tier freshness checking:
+
 - Fresh cache (< 6 hours): Instant response
 - Recent cache (6h-7d): Quick freshness check
 - Stale cache (> 7 days): Full refresh
 
 ### Offline Mode
+
 Work completely offline using embedded versions:
+
 ```bash
 export GOENV_OFFLINE=1
 goenv install --list  # Uses embedded data, no network calls
 ```
 
 ### Cross-Platform
+
 Full support for:
+
 - macOS (Intel & Apple Silicon)
 - Linux (multiple architectures)
 - Windows (native PowerShell & CMD support)
@@ -120,28 +130,31 @@ Full support for:
 ## 💡 Common Use Cases
 
 ### Development Environment
+
 ```bash
 # Install latest stable Go
 goenv install --latest
 
 # Use it globally
-goenv global $(goenv install --latest)
+goenv use $(goenv install --latest) --global
 
 # Or per-project
 cd my-go-project
-goenv local 1.25.2
+goenv use 1.25.2
 ```
 
 ### CI/CD Pipelines
+
 ```bash
 # Fast, reproducible builds
 export GOENV_OFFLINE=1  # No network dependencies
 goenv install 1.25.2
-goenv global 1.25.2
+goenv use 1.25.2 --global
 go build
 ```
 
 ### Air-Gapped Environments
+
 ```bash
 # Works without internet
 export GOENV_OFFLINE=1

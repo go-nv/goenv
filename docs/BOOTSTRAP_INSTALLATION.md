@@ -13,16 +13,19 @@ The Go-based goenv has a classic "chicken-and-egg" problem:
 ### 1. Pre-built Binary (⭐ Recommended)
 
 **Pros:**
+
 - ✅ No dependencies - works on a fresh system
 - ✅ Fast - just download and run
 - ✅ Perfect for CI/CD pipelines
 - ✅ Ideal for users new to Go
 
 **Cons:**
+
 - ⚠️ Must trust the release process
 - ⚠️ Slightly behind latest commits
 
 **Use when:**
+
 - Installing goenv for the first time
 - Setting up a new machine
 - You don't have Go installed
@@ -40,15 +43,18 @@ curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
 ### 2. Git Clone + Build
 
 **Pros:**
+
 - ✅ Latest development version
 - ✅ Easy to contribute changes
 - ✅ Full source code access
 
 **Cons:**
+
 - ⚠️ Requires Go to be installed
 - ⚠️ Extra build step
 
 **Use when:**
+
 - Contributing to goenv
 - You already have Go installed
 - You need bleeding-edge features
@@ -65,15 +71,18 @@ make build  # Requires Go!
 ### 3. Package Manager (Homebrew on macOS)
 
 **Pros:**
+
 - ✅ Integrates with system package manager
 - ✅ Automatic dependency handling
 - ✅ Easy updates
 
 **Cons:**
+
 - ⚠️ Platform-specific
 - ⚠️ May lag behind releases
 
 **Use when:**
+
 - You're on macOS
 - You prefer Homebrew for package management
 - You want automatic updates via `brew upgrade`
@@ -89,11 +98,13 @@ brew install goenv
 ### Build-time vs Runtime Dependencies
 
 **Build-time (only needed to compile goenv):**
+
 - Go compiler (1.21+)
 - Make (for Makefile)
 - Git (for version info)
 
 **Runtime (what the binary needs to run):**
+
 - System libraries only (libc, etc.)
 - **No Go installation required!**
 
@@ -110,12 +121,14 @@ go build -ldflags "-X main.version=... -X main.commit=..." -o goenv .
 ```
 
 Which:
+
 1. Compiles all Go source code
 2. Links system libraries
 3. Embeds version information
 4. Creates a **standalone binary**
 
 The resulting `goenv` binary:
+
 - Is a native executable
 - Contains all Go code compiled in
 - Only depends on OS libraries
@@ -147,20 +160,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      
+
       # Install goenv (no Go needed!)
       - name: Install goenv
         run: |
           curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
           echo "$HOME/.goenv/bin" >> $GITHUB_PATH
-      
+
       # Now use goenv to install Go
       - name: Install Go via goenv
         run: |
           goenv install 1.22.0
-          goenv global 1.22.0
+          goenv use 1.22.0 --global
           eval "$(goenv init -)"
-      
+
       # Build your project
       - name: Build
         run: go build ./...
@@ -177,7 +190,7 @@ build:
     - curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
     - export PATH="$HOME/.goenv/bin:$PATH"
     - goenv install 1.22.0
-    - goenv global 1.22.0
+    - goenv use 1.22.0 --global
     - eval "$(goenv init -)"
   script:
     - go build ./...
@@ -194,7 +207,7 @@ RUN apk add --no-cache curl bash
 RUN curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
 ENV PATH="/root/.goenv/bin:$PATH"
 RUN goenv install 1.22.0
-RUN goenv global 1.22.0
+RUN goenv use 1.22.0 --global
 
 # Stage 2: Build application
 FROM alpine:latest
@@ -231,7 +244,7 @@ source ~/.bashrc
 
 # 4. Install Go
 goenv install 1.22.0
-goenv global 1.22.0
+goenv use 1.22.0 --global
 
 # 5. Start coding!
 go version
@@ -254,7 +267,7 @@ echo 'eval "$(goenv init -)"' >> ~/.zshrc
 # Reload and use
 source ~/.zshrc
 goenv install 1.22.0
-goenv global 1.22.0
+goenv use 1.22.0 --global
 ```
 
 ### Fresh Windows Install
@@ -273,7 +286,7 @@ Add-Content $PROFILE @"
 # Reload and use
 . $PROFILE
 goenv install 1.22.0
-goenv global 1.22.0
+goenv use 1.22.0 --global
 ```
 
 ## Release Process
@@ -315,6 +328,7 @@ sha256sum -c goenv_${VERSION}_checksums.txt --ignore-missing
 ### Q: What if I already have Go installed?
 
 **A:** No problem! You can either:
+
 1. Use the binary (ignore your existing Go)
 2. Build from source using your existing Go
 3. Use Homebrew (uses system Go to build)
@@ -322,6 +336,7 @@ sha256sum -c goenv_${VERSION}_checksums.txt --ignore-missing
 ### Q: How do I update goenv?
 
 **A:** Depends on installation method:
+
 - **Binary**: Download new version from releases
 - **Git clone**: `cd ~/.goenv && git pull && make build`
 - **Homebrew**: `brew upgrade goenv`
@@ -329,7 +344,8 @@ sha256sum -c goenv_${VERSION}_checksums.txt --ignore-missing
 
 ### Q: Which installation method is fastest?
 
-**A:** 
+**A:**
+
 1. Binary download: ~5 seconds
 2. Homebrew: ~30 seconds (downloads + builds)
 3. Git clone: ~60 seconds (clone + build)
@@ -337,6 +353,7 @@ sha256sum -c goenv_${VERSION}_checksums.txt --ignore-missing
 ### Q: Can I switch between installation methods?
 
 **A:** Yes, but clean up the old installation first:
+
 ```bash
 # Remove old installation
 rm -rf ~/.goenv  # or brew uninstall goenv
@@ -352,6 +369,7 @@ curl -sfL ... | bash
 **Issue**: `./goenv: /lib/x86_64-linux-gnu/libc.so.6: version 'GLIBC_2.XX' not found`
 
 **Solution**: Your system libc is too old. Either:
+
 1. Upgrade your OS
 2. Build from source with older Go version
 3. Use Docker with Alpine Linux
@@ -361,6 +379,7 @@ curl -sfL ... | bash
 **Issue**: `"goenv" cannot be opened because the developer cannot be verified`
 
 **Solution**:
+
 ```bash
 xattr -d com.apple.quarantine ~/.goenv/bin/goenv
 ```
@@ -370,6 +389,7 @@ xattr -d com.apple.quarantine ~/.goenv/bin/goenv
 **Issue**: `goenv: command not found`
 
 **Solution**:
+
 ```bash
 # Check if binary exists
 ls -l ~/.goenv/bin/goenv
@@ -382,10 +402,10 @@ export PATH="$HOME/.goenv/bin:$PATH"
 
 ## Summary
 
-| Method | Go Required? | Use Case |
-|--------|-------------|----------|
-| **Binary Download** | ❌ No | First install, CI/CD, fresh systems |
-| **Git Clone** | ✅ Yes | Development, contributors |
-| **Homebrew** | ⚠️ Automatic | macOS users, prefer package managers |
+| Method              | Go Required? | Use Case                             |
+| ------------------- | ------------ | ------------------------------------ |
+| **Binary Download** | ❌ No        | First install, CI/CD, fresh systems  |
+| **Git Clone**       | ✅ Yes       | Development, contributors            |
+| **Homebrew**        | ⚠️ Automatic | macOS users, prefer package managers |
 
 **Recommendation**: Start with binary download, switch to git clone if you want to contribute.

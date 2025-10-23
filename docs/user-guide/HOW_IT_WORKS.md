@@ -42,11 +42,13 @@ goenv works by inserting a directory of _shims_ at the front of your
 `PATH`:
 
 **Unix/Linux/macOS:**
+
 ```
 ~/.goenv/shims:/usr/local/bin:/usr/bin:/bin
 ```
 
 **Windows:**
+
 ```
 %USERPROFILE%\.goenv\shims;C:\Program Files\Go\bin;C:\Windows\System32
 ```
@@ -83,14 +85,14 @@ reading it from the following sources, in this order:
 
 2. The application-specific `.go-version` file in the current
    directory (if present). You can modify the current directory's
-   `.go-version` file with the [`goenv local`](https://github.com/go-nv/goenv/blob/master/COMMANDS.md#goenv-local)
+   `.go-version` file with the [`goenv use`](https://github.com/go-nv/goenv/blob/master/COMMANDS.md#goenv-use)
    command.
 
 3. The first `.go-version` file found (if any) by searching each parent
    directory, until reaching the root of your filesystem.
 
 4. The global `~/.goenv/version` file. You can modify this file using
-   the [`goenv global`](https://github.com/go-nv/goenv/blob/master/COMMANDS.md#goenv-global) command. If the global version
+   the [`goenv use --global`](https://github.com/go-nv/goenv/blob/master/COMMANDS.md#goenv-use) command. If the global version
    file is not present, goenv assumes you want to use the "system"
    Go. (In other words, whatever version would run if goenv isn't present in
    `PATH`.)
@@ -107,18 +109,21 @@ installation.
 Each Go version is installed into its own directory under the goenv root:
 
 **Unix/Linux/macOS:**
+
 ```
 ~/.goenv/versions/1.21.0/
 ~/.goenv/versions/1.22.0/
 ```
 
 **Windows:**
+
 ```
 %USERPROFILE%\.goenv\versions\1.21.0\
 %USERPROFILE%\.goenv\versions\1.22.0\
 ```
 
 Each version directory contains:
+
 ```
 versions/1.21.0/
 ├── bin/           # Go binaries (go, gofmt, etc.)
@@ -135,11 +140,13 @@ the versions directory.
 goenv is written in Go and consists of:
 
 - **Main binary**: `goenv` (or `goenv.exe` on Windows)
+
   - Handles version resolution
   - Manages installations
   - Executes commands with the correct Go version
 
 - **Shims**: Platform-specific lightweight executables
+
   - Unix: Bash scripts that call `goenv exec`
   - Windows: Batch files that call `goenv.exe exec`
 

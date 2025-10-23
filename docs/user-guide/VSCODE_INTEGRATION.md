@@ -22,10 +22,11 @@ The fastest way to set up VS Code integration:
 cd ~/projects/myapp
 
 # Set project Go version AND configure VS Code in one command
-goenv local 1.22.0 --vscode
+goenv use 1.22.0 --vscode
 ```
 
 This automatically:
+
 - Creates `.go-version` file
 - Generates `.vscode/settings.json` with goenv configuration
 - Creates `.vscode/extensions.json` (recommends Go extension)
@@ -51,7 +52,7 @@ The easiest way to ensure VS Code picks up your goenv environment:
 cd ~/projects/myapp
 
 # Set project Go version
-goenv local 1.22.0
+goenv use 1.22.0
 
 # Launch VS Code from terminal
 code .
@@ -111,11 +112,13 @@ The [Go extension](https://marketplace.visualstudio.com/items?itemName=golang.go
 ### When VS Code Inherits Variables
 
 ✅ **VS Code WILL inherit goenv variables when:**
+
 - Launched from a terminal: `code .` or `code /path/to/project`
 - Integrated terminal runs shell init scripts
 - Shell profile (`.bashrc`, `.zshrc`) has goenv initialization
 
 ❌ **VS Code WON'T inherit goenv variables when:**
+
 - Opened via Finder/Spotlight/Dock on macOS
 - Launched via Windows Start Menu or desktop shortcut
 - Opened before shell initialization completes
@@ -139,6 +142,7 @@ goenv vscode init
 ```
 
 **What it does:**
+
 - Creates `.vscode/settings.json` with goenv environment variable references
 - Creates `.vscode/extensions.json` (recommends Go extension)
 - Merges with existing settings (won't overwrite your customizations)
@@ -146,18 +150,18 @@ goenv vscode init
 
 **Templates available:**
 
-| Template | Description | Use Case |
-|----------|-------------|----------|
-| `basic` | Go configuration with goenv env vars | Most projects (default) |
+| Template   | Description                                      | Use Case                 |
+| ---------- | ------------------------------------------------ | ------------------------ |
+| `basic`    | Go configuration with goenv env vars             | Most projects (default)  |
 | `advanced` | Includes gopls, format on save, organize imports | Professional development |
-| `monorepo` | Configured for large repositories | Multi-module projects |
+| `monorepo` | Configured for large repositories                | Multi-module projects    |
 
-### `goenv local --vscode` Flag
+### `goenv use --vscode` Flag
 
 Set Go version AND configure VS Code in one command:
 
 ```bash
-goenv local 1.22.0 --vscode
+goenv use 1.22.0 --vscode
 
 # Output:
 # Initializing VS Code workspace...
@@ -167,6 +171,7 @@ goenv local 1.22.0 --vscode
 ```
 
 **Benefits:**
+
 - Zero friction onboarding
 - One command does everything
 - Perfect for starting new projects
@@ -191,6 +196,7 @@ goenv doctor
 ```
 
 **What it checks:**
+
 - Presence of `.vscode` directory
 - Existence of `settings.json`
 - Go configuration in settings
@@ -202,11 +208,13 @@ goenv doctor
 ### Method 1: Terminal Launch (Simplest)
 
 **Pros:**
+
 - No configuration needed
 - Works immediately
-- Automatically picks up `goenv local` changes on restart
+- Automatically picks up `goenv use` changes on restart
 
 **Cons:**
+
 - Must remember to launch from terminal
 - GUI launches won't work
 
@@ -223,6 +231,7 @@ code .
 ```
 
 **Verify it works:**
+
 1. Open the integrated terminal in VS Code
 2. Run `go version` and `echo $GOROOT`
 3. Should show the goenv-managed version
@@ -230,11 +239,13 @@ code .
 ### Method 2: Workspace Settings (Most Reliable)
 
 **Pros:**
+
 - Works regardless of how VS Code is launched
 - Portable across team members
 - Version controlled with your project
 
 **Cons:**
+
 - Requires configuration per project
 - Need to update if changing goenv location
 
@@ -247,10 +258,10 @@ Create `.vscode/settings.json` in your project:
   "go.goroot": "${env:GOROOT}",
   "go.gopath": "${env:GOPATH}",
   "go.toolsGopath": "${env:HOME}/go/tools",
-  
+
   // Optional: Show current Go version in status bar
   "go.toolsManagement.autoUpdate": true,
-  
+
   // Optional: Use goenv's version for go commands
   "go.alternateTools": {
     "go": "${env:GOROOT}/bin/go"
@@ -277,11 +288,13 @@ git commit -m "Add VS Code Go configuration"
 ### Method 3: User Settings (Global Default)
 
 **Pros:**
+
 - Applies to all projects
 - Set once, forget it
 
 **Cons:**
-- Doesn't respect per-project `goenv local` versions
+
+- Doesn't respect per-project `goenv use` versions
 - Must manually update when changing global version
 
 **Setup:**
@@ -306,6 +319,7 @@ Use both terminal launch AND workspace settings:
 3. **Always launch from terminal** for automatic updates
 
 This gives you:
+
 - Automatic goenv integration
 - Per-project overrides when needed
 - Consistent behavior across launch methods
@@ -314,12 +328,12 @@ This gives you:
 
 ### Standard Project Setup
 
-For a project using `goenv local`:
+For a project using goenv:
 
 ```bash
 # 1. Set project Go version
 cd ~/projects/myapp
-goenv local 1.22.0
+goenv use 1.22.0
 
 # 2. Create VS Code settings
 mkdir -p .vscode
@@ -348,10 +362,7 @@ For projects with multiple Go modules:
   "go.gopath": "${env:GOPATH}",
   "go.useLanguageServer": true,
   "gopls": {
-    "build.directoryFilters": [
-      "-node_modules",
-      "-vendor"
-    ]
+    "build.directoryFilters": ["-node_modules", "-vendor"]
   }
 }
 ```
@@ -370,11 +381,11 @@ For large repositories with multiple Go versions:
 
 ## Troubleshooting
 
-### VS Code Shows Wrong Go Version After `goenv local`
+### VS Code Shows Wrong Go Version After Changing Versions
 
-**Symptom:** After running `goenv local 1.23.2 --vscode`, VS Code still shows the old Go version (e.g., 1.24.4).
+**Symptom:** After running `goenv use 1.23.2 --vscode`, VS Code still shows the old Go version (e.g., 1.24.4).
 
-**Root Cause:** VS Code inherits environment variables (`GOROOT`, `GOPATH`) from the shell that launched it. Simply running `goenv local` updates the `.go-version` file but doesn't update your current shell's environment. Reloading the VS Code window does NOT refresh environment variables.
+**Root Cause:** VS Code inherits environment variables (`GOROOT`, `GOPATH`) from the shell that launched it. Simply running `goenv use` updates the `.go-version` file but doesn't update your current shell's environment. Reloading the VS Code window does NOT refresh environment variables.
 
 **Solution:**
 
@@ -415,12 +426,14 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 **Solution:**
 
 1. **Check shell initialization:**
+
    ```bash
    # Add to ~/.bashrc, ~/.zshrc, etc.
    eval "$(goenv init -)"
    ```
 
 2. **Restart VS Code from terminal:**
+
    ```bash
    # Close VS Code completely
    # Reopen from terminal
@@ -441,10 +454,12 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 **Solution:**
 
 1. **Install Go tools:**
+
    - `Cmd+Shift+P` → "Go: Install/Update Tools"
    - Select all tools
 
 2. **Set tools path:**
+
    ```json
    {
      "go.toolsGopath": "${env:HOME}/go/tools"
@@ -458,14 +473,16 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 
 ### Changes to .go-version Not Picked Up
 
-**Symptom:** Changed `goenv local` but VS Code still uses old version.
+**Symptom:** Changed version with `goenv use` but VS Code still uses old version.
 
 **Solution:**
 
 1. **Reload window:**
+
    - `Cmd+Shift+P` → "Developer: Reload Window"
 
 2. **Or restart VS Code from terminal:**
+
    ```bash
    # In VS Code: Cmd+Q to quit
    # In terminal:
@@ -486,10 +503,12 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 **Solution:**
 
 1. **Check for conflicting settings:**
+
    - User settings vs workspace settings
    - System Go installation on PATH
 
 2. **Use explicit GOROOT:**
+
    ```json
    {
      "go.goroot": "${env:GOROOT}",
@@ -513,7 +532,7 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 Commit `.go-version` to your repository:
 
 ```bash
-goenv local 1.22.0
+goenv use 1.22.0
 git add .go-version
 git commit -m "Set Go version to 1.22.0"
 ```
@@ -568,6 +587,7 @@ The Go version is specified in `.go-version`.
 Ensure goenv is initialized in your shell profile:
 
 **Bash** (`~/.bashrc`):
+
 ```bash
 export GOENV_ROOT="$HOME/.goenv"
 export PATH="$GOENV_ROOT/bin:$PATH"
@@ -575,6 +595,7 @@ eval "$(goenv init -)"
 ```
 
 **Zsh** (`~/.zshrc`):
+
 ```zsh
 export GOENV_ROOT="$HOME/.goenv"
 export PATH="$GOENV_ROOT/bin:$PATH"
@@ -582,6 +603,7 @@ eval "$(goenv init -)"
 ```
 
 **Fish** (`~/.config/fish/config.fish`):
+
 ```fish
 set -gx GOENV_ROOT $HOME/.goenv
 set -gx PATH $GOENV_ROOT/bin $PATH
@@ -684,7 +706,7 @@ Create a checklist for new team members:
 mkdir ~/projects/myapp && cd ~/projects/myapp
 
 # Initialize Go module with VS Code setup in one command
-goenv local 1.22.0 --vscode
+goenv use 1.22.0 --vscode
 go mod init github.com/you/myapp
 
 # Initialize git
@@ -703,7 +725,7 @@ code .
 mkdir ~/projects/myapp && cd ~/projects/myapp
 
 # Initialize Go module
-goenv local 1.22.0
+goenv use 1.22.0
 go mod init github.com/you/myapp
 
 # Setup VS Code
@@ -722,7 +744,7 @@ code .
 
 ```bash
 # Change version
-goenv local 1.21.5
+goenv use 1.21.5
 
 # Reload VS Code
 # Cmd+Shift+P → "Developer: Reload Window"
@@ -736,12 +758,12 @@ code .
 ```bash
 # Project A uses Go 1.22
 cd ~/projects/app-a
-goenv local 1.22.0
+goenv use 1.22.0
 code .
 
 # Project B uses Go 1.21 (in new VS Code window)
 cd ~/projects/app-b
-goenv local 1.21.5
+goenv use 1.21.5
 code .
 ```
 
@@ -763,15 +785,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Read Go version
         id: go-version
         run: echo "version=$(cat .go-version)" >> $GITHUB_OUTPUT
-      
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ steps.go-version.outputs.version }}
-      
+
       - run: go test -v ./...
 ```
 
@@ -780,6 +802,7 @@ This reads the `.go-version` file to match your local development environment.
 ---
 
 **Next Steps:**
+
 - Set up VS Code with one of the methods above
 - Verify with `go version` and `echo $GOROOT` in the integrated terminal
 - Share `.vscode/settings.json` with your team

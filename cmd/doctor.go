@@ -88,6 +88,12 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 12: go.mod version compatibility
 	results = append(results, checkGoModVersion(cfg))
 
+	// Check 13: Verify 'which go' matches expected version
+	results = append(results, checkWhichGo(cfg))
+
+	// Check 14: Check for unmigrated tools when using a new version
+	results = append(results, checkToolMigration(cfg))
+
 	// Print results
 	fmt.Fprintln(cmd.OutOrStdout(), "📋 Diagnostic Results:")
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -410,7 +416,7 @@ func checkInstalledVersions(cfg *config.Config) checkResult {
 	return checkResult{
 		name:    "Installed Go versions",
 		status:  "ok",
-		message: fmt.Sprintf("Found %d version(s): %s", len(versions), strings.Join(versions, ", ")),
+		message: fmt.Sprintf("Found %d valid version(s): %s", len(validVersions), strings.Join(validVersions, ", ")),
 	}
 }
 
@@ -764,4 +770,246 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 		status:  "ok",
 		message: fmt.Sprintf("Current Go %s satisfies go.mod requirement (>= %s)", currentVersion, requiredVersion),
 	}
+}
+
+func checkWhichGo(cfg *config.Config) checkResult {
+	// Get what goenv thinks the version should be
+	mgr := manager.NewManager(cfg)
+	expectedVersion, source, err := mgr.GetCurrentVersion()
+	if err != nil {
+		return checkResult{
+			name:    "Actual 'go' binary",
+			status:  "warning",
+			message: "Cannot determine expected Go version",
+			advice:  "Set a Go version with 'goenv global' or 'goenv local'",
+		}
+	}
+
+	// Find which 'go' binary is actually being used
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		return checkResult{
+			name:    "Actual 'go' binary",
+			status:  "error",
+			message: "No 'go' binary found in PATH",
+			advice:  "Ensure goenv is properly initialized and a version is installed",
+		}
+	}
+
+	// Get the actual version by running 'go version'
+	cmd := exec.Command("go", "version")
+	output, err := cmd.Output()
+	if err != nil {
+		return checkResult{
+			name:    "Actual 'go' binary",
+			status:  "error",
+			message: fmt.Sprintf("Cannot determine actual Go version at %s", goPath),
+			advice:  "Verify the Go installation is not corrupted",
+		}
+	}
+
+	// Parse version from output (format: "go version go1.23.2 darwin/arm64")
+	versionStr := string(output)
+	parts := strings.Fields(versionStr)
+	var actualVersion string
+	if len(parts) >= 3 {
+		actualVersion = strings.TrimPrefix(parts[2], "go")
+	} else {
+		return checkResult{
+			name:    "Actual 'go' binary",
+			status:  "warning",
+			message: fmt.Sprintf("Cannot parse 'go version' output: %s", versionStr),
+		}
+	}
+
+	// Check if it's in the goenv shims directory
+	shimsDir := cfg.ShimsDir()
+	isUsingShim := strings.HasPrefix(goPath, shimsDir)
+
+	// If expected version is "system", we just need to verify go works
+	if expectedVersion == "system" {
+		if isUsingShim {
+			return checkResult{
+				name:    "Actual 'go' binary",
+				status:  "ok",
+				message: fmt.Sprintf("Using system Go %s via goenv shim at %s", actualVersion, goPath),
+			}
+		}
+		return checkResult{
+			name:    "Actual 'go' binary",
+			status:  "ok",
+			message: fmt.Sprintf("Using system Go %s at %s (set by %s)", actualVersion, goPath, source),
+		}
+	}
+
+	// Compare versions
+	if actualVersion != expectedVersion {
+		if isUsingShim {
+			return checkResult{
+				name:    "Actual 'go' binary",
+				status:  "error",
+				message: fmt.Sprintf("Version mismatch: expected %s (set by %s) but 'go version' reports %s", expectedVersion, source, actualVersion),
+				advice:  "This may indicate a corrupted installation. Try: goenv rehash",
+			}
+		}
+
+		// Not using shim - PATH issue
+		return checkResult{
+			name:    "Actual 'go' binary",
+			status:  "error",
+			message: fmt.Sprintf("Version mismatch: expected %s (set by %s) but using %s at %s", expectedVersion, source, actualVersion, goPath),
+			advice:  "The 'go' binary at " + goPath + " is taking precedence. Ensure goenv shims directory (" + shimsDir + ") is first in your PATH. Run: eval \"$(goenv init -)\". If you see build cache errors, run: goenv clean",
+		}
+	}
+
+	// Versions match!
+	if isUsingShim {
+		return checkResult{
+			name:    "Actual 'go' binary",
+			status:  "ok",
+			message: fmt.Sprintf("Correctly using Go %s via goenv shim", actualVersion),
+		}
+	}
+
+	// Version is correct but not using shim - a bit unusual but not wrong
+	return checkResult{
+		name:    "Actual 'go' binary",
+		status:  "ok",
+		message: fmt.Sprintf("Using Go %s at %s (not via shim)", actualVersion, goPath),
+	}
+}
+
+func checkToolMigration(cfg *config.Config) checkResult {
+	mgr := manager.NewManager(cfg)
+
+	// Get current version
+	currentVersion, _, err := mgr.GetCurrentVersion()
+	if err != nil || currentVersion == "" || currentVersion == "system" {
+		// Can't check if no version is set or using system
+		return checkResult{
+			name:    "Tool migration",
+			status:  "ok",
+			message: "Not applicable (no managed version active)",
+		}
+	}
+
+	// Get all installed versions
+	installedVersions, err := mgr.ListInstalledVersions()
+	if err != nil || len(installedVersions) <= 1 {
+		// Can't check if we can't list versions or there's only one version
+		return checkResult{
+			name:    "Tool migration",
+			status:  "ok",
+			message: "Only one Go version installed",
+		}
+	}
+
+	// Check for tools in current version
+	currentTools, err := listToolsForVersion(cfg, currentVersion)
+	if err != nil {
+		return checkResult{
+			name:    "Tool migration",
+			status:  "ok",
+			message: "Cannot detect installed tools",
+		}
+	}
+
+	// If current version has tools, nothing to suggest
+	if len(currentTools) > 0 {
+		return checkResult{
+			name:    "Tool migration",
+			status:  "ok",
+			message: fmt.Sprintf("Found %d tool(s) in current version", len(currentTools)),
+		}
+	}
+
+	// Current version has no tools - check if other versions have tools
+	versionsWithTools := []string{}
+	maxToolCount := 0
+	bestSourceVersion := ""
+
+	for _, version := range installedVersions {
+		if version == currentVersion {
+			continue
+		}
+
+		tools, err := listToolsForVersion(cfg, version)
+		if err != nil {
+			continue
+		}
+
+		if len(tools) > 0 {
+			versionsWithTools = append(versionsWithTools, version)
+			if len(tools) > maxToolCount {
+				maxToolCount = len(tools)
+				bestSourceVersion = version
+			}
+		}
+	}
+
+	// If no other version has tools, all good
+	if len(versionsWithTools) == 0 {
+		return checkResult{
+			name:    "Tool migration",
+			status:  "ok",
+			message: "No tools installed in any version",
+		}
+	}
+
+	// Found tools in other versions but not current - suggest migration
+	if len(versionsWithTools) == 1 {
+		return checkResult{
+			name:    "Tool migration",
+			status:  "warning",
+			message: fmt.Sprintf("Current Go %s has no tools, but Go %s has %d tool(s)", currentVersion, bestSourceVersion, maxToolCount),
+			advice:  fmt.Sprintf("Migrate tools with: goenv migrate-tools %s %s", bestSourceVersion, currentVersion),
+		}
+	}
+
+	// Multiple versions have tools
+	return checkResult{
+		name:    "Tool migration",
+		status:  "warning",
+		message: fmt.Sprintf("Current Go %s has no tools, but %d other version(s) have tools (e.g., Go %s has %d tool(s))", currentVersion, len(versionsWithTools), bestSourceVersion, maxToolCount),
+		advice:  fmt.Sprintf("Migrate tools from most recent version: goenv migrate-tools %s %s", bestSourceVersion, currentVersion),
+	}
+}
+
+// Helper to list tools for a version without importing tooldetect (to avoid circular deps)
+func listToolsForVersion(cfg *config.Config, version string) ([]string, error) {
+	gopathBin := filepath.Join(cfg.VersionsDir(), version, "gopath", "bin")
+
+	// Check if directory exists
+	if _, err := os.Stat(gopathBin); os.IsNotExist(err) {
+		return []string{}, nil
+	}
+
+	// Read directory
+	entries, err := os.ReadDir(gopathBin)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter for executables
+	var tools []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		// Remove .exe extension on Windows
+		if runtime.GOOS == "windows" && strings.HasSuffix(name, ".exe") {
+			name = strings.TrimSuffix(name, ".exe")
+		}
+
+		// Skip common non-tool files
+		if name == ".DS_Store" {
+			continue
+		}
+
+		tools = append(tools, name)
+	}
+
+	return tools, nil
 }

@@ -209,9 +209,9 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 	goVersion := "1.21.0"
 
 	// Setup version structure
+	// The version directory IS the GOROOT (no extra 'go' subdirectory)
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
-	goRoot := filepath.Join(versionPath, "go")
-	goBinDir := filepath.Join(goRoot, "bin")
+	goBinDir := filepath.Join(versionPath, "bin")
 	gopathBin := filepath.Join(versionPath, "gopath", "bin")
 
 	if err := os.MkdirAll(goBinDir, 0755); err != nil {
@@ -257,9 +257,9 @@ func TestInstallTools_Failure(t *testing.T) {
 	goVersion := "1.21.0"
 
 	// Setup version structure
+	// The version directory IS the GOROOT (no extra 'go' subdirectory)
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
-	goRoot := filepath.Join(versionPath, "go")
-	goBinDir := filepath.Join(goRoot, "bin")
+	goBinDir := filepath.Join(versionPath, "bin")
 
 	if err := os.MkdirAll(goBinDir, 0755); err != nil {
 		t.Fatalf("Failed to create go bin directory: %v", err)

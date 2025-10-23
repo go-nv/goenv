@@ -132,11 +132,11 @@ goenv completion --install
 # Restart your shell
 exec $SHELL
 
-# Install a Go version
-goenv install 1.22.0
+# Install and set a Go version (one command!)
+goenv use 1.22.0 --global
 
-# Set it as global
-goenv global 1.22.0
+# Or install first, then set
+goenv install 1.22.0
 
 # Verify
 go version

@@ -18,10 +18,14 @@ func TestListCommand(t *testing.T) {
 				return runList(cmd, args)
 			},
 		}
+		cmd.Flags().BoolVar(&listFlags.remote, "remote", false, "List remote versions")
+		cmd.Flags().BoolVar(&listFlags.stable, "stable", false, "Only stable versions")
+		cmd.Flags().BoolVar(&listFlags.bare, "bare", false, "Bare output")
+		cmd.Flags().BoolVar(&listFlags.skipAliases, "skip-aliases", false, "Skip aliases")
 
 		output := &strings.Builder{}
 		cmd.SetOut(output)
-		cmd.SetArgs([]string{})
+		cmd.SetArgs([]string{"--remote"})
 
 		err := cmd.Execute()
 		if err != nil {
@@ -58,14 +62,20 @@ func TestListCommand(t *testing.T) {
 			Use: "list",
 			RunE: func(cmd *cobra.Command, args []string) error {
 				listFlags.stable = true
-				defer func() { listFlags.stable = false }()
+				listFlags.remote = true
+				defer func() {
+					listFlags.stable = false
+					listFlags.remote = false
+				}()
 				return runList(cmd, args)
 			},
 		}
+		cmd.Flags().BoolVar(&listFlags.remote, "remote", false, "List remote versions")
+		cmd.Flags().BoolVar(&listFlags.stable, "stable", false, "Only stable versions")
 
 		output := &strings.Builder{}
 		cmd.SetOut(output)
-		cmd.SetArgs([]string{})
+		cmd.SetArgs([]string{"--remote", "--stable"})
 
 		err := cmd.Execute()
 		if err != nil {
@@ -103,10 +113,11 @@ func TestListCommand(t *testing.T) {
 				return runList(cmd, args)
 			},
 		}
+		cmd.Flags().BoolVar(&listFlags.remote, "remote", false, "List remote versions")
 
 		output := &strings.Builder{}
 		cmd.SetOut(output)
-		cmd.SetArgs([]string{})
+		cmd.SetArgs([]string{"--remote"})
 
 		err := cmd.Execute()
 		if err != nil {
@@ -145,10 +156,11 @@ func TestListCommand(t *testing.T) {
 				return runList(cmd, args)
 			},
 		}
+		cmd.Flags().BoolVar(&listFlags.remote, "remote", false, "List remote versions")
 
 		output := &strings.Builder{}
 		cmd.SetOut(output)
-		cmd.SetArgs([]string{})
+		cmd.SetArgs([]string{"--remote"})
 
 		err := cmd.Execute()
 		if err != nil {
@@ -178,10 +190,11 @@ func TestListCommand(t *testing.T) {
 				return runList(cmd, args)
 			},
 		}
+		cmd.Flags().BoolVar(&listFlags.remote, "remote", false, "List remote versions")
 
 		output := &strings.Builder{}
 		cmd.SetOut(output)
-		cmd.SetArgs([]string{})
+		cmd.SetArgs([]string{"--remote"})
 
 		err := cmd.Execute()
 		if err != nil {

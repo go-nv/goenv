@@ -3,9 +3,24 @@
 Like `git`, the `goenv` command delegates to subcommands based on its
 first argument.
 
-All subcommands are:
+## 🚀 Modern Unified Commands (Recommended)
+
+**New in v3.0**: Simplified, intuitive commands for common operations:
+
+- **[`goenv use`](#goenv-use)** - Set Go version (replaces `local`/`global`)
+- **[`goenv current`](#goenv-current)** - Show active version (replaces `version`)
+- **[`goenv list`](#goenv-list)** - List versions (replaces `versions`/`installed`)
+
+These unified commands provide a cleaner, more consistent interface. The legacy commands (`local`, `global`, `versions`) still work for backward compatibility.
+
+## 📋 All Subcommands
 
 - [Command Reference](#command-reference)
+  - [🚀 Modern Unified Commands (Recommended)](#-modern-unified-commands-recommended)
+  - [📋 All Subcommands](#-all-subcommands)
+  - [`goenv use`](#goenv-use)
+  - [`goenv current`](#goenv-current)
+  - [`goenv list`](#goenv-list)
   - [`goenv alias`](#goenv-alias)
   - [`goenv commands`](#goenv-commands)
   - [`goenv completions`](#goenv-completions)
@@ -81,13 +96,13 @@ Once created, aliases can be used anywhere a version number is expected:
 
 ```shell
 # Set global version using alias
-> goenv global stable
+> goenv use stable --global
 
 # Set local version using alias
-> goenv local dev
+> goenv use dev
 
 # Aliases are resolved to their target versions
-> goenv version
+> goenv current
 1.23.0 (set by /home/go-nv/.goenv/version)
 ```
 
@@ -96,7 +111,7 @@ Once created, aliases can be used anywhere a version number is expected:
 - Aliases are stored in `~/.goenv/aliases` and persist across sessions
 - Alias names cannot conflict with reserved keywords (`system`, `latest`)
 - Aliases must contain only alphanumeric characters, hyphens, and underscores
-- Aliases are automatically resolved when setting versions with `global` or `local`
+- Aliases are automatically resolved when setting versions with `use`
 - You can create aliases that point to special versions like `latest` or `system`
 
 **Common use cases:**
@@ -104,7 +119,7 @@ Once created, aliases can be used anywhere a version number is expected:
 ```shell
 # Track LTS versions
 > goenv alias lts 1.22.5
-> goenv global lts
+> goenv use lts --global
 
 # Maintain development and stable versions
 > goenv alias stable 1.23.0
@@ -213,6 +228,184 @@ This command verifies:
 - PATH setup (shims directory)
 - Shims directory existence
 - Installed Go versions
+
+## `goenv use`
+
+**Modern unified command** for setting Go versions. Replaces `goenv local` and `goenv global` with a cleaner interface.
+
+**Usage:**
+
+```shell
+# Set local version (creates .go-version in current directory)
+> goenv use 1.25.2
+
+# Set global version (updates ~/.goenv/version)
+> goenv use 1.25.2 --global
+
+# Show current version
+> goenv use
+1.25.2
+
+# Unset local version (removes .go-version)
+> goenv use --unset
+```
+
+**Options:**
+
+- `--global` - Set global version instead of local
+- `--unset` - Remove local .go-version file
+- `--vscode` - Also update VS Code settings.json
+- `--sync` - Sync go.mod toolchain directive
+
+**Examples:**
+
+```shell
+# Set local version for current project
+cd my-project
+goenv use 1.24.8
+
+# Set global default version
+goenv use 1.25.2 --global
+
+# Set version and update VS Code
+goenv use 1.24.0 --vscode
+
+# Sync with go.mod toolchain
+goenv use 1.24.0 --sync
+```
+
+**Why use `goenv use`?**
+
+- **Consistent**: One command for both local and global
+- **Intuitive**: `use` is clearer than `local`/`global`
+- **Modern**: Follows conventions from other version managers
+- **Shorter**: `goenv use X` vs `goenv local X`
+
+**Backward compatibility**: The legacy `goenv local` and `goenv global` commands still work but are hidden from help output.
+
+## `goenv current`
+
+**Modern unified command** for showing the active Go version and its source. Replaces `goenv version`.
+
+**Usage:**
+
+```shell
+# Show current version with source
+> goenv current
+1.25.2 (set by /Users/user/project/.go-version)
+
+# Show just the version number
+> goenv current --bare
+1.25.2
+
+# Show the file that set the version
+> goenv current --origin
+/Users/user/project/.go-version
+```
+
+**Options:**
+
+- `--bare` - Output only the version number
+- `--origin` - Output only the source file path
+
+**Examples:**
+
+```shell
+# Quick version check
+> goenv current
+1.24.8 (set by /Users/user/.goenv/version)
+
+# Use in scripts
+VERSION=$(goenv current --bare)
+echo "Building with Go $VERSION"
+
+# Check where version is set
+> goenv current --origin
+/Users/user/my-project/.go-version
+```
+
+**Why use `goenv current`?**
+
+- **Clear**: "current" is more intuitive than "version"
+- **Consistent**: Matches `goenv use` terminology
+- **Modern**: Common pattern in version managers
+
+**Backward compatibility**: The legacy `goenv version` command still works but is hidden from help output.
+
+## `goenv list`
+
+**Modern unified command** for listing Go versions. Replaces `goenv versions` and `goenv installed`.
+
+**Usage:**
+
+```shell
+# List installed versions (default)
+> goenv list
+  1.23.5
+  1.24.8
+* 1.25.2 (set by /Users/user/.goenv/version)
+
+# List available remote versions
+> goenv list --remote
+  1.20.0
+  1.20.1
+  ...
+  1.25.2
+  1.26rc1
+
+# List only stable versions
+> goenv list --remote --stable
+  1.23.5
+  1.24.8
+  1.25.2
+
+# Output bare version numbers
+> goenv list --bare
+1.23.5
+1.24.8
+1.25.2
+```
+
+**Options:**
+
+- `--remote` - List available versions from remote (not installed)
+- `--stable` - Filter to stable releases only (no beta/rc)
+- `--bare` - Output only version numbers (no markers or descriptions)
+- `--skip-aliases` - Don't show version aliases
+
+**Examples:**
+
+```shell
+# See what's installed
+> goenv list
+  1.24.8
+* 1.25.2 (set by /Users/user/.go-version)
+
+# Check available versions before installing
+> goenv list --remote --stable | tail -5
+1.24.6
+1.24.7
+1.24.8
+1.25.1
+1.25.2
+
+# Use in scripts
+for version in $(goenv list --bare); do
+  echo "Testing with Go $version"
+  goenv use $version
+  go test ./...
+done
+```
+
+**Why use `goenv list`?**
+
+- **Intuitive**: "list" is clearer than "versions"
+- **Unified**: One command for both installed and available
+- **Modern**: Shorter and more familiar command name
+- **Smart default**: Shows installed by default (most common use case)
+
+**Backward compatibility**: The legacy `goenv versions` and `goenv installed` commands still work but are hidden from help output.
+
 - Common configuration problems
 
 Use this command to troubleshoot issues with goenv.
@@ -222,7 +415,7 @@ Use this command to troubleshoot issues with goenv.
 Run an executable with the selected Go version.
 
 Assuming there's an already installed golang by e.g `goenv install 1.11.1` and
-selected by e.g `goenv global 1.11.1`,
+selected by e.g `goenv use 1.11.1 --global`,
 
 ```shell
 > goenv exec go run main.go
@@ -828,12 +1021,12 @@ This command creates or updates `.vscode/settings.json` and `.vscode/extensions.
 
 3. Merges with existing settings (unless `--force` is used)
 
-**Integration with goenv local:**
+**Integration with goenv use:**
 
-You can also automatically set up VS Code when setting a local Go version:
+You can also automatically set up VS Code when setting a Go version:
 
 ```shell
-> goenv local 1.22.0 --vscode
+> goenv use 1.22.0 --vscode
 
 Initializing VS Code workspace...
 ✓ Created/updated .vscode/settings.json
@@ -1024,7 +1217,7 @@ goenv automatically discovers the required Go version from multiple sources. Whe
 2. **.go-version file** (project-specific)
 
    - Simple text file with version number
-   - Created with `goenv local <version>`
+   - Created with `goenv use <version>`
    - Searched from current directory up to root
 
 3. **go.mod file** (Go module projects)
@@ -1035,7 +1228,7 @@ goenv automatically discovers the required Go version from multiple sources. Whe
 
 4. **~/.goenv/version** (global fallback)
    - Your default Go version
-   - Set with `goenv global <version>`
+   - Set with `goenv use <version> --global`
 
 ### Smart Precedence Rules
 
@@ -1135,7 +1328,7 @@ Update .go-version to 1.24.1 to avoid this warning? (Y/n)
 go mod edit -toolchain=go1.24.1
 
 # OR pin explicitly with .go-version
-goenv local 1.24.1  # Creates .go-version
+goenv use 1.24.1  # Creates .go-version
 ```
 
 #### For Scripts/Non-Module Projects
@@ -1143,7 +1336,7 @@ goenv local 1.24.1  # Creates .go-version
 Use `.go-version` as your primary version specification:
 
 ```shell
-goenv local 1.24.1  # Creates .go-version
+goenv use 1.24.1  # Creates .go-version
 ```
 
 #### For CI/CD
@@ -1170,7 +1363,7 @@ A: Check if you have a go.mod with a newer toolchain requirement. Run `goenv doc
 A: Make sure your .go-version is >= the go.mod toolchain requirement. Update it with:
 
 ```shell
-goenv local $(grep toolchain go.mod | awk '{print $2}' | sed 's/go//')
+goenv use $(grep toolchain go.mod | awk '{print $2}' | sed 's/go//')
 ```
 
 **Q: Can I disable go.mod version checking?**

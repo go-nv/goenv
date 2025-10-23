@@ -79,7 +79,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to prepare goenv directories: %w", err)
 	}
 
-	fmt.Print(renderInitScript(shell, cfg, initFlags.noRehash))
+	cmd.Print(renderInitScript(shell, cfg, initFlags.noRehash))
 	return nil
 }
 

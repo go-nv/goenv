@@ -118,7 +118,7 @@ func runMigrateTools(cmd *cobra.Command, args []string) error {
 		fmt.Printf("[%d/%d] Installing %s...\n", i+1, len(toolsToMigrate), tool.Name)
 
 		// Construct install command
-		packagePath := tool.PackagePath
+		var packagePath string
 		if tool.Version != "" && tool.Version != "unknown" {
 			packagePath = fmt.Sprintf("%s@%s", tool.PackagePath, tool.Version)
 		} else {
@@ -126,7 +126,8 @@ func runMigrateTools(cmd *cobra.Command, args []string) error {
 		}
 
 		// Use target version's go binary
-		goBinary := filepath.Join(targetPath, "go", "bin", "go")
+		// The version directory IS the GOROOT (no extra 'go' subdirectory)
+		goBinary := filepath.Join(targetPath, "bin", "go")
 
 		// On Windows, add .exe extension
 		if runtime.GOOS == "windows" {
