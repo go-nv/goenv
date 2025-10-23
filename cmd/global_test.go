@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,7 +30,11 @@ func setupTestEnv(t *testing.T) (string, func()) {
 	utils.GoenvEnvVarRoot.Set(testRoot)
 	os.Setenv("HOME", testHome)
 	// Clear PATH to ensure no system go is found unless explicitly added by test
-	os.Setenv("PATH", "/usr/bin:/bin")
+	if runtime.GOOS == "windows" {
+		os.Setenv("PATH", "C:\\Windows\\System32")
+	} else {
+		os.Setenv("PATH", "/usr/bin:/bin")
+	}
 	// Clear GOENV_VERSION to ensure clean test environment
 	os.Unsetenv("GOENV_VERSION")
 
@@ -75,7 +80,17 @@ func createTestVersion(t *testing.T, root, version string) {
 
 	// Create mock go binary
 	goBin := filepath.Join(binDir, "go")
-	content := "#!/bin/sh\necho go version go" + version + " linux/amd64\n"
+	if runtime.GOOS == "windows" {
+		goBin += ".exe"
+	}
+
+	var content string
+	if runtime.GOOS == "windows" {
+		content = "@echo off\necho go version go" + version + " windows/amd64\n"
+	} else {
+		content = "#!/bin/sh\necho go version go" + version + " linux/amd64\n"
+	}
+
 	if err := os.WriteFile(goBin, []byte(content), 0755); err != nil {
 		t.Fatalf("Failed to create test go binary: %v", err)
 	}

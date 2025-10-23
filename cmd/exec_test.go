@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -112,6 +113,11 @@ func TestExecCommand(t *testing.T) {
 				// Create custom binaries if specified
 				if content, exists := tt.createBinaries[version]; exists {
 					binPath := filepath.Join(testRoot, "versions", version, "bin", "go")
+					if runtime.GOOS == "windows" {
+						binPath += ".exe"
+						// Convert Unix shell script to Windows batch file
+						content = strings.ReplaceAll(content, "#!/bin/sh\n", "@echo off\n")
+					}
 					err := os.WriteFile(binPath, []byte(content), 0755)
 					if err != nil {
 						t.Fatalf("Failed to create custom binary for version %s: %v", version, err)
@@ -162,14 +168,26 @@ func TestExecCommand(t *testing.T) {
 				systemBinDir := filepath.Join(testRoot, "system_bin")
 				os.MkdirAll(systemBinDir, 0755)
 				systemGo := filepath.Join(systemBinDir, "go")
-				err := os.WriteFile(systemGo, []byte("#!/bin/sh\necho system go version\n"), 0755)
+				if runtime.GOOS == "windows" {
+					systemGo += ".exe"
+				}
+
+				var content string
+				if runtime.GOOS == "windows" {
+					content = "@echo off\necho system go version\n"
+				} else {
+					content = "#!/bin/sh\necho system go version\n"
+				}
+
+				err := os.WriteFile(systemGo, []byte(content), 0755)
 				if err != nil {
 					t.Fatalf("Failed to create system go: %v", err)
 				}
 
 				// Add to PATH temporarily
 				oldPath := os.Getenv("PATH")
-				os.Setenv("PATH", systemBinDir+":"+oldPath)
+				pathSep := string(os.PathListSeparator)
+				os.Setenv("PATH", systemBinDir+pathSep+oldPath)
 				defer os.Setenv("PATH", oldPath)
 			}
 
@@ -252,7 +270,17 @@ func TestExecEnvironmentVariables(t *testing.T) {
 
 	// Create a binary that prints specific environment variables
 	binPath := filepath.Join(testRoot, "versions", version, "bin", "env-test")
-	content := "#!/bin/sh\necho \"GOROOT=$GOROOT\"\necho \"GOPATH=$GOPATH\"\n"
+	if runtime.GOOS == "windows" {
+		binPath += ".exe"
+	}
+
+	var content string
+	if runtime.GOOS == "windows" {
+		content = "@echo off\necho GOROOT=%GOROOT%\necho GOPATH=%GOPATH%\n"
+	} else {
+		content = "#!/bin/sh\necho \"GOROOT=$GOROOT\"\necho \"GOPATH=$GOPATH\"\n"
+	}
+
 	err := os.WriteFile(binPath, []byte(content), 0755)
 	if err != nil {
 		t.Fatalf("Failed to create env-test binary: %v", err)
