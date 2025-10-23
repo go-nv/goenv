@@ -42,14 +42,11 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	// Ensure output goes to stdout, not stderr
-	cmd.SetOut(os.Stdout)
-
 	cfg := config.Load()
 
 	if initFlags.complete {
 		for _, option := range []string{"-", "--no-rehash", "bash", "fish", "ksh", "zsh", "powershell", "cmd"} {
-			cmd.Println(option)
+			fmt.Fprintln(cmd.OutOrStdout(), option)
 		}
 		return nil
 	}
