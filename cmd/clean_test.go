@@ -68,6 +68,15 @@ func TestCleanCommand(t *testing.T) {
 			os.Setenv("GOENV_ROOT", tmpDir)
 			defer os.Setenv("GOENV_ROOT", oldRoot)
 
+			// Unset GOENV_VERSION to ensure test uses .go-version file
+			oldVersion := os.Getenv("GOENV_VERSION")
+			os.Unsetenv("GOENV_VERSION")
+			defer func() {
+				if oldVersion != "" {
+					os.Setenv("GOENV_VERSION", oldVersion)
+				}
+			}()
+
 			// Create .go-version file
 			versionFile := filepath.Join(tmpDir, ".go-version")
 			if err := os.WriteFile(versionFile, []byte("1.21.0\n"), 0644); err != nil {
