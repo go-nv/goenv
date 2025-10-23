@@ -113,11 +113,23 @@ func TestVersionFileWriteCommand(t *testing.T) {
 					t.Fatalf("Failed to create bin directory: %v", err)
 				}
 				goExec := filepath.Join(binDir, "go")
-				if err := os.WriteFile(goExec, []byte("#!/bin/sh\necho go version go1.21.0 linux/amd64\n"), 0755); err != nil {
+				if runtime.GOOS == "windows" {
+					goExec += ".exe"
+				}
+
+				var content string
+				if runtime.GOOS == "windows" {
+					content = "@echo off\necho go version go1.21.0 windows/amd64\n"
+				} else {
+					content = "#!/bin/sh\necho go version go1.21.0 linux/amd64\n"
+				}
+
+				if err := os.WriteFile(goExec, []byte(content), 0755); err != nil {
 					t.Fatalf("Failed to create go executable: %v", err)
 				}
 				// Add to PATH
-				os.Setenv("PATH", binDir+":"+originalPath)
+				pathSep := string(os.PathListSeparator)
+				os.Setenv("PATH", binDir+pathSep+originalPath)
 			} else {
 				// Explicitly set PATH to an empty/non-existent directory to ensure no system Go is found
 				emptyDir := filepath.Join(goenvRoot, "empty-bin")

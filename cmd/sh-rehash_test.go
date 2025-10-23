@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -10,6 +11,10 @@ import (
 )
 
 func TestShRehashCommand(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping Unix shell test on Windows")
+	}
+
 	tests := []struct {
 		name           string
 		args           []string

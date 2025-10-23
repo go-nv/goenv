@@ -156,7 +156,15 @@ func TestSyncToolsCommand(t *testing.T) {
 				if runtime.GOOS == "windows" {
 					goBinary += ".exe"
 				}
-				if err := os.WriteFile(goBinary, []byte("#!/bin/sh\necho 'mock go'"), 0755); err != nil {
+
+				var content string
+				if runtime.GOOS == "windows" {
+					content = "@echo off\necho mock go\n"
+				} else {
+					content = "#!/bin/sh\necho 'mock go'\n"
+				}
+
+				if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
 					t.Fatalf("Failed to create go binary: %v", err)
 				}
 

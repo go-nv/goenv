@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -123,14 +124,26 @@ func TestVersionsCommand(t *testing.T) {
 				systemBinDir := filepath.Join(testRoot, "system_bin")
 				os.MkdirAll(systemBinDir, 0755)
 				systemGo := filepath.Join(systemBinDir, "go")
-				err := os.WriteFile(systemGo, []byte("#!/bin/sh\necho go version go1.20.1 linux/amd64\n"), 0755)
+				if runtime.GOOS == "windows" {
+					systemGo += ".exe"
+				}
+
+				var content string
+				if runtime.GOOS == "windows" {
+					content = "@echo off\necho go version go1.20.1 windows/amd64\n"
+				} else {
+					content = "#!/bin/sh\necho go version go1.20.1 linux/amd64\n"
+				}
+
+				err := os.WriteFile(systemGo, []byte(content), 0755)
 				if err != nil {
 					t.Fatalf("Failed to create system go: %v", err)
 				}
 
 				// Add to PATH temporarily
 				oldPath := os.Getenv("PATH")
-				os.Setenv("PATH", systemBinDir+":"+oldPath)
+				pathSep := string(os.PathListSeparator)
+				os.Setenv("PATH", systemBinDir+pathSep+oldPath)
 				defer os.Setenv("PATH", oldPath)
 			}
 
@@ -374,14 +387,26 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 	systemBinDir := filepath.Join(testRoot, "system_bin")
 	os.MkdirAll(systemBinDir, 0755)
 	systemGo := filepath.Join(systemBinDir, "go")
-	err := os.WriteFile(systemGo, []byte("#!/bin/sh\necho go version go1.20.1 linux/amd64\n"), 0755)
+	if runtime.GOOS == "windows" {
+		systemGo += ".exe"
+	}
+
+	var content string
+	if runtime.GOOS == "windows" {
+		content = "@echo off\necho go version go1.20.1 windows/amd64\n"
+	} else {
+		content = "#!/bin/sh\necho go version go1.20.1 linux/amd64\n"
+	}
+
+	err := os.WriteFile(systemGo, []byte(content), 0755)
 	if err != nil {
 		t.Fatalf("Failed to create system go: %v", err)
 	}
 
 	// Add to PATH temporarily
 	oldPath := os.Getenv("PATH")
-	os.Setenv("PATH", systemBinDir+":"+oldPath)
+	pathSep := string(os.PathListSeparator)
+	os.Setenv("PATH", systemBinDir+pathSep+oldPath)
 	defer os.Setenv("PATH", oldPath)
 
 	// Create and execute command

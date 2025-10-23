@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -329,7 +330,11 @@ func TestDoctorCommand_ShellDetection(t *testing.T) {
 
 	// Set a specific shell
 	originalShell := os.Getenv("SHELL")
-	t.Setenv("SHELL", "/bin/bash")
+	if runtime.GOOS == "windows" {
+		t.Setenv("SHELL", "powershell")
+	} else {
+		t.Setenv("SHELL", "/bin/bash")
+	}
 	defer func() {
 		if originalShell != "" {
 			os.Setenv("SHELL", originalShell)

@@ -24,6 +24,7 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv alias`](#goenv-alias)
   - [`goenv commands`](#goenv-commands)
   - [`goenv completions`](#goenv-completions)
+  - [`goenv clean`](#goenv-clean)
   - [`goenv default-tools`](#goenv-default-tools)
   - [`goenv doctor`](#goenv-doctor)
   - [`goenv exec`](#goenv-exec)
@@ -151,6 +152,76 @@ Lists all available goenv commands.
 
 Provides auto-completion for itself and other commands by calling them with `--complete`.
 
+## `goenv clean`
+
+Clean Go build and module caches to fix version mismatch issues.
+
+When switching between Go versions, cached build artifacts can cause "version mismatch" or "exec format error" errors. This command helps fix those issues by clearing the problematic caches.
+
+**Usage:**
+
+```shell
+# Clean build cache only (safe, recommended)
+goenv clean
+goenv clean build
+
+# Clean module cache (downloads will be re-fetched)
+goenv clean modcache
+
+# Clean both caches
+goenv clean all
+
+# Diagnose cache issues before cleaning
+goenv clean --diagnose
+```
+
+**Available targets:**
+
+- `build` - Clear Go build cache only (safe, recommended for "exec format error" fixes)
+- `modcache` - Clear module download cache (modules will be re-downloaded when needed)
+- `all` - Clear both build and module caches
+
+**Flags:**
+
+- `--diagnose` - Show detailed information about your cache configuration without cleaning
+- `-f, --force` - Skip confirmation prompts
+- `-v, --verbose` - Show detailed output during cleaning
+
+**Example: Diagnosing Cache Issues**
+
+```shell
+$ goenv clean --diagnose
+🔍 Diagnosing cache issues...
+
+Current architecture: darwin/arm64
+Current Go version: 1.23.2
+
+GOCACHE location: /Users/username/.goenv/versions/1.23.2/go-build
+✅ Using version-specific cache (goenv managed)
+
+GOMODCACHE location: /Users/username/.goenv/versions/1.23.2/go-mod
+✅ Using version-specific module cache (goenv managed)
+
+Installed Go versions: 14
+  • 1.23.2 (current)
+  • 1.24.4
+  • 1.25.2
+
+Cache isolation settings:
+  ✅ GOENV_DISABLE_GOCACHE not set (cache isolation enabled)
+  ✅ GOENV_DISABLE_GOMODCACHE not set (module cache isolation enabled)
+```
+
+**When to use:**
+
+- You see "exec format error" when running Go tools
+- After switching between Go versions and encountering cache conflicts
+- Build artifacts seem stale or corrupted
+- After migrating from a different machine/architecture
+- To free up disk space
+
+**Note:** With goenv v3+, build caches are automatically isolated per Go version, so you should rarely need to clean caches manually. However, this command is useful for troubleshooting and disk space management.
+
 ## `goenv default-tools`
 
 Manages the list of tools automatically installed with each new Go version.
@@ -228,6 +299,9 @@ This command verifies:
 - PATH setup (shims directory)
 - Shims directory existence
 - Installed Go versions
+- Build cache isolation (checks if GOCACHE is version-specific)
+- Cache architecture (detects potential "exec format error" issues)
+- Tool migration suggestions (recommends syncing tools between versions)
 
 ## `goenv use`
 
@@ -1382,3 +1456,34 @@ goenv use $(grep toolchain go.mod | awk '{print $2}' | sed 's/go//')
 **Q: Can I disable go.mod version checking?**
 
 A: No, this is intentional. Go's toolchain directive is a hard requirement for builds to work correctly. If you want to use a specific version, set it in .go-version to be >= the toolchain requirement.
+
+**Q: I'm getting "exec format error" when running Go tools. How do I fix this?**
+
+A: This error occurs when cached binaries were built with a different Go version or architecture. Starting with goenv v3, build caches are automatically isolated per version to prevent this.
+
+If you're still seeing this error:
+
+1. Clean your shared system cache (one-time migration):
+   ```shell
+   go clean -cache
+   go clean -modcache
+   ```
+
+2. Verify cache isolation is working:
+   ```shell
+   goenv exec go env GOCACHE
+   # Should show: ~/.goenv/versions/{version}/go-build (version-specific)
+   ```
+
+3. Run diagnostics:
+   ```shell
+   goenv clean --diagnose
+   goenv doctor
+   ```
+
+4. If the issue persists, clean the build cache:
+   ```shell
+   goenv clean build
+   ```
+
+See the [Smart Caching Guide](../advanced/SMART_CACHING.md#build-cache-isolation) for more details about cache isolation.

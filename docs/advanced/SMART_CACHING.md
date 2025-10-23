@@ -389,3 +389,212 @@ Debug: Using cached versions
 - **Automatic freshness detection**
 - **Optimal bandwidth usage**
 - **Best performance for active users**
+
+## Build Cache Isolation
+
+### Problem: "exec format error" When Switching Versions
+
+When using multiple Go versions, you may encounter errors like:
+
+```
+fork/exec /Users/username/Library/Caches/go-build/.../staticcheck: exec format error
+```
+
+**Primary cause:** By default, Go uses a **shared build cache** (`GOCACHE`) across all Go versions. When you build tools with Go 1.23, then switch to Go 1.24, the cached binaries become incompatible because:
+- Tool binaries contain Go runtime code specific to the version they were built with
+- Cached intermediate build artifacts may have version-specific formats
+- Go 1.23's cache entries may not be compatible with Go 1.24's expectations
+
+**Secondary causes (rare):**
+- Migration from Intel to Apple Silicon (cached x86_64 binaries on new arm64 machine)
+- Running Go under Rosetta vs natively on Apple Silicon
+- Manual `GOARCH` overrides during builds
+
+### Solution: Version-Specific Cache Isolation
+
+Starting in goenv v3, **build caches are automatically isolated per Go version** to prevent these conflicts.
+
+#### How It Works
+
+When you run `goenv exec go build` or any Go command through goenv:
+
+```bash
+# Go 1.23.2
+$ goenv exec go env GOCACHE
+/Users/username/.goenv/versions/1.23.2/go-build
+
+# Go 1.24.4
+$ goenv exec go env GOCACHE
+/Users/username/.goenv/versions/1.24.4/go-build
+
+# Go 1.25.2
+$ goenv exec go env GOCACHE
+/Users/username/.goenv/versions/1.25.2/go-build
+```
+
+Each Go version gets its own isolated cache directory, preventing architecture/version mismatches.
+
+#### Benefits
+
+- ✅ **No more "exec format error"** when switching Go versions
+- ✅ **Clean isolation** - Each Go version has its own build environment
+- ✅ **No manual cache cleaning** required between version switches
+- ✅ **Automatic and transparent** - works out of the box
+- ✅ **Handles edge cases** - Migration scenarios and architecture changes also covered
+
+#### Module Cache Isolation
+
+Module caches (`GOMODCACHE`) are also isolated by default:
+
+```bash
+# Go 1.23.2
+$ goenv exec go env GOMODCACHE
+/Users/username/.goenv/versions/1.23.2/go-mod
+
+# Go 1.24.4
+$ goenv exec go env GOMODCACHE
+/Users/username/.goenv/versions/1.24.4/go-mod
+```
+
+### Configuration
+
+#### Disable Cache Isolation
+
+If you prefer to use Go's default shared cache:
+
+```bash
+# Disable build cache isolation
+export GOENV_DISABLE_GOCACHE=1
+
+# Disable module cache isolation
+export GOENV_DISABLE_GOMODCACHE=1
+
+# Now uses Go's default shared caches
+$ goenv exec go env GOCACHE
+/Users/username/Library/Caches/go-build
+```
+
+#### Custom Cache Locations
+
+You can specify custom base directories for caches:
+
+```bash
+# Custom GOCACHE base directory
+export GOENV_GOCACHE_DIR=/custom/path/gocache
+# Results in: /custom/path/gocache/1.23.2
+
+# Custom GOMODCACHE base directory
+export GOENV_GOMODCACHE_DIR=/custom/path/gomodcache
+# Results in: /custom/path/gomodcache/1.23.2
+```
+
+### Diagnosing Cache Issues
+
+Use the `goenv clean --diagnose` command to check your cache configuration:
+
+```bash
+$ goenv clean --diagnose
+🔍 Diagnosing cache issues...
+
+Current architecture: darwin/arm64
+Current Go version: 1.23.2
+
+GOCACHE location: /Users/username/.goenv/versions/1.23.2/go-build
+✅ Using version-specific cache (goenv managed)
+
+GOMODCACHE location: /Users/username/.goenv/versions/1.23.2/go-mod
+✅ Using version-specific module cache (goenv managed)
+
+Cache isolation settings:
+  ✅ GOENV_DISABLE_GOCACHE not set (cache isolation enabled)
+  ✅ GOENV_DISABLE_GOMODCACHE not set (module cache isolation enabled)
+```
+
+### Cleaning Caches
+
+If you need to clean caches (e.g., to free disk space):
+
+```bash
+# Clean build cache for current version
+$ goenv clean build
+
+# Clean module cache for current version
+$ goenv clean modcache
+
+# Clean both caches
+$ goenv clean all
+```
+
+### Troubleshooting
+
+#### Still Getting "exec format error"?
+
+1. **Clean your shared system cache** (one-time migration):
+   ```bash
+   go clean -cache
+   go clean -modcache
+   ```
+
+2. **Verify cache isolation is working**:
+   ```bash
+   goenv exec go env GOCACHE
+   # Should show: ~/.goenv/versions/{version}/go-build
+   ```
+
+3. **Run diagnostics**:
+   ```bash
+   goenv doctor
+   # Look for "Build cache isolation" and "Cache architecture" checks
+   ```
+
+#### Cache Taking Too Much Disk Space?
+
+Each version has its own cache, which can use more disk space. To manage this:
+
+```bash
+# Check cache sizes
+$ du -sh ~/.goenv/versions/*/go-build
+1.2G    /Users/username/.goenv/versions/1.23.2/go-build
+890M    /Users/username/.goenv/versions/1.24.4/go-build
+
+# Clean unused versions
+$ goenv uninstall 1.21.5
+# Also removes that version's cache
+
+# Or clean caches for all versions
+$ for v in $(goenv list); do
+    GOENV_VERSION=$v goenv clean all
+  done
+```
+
+### Technical Details
+
+**Cache Directory Structure:**
+
+```
+$GOENV_ROOT/
+└── versions/
+    ├── 1.23.2/
+    │   ├── bin/          # Go distribution binaries
+    │   ├── gopath/       # Installed tools (gopls, etc.)
+    │   ├── go-build/     # Build cache (GOCACHE)
+    │   └── go-mod/       # Module cache (GOMODCACHE)
+    ├── 1.24.4/
+    │   ├── bin/
+    │   ├── gopath/
+    │   ├── go-build/
+    │   └── go-mod/
+    └── 1.25.2/
+        ├── bin/
+        ├── gopath/
+        ├── go-build/
+        └── go-mod/
+```
+
+**When Cache Isolation Applies:**
+
+- ✅ `goenv exec go <command>`
+- ✅ Commands run through goenv shims (`go`, `gofmt`, etc.)
+- ❌ Direct invocation of Go binary (bypasses goenv)
+
+**Shims automatically use cache isolation** because they internally use `goenv exec`.
