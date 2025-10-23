@@ -172,10 +172,15 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 		execCmd.Stderr = &stderr
 	}
 
-	// Execute with timeout
+	// Start the command
+	if err := execCmd.Start(); err != nil {
+		return fmt.Errorf("failed to start command: %v", err)
+	}
+
+	// Wait for completion or timeout
 	done := make(chan error, 1)
 	go func() {
-		done <- execCmd.Run()
+		done <- execCmd.Wait()
 	}()
 
 	select {
