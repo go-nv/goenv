@@ -114,7 +114,7 @@ func TestExecCommand(t *testing.T) {
 				if content, exists := tt.createBinaries[version]; exists {
 					binPath := filepath.Join(testRoot, "versions", version, "bin", "go")
 					if runtime.GOOS == "windows" {
-						binPath += ".exe"
+						binPath += ".bat"
 						// Convert Unix shell script to Windows batch file
 						content = strings.ReplaceAll(content, "#!/bin/sh\n", "@echo off\n")
 					}
@@ -168,12 +168,9 @@ func TestExecCommand(t *testing.T) {
 				systemBinDir := filepath.Join(testRoot, "system_bin")
 				os.MkdirAll(systemBinDir, 0755)
 				systemGo := filepath.Join(systemBinDir, "go")
-				if runtime.GOOS == "windows" {
-					systemGo += ".exe"
-				}
-
 				var content string
 				if runtime.GOOS == "windows" {
+					systemGo += ".bat"
 					content = "@echo off\necho system go version\n"
 				} else {
 					content = "#!/bin/sh\necho system go version\n"
@@ -270,12 +267,9 @@ func TestExecEnvironmentVariables(t *testing.T) {
 
 	// Create a binary that prints specific environment variables
 	binPath := filepath.Join(testRoot, "versions", version, "bin", "env-test")
-	if runtime.GOOS == "windows" {
-		binPath += ".exe"
-	}
-
 	var content string
 	if runtime.GOOS == "windows" {
+		binPath += ".bat"
 		content = "@echo off\necho GOROOT=%GOROOT%\necho GOPATH=%GOPATH%\n"
 	} else {
 		content = "#!/bin/sh\necho \"GOROOT=$GOROOT\"\necho \"GOPATH=$GOPATH\"\n"

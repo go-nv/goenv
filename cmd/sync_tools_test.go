@@ -153,12 +153,9 @@ func TestSyncToolsCommand(t *testing.T) {
 
 				// Create mock go binary
 				goBinary := filepath.Join(goBinDir, "go")
-				if runtime.GOOS == "windows" {
-					goBinary += ".exe"
-				}
-
 				var content string
 				if runtime.GOOS == "windows" {
+					goBinary += ".bat"
 					content = "@echo off\necho mock go\n"
 				} else {
 					content = "#!/bin/sh\necho 'mock go'\n"
@@ -179,7 +176,7 @@ func TestSyncToolsCommand(t *testing.T) {
 					for _, tool := range tools {
 						toolPath := filepath.Join(gopathBin, tool)
 						if runtime.GOOS == "windows" {
-							toolPath += ".exe"
+							toolPath += ".bat"
 						}
 						if err := os.WriteFile(toolPath, []byte("mock tool"), 0755); err != nil {
 							t.Fatalf("Failed to create tool %s: %v", tool, err)
@@ -340,36 +337,36 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 	os.Setenv("GOENV_ROOT", tmpDir)
 	defer os.Unsetenv("GOENV_ROOT")
 
-	// Setup versions with .exe binaries
+	// Setup versions with .bat binaries
 	for _, version := range []string{"1.21.0", "1.22.0"} {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
-		// Create go.exe binary
+		// Create go.bat binary
 		goBinDir := filepath.Join(versionPath, "go", "bin")
 		if err := os.MkdirAll(goBinDir, 0755); err != nil {
 			t.Fatalf("Failed to create go bin directory: %v", err)
 		}
 
-		goBinary := filepath.Join(goBinDir, "go.exe")
+		goBinary := filepath.Join(goBinDir, "go.bat")
 		if err := os.WriteFile(goBinary, []byte("mock go"), 0755); err != nil {
-			t.Fatalf("Failed to create go.exe: %v", err)
+			t.Fatalf("Failed to create go.bat: %v", err)
 		}
 
-		// Create tool .exe files
+		// Create tool .bat files
 		gopathBin := filepath.Join(versionPath, "gopath", "bin")
 		if err := os.MkdirAll(gopathBin, 0755); err != nil {
 			t.Fatalf("Failed to create GOPATH/bin: %v", err)
 		}
 
 		if version == "1.21.0" {
-			toolPath := filepath.Join(gopathBin, "mockgopls.exe")
+			toolPath := filepath.Join(gopathBin, "mockgopls.bat")
 			if err := os.WriteFile(toolPath, []byte("mock tool"), 0755); err != nil {
 				t.Fatalf("Failed to create tool: %v", err)
 			}
 		}
 	}
 
-	// Test that Windows .exe handling works
+	// Test that Windows .bat handling works
 	args := []string{"1.21.0", "1.22.0"}
 	cmd := &cobra.Command{}
 	buf := new(bytes.Buffer)
@@ -377,7 +374,7 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 
 	_ = runSyncTools(cmd, args)
 
-	// Should not error on Windows with proper .exe handling
+	// Should not error on Windows with proper .bat handling
 	output := buf.String()
 	if !strings.Contains(output, "Discovering tools") {
 		t.Errorf("Expected tool discovery on Windows, got output:\n%s", output)

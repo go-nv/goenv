@@ -531,12 +531,9 @@ func TestRehashIdempotency(t *testing.T) {
 func createTestBinary(t *testing.T, root, version, binaryName string) {
 	binDir := filepath.Join(root, "versions", version, "bin")
 	binaryPath := filepath.Join(binDir, binaryName)
-	if runtime.GOOS == "windows" {
-		binaryPath += ".exe"
-	}
-
 	var content string
 	if runtime.GOOS == "windows" {
+		binaryPath += ".bat"
 		content = fmt.Sprintf("@echo off\necho Mock %s from version %s\n", binaryName, version)
 	} else {
 		content = fmt.Sprintf("#!/bin/bash\necho 'Mock %s from version %s'\n", binaryName, version)

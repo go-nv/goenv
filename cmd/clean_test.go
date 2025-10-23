@@ -223,7 +223,7 @@ func TestGetGoBinary(t *testing.T) {
 			if tt.version != "system" && !tt.expectError {
 				expectedPath := filepath.Join(root, "versions", tt.version, "bin", "go")
 				if runtime.GOOS == "windows" {
-					expectedPath += ".exe"
+					expectedPath += ".bat"
 				}
 				if binary != expectedPath {
 					t.Errorf("Expected binary path %q, got %q", expectedPath, binary)
@@ -282,13 +282,10 @@ func setupTestGoVersion(t *testing.T, root, version string) {
 
 	// Create a fake go binary
 	goBinary := filepath.Join(binDir, "go")
-	if runtime.GOOS == "windows" {
-		goBinary += ".exe"
-	}
-
 	// Create a simple script that exits successfully
 	script := "#!/bin/sh\nexit 0"
 	if runtime.GOOS == "windows" {
+		goBinary += ".bat"
 		script = "@echo off\nexit 0"
 	}
 

@@ -140,12 +140,10 @@ func TestUpdateToolsCommand(t *testing.T) {
 
 				// Create mock go binary
 				goBinary := filepath.Join(goBinDir, "go")
-				if runtime.GOOS == "windows" {
-					goBinary += ".exe"
-				}
 				// Mock go install that succeeds
 				mockScript := "#!/bin/sh\nexit 0"
 				if runtime.GOOS == "windows" {
+					goBinary += ".bat"
 					mockScript = "@echo off\nexit 0"
 				}
 				if err := os.WriteFile(goBinary, []byte(mockScript), 0755); err != nil {
@@ -162,7 +160,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 				for _, tool := range tt.setupTools {
 					toolPath := filepath.Join(gopathBin, tool.name)
 					if runtime.GOOS == "windows" {
-						toolPath += ".exe"
+						toolPath += ".bat"
 					}
 
 					// Create mock binary with module info

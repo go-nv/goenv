@@ -127,12 +127,9 @@ func TestPrefixCommand(t *testing.T) {
 				systemBinDir = filepath.Join(testRoot, "system_bin")
 				os.MkdirAll(systemBinDir, 0755)
 				systemGo := filepath.Join(systemBinDir, "go")
-				if runtime.GOOS == "windows" {
-					systemGo += ".exe"
-				}
-
 				var content string
 				if runtime.GOOS == "windows" {
+					systemGo += ".bat"
 					content = "@echo off\necho go version go1.20.1 windows/amd64\n"
 				} else {
 					content = "#!/bin/sh\necho go version go1.20.1 linux/amd64\n"

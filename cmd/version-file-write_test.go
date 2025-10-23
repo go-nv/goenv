@@ -113,12 +113,9 @@ func TestVersionFileWriteCommand(t *testing.T) {
 					t.Fatalf("Failed to create bin directory: %v", err)
 				}
 				goExec := filepath.Join(binDir, "go")
-				if runtime.GOOS == "windows" {
-					goExec += ".exe"
-				}
-
 				var content string
 				if runtime.GOOS == "windows" {
+					goExec += ".bat"
 					content = "@echo off\necho go version go1.21.0 windows/amd64\n"
 				} else {
 					content = "#!/bin/sh\necho go version go1.21.0 linux/amd64\n"

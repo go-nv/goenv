@@ -80,12 +80,9 @@ func createTestVersion(t *testing.T, root, version string) {
 
 	// Create mock go binary
 	goBin := filepath.Join(binDir, "go")
-	if runtime.GOOS == "windows" {
-		goBin += ".exe"
-	}
-
 	var content string
 	if runtime.GOOS == "windows" {
+		goBin += ".bat"
 		content = "@echo off\necho go version go" + version + " windows/amd64\n"
 	} else {
 		content = "#!/bin/sh\necho go version go" + version + " linux/amd64\n"
