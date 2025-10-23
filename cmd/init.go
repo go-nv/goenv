@@ -36,13 +36,15 @@ var initFlags struct {
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-	initCmd.SilenceUsage = true
 	initCmd.Flags().BoolVar(&initFlags.noRehash, "no-rehash", false, "Skip rehashing shims")
 	initCmd.Flags().BoolVar(&initFlags.complete, "complete", false, "Internal flag for shell completions")
 	_ = initCmd.Flags().MarkHidden("complete")
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
+	// Ensure output goes to stdout, not stderr
+	cmd.SetOut(os.Stdout)
+
 	cfg := config.Load()
 
 	if initFlags.complete {
@@ -71,7 +73,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	if !dashMode {
-		cmd.Print(renderUsageSnippet(shell))
+		fmt.Fprint(cmd.OutOrStdout(), renderUsageSnippet(shell))
 		return nil
 	}
 
@@ -79,7 +81,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to prepare goenv directories: %w", err)
 	}
 
-	cmd.Print(renderInitScript(shell, cfg, initFlags.noRehash))
+	fmt.Fprint(cmd.OutOrStdout(), renderInitScript(shell, cfg, initFlags.noRehash))
 	return nil
 }
 
