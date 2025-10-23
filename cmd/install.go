@@ -17,10 +17,11 @@ import (
 )
 
 var installCmd = &cobra.Command{
-	Use:   "install [version]",
-	Short: "Install a Go version",
-	Long:  "Install a specific Go version. If no version is specified, installs the latest stable version.",
-	RunE:  runInstall,
+	Use:     "install [version]",
+	Short:   "Install a Go version",
+	GroupID: "common",
+	Long:    "Install a specific Go version. If no version is specified, installs the latest stable version.",
+	RunE:    runInstall,
 }
 
 var installFlags struct {

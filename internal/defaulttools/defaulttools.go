@@ -134,7 +134,7 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, verbose bo
 
 	// Set up environment for the specific Go version
 	versionPath := filepath.Join(goenvRoot, "versions", goVersion)
-	goRoot := filepath.Join(versionPath, "go")
+	goRoot := versionPath // The version directory IS the GOROOT (no extra 'go' subdirectory)
 	goBin := filepath.Join(goRoot, "bin", "go")
 
 	// On Windows, add .exe extension

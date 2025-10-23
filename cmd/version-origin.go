@@ -16,6 +16,7 @@ var versionOriginCmd = &cobra.Command{
 	Long:         "Display the file path or environment variable that sets the current Go version",
 	RunE:         runVersionOrigin,
 	SilenceUsage: true,
+	Hidden:       true, // Legacy command - use 'goenv current --verbose' instead
 }
 
 func init() {

@@ -11,11 +11,12 @@ import (
 )
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall <version>",
-	Short: "Uninstall a Go version",
-	Long:  "Remove an installed Go version from the system",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runUninstall,
+	Use:     "uninstall <version>",
+	Short:   "Uninstall a Go version",
+	GroupID: "common",
+	Long:    "Remove an installed Go version from the system",
+	Args:    cobra.MaximumNArgs(1),
+	RunE:    runUninstall,
 }
 
 var uninstallFlags struct {

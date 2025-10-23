@@ -17,8 +17,9 @@ import (
 )
 
 var initCmd = &cobra.Command{
-	Use:   "init [shell]",
-	Short: "Configure the shell environment for goenv",
+	Use:     "init [shell]",
+	Short:   "Configure the shell environment for goenv",
+	GroupID: "system",
 	Long: `Configure the shell environment for goenv.
 	
 This command should be evaluated in your shell:

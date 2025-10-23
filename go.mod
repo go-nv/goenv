@@ -2,7 +2,7 @@ module github.com/go-nv/goenv
 
 go 1.22
 
-toolchain go1.24.4
+toolchain go1.23.2
 
 require (
 	github.com/schollz/progressbar/v3 v3.18.0

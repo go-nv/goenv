@@ -124,12 +124,29 @@ func (i *Installer) Install(goVersion string, force bool) error {
 	// Extract the archive (ZIP for Windows, tar.gz for others)
 	if strings.HasSuffix(file.Filename, ".zip") {
 		if err := i.extractZip(tempFile, versionDir); err != nil {
+			os.RemoveAll(versionDir) // Clean up on failure
 			return fmt.Errorf("failed to extract: %w", err)
 		}
 	} else {
 		if err := i.extractTarGz(tempFile, versionDir); err != nil {
+			os.RemoveAll(versionDir) // Clean up on failure
 			return fmt.Errorf("failed to extract: %w", err)
 		}
+	}
+
+	// Verify installation by checking for go binary
+	goBinaryName := "go"
+	if strings.Contains(file.OS, "windows") {
+		goBinaryName = "go.exe"
+	}
+	goBinary := filepath.Join(versionDir, "bin", goBinaryName)
+	if _, err := os.Stat(goBinary); err != nil {
+		os.RemoveAll(versionDir) // Clean up corrupted installation
+		return fmt.Errorf("installation verification failed: go binary not found at %s (extraction may have failed)", goBinary)
+	}
+
+	if i.Verbose {
+		fmt.Printf("Installation verified: %s\n", goBinary)
 	}
 
 	fmt.Printf("Successfully installed Go %s to %s\n", targetRelease.Version, versionDir)

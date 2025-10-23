@@ -16,8 +16,9 @@ import (
 )
 
 var doctorCmd = &cobra.Command{
-	Use:   "doctor",
-	Short: "Diagnose goenv installation and configuration issues",
+	Use:     "doctor",
+	Short:   "Diagnose goenv installation and configuration issues",
+	GroupID: "common",
 	Long: `Checks your goenv installation and configuration for common issues.
 
 This command verifies:
@@ -378,6 +379,34 @@ func checkInstalledVersions(cfg *config.Config) checkResult {
 		}
 	}
 
+	// Validate each installation for corruption
+	var corruptedVersions []string
+	var validVersions []string
+	versionsDir := cfg.VersionsDir()
+
+	for _, ver := range versions {
+		goBinaryName := "go"
+		if runtime.GOOS == "windows" {
+			goBinaryName = "go.exe"
+		}
+		goBinary := filepath.Join(versionsDir, ver, "bin", goBinaryName)
+
+		if _, err := os.Stat(goBinary); err != nil {
+			corruptedVersions = append(corruptedVersions, ver)
+		} else {
+			validVersions = append(validVersions, ver)
+		}
+	}
+
+	if len(corruptedVersions) > 0 {
+		return checkResult{
+			name:    "Installed Go versions",
+			status:  "error",
+			message: fmt.Sprintf("Found %d version(s), but %d are CORRUPTED: %s", len(versions), len(corruptedVersions), strings.Join(corruptedVersions, ", ")),
+			advice:  fmt.Sprintf("Reinstall corrupted versions: goenv uninstall %s && goenv install %s", corruptedVersions[0], corruptedVersions[0]),
+		}
+	}
+
 	return checkResult{
 		name:    "Installed Go versions",
 		status:  "ok",
@@ -413,6 +442,23 @@ func checkCurrentVersion(cfg *config.Config) checkResult {
 			status:  "error",
 			message: fmt.Sprintf("Version '%s' is set but not installed (set by %s)", version, source),
 			advice:  fmt.Sprintf("Install the version with 'goenv install %s'", version),
+		}
+	}
+
+	// Check if the installation is corrupted (missing go binary)
+	goBinaryName := "go"
+	if runtime.GOOS == "windows" {
+		goBinaryName = "go.exe"
+	}
+	versionPath := filepath.Join(cfg.VersionsDir(), version)
+	goBinary := filepath.Join(versionPath, "bin", goBinaryName)
+
+	if _, err := os.Stat(goBinary); err != nil {
+		return checkResult{
+			name:    "Current Go version",
+			status:  "error",
+			message: fmt.Sprintf("Version '%s' is CORRUPTED - go binary missing (set by %s)", version, source),
+			advice:  fmt.Sprintf("Reinstall: goenv uninstall %s && goenv install %s", version, version),
 		}
 	}
 

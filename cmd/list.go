@@ -9,28 +9,68 @@ import (
 )
 
 var listCmd = &cobra.Command{
-	Use:    "list",
-	Short:  "List all available Go versions from the official repository",
-	Long:   "Fetches and displays all available Go versions from the official Go website",
-	RunE:   runList,
-	Hidden: true, // Hidden from commands list to match bash version
+	Use:     "list",
+	Short:   "List installed Go versions",
+	GroupID: "common",
+	Long: `List all locally installed Go versions with the current version highlighted.
+
+By default, shows installed versions (same as 'goenv versions').
+Use --remote to list available versions from golang.org.
+
+Examples:
+  goenv list              # Show installed versions
+  goenv list --remote     # Show available versions to install
+  goenv list --bare       # Show version numbers only`,
+	RunE: runList,
 }
 
 var listFlags struct {
-	stable bool
+	bare        bool
+	skipAliases bool
+	remote      bool
+	stable      bool
 }
 
 func init() {
 	rootCmd.AddCommand(listCmd)
-	listCmd.Flags().BoolVar(&listFlags.stable, "stable", false, "Show only stable releases")
+
+	// Flags for installed versions (when --remote is not used)
+	listCmd.Flags().BoolVarP(&listFlags.bare, "bare", "b", false, "Display bare version numbers only")
+	listCmd.Flags().BoolVar(&listFlags.skipAliases, "skip-aliases", false, "Skip aliases")
+
+	// Flags for remote versions (when --remote is used)
+	listCmd.Flags().BoolVarP(&listFlags.remote, "remote", "r", false, "List available versions from golang.org")
+	listCmd.Flags().BoolVar(&listFlags.stable, "stable", false, "Show only stable releases (with --remote)")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	// Validate: list command takes no positional arguments (only --stable flag)
+	// Validate: list command takes no positional arguments
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv list [--stable]")
+		if listFlags.remote {
+			return fmt.Errorf("Usage: goenv list --remote [--stable]")
+		}
+		return fmt.Errorf("Usage: goenv list [--bare] [--skip-aliases] [--remote]")
 	}
 
+	// Route to appropriate handler
+	if listFlags.remote {
+		return runListRemote(cmd)
+	}
+	return runListInstalled(cmd)
+}
+
+// runListInstalled shows locally installed versions (reuses versions command logic)
+func runListInstalled(cmd *cobra.Command) error {
+	// Copy flags to versionsFlags so we can reuse runVersions
+	versionsFlags.bare = listFlags.bare
+	versionsFlags.skipAliases = listFlags.skipAliases
+
+	// Reuse the versions command implementation
+	return runVersions(cmd, []string{})
+}
+
+// runListRemote shows available versions from golang.org
+func runListRemote(cmd *cobra.Command) error {
 	cfg := config.Load()
 	if cfg.Debug {
 		fmt.Println("Debug: Fetching available Go versions...")

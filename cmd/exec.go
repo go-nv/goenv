@@ -18,8 +18,9 @@ import (
 )
 
 var execCmd = &cobra.Command{
-	Use:   "exec <command> [args...]",
-	Short: "Execute a command with the selected Go version",
+	Use:     "exec <command> [args...]",
+	Short:   "Execute a command with the selected Go version",
+	GroupID: "system",
 	Long: `Runs an executable by first preparing PATH so that the selected Go version's bin directory is at the front.
 
 goenv automatically rehashes after successful 'go install' commands, so installed tools are immediately available without running 'goenv rehash' manually.`,

@@ -16,8 +16,9 @@ import (
 )
 
 var updateCmd = &cobra.Command{
-	Use:   "update",
-	Short: "Update goenv to the latest version",
+	Use:     "update",
+	Short:   "Update goenv to the latest version",
+	GroupID: "system",
 	Long: `Updates goenv to the latest version.
 
 For git-based installations (recommended):

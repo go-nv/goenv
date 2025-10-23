@@ -5,15 +5,17 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
+	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
 
 var globalCmd = &cobra.Command{
-	Use:   "global [version]",
-	Short: "Set or show the global Go version",
-	Long:  "Set the global Go version that is used in all directories unless overridden by a local .go-version file",
-	RunE:  runGlobal,
+	Use:    "global [version]",
+	Short:  "Set or show the global Go version",
+	Long:   "Set the global Go version that is used in all directories unless overridden by a local .go-version file",
+	RunE:   runGlobal,
+	Hidden: true, // Legacy command - use 'goenv use <version> --global' instead
 }
 
 var globalFlags struct {
@@ -70,11 +72,52 @@ func runGlobal(cmd *cobra.Command, args []string) error {
 	// Set global version
 	version := args[0]
 
-	if cfg.Debug {
-		fmt.Printf("Debug: Setting global version to %s\n", version)
+	// Resolve version spec
+	resolvedVersion, err := mgr.ResolveVersionSpec(version)
+	if err != nil {
+		return err
 	}
 
-	if err := mgr.SetGlobalVersion(version); err != nil {
+	// Check installation status
+	status, err := mgr.CheckVersionStatus(resolvedVersion)
+	if err != nil {
+		return fmt.Errorf("failed to check version status: %w", err)
+	}
+
+	if !status.Installed {
+		fmt.Fprintf(cmd.OutOrStdout(), "Go %s is not installed\n\n", resolvedVersion)
+
+		// Prompt for installation
+		if manager.PromptForInstall(resolvedVersion, fmt.Sprintf("Setting global version to %s", resolvedVersion)) {
+			fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing Go %s...\n", resolvedVersion)
+
+			installer := install.NewInstaller(cfg)
+			if err := installer.Install(resolvedVersion, false); err != nil {
+				return fmt.Errorf("installation failed: %w", err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "✅ Installation complete\n\n")
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "global"))
+			return fmt.Errorf("installation cancelled")
+		}
+	} else if status.Corrupted {
+		if manager.PromptForReinstall(resolvedVersion) {
+			installer := install.NewInstaller(cfg)
+			if err := installer.Install(resolvedVersion, true); err != nil {
+				return fmt.Errorf("reinstallation failed: %w", err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "✅ Reinstallation complete\n\n")
+		} else {
+			return fmt.Errorf("corrupted installation - reinstall cancelled")
+		}
+	}
+
+	if cfg.Debug {
+		fmt.Printf("Debug: Setting global version to %s\n", resolvedVersion)
+	}
+
+	if err := mgr.SetGlobalVersion(resolvedVersion); err != nil {
 		return err
 	}
 

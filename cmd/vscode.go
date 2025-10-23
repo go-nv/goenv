@@ -16,9 +16,10 @@ import (
 )
 
 var vscodeCmd = &cobra.Command{
-	Use:   "vscode",
-	Short: "Manage VS Code integration",
-	Long:  "Commands to configure and manage Visual Studio Code integration with goenv",
+	Use:     "vscode",
+	Short:   "Manage VS Code integration",
+	GroupID: "config",
+	Long:    "Commands to configure and manage Visual Studio Code integration with goenv",
 }
 
 var vscodeInitCmd = &cobra.Command{

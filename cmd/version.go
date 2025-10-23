@@ -15,6 +15,7 @@ var versionCmd = &cobra.Command{
 	Long:               "Display the currently active Go version and how it was set",
 	RunE:               runVersion,
 	DisableFlagParsing: true, // Prevent --version from being treated as a flag
+	Hidden:             true, // Legacy command - use 'goenv current' instead
 }
 
 func init() {

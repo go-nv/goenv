@@ -9,14 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var rootCmd2 = &cobra.Command{
-	Use:                "root",
-	Short:              "Display the root directory where goenv stores its data",
-	Long:               "Show the GOENV_ROOT directory path",
-	DisableFlagParsing: true,
-	RunE:               runRoot,
-}
-
 var prefixCmd = &cobra.Command{
 	Use:   "prefix [version]",
 	Short: "Display the installation prefix for a Go version",
@@ -29,21 +21,9 @@ var prefixFlags struct {
 }
 
 func init() {
-	rootCmd.AddCommand(rootCmd2)
 	rootCmd.AddCommand(prefixCmd)
 	prefixCmd.Flags().BoolVar(&prefixFlags.complete, "complete", false, "Show completion options")
 	_ = prefixCmd.Flags().MarkHidden("complete")
-}
-
-func runRoot(cmd *cobra.Command, args []string) error {
-	// Validate: root command takes no arguments
-	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv root")
-	}
-
-	cfg := config.Load()
-	fmt.Fprintln(cmd.OutOrStdout(), cfg.Root)
-	return nil
 }
 
 func runPrefix(cmd *cobra.Command, args []string) error {

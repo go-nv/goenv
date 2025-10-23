@@ -17,6 +17,7 @@ var versionFileWriteCmd = &cobra.Command{
 	Args:         cobra.MinimumNArgs(2),
 	RunE:         runVersionFileWrite,
 	SilenceUsage: true,
+	Hidden:       true, // Internal command - not for typical user interaction
 }
 
 func init() {

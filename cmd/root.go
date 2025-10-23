@@ -90,7 +90,7 @@ var rootCmd = &cobra.Command{
 				}
 
 				fmt.Fprintf(cmd.OutOrStdout(), "\n")
-				showHelpMessage(cmd)
+				cmd.Help()
 				return
 			}
 
@@ -134,39 +134,17 @@ var rootCmd = &cobra.Command{
 			// If we found a version, show help and exit
 			if result.VersionFound {
 				fmt.Fprintf(cmd.OutOrStdout(), "\n")
-				showHelpMessage(cmd)
+				cmd.Help()
 				return
 			}
 		}
 
-		// If no command is provided and no .go-version, show simple help message matching bash version
-		showHelpMessage(cmd)
+		// If no command is provided and no .go-version, show help using cobra's built-in grouped help
+		cmd.Help()
 		os.Exit(1)
 	},
 }
 
-// showHelpMessage displays the goenv help information
-func showHelpMessage(cmd *cobra.Command) {
-	fmt.Fprintf(cmd.OutOrStdout(), "goenv %s\n", appVersion)
-	fmt.Fprintln(cmd.OutOrStdout(), `Usage: goenv <command> [<args>]
-
-Some useful goenv commands are:
-   commands    List all available commands of goenv
-   local       Set or show the local application-specific Go version
-   global      Set or show the global Go version
-   shell       Set or show the shell-specific Go version
-   install     Install a Go version using go-build
-   uninstall   Uninstall a specific Go version
-   refresh     Clear caches and fetch fresh version data
-   rehash      Rehash goenv shims (run this after installing executables)
-   version     Show the current Go version and its origin
-   versions    List all Go versions available to goenv
-   which       Display the full path to an executable
-   whence      List all Go versions that contain the given executable
-
-See 'goenv help <command>' for information on a specific command.
-For full documentation, see: https://github.com/go-nv/goenv#readme`)
-}
 func Execute() {
 	// Check for version shorthand syntax before executing
 	// If first arg looks like a version number, route to local command
@@ -215,6 +193,26 @@ func isVersionLike(s string) bool {
 }
 
 func init() {
+	// Add command groups to organize help output
+	rootCmd.AddGroup(
+		&cobra.Group{
+			ID:    "common",
+			Title: "Common Commands:",
+		},
+		&cobra.Group{
+			ID:    "tools",
+			Title: "Tool Management:",
+		},
+		&cobra.Group{
+			ID:    "config",
+			Title: "Configuration:",
+		},
+		&cobra.Group{
+			ID:    "system",
+			Title: "System Commands:",
+		},
+	)
+
 	// Add global flags here if needed
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug mode")
 

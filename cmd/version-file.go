@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
@@ -15,6 +16,7 @@ var versionFileCmd = &cobra.Command{
 	Args:         cobra.MaximumNArgs(1),
 	RunE:         runVersionFile,
 	SilenceUsage: true,
+	Hidden:       true, // Legacy command - use 'goenv current --file' instead
 }
 
 func init() {

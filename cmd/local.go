@@ -7,15 +7,17 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
+	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
 
 var localCmd = &cobra.Command{
-	Use:   "local [version]",
-	Short: "Set or show the local Go version for this directory",
-	Long:  "Set a local Go version for the current directory by creating a .go-version file",
-	RunE:  runLocal,
+	Use:    "local [version]",
+	Short:  "Set or show the local Go version for this directory",
+	Long:   "Set a local Go version for the current directory by creating a .go-version file",
+	RunE:   runLocal,
+	Hidden: true, // Legacy command - use 'goenv use <version>' instead
 }
 
 var localFlags struct {
@@ -137,16 +139,42 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		}
 
 		spec = versionFromGoMod
-
-		// For --from-gomod, use the version directly (don't require it to be installed yet)
 		resolvedVersion = spec
 
-		// Check if version is installed
-		if !mgr.IsVersionInstalled(resolvedVersion) {
-			fmt.Fprintf(cmd.OutOrStdout(), "Go %s (from go.mod) is not installed\n", resolvedVersion)
-			fmt.Fprintf(cmd.OutOrStdout(), "\nTo install and set this version:\n")
-			fmt.Fprintf(cmd.OutOrStdout(), "  goenv install %s && goenv local %s\n", resolvedVersion, resolvedVersion)
-			return fmt.Errorf("version %s not installed", resolvedVersion)
+		// Check installation status
+		status, err := mgr.CheckVersionStatus(resolvedVersion)
+		if err != nil {
+			return fmt.Errorf("failed to check version status: %w", err)
+		}
+
+		if !status.Installed {
+			fmt.Fprintf(cmd.OutOrStdout(), "Go %s (from go.mod) is not installed\n\n", resolvedVersion)
+
+			// Prompt for installation
+			if manager.PromptForInstall(resolvedVersion, "Setting local version from go.mod") {
+				fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing Go %s...\n", resolvedVersion)
+
+				installer := install.NewInstaller(cfg)
+				if err := installer.Install(resolvedVersion, false); err != nil {
+					return fmt.Errorf("installation failed: %w", err)
+				}
+
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Installation complete\n\n")
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "\nTo install later:\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "  goenv install %s && goenv local %s\n", resolvedVersion, resolvedVersion)
+				return fmt.Errorf("installation cancelled")
+			}
+		} else if status.Corrupted {
+			if manager.PromptForReinstall(resolvedVersion) {
+				installer := install.NewInstaller(cfg)
+				if err := installer.Install(resolvedVersion, true); err != nil {
+					return fmt.Errorf("reinstallation failed: %w", err)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Reinstallation complete\n\n")
+			} else {
+				return fmt.Errorf("corrupted installation - reinstall cancelled")
+			}
 		}
 	} else {
 		if len(args) == 0 {
@@ -154,11 +182,46 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		}
 		spec = args[0]
 
-		// For manual version spec, resolve and validate it's installed
+		// For manual version spec, resolve and check status
 		var err error
 		resolvedVersion, err = mgr.ResolveVersionSpec(spec)
 		if err != nil {
 			return err
+		}
+
+		// Check installation status
+		status, err := mgr.CheckVersionStatus(resolvedVersion)
+		if err != nil {
+			return fmt.Errorf("failed to check version status: %w", err)
+		}
+
+		if !status.Installed {
+			fmt.Fprintf(cmd.OutOrStdout(), "Go %s is not installed\n\n", resolvedVersion)
+
+			// Prompt for installation
+			if manager.PromptForInstall(resolvedVersion, fmt.Sprintf("Setting local version to %s", resolvedVersion)) {
+				fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing Go %s...\n", resolvedVersion)
+
+				installer := install.NewInstaller(cfg)
+				if err := installer.Install(resolvedVersion, false); err != nil {
+					return fmt.Errorf("installation failed: %w", err)
+				}
+
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Installation complete\n\n")
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "local"))
+				return fmt.Errorf("installation cancelled")
+			}
+		} else if status.Corrupted {
+			if manager.PromptForReinstall(resolvedVersion) {
+				installer := install.NewInstaller(cfg)
+				if err := installer.Install(resolvedVersion, true); err != nil {
+					return fmt.Errorf("reinstallation failed: %w", err)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Reinstallation complete\n\n")
+			} else {
+				return fmt.Errorf("corrupted installation - reinstall cancelled")
+			}
 		}
 	}
 

@@ -11,10 +11,11 @@ import (
 )
 
 var versionsCmd = &cobra.Command{
-	Use:   "versions",
-	Short: "List all installed Go versions",
-	Long:  "Show all locally installed Go versions with the current version highlighted",
-	RunE:  runVersions,
+	Use:    "versions",
+	Short:  "List all installed Go versions",
+	Long:   "Show all locally installed Go versions with the current version highlighted",
+	RunE:   runVersions,
+	Hidden: true, // Legacy command - use 'goenv list' instead
 }
 
 var versionsFlags struct {

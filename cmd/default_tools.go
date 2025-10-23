@@ -10,8 +10,9 @@ import (
 )
 
 var defaultToolsCmd = &cobra.Command{
-	Use:   "default-tools",
-	Short: "Manage default tools installed with new Go versions",
+	Use:     "default-tools",
+	Short:   "Manage default tools installed with new Go versions",
+	GroupID: "tools",
 	Long: `Manages the list of tools automatically installed with each new Go version.
 
 Default tools are specified in ~/.goenv/default-tools.yaml and are automatically

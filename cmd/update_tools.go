@@ -13,8 +13,9 @@ import (
 )
 
 var updateToolsCmd = &cobra.Command{
-	Use:   "update-tools",
-	Short: "Update installed Go tools to their latest versions",
+	Use:     "update-tools",
+	Short:   "Update installed Go tools to their latest versions",
+	GroupID: "tools",
 	Long: `Updates all installed Go tools to their latest versions.
 
 This command checks all tools installed in the current Go version's GOPATH

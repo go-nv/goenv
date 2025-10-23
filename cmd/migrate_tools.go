@@ -15,8 +15,9 @@ import (
 )
 
 var migrateToolsCmd = &cobra.Command{
-	Use:   "migrate-tools <source-version> <target-version>",
-	Short: "Migrate installed Go tools from one Go version to another",
+	Use:     "migrate-tools <source-version> <target-version>",
+	Short:   "Migrate installed Go tools from one Go version to another",
+	GroupID: "tools",
 	Long: `Migrates all installed Go tools from a source Go version to a target Go version.
 
 This command is useful when upgrading Go versions and wanting to maintain
