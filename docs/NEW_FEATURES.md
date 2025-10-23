@@ -456,7 +456,6 @@ Provides fine-grained control over automatic rehashing with the `--no-rehash` fl
 # Rehash happens automatically after:
 goenv install 1.22.5        # Auto-rehash creates shims
 goenv exec go install ...   # Auto-rehash after tool installation
-goenv migrate-tools         # Auto-rehash after migration
 
 # Takes ~60ms - negligible for interactive use
 ```
@@ -549,7 +548,7 @@ echo "Installed and rehashed all versions"
 **Environment Variable:**
 
 - `GOENV_NO_AUTO_REHASH=1` - Disable auto-rehash globally
-- Applies to: `goenv install`, `goenv exec go install`, `goenv migrate-tools`
+- Applies to: `goenv install`, `goenv exec go install`, `goenv sync-tools`
 
 ### When to Use
 

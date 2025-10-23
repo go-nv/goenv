@@ -956,22 +956,22 @@ func checkToolMigration(cfg *config.Config) checkResult {
 		}
 	}
 
-	// Found tools in other versions but not current - suggest migration
+	// Found tools in other versions but not current - suggest sync
 	if len(versionsWithTools) == 1 {
 		return checkResult{
-			name:    "Tool migration",
+			name:    "Tool sync",
 			status:  "warning",
 			message: fmt.Sprintf("Current Go %s has no tools, but Go %s has %d tool(s)", currentVersion, bestSourceVersion, maxToolCount),
-			advice:  fmt.Sprintf("Migrate tools with: goenv migrate-tools %s %s", bestSourceVersion, currentVersion),
+			advice:  fmt.Sprintf("Sync tools with: goenv sync-tools (or: goenv sync-tools %s)", bestSourceVersion),
 		}
 	}
 
 	// Multiple versions have tools
 	return checkResult{
-		name:    "Tool migration",
+		name:    "Tool sync",
 		status:  "warning",
 		message: fmt.Sprintf("Current Go %s has no tools, but %d other version(s) have tools (e.g., Go %s has %d tool(s))", currentVersion, len(versionsWithTools), bestSourceVersion, maxToolCount),
-		advice:  fmt.Sprintf("Migrate tools from most recent version: goenv migrate-tools %s %s", bestSourceVersion, currentVersion),
+		advice:  fmt.Sprintf("Sync tools from best source: goenv sync-tools (will auto-select Go %s)", bestSourceVersion),
 	}
 }
 

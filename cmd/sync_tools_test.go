@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func TestMigrateToolsCommand(t *testing.T) {
+func TestSyncToolsCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		args           []string
@@ -25,23 +25,23 @@ func TestMigrateToolsCommand(t *testing.T) {
 		{
 			name:          "no arguments provided",
 			args:          []string{},
-			expectedError: "accepts 2 arg(s), received 0",
+			expectedError: "cannot determine current Go version",
 		},
 		{
 			name:          "only one argument provided",
 			args:          []string{"1.21.0"},
-			expectedError: "accepts 2 arg(s), received 1",
+			expectedError: "cannot determine current Go version",
 		},
 		{
 			name:          "too many arguments provided",
 			args:          []string{"1.21.0", "1.22.0", "extra"},
-			expectedError: "accepts 2 arg(s), received 3",
+			expectedError: "accepts at most 2 arg(s), received 3",
 		},
 		{
 			name:          "source and target versions are the same",
 			args:          []string{"1.21.0", "1.21.0"},
 			setupVersions: []string{"1.21.0"},
-			expectedError: "source and target versions cannot be the same",
+			expectedError: "source and target versions are the same",
 		},
 		{
 			name:          "source version does not exist",
@@ -69,7 +69,7 @@ func TestMigrateToolsCommand(t *testing.T) {
 			setupTools: map[string][]string{
 				"1.21.0": {"mockgopls"},
 			},
-			expectedOutput: "Successfully migrated: 1 tool(s)",
+			expectedOutput: "Successfully synced: 1 tool(s)",
 		},
 		{
 			name:          "dry-run mode",
@@ -93,7 +93,7 @@ func TestMigrateToolsCommand(t *testing.T) {
 			flags: map[string]string{
 				"select": "mockgopls,mockdelve",
 			},
-			expectedOutput: "2 tool(s) to migrate",
+			expectedOutput: "2 tool(s) to sync",
 		},
 		{
 			name:          "exclude specific tools",
@@ -105,7 +105,7 @@ func TestMigrateToolsCommand(t *testing.T) {
 			flags: map[string]string{
 				"exclude": "mockstaticcheck",
 			},
-			expectedOutput: "2 tool(s) to migrate",
+			expectedOutput: "2 tool(s) to sync",
 		},
 		{
 			name:          "select and exclude together",
@@ -118,7 +118,7 @@ func TestMigrateToolsCommand(t *testing.T) {
 				"select":  "mockgopls,mockdelve,mockstaticcheck",
 				"exclude": "mockdelve",
 			},
-			expectedOutput: "2 tool(s) to migrate",
+			expectedOutput: "2 tool(s) to sync",
 		},
 		{
 			name:          "no tools after filtering",
@@ -130,7 +130,7 @@ func TestMigrateToolsCommand(t *testing.T) {
 			flags: map[string]string{
 				"select": "mockdelve", // Select tool that doesn't exist
 			},
-			expectedOutput: "No tools to migrate",
+			expectedOutput: "No tools to sync",
 		},
 	}
 
@@ -185,13 +185,13 @@ func TestMigrateToolsCommand(t *testing.T) {
 			cmd.SetArgs(tt.args)
 
 			// Set flags
-			migrateToolsCmd.ResetFlags()
-			migrateToolsCmd.Flags().BoolVar(&migrateToolsFlags.dryRun, "dry-run", false, "")
-			migrateToolsCmd.Flags().StringVar(&migrateToolsFlags.select_, "select", "", "")
-			migrateToolsCmd.Flags().StringVar(&migrateToolsFlags.exclude, "exclude", "", "")
+			syncToolsCmd.ResetFlags()
+			syncToolsCmd.Flags().BoolVar(&syncToolsFlags.dryRun, "dry-run", false, "")
+			syncToolsCmd.Flags().StringVar(&syncToolsFlags.select_, "select", "", "")
+			syncToolsCmd.Flags().StringVar(&syncToolsFlags.exclude, "exclude", "", "")
 
 			for key, value := range tt.flags {
-				migrateToolsCmd.Flags().Set(key, value)
+				syncToolsCmd.Flags().Set(key, value)
 			}
 
 			// Capture output
@@ -200,17 +200,17 @@ func TestMigrateToolsCommand(t *testing.T) {
 			r, w, _ := os.Pipe()
 			os.Stdout = w
 
-			migrateToolsCmd.SetOut(buf)
-			migrateToolsCmd.SetErr(buf)
+			syncToolsCmd.SetOut(buf)
+			syncToolsCmd.SetErr(buf)
 
 			// Execute - check Args validation first for cases with wrong number of args
 			var err error
 			if len(tt.args) != 2 {
-				// These will fail Args validation, not in runMigrateTools
-				err = migrateToolsCmd.Args(migrateToolsCmd, tt.args)
+				// These will fail Args validation, not in runSyncTools
+				err = syncToolsCmd.Args(syncToolsCmd, tt.args)
 			} else {
 				// Proper arg count, execute normally
-				err = runMigrateTools(migrateToolsCmd, tt.args)
+				err = runSyncTools(syncToolsCmd, tt.args)
 			}
 
 			// Restore stdout and get output
@@ -239,16 +239,16 @@ func TestMigrateToolsCommand(t *testing.T) {
 			}
 
 			// Reset flags after each test
-			migrateToolsFlags.dryRun = false
-			migrateToolsFlags.select_ = ""
-			migrateToolsFlags.exclude = ""
+			syncToolsFlags.dryRun = false
+			syncToolsFlags.select_ = ""
+			syncToolsFlags.exclude = ""
 		})
 	}
 }
 
-func TestMigrateToolsHelp(t *testing.T) {
+func TestSyncToolsHelp(t *testing.T) {
 	buf := new(bytes.Buffer)
-	cmd := migrateToolsCmd
+	cmd := syncToolsCmd
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 
@@ -262,7 +262,7 @@ func TestMigrateToolsHelp(t *testing.T) {
 
 	// Check for key help text elements
 	expectedStrings := []string{
-		"migrate-tools",
+		"sync-tools",
 		"source-version",
 		"target-version",
 		"--dry-run",
@@ -280,7 +280,7 @@ func TestMigrateToolsHelp(t *testing.T) {
 
 func TestFilterTools(t *testing.T) {
 	// This function tests the filter logic conceptually
-	// The actual filterTools function is tested indirectly through TestMigrateToolsCommand
+	// The actual filterTools function is tested indirectly through TestSyncToolsCommand
 
 	tests := []struct {
 		name          string
@@ -323,7 +323,7 @@ func TestFilterTools(t *testing.T) {
 	}
 }
 
-func TestMigrateToolsWindowsCompatibility(t *testing.T) {
+func TestSyncToolsWindowsCompatibility(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows-specific test")
 	}
@@ -367,7 +367,7 @@ func TestMigrateToolsWindowsCompatibility(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 
-	_ = runMigrateTools(cmd, args)
+	_ = runSyncTools(cmd, args)
 
 	// Should not error on Windows with proper .exe handling
 	output := buf.String()

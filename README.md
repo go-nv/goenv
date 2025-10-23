@@ -32,7 +32,7 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
 - **Self-update capability** (`goenv update`) for both git and binary installations
 - **Default tools** (`goenv default-tools`) - auto-install common tools with new Go versions
 - **Update tools** (`goenv update-tools`) - keep all installed Go tools current
-- **Migrate tools** (`goenv migrate-tools`) - copy tools when upgrading Go versions
+- **Sync tools** (`goenv sync-tools`) - replicate tools when upgrading Go versions (with smart auto-detection)
 - **Version aliases** (`goenv alias`) - create convenient shorthand names for versions
 
 ### goenv compared to others:

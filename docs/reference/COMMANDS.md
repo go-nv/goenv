@@ -36,7 +36,7 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv installed`](#goenv-installed)
   - [`goenv local`](#goenv-local)
     - [`goenv local` (advanced)](#goenv-local-advanced)
-  - [`goenv migrate-tools`](#goenv-migrate-tools)
+  - [`goenv sync-tools`](#goenv-sync-tools)
     - [Options](#options-1)
   - [`goenv prefix`](#goenv-prefix)
   - [`goenv refresh`](#goenv-refresh)
@@ -679,33 +679,46 @@ You can use a shorthand syntax to set the local version by specifying the versio
 
 This shorthand automatically routes to the `local` command, making it faster to switch versions in your current directory.
 
-## `goenv migrate-tools`
+## `goenv sync-tools`
 
-Migrate installed Go tools from one Go version to another.
+Sync/replicate installed Go tools from one Go version to another.
+
+This command discovers tools in the source version and reinstalls them (from source) in the target version. The source version remains unchanged - think of this as "syncing" or "replicating" your tool setup rather than "moving" tools.
+
+**Smart defaults:**
+- No args: Sync from version with most tools → current version
+- One arg: Sync from that version → current version
+- Two args: Sync from source → target (explicit control)
 
 **Usage:**
 
 ```shell
-# Migrate all tools from 1.24.1 to 1.25.2
-> goenv migrate-tools 1.24.1 1.25.2
+# Auto-sync: finds best source, syncs to current version
+> goenv sync-tools
 
-# Preview migration without actually installing
-> goenv migrate-tools 1.24.1 1.25.2 --dry-run
+# Sync from specific version to current version
+> goenv sync-tools 1.24.1
 
-# Migrate only specific tools
-> goenv migrate-tools 1.24.1 1.25.2 --select gopls,delve
+# Explicit source and target
+> goenv sync-tools 1.24.1 1.25.2
 
-# Migrate all except specific tools
-> goenv migrate-tools 1.24.1 1.25.2 --exclude staticcheck
+# Preview auto-sync
+> goenv sync-tools --dry-run
+
+# Sync only specific tools
+> goenv sync-tools 1.24.1 --select gopls,delve
+
+# Exclude certain tools
+> goenv sync-tools 1.24.1 --exclude staticcheck
 ```
 
 ### Options
 
-- `--dry-run` - Show what would be migrated without actually migrating
-- `--select <tools>` - Comma-separated list of tools to migrate (e.g., gopls,delve)
-- `--exclude <tools>` - Comma-separated list of tools to exclude from migration
+- `--dry-run` / `-n` - Show what would be synced without actually syncing
+- `--select <tools>` - Comma-separated list of tools to sync (e.g., gopls,delve)
+- `--exclude <tools>` - Comma-separated list of tools to exclude from sync
 
-This command is useful when upgrading Go versions and wanting to maintain your tool environment. It discovers all tools in the source version and reinstalls them in the target version.
+This command is useful when upgrading Go versions and wanting to maintain your tool environment across versions.
 
 ## `goenv prefix`
 
