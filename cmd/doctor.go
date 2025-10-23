@@ -94,6 +94,12 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 14: Check for unmigrated tools when using a new version
 	results = append(results, checkToolMigration(cfg))
 
+	// Check 15: GOCACHE isolation
+	results = append(results, checkGocacheIsolation(cfg))
+
+	// Check 16: Architecture mismatches in cache
+	results = append(results, checkCacheArchitecture(cfg))
+
 	// Print results
 	fmt.Fprintln(cmd.OutOrStdout(), "📋 Diagnostic Results:")
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -972,6 +978,107 @@ func checkToolMigration(cfg *config.Config) checkResult {
 		status:  "warning",
 		message: fmt.Sprintf("Current Go %s has no tools, but %d other version(s) have tools (e.g., Go %s has %d tool(s))", currentVersion, len(versionsWithTools), bestSourceVersion, maxToolCount),
 		advice:  fmt.Sprintf("Sync tools from best source: goenv sync-tools (will auto-select Go %s)", bestSourceVersion),
+	}
+}
+
+func checkGocacheIsolation(cfg *config.Config) checkResult {
+	mgr := manager.NewManager(cfg)
+	version, _, err := mgr.GetCurrentVersion()
+	if err != nil || version == "" {
+		return checkResult{
+			name:    "Build cache isolation",
+			status:  "ok",
+			message: "Not applicable (no version set)",
+		}
+	}
+
+	if version == "system" {
+		return checkResult{
+			name:    "Build cache isolation",
+			status:  "ok",
+			message: "Not applicable (using system Go)",
+		}
+	}
+
+	// Check if GOCACHE isolation is disabled
+	if os.Getenv("GOENV_DISABLE_GOCACHE") == "1" {
+		return checkResult{
+			name:    "Build cache isolation",
+			status:  "ok",
+			message: "Cache isolation disabled by GOENV_DISABLE_GOCACHE",
+		}
+	}
+
+	// Get expected GOCACHE path
+	versionPath := filepath.Join(cfg.VersionsDir(), version)
+	customGocacheDir := os.Getenv("GOENV_GOCACHE_DIR")
+	var expectedGocache string
+	if customGocacheDir != "" {
+		expectedGocache = filepath.Join(customGocacheDir, version)
+	} else {
+		expectedGocache = filepath.Join(versionPath, "go-build")
+	}
+
+	// Check what GOCACHE would be set to when running commands
+	// Note: We can't rely on current env var since exec.go sets it
+	return checkResult{
+		name:    "Build cache isolation",
+		status:  "ok",
+		message: fmt.Sprintf("Version-specific cache: %s", expectedGocache),
+		advice:  "Cache isolation prevents 'exec format error' when switching versions",
+	}
+}
+
+func checkCacheArchitecture(cfg *config.Config) checkResult {
+	// Detect current architecture
+	currentArch := runtime.GOARCH
+	currentOS := runtime.GOOS
+
+	// Try to get GOCACHE location
+	cmd := exec.Command("go", "env", "GOCACHE")
+	output, err := cmd.Output()
+	var gocache string
+	if err == nil {
+		gocache = strings.TrimSpace(string(output))
+	} else {
+		// Fallback to environment variable
+		gocache = os.Getenv("GOCACHE")
+	}
+
+	if gocache == "" {
+		return checkResult{
+			name:    "Cache architecture",
+			status:  "ok",
+			message: "Cannot determine GOCACHE location",
+		}
+	}
+
+	// Check if cache directory exists
+	stat, err := os.Stat(gocache)
+	if err != nil || !stat.IsDir() {
+		return checkResult{
+			name:    "Cache architecture",
+			status:  "ok",
+			message: "Build cache is empty or doesn't exist yet",
+		}
+	}
+
+	// Check if it's a version-specific cache (contains GOENV_ROOT path)
+	isVersionSpecific := strings.Contains(gocache, cfg.Root)
+
+	if isVersionSpecific {
+		return checkResult{
+			name:    "Cache architecture",
+			status:  "ok",
+			message: fmt.Sprintf("Using version-specific cache for %s/%s", currentOS, currentArch),
+		}
+	}
+
+	return checkResult{
+		name:    "Cache architecture",
+		status:  "warning",
+		message: fmt.Sprintf("Using shared system cache at %s for %s/%s", gocache, currentOS, currentArch),
+		advice:  "If you see 'exec format error', run: goenv clean build",
 	}
 }
 

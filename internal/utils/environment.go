@@ -21,6 +21,8 @@ const (
 	GoenvEnvVarShimDebug        GoenvEnvVar = "GOENV_SHIM_DEBUG"
 	GoenvEnvVarHooksConfig      GoenvEnvVar = "GOENV_HOOKS_CONFIG"
 	GoenvEnvVarInstallRoot      GoenvEnvVar = "GOENV_INSTALL_ROOT"
+	GoenvEnvVarGocacheDir       GoenvEnvVar = "GOENV_GOCACHE_DIR"
+	GoenvEnvVarGomodcacheDir    GoenvEnvVar = "GOENV_GOMODCACHE_DIR"
 	// #endregion
 
 	// #region Bool Env Vars
@@ -30,9 +32,11 @@ const (
 	GoenvEnvVarAppendGopath  GoenvBoolEnv = "GOENV_APPEND_GOPATH"
 	GoenvEnvVarPrependGopath GoenvBoolEnv = "GOENV_PREPEND_GOPATH"
 	GoenvEnvVarAutoInstall   GoenvBoolEnv = "GOENV_AUTO_INSTALL"
-	GoenvEnvVarNoAutoRehash  GoenvBoolEnv = "GOENV_NO_AUTO_REHASH"
-	GoenvEnvVarOffline       GoenvBoolEnv = "GOENV_OFFLINE"
-	GoenvEnvVarAutoRehash    GoenvBoolEnv = "GOENV_AUTO_REHASH"
+	GoenvEnvVarNoAutoRehash     GoenvBoolEnv = "GOENV_NO_AUTO_REHASH"
+	GoenvEnvVarOffline          GoenvBoolEnv = "GOENV_OFFLINE"
+	GoenvEnvVarAutoRehash       GoenvBoolEnv = "GOENV_AUTO_REHASH"
+	GoenvEnvVarDisableGocache   GoenvBoolEnv = "GOENV_DISABLE_GOCACHE"
+	GoenvEnvVarDisableGomodcache GoenvBoolEnv = "GOENV_DISABLE_GOMODCACHE"
 	// #endregion
 )
 

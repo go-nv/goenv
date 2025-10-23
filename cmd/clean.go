@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
@@ -40,14 +41,16 @@ Examples:
 }
 
 var cleanFlags struct {
-	force   bool
-	verbose bool
+	force    bool
+	verbose  bool
+	diagnose bool
 }
 
 func init() {
 	rootCmd.AddCommand(cleanCmd)
 	cleanCmd.Flags().BoolVarP(&cleanFlags.force, "force", "f", false, "Skip confirmation prompts")
 	cleanCmd.Flags().BoolVarP(&cleanFlags.verbose, "verbose", "v", false, "Show detailed output")
+	cleanCmd.Flags().BoolVar(&cleanFlags.diagnose, "diagnose", false, "Show why cache might need cleaning")
 	helptext.SetCommandHelp(cleanCmd)
 }
 
@@ -59,6 +62,13 @@ func completeCleanTargets(cmd *cobra.Command, args []string, toComplete string) 
 }
 
 func runClean(cmd *cobra.Command, args []string) error {
+	cfg := config.Load()
+
+	// If diagnose flag is set, run diagnostics and exit
+	if cleanFlags.diagnose {
+		return diagnoseCacheIssues(cmd, cfg)
+	}
+
 	// Determine target
 	target := "build"
 	if len(args) > 0 {
@@ -80,7 +90,6 @@ func runClean(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("too many arguments. Usage: goenv clean [build|modcache|all]")
 	}
 
-	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 
 	// Get current Go version
@@ -245,4 +254,109 @@ func joinWithCommas(items []string) string {
 		}
 	}
 	return result
+}
+
+func diagnoseCacheIssues(cmd *cobra.Command, cfg *config.Config) error {
+	fmt.Fprintln(cmd.OutOrStdout(), "🔍 Diagnosing cache issues...")
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Check architecture
+	fmt.Fprintf(cmd.OutOrStdout(), "Current architecture: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+
+	// Get current Go version
+	mgr := manager.NewManager(cfg)
+	currentVersion, _, err := mgr.GetCurrentVersion()
+	if err == nil && currentVersion != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "Current Go version: %s\n", currentVersion)
+	}
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Check GOCACHE
+	gocacheCmd := exec.Command("go", "env", "GOCACHE")
+	if output, err := gocacheCmd.Output(); err == nil {
+		gocache := strings.TrimSpace(string(output))
+		fmt.Fprintf(cmd.OutOrStdout(), "GOCACHE location: %s\n", gocache)
+
+		// Check if it's shared or version-specific
+		if strings.Contains(gocache, cfg.Root) {
+			fmt.Fprintln(cmd.OutOrStdout(), "✅ Using version-specific cache (goenv managed)")
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "⚠️  WARNING: Using shared system cache (not version-specific)")
+			fmt.Fprintln(cmd.OutOrStdout(), "   This can cause 'exec format error' when switching versions")
+			fmt.Fprintln(cmd.OutOrStdout(), "   or architectures (e.g., Rosetta vs native on Apple Silicon)")
+		}
+
+		// Check if cache exists and estimate size
+		if stat, err := os.Stat(gocache); err == nil && stat.IsDir() {
+			// Try to estimate cache size
+			var totalSize int64
+			filepath.Walk(gocache, func(path string, info os.FileInfo, err error) error {
+				if err == nil && !info.IsDir() {
+					totalSize += info.Size()
+				}
+				return nil
+			})
+			sizeMB := totalSize / (1024 * 1024)
+			if sizeMB > 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "   Cache size: ~%d MB\n", sizeMB)
+			}
+		}
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), "⚠️  Cannot determine GOCACHE location")
+	}
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Check GOMODCACHE
+	gomodcacheCmd := exec.Command("go", "env", "GOMODCACHE")
+	if output, err := gomodcacheCmd.Output(); err == nil {
+		gomodcache := strings.TrimSpace(string(output))
+		fmt.Fprintf(cmd.OutOrStdout(), "GOMODCACHE location: %s\n", gomodcache)
+
+		// Check if it's shared or version-specific
+		if strings.Contains(gomodcache, cfg.Root) {
+			fmt.Fprintln(cmd.OutOrStdout(), "✅ Using version-specific module cache (goenv managed)")
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "⚠️  Using shared system module cache")
+		}
+	}
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Check for multiple Go versions
+	versions, err := mgr.ListInstalledVersions()
+	if err == nil && len(versions) > 1 {
+		fmt.Fprintf(cmd.OutOrStdout(), "Installed Go versions: %d\n", len(versions))
+		for _, v := range versions {
+			if v == currentVersion {
+				fmt.Fprintf(cmd.OutOrStdout(), "  • %s (current)\n", v)
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", v)
+			}
+		}
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), "💡 With multiple versions, version-specific caching is recommended")
+		fmt.Fprintln(cmd.OutOrStdout(), "   Run: goenv clean build")
+	}
+
+	// Check for cache isolation settings
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "Cache isolation settings:")
+	if os.Getenv("GOENV_DISABLE_GOCACHE") == "1" {
+		fmt.Fprintln(cmd.OutOrStdout(), "  ⚠️  GOENV_DISABLE_GOCACHE=1 (cache isolation disabled)")
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), "  ✅ GOENV_DISABLE_GOCACHE not set (cache isolation enabled)")
+	}
+	if os.Getenv("GOENV_DISABLE_GOMODCACHE") == "1" {
+		fmt.Fprintln(cmd.OutOrStdout(), "  ⚠️  GOENV_DISABLE_GOMODCACHE=1 (module cache isolation disabled)")
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), "  ✅ GOENV_DISABLE_GOMODCACHE not set (module cache isolation enabled)")
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(cmd.OutOrStdout(), "To clean caches:")
+	fmt.Fprintln(cmd.OutOrStdout(), "  goenv clean build      # Clean build cache only")
+	fmt.Fprintln(cmd.OutOrStdout(), "  goenv clean modcache   # Clean module cache")
+	fmt.Fprintln(cmd.OutOrStdout(), "  goenv clean all        # Clean both caches")
+
+	return nil
 }

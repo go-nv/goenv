@@ -122,8 +122,9 @@ func TestCleanCommand(t *testing.T) {
 			// Reset command for next test
 			cmd.SetArgs(nil)
 			cleanFlags = struct {
-				force   bool
-				verbose bool
+				force    bool
+				verbose  bool
+				diagnose bool
 			}{}
 		})
 	}

@@ -125,6 +125,35 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 			env = setEnvVar(env, "GOPATH", versionGopath)
 		}
+
+		// Set version-specific GOCACHE to prevent architecture/version conflicts
+		// This prevents "exec format error" when switching between Go versions or architectures
+		if !utils.GoenvEnvVarDisableGocache.IsTrue() {
+			customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
+			var versionGocache string
+			if customGocacheDir != "" {
+				// Use custom GOCACHE directory if specified
+				versionGocache = filepath.Join(customGocacheDir, currentVersion)
+			} else {
+				// Use GOENV_ROOT/versions/{version}/go-build as default GOCACHE
+				versionGocache = filepath.Join(versionPath, "go-build")
+			}
+			env = setEnvVar(env, "GOCACHE", versionGocache)
+		}
+
+		// Set version-specific GOMODCACHE to prevent module conflicts
+		if !utils.GoenvEnvVarDisableGomodcache.IsTrue() {
+			customGomodcacheDir := utils.GoenvEnvVarGomodcacheDir.UnsafeValue()
+			var versionGomodcache string
+			if customGomodcacheDir != "" {
+				// Use custom GOMODCACHE directory if specified
+				versionGomodcache = filepath.Join(customGomodcacheDir, currentVersion)
+			} else {
+				// Use GOENV_ROOT/versions/{version}/go-mod as default GOMODCACHE
+				versionGomodcache = filepath.Join(versionPath, "go-mod")
+			}
+			env = setEnvVar(env, "GOMODCACHE", versionGomodcache)
+		}
 	}
 
 	// Execute the command
