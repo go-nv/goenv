@@ -23,8 +23,10 @@ jobs:
         with:
           go-version: "stable"
       - name: Build goenv
+        shell: bash
         run: make build
       - name: Run Unit Tests
+        shell: bash
         run: |
           echo "Running tests with GOENV_NATIVE_EXT=${{ matrix.goenv_native_ext }}"
           make test 2>&1 | tee test_output.log
