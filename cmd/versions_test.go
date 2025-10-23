@@ -182,9 +182,10 @@ func TestVersionsCommand(t *testing.T) {
 
 				// Adjust expected output if system Go is present (but not expected in test setup)
 				expectedLines := tt.expectedOutput
-				if !tt.expectSystemGo && hasSystemGoInTest() && !versionsFlags.bare {
+				if !tt.expectSystemGo && hasSystemGoInTest() && !versionsFlags.bare && !versionsFlags.complete {
 					// System Go exists on this machine but test didn't explicitly expect it
 					// Insert "  system" at the beginning of expected output
+					// (but not in completion mode or bare mode)
 					expectedLines = append([]string{"  system"}, expectedLines...)
 				}
 

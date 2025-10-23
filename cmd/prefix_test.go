@@ -119,6 +119,9 @@ func TestPrefixCommand(t *testing.T) {
 
 			// Setup system go if needed
 			var systemBinDir string
+			oldPath := os.Getenv("PATH")
+			defer os.Setenv("PATH", oldPath)
+
 			if tt.setupSystemGo {
 				systemBinDir = filepath.Join(testRoot, "system_bin")
 				os.MkdirAll(systemBinDir, 0755)
@@ -129,12 +132,13 @@ func TestPrefixCommand(t *testing.T) {
 				}
 
 				// Add to PATH
-				oldPath := os.Getenv("PATH")
 				os.Setenv("PATH", systemBinDir+":"+oldPath)
-				defer os.Setenv("PATH", oldPath)
-			}
-
-			// Set local version if specified
+			} else {
+				// Explicitly set PATH to empty directory to ensure no system Go found
+				emptyDir := filepath.Join(testRoot, "empty-bin")
+				os.MkdirAll(emptyDir, 0755)
+				os.Setenv("PATH", emptyDir)
+			} // Set local version if specified
 			if tt.localVersion != "" {
 				localFile := filepath.Join(testRoot, ".go-version")
 				err := os.WriteFile(localFile, []byte(tt.localVersion), 0644)
