@@ -25,12 +25,12 @@ func TestSyncToolsCommand(t *testing.T) {
 		{
 			name:          "no arguments provided",
 			args:          []string{},
-			expectedError: "cannot determine current Go version",
+			expectedError: "need at least 2 Go versions", // Auto-detect requires 2+ versions
 		},
 		{
 			name:          "only one argument provided",
 			args:          []string{"1.21.0"},
-			expectedError: "cannot determine current Go version",
+			expectedError: "source Go version 1.21.0 is not installed",
 		},
 		{
 			name:          "too many arguments provided",
@@ -145,8 +145,8 @@ func TestSyncToolsCommand(t *testing.T) {
 			for _, version := range tt.setupVersions {
 				versionPath := filepath.Join(tmpDir, "versions", version)
 
-				// Create go binary directory
-				goBinDir := filepath.Join(versionPath, "go", "bin")
+				// Create go binary directory (version dir IS the GOROOT)
+				goBinDir := filepath.Join(versionPath, "bin")
 				if err := os.MkdirAll(goBinDir, 0755); err != nil {
 					t.Fatalf("Failed to create go bin directory: %v", err)
 				}
@@ -205,11 +205,11 @@ func TestSyncToolsCommand(t *testing.T) {
 
 			// Execute - check Args validation first for cases with wrong number of args
 			var err error
-			if len(tt.args) != 2 {
-				// These will fail Args validation, not in runSyncTools
+			if len(tt.args) > 2 {
+				// This will fail Args validation (MaximumNArgs(2))
 				err = syncToolsCmd.Args(syncToolsCmd, tt.args)
 			} else {
-				// Proper arg count, execute normally
+				// 0, 1, or 2 args - execute normally (may fail in runSyncTools)
 				err = runSyncTools(syncToolsCmd, tt.args)
 			}
 

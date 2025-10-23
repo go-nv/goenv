@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/spf13/cobra"
 )
 
 func TestCleanCommand(t *testing.T) {
@@ -78,8 +79,13 @@ func TestCleanCommand(t *testing.T) {
 			os.Chdir(tmpDir)
 			defer os.Chdir(oldWd)
 
-			// Run command
-			cmd := cleanCmd
+			// Create fresh command instance for test isolation
+			cmd := &cobra.Command{
+				Use:  "clean [target]",
+				RunE: runClean,
+			}
+			cmd.Flags().BoolVarP(&cleanFlags.force, "force", "f", false, "Skip confirmation prompts")
+			cmd.Flags().BoolVarP(&cleanFlags.verbose, "verbose", "v", false, "Show detailed output")
 			cmd.SetArgs(append(tt.args, tt.flags...))
 
 			var stdout, stderr bytes.Buffer
