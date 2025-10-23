@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
 
@@ -178,14 +180,22 @@ func TestVersionsCommand(t *testing.T) {
 				got := strings.TrimRight(output.String(), "\n")
 				gotLines := strings.Split(got, "\n")
 
-				if len(gotLines) != len(tt.expectedOutput) {
+				// Adjust expected output if system Go is present (but not expected in test setup)
+				expectedLines := tt.expectedOutput
+				if !tt.expectSystemGo && hasSystemGoInTest() && !versionsFlags.bare {
+					// System Go exists on this machine but test didn't explicitly expect it
+					// Insert "  system" at the beginning of expected output
+					expectedLines = append([]string{"  system"}, expectedLines...)
+				}
+
+				if len(gotLines) != len(expectedLines) {
 					t.Errorf("Expected %d lines, got %d:\nExpected:\n%s\nGot:\n%s",
-						len(tt.expectedOutput), len(gotLines),
-						strings.Join(tt.expectedOutput, "\n"), got)
+						len(expectedLines), len(gotLines),
+						strings.Join(expectedLines, "\n"), got)
 					return
 				}
 
-				for i, expectedLine := range tt.expectedOutput {
+				for i, expectedLine := range expectedLines {
 					if i >= len(gotLines) {
 						t.Errorf("Missing expected line %d: '%s'", i, expectedLine)
 						continue
@@ -266,25 +276,48 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 
 	// Should show local version (1.22.2) as current with source, not global (1.21.5)
 	// The source path will be the tempDir/.go-version
-	if len(gotLines) != 2 {
-		t.Errorf("Expected 2 lines, got %d:\nGot:\n%s", len(gotLines), got)
+	expectedLines := 2
+	if hasSystemGoInTest() {
+		// System Go adds an extra line at the beginning
+		expectedLines = 3
+	}
+
+	if len(gotLines) != expectedLines {
+		t.Errorf("Expected %d lines, got %d:\nGot:\n%s", expectedLines, len(gotLines), got)
 		return
 	}
 
-	// Check line 0: non-current version
-	if gotLines[0] != "  1.21.5" {
-		t.Errorf("Line 0: expected '  1.21.5', got '%s'", gotLines[0])
+	// Adjust line indices if system Go is present
+	offset := 0
+	if hasSystemGoInTest() {
+		// System Go appears first, so our versions are offset by 1
+		offset = 1
+		// Verify system line is present
+		if !strings.Contains(gotLines[0], "system") {
+			t.Errorf("Line 0: expected system line, got '%s'", gotLines[0])
+		}
 	}
 
-	// Check line 1: current version with suffix
+	// Check line: non-current version
+	if gotLines[0+offset] != "  1.21.5" {
+		t.Errorf("Line %d: expected '  1.21.5', got '%s'", 0+offset, gotLines[0+offset])
+	}
+
+	// Check line: current version with suffix
 	expectedPrefix := "* 1.22.2 (set by "
 	expectedSuffix := "/.go-version)"
-	if !strings.HasPrefix(gotLines[1], expectedPrefix) || !strings.HasSuffix(gotLines[1], expectedSuffix) {
-		t.Errorf("Line 1: expected to match '* 1.22.2 (set by .../.go-version)', got '%s'", gotLines[1])
+	if !strings.HasPrefix(gotLines[1+offset], expectedPrefix) || !strings.HasSuffix(gotLines[1+offset], expectedSuffix) {
+		t.Errorf("Line %d: expected to match '* 1.22.2 (set by .../.go-version)', got '%s'", 1+offset, gotLines[1+offset])
 	}
 }
 
 func TestVersionsNoVersionsInstalled(t *testing.T) {
+	// Skip this test if system Go is available
+	// This test specifically checks the error case when NO Go is available at all
+	if hasSystemGoInTest() {
+		t.Skip("System Go is available, cannot test 'no Go at all' scenario")
+	}
+
 	_, cleanup := setupTestEnv(t)
 	defer cleanup()
 
@@ -379,4 +412,12 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 	if got != expected {
 		t.Errorf("Expected output '%s', got '%s'", expected, got)
 	}
+}
+
+// hasSystemGoInTest checks if system Go is available during test execution
+// This is needed because CI/macOS systems may have Go installed in PATH
+func hasSystemGoInTest() bool {
+	cfg := config.Load()
+	mgr := manager.NewManager(cfg)
+	return mgr.HasSystemGo()
 }

@@ -37,6 +37,9 @@ func main() {
 	testHomeEnvVar()
 	testUnixCommands()
 	testShellRedirection()
+	testHardcodedUnixPaths()
+	testFilePermissions()
+	testPowerShellProfileDetection()
 
 	// Summary
 	fmt.Println()
@@ -57,6 +60,9 @@ func main() {
 		fmt.Println("  ✓ No HOME env var issues")
 		fmt.Println("  ✓ No Unix-only commands")
 		fmt.Println("  ✓ No Unix-specific shell redirection")
+		fmt.Println("  ✓ No hardcoded Unix paths")
+		fmt.Println("  ✓ File permissions handled correctly")
+		fmt.Println("  ✓ PowerShell profile detection implemented")
 		fmt.Println()
 		fmt.Println("Recommendations:")
 		fmt.Println("  1. Test actual installation on Windows")
@@ -422,6 +428,7 @@ func testUnixCommands() {
 		scanner := bufio.NewScanner(file)
 		lineNum := 0
 		hasWindowsCheck := false
+		hasShellBranching := false
 		for scanner.Scan() {
 			lineNum++
 			line := scanner.Text()
@@ -429,6 +436,12 @@ func testUnixCommands() {
 			// Track if file has Windows checks
 			if strings.Contains(line, "runtime.GOOS") && strings.Contains(line, "windows") {
 				hasWindowsCheck = true
+			}
+
+			// Track if file has shell-specific branching (fish/powershell/cmd/else)
+			if strings.Contains(line, "shell ==") &&
+			   (strings.Contains(line, "powershell") || strings.Contains(line, "cmd") || strings.Contains(line, "fish")) {
+				hasShellBranching = true
 			}
 
 			// Check for ps command
@@ -439,9 +452,10 @@ func testUnixCommands() {
 				}
 			}
 
-			// Check for hash -r
+			// Check for hash -r (but allow if in shell-specific branch)
 			if strings.Contains(line, "hash -r") && !strings.Contains(line, "//") {
-				if !hasWindowsCheck {
+				// Only flag if no platform/shell checks exist
+				if !hasWindowsCheck && !hasShellBranching {
 					issues = append(issues, fmt.Sprintf("%s:%d: hash -r", path, lineNum))
 				}
 			}
@@ -533,6 +547,228 @@ func testShellRedirection() {
 			fmt.Printf("  ... and %d more\n", len(issues)-3)
 		}
 		failed++
+	}
+	fmt.Println()
+}
+
+func testHardcodedUnixPaths() {
+	fmt.Println("Test 10: No Hardcoded Unix Paths")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		// Skip this test file itself to avoid self-reference
+		if strings.Contains(path, "test_windows_compatibility") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		allLines := []string{} // Store all lines for function-level analysis
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		// Analyze lines with full file context
+		for i, line := range allLines {
+			lineNum = i + 1
+
+			// Check for hardcoded Unix paths like /usr/local
+			if regexp.MustCompile(`"/usr/|"/etc/|"/var/|"/tmp/`).MatchString(line) &&
+				!strings.Contains(line, "//") &&
+				!strings.Contains(line, "runtime.GOOS") {
+
+				// Look back up to 15 lines for function-level guards
+				hasGuard := false
+				lookback := 15
+				if i < lookback {
+					lookback = i
+				}
+				for j := 1; j <= lookback; j++ {
+					prevLine := allLines[i-j]
+					// Check for Windows guards or function boundaries
+					if strings.Contains(prevLine, "runtime.GOOS") &&
+					   (strings.Contains(prevLine, "windows") || strings.Contains(prevLine, "!= \"windows\"")) {
+						hasGuard = true
+						break
+					}
+					// Stop at function boundary
+					if strings.HasPrefix(strings.TrimSpace(prevLine), "func ") {
+						break
+					}
+				}
+
+				if !hasGuard {
+					issues = append(issues, fmt.Sprintf("%s:%d: %s", path, lineNum, strings.TrimSpace(line)))
+				}
+			}
+
+			// Check for hardcoded .bashrc, .zshrc paths without os.UserHomeDir
+			if (strings.Contains(line, ".bashrc") || strings.Contains(line, ".zshrc") || strings.Contains(line, ".config")) &&
+				strings.Contains(line, `"HOME"`) &&
+				!strings.Contains(line, "//") {
+				issues = append(issues, fmt.Sprintf("%s:%d: HOME env var in path", path, lineNum))
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: No hardcoded Unix paths found")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d hardcoded Unix path issues\n", len(issues))
+		for i, issue := range issues {
+			if i < 5 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		if len(issues) > 5 {
+			fmt.Printf("  ... and %d more\n", len(issues)-5)
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testFilePermissions() {
+	fmt.Println("Test 11: File Permission Handling")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	shimFiles := make(map[string]bool)
+
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		// Track shim-related files
+		if strings.Contains(path, "shim") {
+			shimFiles[path] = true
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+
+			// Check for inconsistent permissions between .bat and Unix shims
+			if strings.Contains(line, "WriteFile") && regexp.MustCompile(`0[67]\d{2}`).MatchString(line) {
+				// Check if this file handles both Windows and Unix
+				if shimFiles[path] && !strings.Contains(line, "runtime.GOOS") {
+					issues = append(issues, fmt.Sprintf("%s:%d: Permission may need platform check", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: File permissions look correct")
+		passed++
+	} else {
+		fmt.Printf("⚠️  INFO: Found %d file permission patterns (informational)\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings++
+	}
+	fmt.Println()
+}
+
+func testPowerShellProfileDetection() {
+	fmt.Println("Test 12: PowerShell Profile Auto-Detection Support")
+	fmt.Println("--------------------------------------------------")
+
+	foundPowerShellHandling := false
+	foundProfilePath := false
+
+	err := filepath.Walk("cmd", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.Contains(line, "powershell") && strings.Contains(line, "case") {
+				foundPowerShellHandling = true
+			}
+			if strings.Contains(line, "$PROFILE") || strings.Contains(line, "Documents\\PowerShell") || strings.Contains(line, "Documents/PowerShell") {
+				foundProfilePath = true
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if foundPowerShellHandling && foundProfilePath {
+		fmt.Println("✓ PASS: PowerShell profile detection implemented")
+		passed++
+	} else if foundPowerShellHandling {
+		fmt.Println("⚠️  INFO: PowerShell handling exists but profile auto-detection may need improvement")
+		fmt.Println("  Consider adding $PROFILE path detection for Windows users")
+		warnings++
+	} else {
+		fmt.Println("ℹ️  INFO: PowerShell integration may need profile auto-detection")
+		warnings++
 	}
 	fmt.Println()
 }

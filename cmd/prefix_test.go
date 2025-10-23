@@ -37,6 +37,7 @@ func TestPrefixCommand(t *testing.T) {
 		},
 		{
 			name:          "fails when no version exists and version is system without go in PATH",
+			args:          []string{"system"},
 			expectedError: "system version not found in PATH",
 		},
 		{

@@ -114,7 +114,11 @@ func runCompletion(cmd *cobra.Command, args []string) error {
 	switch shell {
 	case "bash":
 		script = completions.Bash
-		installPath = filepath.Join(os.Getenv("HOME"), ".bashrc")
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("cannot determine home directory: %w", err)
+		}
+		installPath = filepath.Join(home, ".bashrc")
 		installInstructions = fmt.Sprintf(`
 Bash completion script generated.
 
@@ -129,10 +133,12 @@ Or install system-wide (requires sudo):
 	case "zsh":
 		script = completions.Zsh
 		// Try to find zsh fpath
-		fpath := "/usr/local/share/zsh/site-functions"
-		if home := os.Getenv("HOME"); home != "" {
-			fpath = filepath.Join(home, ".zsh", "completions")
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("cannot determine home directory: %w", err)
 		}
+		// Use user's home directory for zsh completions (cross-platform)
+		fpath := filepath.Join(home, ".zsh", "completions")
 		installPath = filepath.Join(fpath, "_goenv")
 		installInstructions = fmt.Sprintf(`
 Zsh completion script generated.
@@ -148,7 +154,11 @@ To install manually:
 
 	case "fish":
 		script = completions.Fish
-		installPath = filepath.Join(os.Getenv("HOME"), ".config", "fish", "completions", "goenv.fish")
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("cannot determine home directory: %w", err)
+		}
+		installPath = filepath.Join(home, ".config", "fish", "completions", "goenv.fish")
 		installInstructions = fmt.Sprintf(`
 Fish completion script generated.
 

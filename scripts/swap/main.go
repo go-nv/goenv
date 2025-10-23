@@ -121,9 +121,11 @@ func detectGoenv() (string, error) {
 		return manualPath, nil
 	}
 
-	// Method 4: Check system
-	if _, err := os.Stat("/usr/bin/goenv"); err == nil {
-		return "/usr/bin/goenv", nil
+	// Method 4: Check system (Unix only)
+	if runtime.GOOS != "windows" {
+		if _, err := os.Stat("/usr/bin/goenv"); err == nil {
+			return "/usr/bin/goenv", nil
+		}
 	}
 
 	return "", fmt.Errorf("goenv not found")

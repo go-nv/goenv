@@ -101,7 +101,10 @@ func TestVersionFileWriteCommand(t *testing.T) {
 				createTestVersion(t, goenvRoot, version)
 			}
 
-			// Setup system Go if needed
+			// Setup system Go if needed, or explicitly remove it
+			originalPath := os.Getenv("PATH")
+			defer os.Setenv("PATH", originalPath)
+
 			if tt.setupSystemGo {
 				// Create a bin directory in PATH with go executable
 				binDir := filepath.Join(goenvRoot, "system-bin")
@@ -113,9 +116,12 @@ func TestVersionFileWriteCommand(t *testing.T) {
 					t.Fatalf("Failed to create go executable: %v", err)
 				}
 				// Add to PATH
-				originalPath := os.Getenv("PATH")
 				os.Setenv("PATH", binDir+":"+originalPath)
-				defer os.Setenv("PATH", originalPath)
+			} else {
+				// Explicitly set PATH to an empty/non-existent directory to ensure no system Go is found
+				emptyDir := filepath.Join(goenvRoot, "empty-bin")
+				os.MkdirAll(emptyDir, 0755)
+				os.Setenv("PATH", emptyDir)
 			}
 
 			// Create existing file if specified
