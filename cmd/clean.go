@@ -11,6 +11,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/spf13/cobra"
 )
 
@@ -220,14 +221,11 @@ func getGoBinary(cfg *config.Config, version string) (string, error) {
 
 	// Build path to versioned Go binary
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
-	goBinary := filepath.Join(versionPath, "bin", "go")
+	goBinaryBase := filepath.Join(versionPath, "bin", "go")
 
-	if runtime.GOOS == "windows" {
-		goBinary += ".exe"
-	}
-
-	// Verify it exists
-	if _, err := os.Stat(goBinary); err != nil {
+	// Find the executable (handles .exe and .bat on Windows)
+	goBinary, err := pathutil.FindExecutable(goBinaryBase)
+	if err != nil {
 		return "", fmt.Errorf("Go binary not found for version %s: %w", version, err)
 	}
 

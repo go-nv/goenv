@@ -5,11 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/tooldetect"
 	"github.com/spf13/cobra"
 )
@@ -166,15 +166,12 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 
 		// Use target version's go binary
 		// The version directory IS the GOROOT (no extra 'go' subdirectory)
-		goBinary := filepath.Join(targetPath, "bin", "go")
+		goBinaryBase := filepath.Join(targetPath, "bin", "go")
 
-		// On Windows, add .exe extension
-		if runtime.GOOS == "windows" {
-			goBinary += ".exe"
-		}
-
-		if _, err := os.Stat(goBinary); os.IsNotExist(err) {
-			return fmt.Errorf("go binary not found in target version: %s", goBinary)
+		// Find the executable (handles .exe and .bat on Windows)
+		goBinary, err := pathutil.FindExecutable(goBinaryBase)
+		if err != nil {
+			return fmt.Errorf("go binary not found in target version: %w", err)
 		}
 
 		// Set GOPATH for target version

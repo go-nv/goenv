@@ -3,6 +3,7 @@ package pathutil
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -29,4 +30,33 @@ func ExpandPath(path string) string {
 	}
 
 	return path
+}
+
+// FindExecutable finds an executable file, handling Windows executable extensions.
+// On Windows, it checks for both .exe (production) and .bat (tests) files.
+// On Unix, it returns the path as-is.
+// Returns the full path if the executable exists, or an error if not found.
+func FindExecutable(basePath string) (string, error) {
+	if runtime.GOOS != "windows" {
+		// On Unix, just check if the file exists
+		if _, err := os.Stat(basePath); err != nil {
+			return "", err
+		}
+		return basePath, nil
+	}
+
+	// On Windows, try .exe first (production), then .bat (tests)
+	exePath := basePath + ".exe"
+	if _, err := os.Stat(exePath); err == nil {
+		return exePath, nil
+	}
+
+	batPath := basePath + ".bat"
+	if _, err := os.Stat(batPath); err == nil {
+		return batPath, nil
+	}
+
+	// Neither exists, return error for .exe (expected in production)
+	_, err := os.Stat(exePath)
+	return "", err
 }

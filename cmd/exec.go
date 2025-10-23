@@ -243,8 +243,14 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 // shouldAutoRehash determines if we should automatically rehash after command execution
 func shouldAutoRehash(command string, args []string) bool {
-	// Check if command is 'go' and first arg is 'install'
-	if command != "go" && !strings.HasSuffix(command, "/go") && !strings.HasSuffix(command, "\\go.exe") {
+	// Check if command is 'go' (with or without path, with or without extension)
+	baseName := filepath.Base(command)
+	// Remove any Windows executable extensions
+	baseName = strings.TrimSuffix(baseName, ".exe")
+	baseName = strings.TrimSuffix(baseName, ".bat")
+	baseName = strings.TrimSuffix(baseName, ".cmd")
+
+	if baseName != "go" {
 		return false
 	}
 
@@ -297,18 +303,9 @@ func prependToPath(env []string, dir string) []string {
 
 // findBinaryInDir searches for a binary in a directory, handling .exe on Windows
 func findBinaryInDir(binDir, command string) string {
-	// Try exact name first
-	binaryPath := filepath.Join(binDir, command)
-	if _, err := os.Stat(binaryPath); err == nil {
+	// Use cross-platform binary finder
+	if binaryPath, err := utils.FindExecutable(binDir, command); err == nil {
 		return binaryPath
-	}
-
-	// On Windows, try adding .exe extension
-	if filepath.Ext(command) == "" {
-		exePath := filepath.Join(binDir, command+".exe")
-		if _, err := os.Stat(exePath); err == nil {
-			return exePath
-		}
 	}
 
 	return ""

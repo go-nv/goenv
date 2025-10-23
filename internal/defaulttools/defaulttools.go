@@ -5,9 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/pathutil"
 	"gopkg.in/yaml.v3"
 )
 
@@ -135,15 +135,11 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, verbose bo
 	// Set up environment for the specific Go version
 	versionPath := filepath.Join(goenvRoot, "versions", goVersion)
 	goRoot := versionPath // The version directory IS the GOROOT (no extra 'go' subdirectory)
-	goBin := filepath.Join(goRoot, "bin", "go")
+	goBinBase := filepath.Join(goRoot, "bin", "go")
 
-	// On Windows, add .exe extension
-	if runtime.GOOS == "windows" {
-		goBin += ".exe"
-	}
-
-	// Verify Go binary exists
-	if _, err := os.Stat(goBin); err != nil {
+	// Find the executable (handles .exe and .bat on Windows)
+	goBin, err := pathutil.FindExecutable(goBinBase)
+	if err != nil {
 		return fmt.Errorf("Go binary not found for version %s: %w", goVersion, err)
 	}
 
@@ -220,15 +216,10 @@ func VerifyTools(config *Config, goVersion string, goenvRoot string) (map[string
 			binaryName = parts[len(parts)-1]
 		}
 
-		binaryPath := filepath.Join(gopathBin, binaryName)
+		binaryBasePath := filepath.Join(gopathBin, binaryName)
 
-		// Check for binary with or without .exe extension (Windows compatibility)
-		_, err := os.Stat(binaryPath)
-		if err != nil && runtime.GOOS == "windows" {
-			// Try with .exe extension on Windows
-			_, err = os.Stat(binaryPath + ".exe")
-		}
-
+		// Check if executable exists (handles .exe and .bat on Windows)
+		_, err := pathutil.FindExecutable(binaryBasePath)
 		results[tool.Name] = (err == nil)
 	}
 
