@@ -373,9 +373,19 @@ func TestDoctorCommand_SuccessScenario(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("PATH", filepath.Join(tmpDir, "shims")+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	// Add both bin and shims to PATH
+	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+filepath.Join(tmpDir, "shims")+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	// Override exit to prevent test termination
+	oldExit := doctorExit
+	doctorExit = func(code int) {}
+	defer func() { doctorExit = oldExit }()
 
 	// Create complete directory structure
+	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
 	shimsDir := filepath.Join(tmpDir, "shims")
 	versionsDir := filepath.Join(tmpDir, "versions")
 	if err := os.MkdirAll(shimsDir, 0755); err != nil {
@@ -459,6 +469,18 @@ func TestDoctorCommand_ShellDetection(t *testing.T) {
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("GOENV_DIR", tmpDir)
 
+	// Clear GOENV_VERSION to avoid picking up .go-version from repo
+	t.Setenv("GOENV_VERSION", "system")
+
+	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+
+	// Override exit to prevent test termination
+	oldExit := doctorExit
+	doctorExit = func(code int) {}
+	defer func() { doctorExit = oldExit }()
+
 	// Set a specific shell
 	originalShell := os.Getenv("SHELL")
 	if runtime.GOOS == "windows" {
@@ -473,6 +495,9 @@ func TestDoctorCommand_ShellDetection(t *testing.T) {
 	}()
 
 	// Create basic structure
+	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
 	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
@@ -499,7 +524,22 @@ func TestDoctorCommand_NoVersions(t *testing.T) {
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("GOENV_DIR", tmpDir)
 
+	// Clear GOENV_VERSION to avoid picking up .go-version from repo
+	t.Setenv("GOENV_VERSION", "system")
+
+	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+
+	// Override exit to prevent test termination
+	oldExit := doctorExit
+	doctorExit = func(code int) {}
+	defer func() { doctorExit = oldExit }()
+
 	// Create structure but NO versions
+	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
 	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
@@ -791,7 +831,22 @@ func TestDoctorCommand_EnvironmentDetection(t *testing.T) {
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("GOENV_DIR", tmpDir)
 
+	// Clear GOENV_VERSION to avoid picking up .go-version from repo
+	t.Setenv("GOENV_VERSION", "system")
+
+	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+
+	// Override exit to prevent test termination
+	oldExit := doctorExit
+	doctorExit = func(code int) {}
+	defer func() { doctorExit = oldExit }()
+
 	// Create directory structure
+	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
 	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
