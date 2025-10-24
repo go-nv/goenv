@@ -17,7 +17,22 @@ func TestDoctorCommand_BasicRun(t *testing.T) {
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("GOENV_DIR", tmpDir)
 
+	// Clear GOENV_VERSION to avoid picking up .go-version from repo
+	t.Setenv("GOENV_VERSION", "system")
+
+	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+
+	// Override exit to prevent test termination
+	oldExit := doctorExit
+	doctorExit = func(code int) {}
+	defer func() { doctorExit = oldExit }()
+
 	// Create basic directory structure
+	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
 	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
@@ -52,7 +67,22 @@ func TestDoctorCommand_ChecksExecuted(t *testing.T) {
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("GOENV_DIR", tmpDir)
 
+	// Clear GOENV_VERSION to avoid picking up .go-version from repo
+	t.Setenv("GOENV_VERSION", "system")
+
+	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+
+	// Override exit to prevent test termination
+	oldExit := doctorExit
+	doctorExit = func(code int) {}
+	defer func() { doctorExit = oldExit }()
+
 	// Create directory structure
+	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
 	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
@@ -91,9 +121,25 @@ func TestDoctorCommand_WithInstalledVersion(t *testing.T) {
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("GOENV_DIR", tmpDir)
 
+	// Clear GOENV_VERSION to avoid picking up .go-version from repo
+	t.Setenv("GOENV_VERSION", "system")
+
+	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+
+	// Override exit to prevent test termination
+	oldExit := doctorExit
+	doctorExit = func(code int) {}
+	defer func() { doctorExit = oldExit }()
+
 	// Create complete directory structure
+	rootBinDir := filepath.Join(tmpDir, "bin")
 	shimsDir := filepath.Join(tmpDir, "shims")
 	versionsDir := filepath.Join(tmpDir, "versions")
+	if err := os.MkdirAll(rootBinDir, 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
 	if err := os.MkdirAll(shimsDir, 0755); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
@@ -141,16 +187,30 @@ func TestDoctorCommand_MissingGOENV_ROOT(t *testing.T) {
 	t.Setenv("GOENV_ROOT", nonExistentDir)
 	t.Setenv("GOENV_DIR", nonExistentDir)
 
+	// Capture exit code
+	exitCode := -1
+	oldExit := doctorExit
+	doctorExit = func(code int) {
+		exitCode = code
+	}
+	defer func() { doctorExit = oldExit }()
+
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
 	doctorCmd.SetErr(buf)
 
 	err := doctorCmd.RunE(doctorCmd, []string{})
 
-	// Should return error due to missing root
-	if err == nil {
-		t.Error("Expected error when GOENV_ROOT doesn't exist")
+	t.Logf("Exit code: %d", exitCode)
+
+	// Doctor should call exit(1) when GOENV_ROOT doesn't exist
+	if exitCode != 1 {
+		t.Errorf("Expected exit code 1 when GOENV_ROOT doesn't exist, got: %d", exitCode)
 	}
+
+	// Error may or may not be returned (before exit is called) - doctor now calls os.Exit
+	// so we just check that output contains the error
+	t.Logf("Error returned: %v", err)
 
 	output := buf.String()
 
@@ -248,11 +308,22 @@ func TestDoctorCommand_ErrorCount(t *testing.T) {
 	t.Setenv("GOENV_ROOT", nonExistentDir)
 	t.Setenv("GOENV_DIR", nonExistentDir)
 
+	// Capture exit code
+	exitCode := -1
+	oldExit := doctorExit
+	doctorExit = func(code int) {
+		exitCode = code
+	}
+	defer func() { doctorExit = oldExit }()
+
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
 	doctorCmd.SetErr(buf)
 
 	err := doctorCmd.RunE(doctorCmd, []string{})
+
+	t.Logf("Exit code: %d", exitCode)
+	t.Logf("Error returned: %v", err)
 
 	output := buf.String()
 
@@ -261,9 +332,9 @@ func TestDoctorCommand_ErrorCount(t *testing.T) {
 		t.Errorf("Expected error count in summary, got: %s", output)
 	}
 
-	// Should return error
-	if err == nil {
-		t.Error("Expected command to return error when errors are found")
+	// Doctor should call exit(1) when errors are found
+	if exitCode != 1 {
+		t.Errorf("Expected exit code 1 when errors are found, got: %d", exitCode)
 	}
 }
 
