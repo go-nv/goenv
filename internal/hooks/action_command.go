@@ -183,9 +183,12 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 		done <- execCmd.Wait()
 	}()
 
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
 	select {
 	case err := <-done:
-		// Command completed
+		// Command completed normally
 		if err != nil {
 			errMsg := fmt.Sprintf("command failed: %v", err)
 			if stderr.Len() > 0 {
@@ -217,14 +220,14 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 
 		return nil
 
-	case <-time.After(timeout):
+	case <-timer.C:
 		// Timeout - kill the process
 		if execCmd.Process != nil {
 			execCmd.Process.Kill()
 		}
 
-		// Drain the done channel to avoid race where exit error arrives after kill
-		go func() { <-done }()
+		// Wait for the process to finish being killed
+		<-done
 
 		errMsg := fmt.Sprintf("command timed out after %s", timeout)
 		if logOutput {
