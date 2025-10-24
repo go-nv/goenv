@@ -41,6 +41,14 @@ func main() {
 	testFilePermissions()
 	testPowerShellProfileDetection()
 
+	// Windows binary detection tests
+	testHardcodedExeChecks()
+	testBinaryCreationInTests()
+	testPathComparisonInTests()
+	testPlatformSpecificErrorMessages()
+	testBinaryExtensionStripping()
+	testPermissionTestsSkipWindows()
+
 	// Summary
 	fmt.Println()
 	fmt.Println("==================================================")
@@ -63,6 +71,12 @@ func main() {
 		fmt.Println("  ✓ No hardcoded Unix paths")
 		fmt.Println("  ✓ File permissions handled correctly")
 		fmt.Println("  ✓ PowerShell profile detection implemented")
+		fmt.Println("  ✓ All .exe checks include .bat support")
+		fmt.Println("  ✓ Test binaries use platform-specific extensions")
+		fmt.Println("  ✓ Path comparisons use ToSlash() normalization")
+		fmt.Println("  ✓ Error messages are platform-agnostic")
+		fmt.Println("  ✓ Binary extension stripping handles both .exe and .bat")
+		fmt.Println("  ✓ Permission tests skip on Windows")
 		fmt.Println()
 		fmt.Println("Recommendations:")
 		fmt.Println("  1. Test actual installation on Windows")
@@ -769,6 +783,466 @@ func testPowerShellProfileDetection() {
 	} else {
 		fmt.Println("ℹ️  INFO: PowerShell integration may need profile auto-detection")
 		warnings++
+	}
+	fmt.Println()
+}
+
+func testHardcodedExeChecks() {
+	fmt.Println("Test 13: No Hardcoded .exe Checks Without .bat Support")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Check for hardcoded .exe without .bat support
+			if (strings.Contains(line, `".exe"`) || strings.Contains(line, "go.exe")) &&
+				strings.Contains(line, "runtime.GOOS") &&
+				strings.Contains(line, "windows") &&
+				!strings.Contains(line, "//") {
+
+				// Look ahead/behind for .bat support or pathutil.FindExecutable
+				hasBatSupport := false
+				lookRange := 5
+				startIdx := i - lookRange
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				for j := startIdx; j <= endIdx; j++ {
+					if strings.Contains(allLines[j], ".bat") || strings.Contains(allLines[j], "pathutil.FindExecutable") {
+						hasBatSupport = true
+						break
+					}
+				}
+
+				if !hasBatSupport && !strings.Contains(path, "shim") {
+					issues = append(issues, fmt.Sprintf("%s:%d: .exe without .bat support", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: All .exe checks include .bat support")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d .exe checks without .bat support\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testBinaryCreationInTests() {
+	fmt.Println("Test 14: Test Files Create Binaries With Correct Extensions")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Check for WriteFile creating binaries without Windows handling
+			if strings.Contains(line, "WriteFile") &&
+				(strings.Contains(line, `"go"`) || strings.Contains(line, "goExe") || 
+				 strings.Contains(line, "goBinary") || strings.Contains(line, "execPath")) &&
+				!strings.Contains(line, "//") {
+
+				// Check if runtime.GOOS or .bat exists nearby
+				hasRuntimeCheck := false
+				lookRange := 10
+				startIdx := i - lookRange
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				for j := startIdx; j <= endIdx; j++ {
+					if (strings.Contains(allLines[j], "runtime.GOOS") && strings.Contains(allLines[j], "windows")) ||
+					   strings.Contains(allLines[j], ".bat") {
+						hasRuntimeCheck = true
+						break
+					}
+				}
+
+				if !hasRuntimeCheck {
+					issues = append(issues, fmt.Sprintf("%s:%d: Binary created without Windows extension handling", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: All test binaries use platform-specific extensions")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d test binary creations without extension handling\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testPathComparisonInTests() {
+	fmt.Println("Test 15: Test Path Comparisons Use filepath.ToSlash()")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+
+			// Check for path comparisons with Unix-style paths without ToSlash
+			if (strings.Contains(line, "Expected") || strings.Contains(line, "expected")) &&
+				strings.Contains(line, `"/`) &&
+				(strings.Contains(line, "!=") || strings.Contains(line, "==")) &&
+				!strings.Contains(line, "ToSlash") &&
+				!strings.Contains(line, "//") {
+				issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: Path comparisons use ToSlash() normalization")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d path comparisons without ToSlash()\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testPlatformSpecificErrorMessages() {
+	fmt.Println("Test 16: Error Message Checks Are Platform-Agnostic")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+
+			// Check for Unix-specific error messages
+			if (strings.Contains(line, `"no such file or directory"`) ||
+				strings.Contains(line, `"permission denied"`) ||
+				strings.Contains(line, `"Permission denied"`)) &&
+				!strings.Contains(line, "//") {
+				issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: Error message checks are platform-agnostic")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d platform-specific error message checks\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testBinaryExtensionStripping() {
+	fmt.Println("Test 17: Binary Name Stripping Handles Both .exe and .bat")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Check for TrimSuffix(".exe") without .bat handling
+			if strings.Contains(line, "TrimSuffix") && strings.Contains(line, `".exe"`) &&
+				!strings.Contains(line, "//") {
+
+				// Look nearby for .bat handling
+				hasBatHandling := false
+				lookRange := 3
+				startIdx := i - lookRange
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				for j := startIdx; j <= endIdx; j++ {
+					if strings.Contains(allLines[j], `".bat"`) {
+						hasBatHandling = true
+						break
+					}
+				}
+
+				if !hasBatHandling {
+					issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: Binary extension stripping handles both .exe and .bat")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d extension stripping issues\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testPermissionTestsSkipWindows() {
+	fmt.Println("Test 18: Permission Tests Skip On Windows")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Check for permission-related test setup
+			if (strings.Contains(line, "Chmod") || strings.Contains(line, "0444") || strings.Contains(line, "0000")) &&
+				!strings.Contains(line, "//") {
+
+				// Look for Windows skip nearby
+				hasWindowsSkip := false
+				lookRange := 15
+				startIdx := i - lookRange
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				for j := startIdx; j <= endIdx; j++ {
+					testLine := allLines[j]
+					if (strings.Contains(testLine, "runtime.GOOS") && strings.Contains(testLine, "windows") && strings.Contains(testLine, "Skip")) ||
+						strings.Contains(testLine, "skipOnWindows") {
+						hasWindowsSkip = true
+						break
+					}
+				}
+
+				if !hasWindowsSkip {
+					issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: Permission tests skip on Windows")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d permission tests without Windows skip\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
 	}
 	fmt.Println()
 }

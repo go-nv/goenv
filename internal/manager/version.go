@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -741,6 +742,33 @@ func compareGoVersions(v1, v2 string) int {
 }
 
 // HasSystemGo checks if system Go is available in PATH
+// findExecutableInPath looks for an executable in a specific directory, handling Windows extensions
+func findExecutableInPath(dir, name string) (string, error) {
+	// On Windows, try common executable extensions
+	if runtime.GOOS == "windows" {
+		extensions := []string{".bat", ".cmd", ".exe"}
+		for _, ext := range extensions {
+			path := filepath.Join(dir, name+ext)
+			if _, err := os.Stat(path); err == nil {
+				return path, nil
+			}
+		}
+		// Also try without extension
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+		return "", fmt.Errorf("executable not found")
+	}
+
+	// On Unix, check if file exists
+	path := filepath.Join(dir, name)
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	}
+	return "", fmt.Errorf("executable not found")
+}
+
 func (m *Manager) HasSystemGo() bool {
 	// Try to find 'go' in PATH
 	// This is equivalent to the BATS test helper stub_system_go check
@@ -762,8 +790,7 @@ func (m *Manager) HasSystemGo() bool {
 			if dir == "" {
 				continue
 			}
-			goPath := filepath.Join(dir, "go")
-			if _, err := os.Stat(goPath); err == nil {
+			if _, err := findExecutableInPath(dir, "go"); err == nil {
 				return true
 			}
 		}
@@ -784,8 +811,7 @@ func (m *Manager) GetSystemGoDir() (string, error) {
 		if dir == "" {
 			continue
 		}
-		goPath := filepath.Join(dir, "go")
-		if _, err := os.Stat(goPath); err == nil {
+		if _, err := findExecutableInPath(dir, "go"); err == nil {
 			// Return the parent directory (not the bin dir)
 			// For /usr/bin/go, return /usr
 			return filepath.Dir(dir), nil

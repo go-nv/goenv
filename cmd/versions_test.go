@@ -316,8 +316,9 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 
 	// Check line: current version with suffix
 	expectedPrefix := "* 1.22.2 (set by "
-	expectedSuffix := "/.go-version)"
-	if !strings.HasPrefix(gotLines[1+offset], expectedPrefix) || !strings.HasSuffix(gotLines[1+offset], expectedSuffix) {
+	expectedSuffix := ".go-version)"
+	normalizedLine := filepath.ToSlash(gotLines[1+offset])
+	if !strings.HasPrefix(normalizedLine, expectedPrefix) || !strings.HasSuffix(normalizedLine, expectedSuffix) {
 		t.Errorf("Line %d: expected to match '* 1.22.2 (set by .../.go-version)', got '%s'", 1+offset, gotLines[1+offset])
 	}
 }

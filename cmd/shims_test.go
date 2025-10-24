@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -53,7 +54,14 @@ func TestShimsCommand(t *testing.T) {
 				os.MkdirAll(shimsDir, 0755)
 				for _, shim := range tt.setupShims {
 					shimPath := filepath.Join(shimsDir, shim)
-					os.WriteFile(shimPath, []byte("#!/bin/bash\necho shim"), 0755)
+					var shimContent string
+					if runtime.GOOS == "windows" {
+						shimPath += ".bat"
+						shimContent = "@echo off\necho shim\n"
+					} else {
+						shimContent = "#!/bin/bash\necho shim\n"
+					}
+					os.WriteFile(shimPath, []byte(shimContent), 0755)
 				}
 			}
 
@@ -108,8 +116,11 @@ func TestShimsCommand(t *testing.T) {
 					}
 					// For full paths, just check if it ends with the expected suffix
 					if !tt.useShortFlag {
-						if !strings.HasSuffix(gotLines[i], expected) {
-							t.Errorf("Line %d: expected to end with %q, got %q", i, expected, gotLines[i])
+						// Normalize path separators for cross-platform comparison
+						normalizedGot := filepath.ToSlash(gotLines[i])
+						normalizedExpected := filepath.ToSlash(expected)
+						if !strings.HasSuffix(normalizedGot, normalizedExpected) {
+							t.Errorf("Line %d: expected to end with %q, got %q", i, normalizedExpected, normalizedGot)
 						}
 					} else {
 						if gotLines[i] != expected {

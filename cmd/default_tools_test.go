@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -337,7 +338,14 @@ func TestDefaultToolsInstall_DisabledConfig(t *testing.T) {
 
 	// Create a mock go binary
 	goBinary := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/bash\necho 1.21.0\n"), 0755); err != nil {
+	var content string
+	if runtime.GOOS == "windows" {
+		goBinary += ".bat"
+		content = "@echo off\necho 1.21.0\n"
+	} else {
+		content = "#!/bin/bash\necho 1.21.0\n"
+	}
+	if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
 		t.Fatalf("Failed to create mock go binary: %v", err)
 	}
 

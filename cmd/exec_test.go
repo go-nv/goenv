@@ -117,6 +117,8 @@ func TestExecCommand(t *testing.T) {
 						binPath += ".bat"
 						// Convert Unix shell script to Windows batch file
 						content = strings.ReplaceAll(content, "#!/bin/sh\n", "@echo off\n")
+						// Convert Unix shell variable expansion to Windows batch
+						content = strings.ReplaceAll(content, "$@", "%*")
 					}
 					err := os.WriteFile(binPath, []byte(content), 0755)
 					if err != nil {
@@ -336,7 +338,13 @@ func TestExecWithShims(t *testing.T) {
 	}
 
 	shimPath := filepath.Join(shimsDir, "go")
-	shimContent := "#!/usr/bin/env bash\nexec goenv exec \"$(basename \"$0\")\" \"$@\"\n"
+	var shimContent string
+	if runtime.GOOS == "windows" {
+		shimPath += ".bat"
+		shimContent = "@echo off\ngoenv exec go %*\n"
+	} else {
+		shimContent = "#!/usr/bin/env bash\nexec goenv exec \"$(basename \"$0\")\" \"$@\"\n"
+	}
 	err = os.WriteFile(shimPath, []byte(shimContent), 0755)
 	if err != nil {
 		t.Fatalf("Failed to create shim: %v", err)

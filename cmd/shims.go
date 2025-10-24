@@ -228,6 +228,39 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	return runWhenceManual(cmd, commandName, cfg)
 }
 
+// findExecutable looks for an executable file, handling Windows extensions
+func findExecutable(basePath string) (string, error) {
+	// On Windows, try common executable extensions
+	if runtime.GOOS == "windows" {
+		extensions := []string{".bat", ".cmd", ".exe"}
+		for _, ext := range extensions {
+			path := basePath + ext
+			if info, err := os.Stat(path); err == nil && !info.IsDir() {
+				return path, nil
+			}
+		}
+		// Also try without extension
+		if info, err := os.Stat(basePath); err == nil && !info.IsDir() {
+			return basePath, nil
+		}
+		return "", fmt.Errorf("executable not found")
+	}
+
+	// On Unix, check if file exists and is executable
+	info, err := os.Stat(basePath)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("is a directory")
+	}
+	// Check executable bit
+	if info.Mode()&0111 == 0 {
+		return "", fmt.Errorf("not executable")
+	}
+	return basePath, nil
+}
+
 // runWhichManual implements which command logic manually for testing/fallback
 func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) error {
 	mgr := manager.NewManager(cfg)
@@ -270,8 +303,8 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 		}
 
 		commandPath := filepath.Join(versionPath, "bin", commandName)
-		if _, err := os.Stat(commandPath); err == nil {
-			fmt.Fprintln(cmd.OutOrStdout(), commandPath)
+		if foundPath, err := findExecutable(commandPath); err == nil {
+			fmt.Fprintln(cmd.OutOrStdout(), foundPath)
 			return nil
 		}
 	}
@@ -293,7 +326,7 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 		}
 
 		commandPath := filepath.Join(versionPath, "bin", commandName)
-		if _, err := os.Stat(commandPath); err == nil {
+		if _, err := findExecutable(commandPath); err == nil {
 			foundInVersions = append(foundInVersions, v)
 		}
 	}
@@ -362,13 +395,8 @@ func findInSystemPath(commandName string, goenvRoot string) (string, error) {
 		}
 
 		commandPath := filepath.Join(dir, commandName)
-		info, err := os.Stat(commandPath)
-		if err == nil && !info.IsDir() {
-			// Check if executable
-			// On Windows, all files are "executable"; on Unix, check the executable bit
-			if runtime.GOOS == "windows" || info.Mode()&0111 != 0 {
-				return commandPath, nil
-			}
+		if foundPath, err := findExecutable(commandPath); err == nil {
+			return foundPath, nil
 		}
 	}
 
@@ -395,17 +423,12 @@ func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config)
 		}
 
 		commandPath := filepath.Join(versionPath, "bin", commandName)
-		info, err := os.Stat(commandPath)
-		if err == nil && !info.IsDir() {
-			// Check if executable
-			// On Windows, all files are "executable"; on Unix, check the executable bit
-			if runtime.GOOS == "windows" || info.Mode()&0111 != 0 {
-				foundAny = true
-				if whenceFlags.path {
-					fmt.Fprintln(cmd.OutOrStdout(), commandPath)
-				} else {
-					fmt.Fprintln(cmd.OutOrStdout(), version)
-				}
+		if foundPath, err := findExecutable(commandPath); err == nil {
+			foundAny = true
+			if whenceFlags.path {
+				fmt.Fprintln(cmd.OutOrStdout(), foundPath)
+			} else {
+				fmt.Fprintln(cmd.OutOrStdout(), version)
 			}
 		}
 	}
