@@ -167,16 +167,15 @@ func TestListInstalledTools(t *testing.T) {
 			// Create tool binaries
 			for _, tool := range tt.setupTools {
 				toolPath := filepath.Join(gopathBin, tool)
-			var content string
-			if runtime.GOOS == "windows" {
-				toolPath += ".bat"
-				content = "@echo off\necho mock tool\n"
-			} else {
-				content = "#!/bin/sh\necho mock tool\n"
-			}
-			if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
-					t.Fatalf("Failed to create tool %s: %v", tool, err)
+				var content string
+				if runtime.GOOS == "windows" {
+					toolPath += ".bat"
+					content = "@echo off\necho mock tool\n"
+				} else {
+					content = "#!/bin/sh\necho mock tool\n"
 				}
+				if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
+					t.Fatalf("Failed to create tool %s: %v", tool, err)
 				}
 			}
 
