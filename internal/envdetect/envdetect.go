@@ -289,23 +289,16 @@ func detectWindowsFilesystem(path string) FilesystemType {
 		return FSTypeSMB
 	}
 
-	// Get absolute path
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return FSTypeUnknown
-	}
-
-	// On Windows, we need to check for:
-	// - UNC paths (\\server\share) - SMB/CIFS
-	// - Mapped network drives
-	// - WSL paths (/mnt/c, /mnt/wsl, etc. - only when running in WSL)
-
-	// Check if running in WSL and path is on Windows filesystem
-	if strings.HasPrefix(absPath, "/mnt/") {
+	// Check for WSL paths BEFORE normalizing (filepath.Abs on Windows converts Unix paths)
+	if strings.HasPrefix(path, "/mnt/") {
 		// This is a WSL mount of a Windows drive
 		// These are typically much slower than native Linux filesystem
 		return FSTypeFUSE // FUSE-like performance characteristics
 	}
+
+	// On Windows, we need to check for:
+	// - UNC paths (\\server\share) - SMB/CIFS (checked above)
+	// - Mapped network drives (future: could check drive letters)
 
 	// Default to local for Windows drives
 	return FSTypeLocal

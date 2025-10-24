@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -753,7 +754,19 @@ func TestFilterGoKeys(t *testing.T) {
 }
 
 func TestConvertToWorkspacePaths(t *testing.T) {
-	workspaceRoot := "/Users/adam/projects/myapp"
+	// Use platform-appropriate paths
+	var workspaceRoot string
+	var externalPath1, externalPath2 string
+
+	if runtime.GOOS == "windows" {
+		workspaceRoot = `C:\Users\adam\projects\myapp`
+		externalPath1 = `C:\Program Files\Go`
+		externalPath2 = `C:\Users\adam\go\tools`
+	} else {
+		workspaceRoot = "/Users/adam/projects/myapp"
+		externalPath1 = "/usr/local/go"
+		externalPath2 = "/Users/adam/go/tools"
+	}
 
 	tests := []struct {
 		name     string
@@ -763,8 +776,8 @@ func TestConvertToWorkspacePaths(t *testing.T) {
 		{
 			name: "convert absolute paths",
 			settings: map[string]any{
-				"go.goroot": "/Users/adam/projects/myapp/sdk/go",
-				"go.gopath": "/Users/adam/projects/myapp/gopath",
+				"go.goroot": filepath.Join(workspaceRoot, "sdk", "go"),
+				"go.gopath": filepath.Join(workspaceRoot, "gopath"),
 			},
 			expected: map[string]any{
 				"go.goroot": "${workspaceFolder}/sdk/go",
@@ -774,12 +787,12 @@ func TestConvertToWorkspacePaths(t *testing.T) {
 		{
 			name: "leave external paths unchanged",
 			settings: map[string]any{
-				"go.goroot":      "/usr/local/go",
-				"go.toolsGopath": "/Users/adam/go/tools",
+				"go.goroot":      externalPath1,
+				"go.toolsGopath": externalPath2,
 			},
 			expected: map[string]any{
-				"go.goroot":      "/usr/local/go",
-				"go.toolsGopath": "/Users/adam/go/tools",
+				"go.goroot":      externalPath1,
+				"go.toolsGopath": externalPath2,
 			},
 		},
 		{
@@ -787,7 +800,7 @@ func TestConvertToWorkspacePaths(t *testing.T) {
 			settings: map[string]any{
 				"gopls": map[string]any{
 					"build.env": map[string]any{
-						"GOROOT": "/Users/adam/projects/myapp/sdk/go",
+						"GOROOT": filepath.Join(workspaceRoot, "sdk", "go"),
 					},
 				},
 			},
@@ -802,7 +815,7 @@ func TestConvertToWorkspacePaths(t *testing.T) {
 		{
 			name: "preserve non-string values",
 			settings: map[string]any{
-				"go.goroot":                     "/Users/adam/projects/myapp/go",
+				"go.goroot":                     filepath.Join(workspaceRoot, "go"),
 				"go.toolsManagement.autoUpdate": true,
 				"gopls": map[string]any{
 					"formatting.gofumpt": true,

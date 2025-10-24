@@ -429,7 +429,8 @@ func ConvertToWorkspacePaths(settings map[string]any, workspaceRoot string) map[
 		case string:
 			// Convert absolute paths to workspace-relative
 			if rel, found := strings.CutPrefix(v, workspaceRoot); found {
-				rel = strings.TrimPrefix(rel, string(filepath.Separator))
+				// Trim leading separators (both forward slash and backslash for Windows compatibility)
+				rel = strings.TrimLeft(rel, "/\\")
 				result[key] = "${workspaceFolder}/" + strings.ReplaceAll(rel, string(filepath.Separator), "/")
 			} else {
 				result[key] = v

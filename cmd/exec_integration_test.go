@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -279,7 +280,11 @@ func main() { fmt.Println("goenv-exec-test-ok") }`
 	}
 
 	// Compile the test tool using system Go
-	toolBinaryPath := filepath.Join(tempDir, "testtool")
+	toolBinaryName := "testtool"
+	if runtime.GOOS == "windows" {
+		toolBinaryName = "testtool.exe"
+	}
+	toolBinaryPath := filepath.Join(tempDir, toolBinaryName)
 	compileCmd := exec.Command(systemGo, "build", "-o", toolBinaryPath, toolSourcePath)
 	if output, err := compileCmd.CombinedOutput(); err != nil {
 		t.Skipf("Cannot compile test tool: %v\nOutput: %s", err, output)
@@ -307,6 +312,7 @@ func main() { fmt.Println("goenv-exec-test-ok") }`
 	t.Setenv("PATH", newPath)
 
 	// Execute the tool by name (should find it in PATH)
+	// On Windows, we can use "testtool" and the shell will find "testtool.exe"
 	pathCmd := exec.Command("testtool")
 	pathOutput, err := pathCmd.CombinedOutput()
 	if err != nil {

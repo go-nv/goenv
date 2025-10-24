@@ -155,6 +155,14 @@ func TestDetectWindowsFilesystemUNC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Skip WSL mount test on native Windows (only valid in WSL)
+			if tt.name == "WSL mount" && runtime.GOOS == "windows" {
+				// Check if we're in WSL by looking for /proc/version
+				if _, err := os.Stat("/proc/version"); os.IsNotExist(err) {
+					t.Skip("Skipping WSL mount test on native Windows")
+				}
+			}
+
 			result := detectWindowsFilesystem(tt.path)
 			if result != tt.expected {
 				t.Errorf("detectWindowsFilesystem(%s) = %s, want %s", tt.path, result, tt.expected)

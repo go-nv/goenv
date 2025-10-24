@@ -353,8 +353,16 @@ func TestCacheCleanDryRun(t *testing.T) {
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-		t.Fatal(err)
+	if runtime.GOOS == "windows" {
+		// On Windows, pathutil.FindExecutable looks for .exe or .bat
+		goExe = filepath.Join(binDir, "go.bat")
+		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if err := os.MkdirAll(buildCache, 0755); err != nil {
@@ -395,13 +403,13 @@ func TestCacheCleanDryRun(t *testing.T) {
 
 	// Verify dry-run message appears
 	if !strings.Contains(outputStr, "Dry-run mode") {
-		t.Error("Expected 'Dry-run mode' message in output")
+		t.Errorf("Expected 'Dry-run mode' message in output. Got:\n%s", outputStr)
 	}
 	if !strings.Contains(outputStr, "No caches were actually deleted") {
-		t.Error("Expected 'No caches were actually deleted' message")
+		t.Errorf("Expected 'No caches were actually deleted' message. Got:\n%s", outputStr)
 	}
 	if !strings.Contains(outputStr, "without --dry-run") {
-		t.Error("Expected instruction about running without --dry-run")
+		t.Errorf("Expected instruction about running without --dry-run. Got:\n%s", outputStr)
 	}
 
 	// Verify files were NOT deleted
@@ -429,8 +437,16 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-		t.Fatal(err)
+	if runtime.GOOS == "windows" {
+		// On Windows, pathutil.FindExecutable looks for .exe or .bat
+		goExe = filepath.Join(binDir, "go.bat")
+		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if err := os.MkdirAll(buildCache, 0755); err != nil {
@@ -475,17 +491,17 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 
 	// Should show caches to clean
 	if !strings.Contains(outputStr, "Caches to clean") {
-		t.Error("Expected 'Caches to clean' section in dry-run output")
+		t.Errorf("Expected 'Caches to clean' section in dry-run output. Got:\n%s", outputStr)
 	}
 
 	// Should mention the specific version
 	if !strings.Contains(outputStr, "1.23.2") {
-		t.Error("Expected version 1.23.2 in output")
+		t.Errorf("Expected version 1.23.2 in output. Got:\n%s", outputStr)
 	}
 
 	// Should have dry-run message
 	if !strings.Contains(outputStr, "Dry-run mode") {
-		t.Error("Expected dry-run message")
+		t.Errorf("Expected dry-run message. Got:\n%s", outputStr)
 	}
 
 	// Files should still exist
@@ -509,8 +525,16 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-		t.Fatal(err)
+	if runtime.GOOS == "windows" {
+		// On Windows, pathutil.FindExecutable looks for .exe or .bat
+		goExe = filepath.Join(binDir, "go.bat")
+		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	for _, cache := range []string{buildCache1, buildCache2} {
@@ -550,20 +574,20 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 
 	// Should show both caches
 	if !strings.Contains(outputStr, "darwin-arm64") {
-		t.Error("Expected darwin-arm64 cache in output")
+		t.Errorf("Expected darwin-arm64 cache in output. Got:\n%s", outputStr)
 	}
 	if !strings.Contains(outputStr, "linux-amd64") {
-		t.Error("Expected linux-amd64 cache in output")
+		t.Errorf("Expected linux-amd64 cache in output. Got:\n%s", outputStr)
 	}
 
 	// Should show total size
 	if !strings.Contains(outputStr, "Total to clean") {
-		t.Error("Expected 'Total to clean' summary")
+		t.Errorf("Expected 'Total to clean' summary. Got:\n%s", outputStr)
 	}
 
 	// Should have dry-run warning
 	if !strings.Contains(outputStr, "Dry-run mode") {
-		t.Error("Expected dry-run mode message")
+		t.Errorf("Expected dry-run mode message. Got:\n%s", outputStr)
 	}
 
 	// Verify no actual deletion
@@ -586,8 +610,16 @@ func TestCacheCleanDryRunEmptyCaches(t *testing.T) {
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-		t.Fatal(err)
+	if runtime.GOOS == "windows" {
+		// On Windows, pathutil.FindExecutable looks for .exe or .bat
+		goExe = filepath.Join(binDir, "go.bat")
+		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Save and restore environment
@@ -616,7 +648,7 @@ func TestCacheCleanDryRunEmptyCaches(t *testing.T) {
 
 	// Should report no caches found
 	if !strings.Contains(outputStr, "No caches found") {
-		t.Error("Expected 'No caches found' message when no caches exist")
+		t.Errorf("Expected 'No caches found' message when no caches exist. Got:\n%s", outputStr)
 	}
 
 	// Should NOT show dry-run message if there's nothing to clean
@@ -637,8 +669,16 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-		t.Fatal(err)
+	if runtime.GOOS == "windows" {
+		// On Windows, pathutil.FindExecutable looks for .exe or .bat
+		goExe = filepath.Join(binDir, "go.bat")
+		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if err := os.MkdirAll(buildCache, 0755); err != nil {
@@ -692,7 +732,7 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 
 	// Should return an error
 	if err == nil {
-		t.Fatal("Expected error when running cache clean without --force in non-interactive mode")
+		t.Fatalf("Expected error when running cache clean without --force in non-interactive mode. Got output:\n%s\nError output:\n%s", output.String(), errOutput.String())
 	}
 
 	// Error should contain "--force" to guide the user
