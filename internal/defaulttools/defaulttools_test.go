@@ -164,7 +164,8 @@ func TestInstallTools_Disabled(t *testing.T) {
 		},
 	}
 
-	err := InstallTools(config, "1.21.0", tmpDir, true)
+	hostGopath := filepath.Join(tmpDir, "host-gopath")
+	err := InstallTools(config, "1.21.0", tmpDir, hostGopath, true)
 	if err != nil {
 		t.Errorf("InstallTools should not error when disabled: %v", err)
 	}
@@ -178,7 +179,8 @@ func TestInstallTools_NoTools(t *testing.T) {
 		Tools:   []Tool{},
 	}
 
-	err := InstallTools(config, "1.21.0", tmpDir, true)
+	hostGopath := filepath.Join(tmpDir, "host-gopath")
+	err := InstallTools(config, "1.21.0", tmpDir, hostGopath, true)
 	if err != nil {
 		t.Errorf("InstallTools should not error with no tools: %v", err)
 	}
@@ -194,7 +196,8 @@ func TestInstallTools_GoNotFound(t *testing.T) {
 		},
 	}
 
-	err := InstallTools(config, "1.21.0", tmpDir, false)
+	hostGopath := filepath.Join(tmpDir, "host-gopath")
+	err := InstallTools(config, "1.21.0", tmpDir, hostGopath, false)
 	if err == nil {
 		t.Error("Expected error when Go binary not found")
 	}
@@ -244,7 +247,8 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 		},
 	}
 
-	err := InstallTools(config, goVersion, tmpDir, false)
+	hostGopath := filepath.Join(tmpDir, "host-gopath")
+	err := InstallTools(config, goVersion, tmpDir, hostGopath, false)
 	if err != nil {
 		t.Errorf("InstallTools failed: %v", err)
 	}
@@ -284,7 +288,8 @@ func TestInstallTools_Failure(t *testing.T) {
 		},
 	}
 
-	err := InstallTools(config, goVersion, tmpDir, false)
+	hostGopath := filepath.Join(tmpDir, "host-gopath")
+	err := InstallTools(config, goVersion, tmpDir, hostGopath, false)
 	if err == nil {
 		t.Error("Expected error when tool installation fails")
 	}

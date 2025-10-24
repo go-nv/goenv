@@ -6,13 +6,13 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/defaulttools"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var defaultToolsCmd = &cobra.Command{
-	Use:     "default-tools",
-	Short:   "Manage default tools installed with new Go versions",
-	GroupID: "tools",
+	Use:   "default-tools",
+	Short: "Manage default tools installed with new Go versions",
 	Long: `Manages the list of tools automatically installed with each new Go version.
 
 Default tools are specified in ~/.goenv/default-tools.yaml and are automatically
@@ -24,11 +24,11 @@ Common use cases:
   - Reduce manual setup after installing new Go versions
 
 Examples:
-  goenv default-tools list              # Show configured tools
-  goenv default-tools init              # Create default config file
-  goenv default-tools enable            # Enable auto-installation
-  goenv default-tools disable           # Disable auto-installation
-  goenv default-tools install 1.25.2    # Install tools for specific version`,
+  goenv tools default list              # Show configured tools
+  goenv tools default init              # Create default config file
+  goenv tools default enable            # Enable auto-installation
+  goenv tools default disable           # Disable auto-installation
+  goenv tools default install 1.25.2    # Install tools for specific version`,
 }
 
 var defaultToolsListCmd = &cobra.Command{
@@ -87,13 +87,13 @@ var verifyCmd = &cobra.Command{
 }
 
 func init() {
+	// Now registered as subcommand in tools.go
 	defaultToolsCmd.AddCommand(defaultToolsListCmd)
 	defaultToolsCmd.AddCommand(defaultToolsInitCmd)
 	defaultToolsCmd.AddCommand(enableCmd)
 	defaultToolsCmd.AddCommand(disableCmd)
 	defaultToolsCmd.AddCommand(installToolsCmd)
 	defaultToolsCmd.AddCommand(verifyCmd)
-	rootCmd.AddCommand(defaultToolsCmd)
 }
 
 func runDefaultToolsList(cmd *cobra.Command, args []string) error {
@@ -103,7 +103,7 @@ func runDefaultToolsList(cmd *cobra.Command, args []string) error {
 	// Check if config exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		fmt.Fprintln(cmd.OutOrStdout(), "No default tools configuration found.")
-		fmt.Fprintln(cmd.OutOrStdout(), "Run 'goenv default-tools init' to create one.")
+		fmt.Fprintln(cmd.OutOrStdout(), "Run 'goenv tools default init' to create one.")
 		return nil
 	}
 
@@ -160,12 +160,12 @@ func runDefaultToolsInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create config: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "✅ Created default tools configuration")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sCreated default tools configuration\n", utils.Emoji("✅ "))
 	fmt.Fprintf(cmd.OutOrStdout(), "   Location: %s\n", configPath)
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintln(cmd.OutOrStdout(), "Default tools included:")
 	for _, tool := range toolConfig.Tools {
-		fmt.Fprintf(cmd.OutOrStdout(), "  • %s (%s)\n", tool.Name, tool.Package)
+		fmt.Fprintf(cmd.OutOrStdout(), "  %s%s (%s)\n", utils.Emoji("• "), tool.Name, tool.Package)
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintln(cmd.OutOrStdout(), "These tools will be automatically installed with new Go versions.")
@@ -193,7 +193,7 @@ func runEnable(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "✅ Default tools enabled")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sDefault tools enabled\n", utils.Emoji("✅ "))
 	fmt.Fprintln(cmd.OutOrStdout(), "Tools will be automatically installed with new Go versions.")
 
 	return nil
@@ -218,7 +218,7 @@ func runDisable(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "✅ Default tools disabled")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sDefault tools disabled\n", utils.Emoji("✅ "))
 	fmt.Fprintln(cmd.OutOrStdout(), "Tools will not be automatically installed with new Go versions.")
 	fmt.Fprintln(cmd.OutOrStdout(), "Configuration file preserved.")
 
@@ -236,26 +236,26 @@ func runInstallTools(cmd *cobra.Command, args []string) error {
 	}
 
 	if !toolConfig.Enabled {
-		fmt.Fprintln(cmd.OutOrStderr(), "⚠️  Default tools are disabled in config")
+		fmt.Fprintf(cmd.OutOrStderr(), "%sDefault tools are disabled in config\n", utils.Emoji("⚠️  "))
 		fmt.Fprintln(cmd.OutOrStderr(), "Installing anyway...")
 		fmt.Fprintln(cmd.OutOrStdout())
 	}
 
 	if len(toolConfig.Tools) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "No tools configured to install.")
-		fmt.Fprintln(cmd.OutOrStdout(), "Run 'goenv default-tools init' to create a default configuration.")
+		fmt.Fprintln(cmd.OutOrStdout(), "Run 'goenv tools default init' to create a default configuration.")
 		return nil
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Installing default tools for Go %s...\n", goVersion)
 	fmt.Fprintln(cmd.OutOrStdout())
 
-	if err := defaulttools.InstallTools(toolConfig, goVersion, cfg.Root, true); err != nil {
+	if err := defaulttools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.HostGopath(), true); err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "💡 Run 'goenv rehash' to make tools available as shims")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sRun 'goenv rehash' to make tools available as shims\n", utils.Emoji("💡 "))
 
 	return nil
 }
@@ -289,10 +289,10 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	for _, tool := range toolConfig.Tools {
 		if results[tool.Name] {
 			installed = append(installed, tool.Name)
-			fmt.Fprintf(cmd.OutOrStdout(), "✅ %s\n", tool.Name)
+			fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", utils.Emoji("✅ "), tool.Name)
 		} else {
 			missing = append(missing, tool.Name)
-			fmt.Fprintf(cmd.OutOrStdout(), "❌ %s (not installed)\n", tool.Name)
+			fmt.Fprintf(cmd.OutOrStdout(), "%s%s (not installed)\n", utils.Emoji("❌ "), tool.Name)
 		}
 	}
 
@@ -301,7 +301,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 
 	if len(missing) > 0 {
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintf(cmd.OutOrStdout(), "To install missing tools: goenv default-tools install %s\n", goVersion)
+		fmt.Fprintf(cmd.OutOrStdout(), "To install missing tools: goenv tools default install %s\n", goVersion)
 	}
 
 	return nil
@@ -309,7 +309,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 
 func statusString(enabled bool) string {
 	if enabled {
-		return "✅ Enabled"
+		return utils.Emoji("✅ ") + "Enabled"
 	}
-	return "❌ Disabled"
+	return utils.Emoji("❌ ") + "Disabled"
 }

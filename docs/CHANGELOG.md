@@ -55,13 +55,17 @@ Change line format:
 
 ### Added
 
-- **🩺 Doctor Command** - Comprehensive diagnostic tool with 12 health checks including VS Code integration, go.mod compatibility, cache validation, and PATH configuration
+- **🩺 Doctor Command** - Comprehensive diagnostic tool with 25+ health checks including VS Code integration, go.mod compatibility, cache validation, PATH configuration, and environment detection
+- **🌍 Environment Detection** - Automatic detection of containers (Docker, Podman, Kubernetes, LXC, BuildKit), WSL (versions 1/2), and filesystem types (NFS, SMB, FUSE, bind mounts) with actionable warnings
+- **🖥️  Platform-Specific Enhancements** - macOS deployment target validation, Windows MSVC/MinGW detection, Windows ARM64/ARM64EC support, Linux kernel version checks, and glibc compatibility suggestions
 - **⚡ Smart Caching System** - 10-50x faster version listing with intelligent cache validation, HTTP ETag support, and automatic freshness checking
 - **🔄 Cache Refresh Command** - `goenv refresh` command to clear cached data and force fresh fetch from go.dev API
 - **⚡ Hook System** - Fully functional hook execution at 8 lifecycle points (pre/post install, uninstall, exec, rehash) with 20+ built-in actions
 - **⚙️ Auto-Rehash Control** - Configurable automatic rehashing with `--no-rehash` flag and `GOENV_NO_AUTO_REHASH` environment variable
 - **🎯 VS Code Integration** - `goenv vscode init` command with templates (basic, advanced, monorepo) and smart settings merging
 - **📦 GOPATH Integration** - Automatic per-version GOPATH management and tool binary scanning during rehash
+- **🔒 SBOM Generation** - `goenv sbom project` command for generating Software Bill of Materials with industry-standard tools (cyclonedx-gomod, syft) in CycloneDX and SPDX formats
+- **📊 Go Version Inventory** - `goenv inventory go` command for auditing installed Go versions with text and JSON output, including optional SHA256 checksums
 - **⚡ Version Shorthand Support** - Install latest patch with `goenv install 1.22` or latest minor with `goenv install 1`
 - **🔄 Complete Tab Completion** - Enhanced completion for all commands including version lists, installed versions, and command options
 - **🌐 Offline Mode** - Complete offline operation with embedded version data via `GOENV_OFFLINE=1`
@@ -80,6 +84,14 @@ Change line format:
 - **📦 Install Command** - Enhanced with completion, caching, and configurable auto-rehash behavior
 - go.mod version discovery is now always enabled (no longer requires `GOENV_GOMOD_VERSION_ENABLE=1`)
 - Smart version precedence: `.go-version` takes precedence when it satisfies or exceeds `go.mod` toolchain requirements
+
+### Fixed
+
+- **🔧 Cache Isolation** - Fixed cache migration to use runtime platform detection (`runtime.GOOS/GOARCH`) instead of cross-compilation environment variables, preventing "exec format error" when switching architectures
+- **🔧 Cache ABI Parsing** - Enhanced cache name parser to handle ARM variant formats (both "v6" and "6"), CGO toolchain hashes, and GOEXPERIMENT flags for accurate cache matching
+- **🔧 Atomic Cache Writes** - Fixed build.info atomic writer to properly use file locking mechanism, ensuring cache consistency under concurrent operations
+- **🔧 Doctor Network Check** - Replaced ICMP ping (blocked in CI/containers) with HTTPS HEAD request to go.dev for reliable network connectivity testing
+- **🔧 Windows PATH Filtering** - Fixed shim PATH detection to use normalized absolute path comparison instead of substring matching, preventing false exclusions of directories like `goenv_shims_backup`
 
 ### Removed
 

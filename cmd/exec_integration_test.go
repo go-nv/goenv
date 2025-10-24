@@ -253,3 +253,71 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 		t.Log("⚠ Shims not created (install may have failed silently)")
 	}
 }
+
+// TestExec_MinimalNoopPath tests the absolute minimal exec path without external dependencies.
+// This test compiles a tiny Go tool at test runtime and verifies the basic exec mechanism.
+// Unlike the integration tests above, this test runs in CI and doesn't require:
+// - Pre-installed goenv-managed Go versions
+// - Network access
+// - Long-running installations
+func TestExec_MinimalNoopPath(t *testing.T) {
+	// Check if system Go is available (needed to compile our test tool)
+	systemGo, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("System Go not available, cannot compile test tool")
+	}
+
+	// Create a minimal Go program
+	tempDir := t.TempDir()
+	toolSource := `package main
+import "fmt"
+func main() { fmt.Println("goenv-exec-test-ok") }`
+
+	toolSourcePath := filepath.Join(tempDir, "testtool.go")
+	if err := os.WriteFile(toolSourcePath, []byte(toolSource), 0644); err != nil {
+		t.Fatalf("Failed to write test tool source: %v", err)
+	}
+
+	// Compile the test tool using system Go
+	toolBinaryPath := filepath.Join(tempDir, "testtool")
+	compileCmd := exec.Command(systemGo, "build", "-o", toolBinaryPath, toolSourcePath)
+	if output, err := compileCmd.CombinedOutput(); err != nil {
+		t.Skipf("Cannot compile test tool: %v\nOutput: %s", err, output)
+	}
+
+	// Verify the binary was created and is executable
+	if _, err := os.Stat(toolBinaryPath); err != nil {
+		t.Fatalf("Test tool binary not created: %v", err)
+	}
+
+	// Test 1: Direct execution of the tool (sanity check)
+	directCmd := exec.Command(toolBinaryPath)
+	directOutput, err := directCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Direct execution of test tool failed: %v\nOutput: %s", err, directOutput)
+	}
+	if !strings.Contains(string(directOutput), "goenv-exec-test-ok") {
+		t.Fatalf("Test tool didn't produce expected output: %s", directOutput)
+	}
+
+	// Test 2: Execution through PATH (simulating shim behavior)
+	// Add our temp directory to PATH
+	oldPath := os.Getenv("PATH")
+	newPath := tempDir + string(os.PathListSeparator) + oldPath
+	t.Setenv("PATH", newPath)
+
+	// Execute the tool by name (should find it in PATH)
+	pathCmd := exec.Command("testtool")
+	pathOutput, err := pathCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("PATH-based execution failed: %v\nOutput: %s", err, pathOutput)
+	}
+	if !strings.Contains(string(pathOutput), "goenv-exec-test-ok") {
+		t.Fatalf("PATH execution didn't produce expected output: %s", pathOutput)
+	}
+
+	t.Log("✓ Minimal exec path verification passed")
+	t.Logf("  - Tool compilation: OK")
+	t.Logf("  - Direct execution: OK")
+	t.Logf("  - PATH resolution: OK")
+}

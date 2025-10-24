@@ -394,6 +394,16 @@ func findInSystemPath(commandName string, goenvRoot string) (string, error) {
 	}
 
 	shimsDir := filepath.Join(goenvRoot, "shims")
+
+	// Normalize shims directory to absolute path for accurate comparison
+	shimsAbs, err := filepath.Abs(shimsDir)
+	if err != nil {
+		// If we can't get absolute path, fall back to original path
+		shimsAbs = shimsDir
+	}
+	// Clean the path to remove . and .. components
+	shimsAbs = filepath.Clean(shimsAbs)
+
 	pathDirs := strings.Split(pathEnv, string(os.PathListSeparator))
 
 	for _, dir := range pathDirs {
@@ -401,8 +411,17 @@ func findInSystemPath(commandName string, goenvRoot string) (string, error) {
 			continue
 		}
 
-		// Skip goenv shims directory
-		if strings.Contains(dir, shimsDir) {
+		// Normalize the PATH directory to absolute path
+		dirAbs, err := filepath.Abs(dir)
+		if err != nil {
+			// If we can't resolve it, use as-is
+			dirAbs = dir
+		}
+		dirAbs = filepath.Clean(dirAbs)
+
+		// Skip goenv shims directory using proper path comparison
+		// Check exact match or if dir is a subdirectory of shims
+		if dirAbs == shimsAbs || strings.HasPrefix(dirAbs+string(filepath.Separator), shimsAbs+string(filepath.Separator)) {
 			continue
 		}
 

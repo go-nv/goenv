@@ -92,10 +92,23 @@ func (a *LogToFileAction) Execute(ctx *HookContext, params map[string]interface{
 	}
 	defer f.Close()
 
-	// Check file size (limit to 100MB)
+	// Check file size (limit to 100MB with rotation)
 	info, err := f.Stat()
 	if err == nil && info.Size() > 100*1024*1024 {
-		return fmt.Errorf("log file exceeds maximum size (100MB)")
+		f.Close() // Close before rotating
+
+		// Simple rotation: rename current file to .1
+		rotatedFile := file + ".1"
+		if err := os.Rename(file, rotatedFile); err != nil {
+			return fmt.Errorf("log file exceeds maximum size (100MB) and rotation failed: %w", err)
+		}
+
+		// Reopen file (will create new empty file)
+		f, err = os.OpenFile(file, flags, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to reopen log file after rotation: %w", err)
+		}
+		defer f.Close()
 	}
 
 	// Write message

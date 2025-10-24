@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
@@ -88,12 +89,37 @@ func (c *Config) AliasesFile() string {
 	return filepath.Join(c.Root, "aliases")
 }
 
+// HostsDir returns the directory containing host-specific data
+func (c *Config) HostsDir() string {
+	return filepath.Join(c.Root, "hosts")
+}
+
+// HostDir returns the directory for the current host (GOOS-GOARCH)
+// Uses runtime.GOOS and runtime.GOARCH to identify the host architecture
+func (c *Config) HostDir() string {
+	hostOS := runtime.GOOS
+	hostArch := runtime.GOARCH
+	return filepath.Join(c.HostsDir(), hostOS+"-"+hostArch)
+}
+
+// HostGopath returns the GOPATH for the current host
+func (c *Config) HostGopath() string {
+	return filepath.Join(c.HostDir(), "gopath")
+}
+
+// HostBinDir returns the bin directory for the current host
+func (c *Config) HostBinDir() string {
+	return filepath.Join(c.HostGopath(), "bin")
+}
+
 // EnsureDirectories creates necessary directories if they don't exist
 func (c *Config) EnsureDirectories() error {
 	dirs := []string{
 		c.Root,
 		c.VersionsDir(),
 		c.ShimsDir(),
+		c.HostDir(),
+		c.HostGopath(),
 	}
 
 	for _, dir := range dirs {

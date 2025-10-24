@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
 )
 
@@ -69,7 +70,7 @@ func (s *InteractiveSetup) Run() (*WorkflowResult, error) {
 	result.VersionInstalled = versionInstalled
 
 	if versionInstalled {
-		fmt.Fprintf(s.Stdout, "✓ Go %s is installed\n", discovered.Version)
+		fmt.Fprintf(s.Stdout, "%sGo %s is installed\n", utils.Emoji("✓ "), discovered.Version)
 	} else {
 		// Offer to install
 		result.InstallRequested = s.promptInstall(discovered.Version)
@@ -94,7 +95,7 @@ func (s *InteractiveSetup) Run() (*WorkflowResult, error) {
 			if err := s.VSCodeUpdate(discovered.Version); err != nil {
 				fmt.Fprintf(s.Stderr, "Failed to update VS Code settings: %v\n", err)
 			} else {
-				fmt.Fprintf(s.Stdout, "✓ VS Code settings updated\n")
+				fmt.Fprintf(s.Stdout, "%sVS Code settings updated\n", utils.Emoji("✓ "))
 				result.VSCodeUpdated = true
 			}
 		}
@@ -107,7 +108,7 @@ func (s *InteractiveSetup) Run() (*WorkflowResult, error) {
 // Returns true if user wants to install, false otherwise
 // The actual installation should be handled by the caller
 func (s *InteractiveSetup) promptInstall(version string) bool {
-	fmt.Fprintf(s.Stdout, "⚠️  Go %s is not installed\n", version)
+	fmt.Fprintf(s.Stdout, "%sGo %s is not installed\n", utils.Emoji("⚠️  "), version)
 	fmt.Fprintf(s.Stdout, "Install now? (Y/n) ")
 
 	response := s.readInput()
@@ -131,7 +132,7 @@ func (s *InteractiveSetup) checkVersionMismatch(discoveredVersion *manager.Disco
 	// If discovery chose go.mod over .go-version (because .go-version was older),
 	// prompt the user to update .go-version
 	if discoveredVersion.Source == manager.SourceGoMod && goVersionVer != "" {
-		fmt.Fprintf(s.Stdout, "\n⚠️  Your .go-version (%s) is older than go.mod's toolchain requirement (%s)\n", goVersionVer, goModVer)
+		fmt.Fprintf(s.Stdout, "\n%sYour .go-version (%s) is older than go.mod's toolchain requirement (%s)\n", utils.Emoji("⚠️  "), goVersionVer, goModVer)
 		fmt.Fprintf(s.Stdout, "   Using %s as required by go.mod\n\n", goModVer)
 
 		fmt.Fprintf(s.Stdout, "Update .go-version to %s to avoid this warning? (Y/n) ", goModVer)
@@ -140,10 +141,10 @@ func (s *InteractiveSetup) checkVersionMismatch(discoveredVersion *manager.Disco
 		if response == "" || response == "y" || response == "yes" {
 			versionFile := filepath.Join(s.WorkingDir, ".go-version")
 			if err := os.WriteFile(versionFile, []byte(goModVer+"\n"), 0644); err != nil {
-				fmt.Fprintf(s.Stdout, "⚠️  Failed to update .go-version: %v\n", err)
+				fmt.Fprintf(s.Stdout, "%sFailed to update .go-version: %v\n", utils.Emoji("⚠️  "), err)
 				return false
 			}
-			fmt.Fprintf(s.Stdout, "✅ Updated .go-version to %s\n\n", goModVer)
+			fmt.Fprintf(s.Stdout, "%sUpdated .go-version to %s\n\n", utils.Emoji("✅ "), goModVer)
 			return true
 		}
 		fmt.Fprintln(s.Stdout)
@@ -151,10 +152,10 @@ func (s *InteractiveSetup) checkVersionMismatch(discoveredVersion *manager.Disco
 	}
 
 	// Otherwise just show informational message
-	fmt.Fprintf(s.Stdout, "\n⚠️  Version mismatch detected:\n")
+	fmt.Fprintf(s.Stdout, "\n%sVersion mismatch detected:\n", utils.Emoji("⚠️  "))
 	fmt.Fprintf(s.Stdout, "   .go-version: %s\n", goVersionVer)
 	fmt.Fprintf(s.Stdout, "   go.mod:      %s\n", goModVer)
-	fmt.Fprintf(s.Stdout, "\n💡 Consider updating .go-version to match go.mod:\n")
+	fmt.Fprintf(s.Stdout, "\n%sConsider updating .go-version to match go.mod:\n", utils.Emoji("💡 "))
 	fmt.Fprintf(s.Stdout, "   goenv local %s\n\n", goModVer)
 	return false
 }
@@ -176,24 +177,24 @@ func (s *InteractiveSetup) checkVSCodeSettings(version string, versionInstalled 
 
 	// Treat missing Go settings same as mismatch - offer to configure
 	if !result.HasSettings {
-		fmt.Fprintf(s.Stdout, "💡 VS Code settings found but not configured for goenv\n")
+		fmt.Fprintf(s.Stdout, "%sVS Code settings found but not configured for goenv\n", utils.Emoji("💡 "))
 		return true
 	}
 
 	if result.Mismatch {
 		if result.ConfiguredVersion != "" {
-			fmt.Fprintf(s.Stdout, "⚠️  VS Code settings use Go %s but discovered version is %s\n", result.ConfiguredVersion, version)
+			fmt.Fprintf(s.Stdout, "%sVS Code settings use Go %s but discovered version is %s\n", utils.Emoji("⚠️  "), result.ConfiguredVersion, version)
 		} else {
-			fmt.Fprintf(s.Stdout, "💡 VS Code settings found but not configured for goenv\n")
+			fmt.Fprintf(s.Stdout, "%sVS Code settings found but not configured for goenv\n", utils.Emoji("💡 "))
 		}
 		return true
 	}
 
 	// No mismatch - check if using env vars
 	if result.UsesEnvVars {
-		fmt.Fprintf(s.Stdout, "✓ VS Code settings using environment variables\n")
+		fmt.Fprintf(s.Stdout, "%sVS Code settings using environment variables\n", utils.Emoji("✓ "))
 	} else {
-		fmt.Fprintf(s.Stdout, "✓ VS Code settings are correct\n")
+		fmt.Fprintf(s.Stdout, "%sVS Code settings are correct\n", utils.Emoji("✓ "))
 	}
 
 	return false
@@ -272,7 +273,7 @@ func (s *AutoInstallSetup) Run() (*AutoInstallResult, error) {
 			// After install, configure VS Code
 			if s.VSCodeUpdate != nil {
 				if err := s.VSCodeUpdate(discovered.Version); err == nil {
-					fmt.Fprintf(s.Stdout, "✅ Configured VS Code for Go %s\n", discovered.Version)
+					fmt.Fprintf(s.Stdout, "%sConfigured VS Code for Go %s\n", utils.Emoji("✅ "), discovered.Version)
 					result.VSCodeConfigured = true
 				}
 			}
@@ -283,7 +284,7 @@ func (s *AutoInstallSetup) Run() (*AutoInstallResult, error) {
 			// Just verify VS Code settings are correct
 			if s.VSCodeUpdate != nil {
 				if err := s.VSCodeUpdate(discovered.Version); err == nil {
-					fmt.Fprintf(s.Stdout, "✅ Go %s already installed and configured\n", discovered.Version)
+					fmt.Fprintf(s.Stdout, "%sGo %s already installed and configured\n", utils.Emoji("✅ "), discovered.Version)
 					result.VSCodeConfigured = true
 				}
 			}

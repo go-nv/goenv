@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/tidwall/jsonc"
 	"github.com/tidwall/pretty"
 	"github.com/tidwall/sjson"
@@ -50,7 +51,7 @@ func CheckSettings(settingsPath string, expectedVersion string) CheckResult {
 	// Strip comments and trailing commas (VS Code uses JSONC format)
 	data = jsonc.ToJSON(data)
 
-	var settings map[string]interface{}
+	var settings map[string]any
 	if err := json.Unmarshal(data, &settings); err != nil {
 		// Invalid JSON - treat as if no Go settings exist
 		return result
@@ -74,11 +75,15 @@ func CheckSettings(settingsPath string, expectedVersion string) CheckResult {
 			return result
 		}
 
+		// Expand environment variables before parsing
+		// Handle ${env:HOME}, ${env:USERPROFILE}, ${env:GOENV_ROOT}, etc.
+		expandedPath := expandEnvVars(gorootStr)
+
 		// Extract version from GOROOT path
 		// Path format: /Users/username/.goenv/versions/1.23.2 (Unix)
 		//          or: C:\Users\username\.goenv\versions\1.23.2 (Windows)
 		// Normalize backslashes to forward slashes for consistent parsing
-		normalizedPath := strings.ReplaceAll(gorootStr, `\`, `/`)
+		normalizedPath := strings.ReplaceAll(expandedPath, `\`, `/`)
 		parts := strings.Split(normalizedPath, "/")
 		for i, part := range parts {
 			if part == "versions" && i+1 < len(parts) {
@@ -89,6 +94,25 @@ func CheckSettings(settingsPath string, expectedVersion string) CheckResult {
 				}
 				return result
 			}
+		}
+	}
+
+	return result
+}
+
+// expandEnvVars expands VS Code style environment variables like ${env:HOME}
+func expandEnvVars(path string) string {
+	// VS Code uses ${env:VAR_NAME} syntax
+	result := path
+
+	// Common environment variables in VS Code settings
+	envVars := []string{"HOME", "USERPROFILE", "GOENV_ROOT", "GOPATH", "GOROOT"}
+
+	for _, envVar := range envVars {
+		placeholder := fmt.Sprintf("${env:%s}", envVar)
+		if strings.Contains(result, placeholder) {
+			value := os.Getenv(envVar)
+			result = strings.ReplaceAll(result, placeholder, value)
 		}
 	}
 
@@ -121,6 +145,7 @@ func DetectIndentation(content string) int {
 				// If tabs are used, convert to 4 spaces equivalent
 				return 4
 			} else {
+				// Hit non-whitespace, done counting
 				break
 			}
 		}
@@ -156,7 +181,7 @@ func EscapeJSONKey(key string) string {
 //  1. No Go library supports true JSONC round-tripping
 //  2. VS Code itself strips comments/trailing commas when modifying settings via UI
 //  3. The key order and indentation preservation are more important for readability
-func UpdateJSONKeys(path string, keysToUpdate map[string]interface{}) error {
+func UpdateJSONKeys(path string, keysToUpdate map[string]any) error {
 	// Read original file (may be JSONC)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -224,7 +249,7 @@ func HasVSCodeDirectory(dir string) bool {
 }
 
 // ReadExistingSettings reads and parses existing settings.json
-func ReadExistingSettings(path string) (map[string]interface{}, error) {
+func ReadExistingSettings(path string) (map[string]any, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -233,7 +258,7 @@ func ReadExistingSettings(path string) (map[string]interface{}, error) {
 	// Convert JSONC to JSON (handles comments and trailing commas)
 	data = jsonc.ToJSON(data)
 
-	var settings map[string]interface{}
+	var settings map[string]any
 	if err := json.Unmarshal(data, &settings); err != nil {
 		return nil, fmt.Errorf("invalid JSON in existing settings: %w", err)
 	}
@@ -267,7 +292,7 @@ func ReadExistingExtensions(path string) (*Extensions, error) {
 // WriteJSONFile writes a JSON file with proper formatting
 // Detects and preserves existing indentation and trailing newlines if file exists
 // Defaults to 2 spaces and single trailing newline for new files
-func WriteJSONFile(path string, data interface{}) error {
+func WriteJSONFile(path string, data any) error {
 	// Detect indentation and trailing newlines from existing file if it exists
 	indentWidth := 2      // Default to 2 spaces
 	trailingNewlines := 1 // Default to single newline
@@ -304,4 +329,118 @@ func WriteJSONFile(path string, data interface{}) error {
 	}
 
 	return nil
+}
+
+// BackupFile creates a backup of a file by copying it to .bak extension
+func BackupFile(path string) error {
+	// Check if file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		// No file to backup
+		return nil
+	}
+
+	// Read original file
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read file for backup: %w", err)
+	}
+
+	// Write backup
+	backupPath := path + ".bak"
+	if err := os.WriteFile(backupPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write backup file: %w", err)
+	}
+
+	return nil
+}
+
+// RestoreFromBackup restores a file from its .bak backup
+func RestoreFromBackup(path string) error {
+	backupPath := path + ".bak"
+
+	// Check if backup exists
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		return fmt.Errorf("no backup found at %s", backupPath)
+	}
+
+	// Read backup
+	data, err := os.ReadFile(backupPath)
+	if err != nil {
+		return fmt.Errorf("failed to read backup file: %w", err)
+	}
+
+	// Write to original path
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to restore from backup: %w", err)
+	}
+
+	return nil
+}
+
+// IsGoRelatedKey returns true if the key is a Go or gopls setting
+func IsGoRelatedKey(key string) bool {
+	return strings.HasPrefix(key, "go.") ||
+		strings.HasPrefix(key, "gopls") ||
+		key == "gopls"
+}
+
+// FilterGoKeys returns only the Go-related keys from a settings map
+func FilterGoKeys(settings map[string]any) map[string]any {
+	filtered := make(map[string]any)
+	for k, v := range settings {
+		if IsGoRelatedKey(k) {
+			filtered[k] = v
+		}
+	}
+	return filtered
+}
+
+// DeprecatedKeys lists keys that should trigger warnings
+var DeprecatedKeys = map[string]string{
+	"go.useLanguageServer":                  "Removed in Go extension v0.30.0+. gopls is now the default and only supported language server.",
+	"go.languageServerExperimentalFeatures": "Deprecated. Individual gopls features are now stable and enabled by default.",
+	"go.useCodeSnippetsOnFunctionSuggest":   "Deprecated. Use gopls.ui.completion.usePlaceholders instead.",
+}
+
+// ValidateSettingsKeys checks if keys are safe to update and returns warnings for deprecated keys
+func ValidateSettingsKeys(keys map[string]any) (warnings []string, err error) {
+	for key := range keys {
+		// Check if key is Go-related
+		if !IsGoRelatedKey(key) {
+			return nil, fmt.Errorf("refusing to modify non-Go setting: %s (only go.* and gopls.* keys are allowed)", key)
+		}
+
+		// Check for deprecated keys
+		if msg, deprecated := DeprecatedKeys[key]; deprecated {
+			warnings = append(warnings, fmt.Sprintf("%s%s is deprecated: %s", utils.Emoji("⚠️  "), key, msg))
+		}
+	}
+
+	return warnings, nil
+}
+
+// ConvertToWorkspacePaths converts absolute paths to ${workspaceFolder}-relative paths
+// This makes settings portable across machines and team members
+func ConvertToWorkspacePaths(settings map[string]any, workspaceRoot string) map[string]any {
+	result := make(map[string]any)
+
+	for key, value := range settings {
+		switch v := value.(type) {
+		case string:
+			// Convert absolute paths to workspace-relative
+			if rel, found := strings.CutPrefix(v, workspaceRoot); found {
+				rel = strings.TrimPrefix(rel, string(filepath.Separator))
+				result[key] = "${workspaceFolder}/" + strings.ReplaceAll(rel, string(filepath.Separator), "/")
+			} else {
+				result[key] = v
+			}
+		case map[string]any:
+			// Recursively handle nested maps
+			result[key] = ConvertToWorkspacePaths(v, workspaceRoot)
+		default:
+			result[key] = v
+		}
+	}
+
+	return result
 }

@@ -347,15 +347,163 @@ Debug: Using cached versions
 → Stable versions always prioritized
 ```
 
+## Advanced Cache Features
+
+### ETag Support (HTTP Conditional Requests)
+
+Starting in v3.0, goenv supports HTTP ETags for ultra-efficient cache validation:
+
+**How it works:**
+```
+First fetch:
+  → Request: GET /dl/?mode=json&include=all
+  → Response: 200 OK, ETag: "abc123", Body: 2MB
+  → Cache: Save releases + ETag
+
+Second fetch:
+  → Request: GET /dl/?mode=json&include=all
+              If-None-Match: "abc123"
+  → Response: 304 Not Modified (no body!)
+  → Cache: Use existing data
+```
+
+**Benefits:**
+- ✅ **0 bytes transferred** when cache is current (304 response ~500 bytes vs 2MB)
+- ✅ **99.97% bandwidth savings** when content hasn't changed
+- ✅ **Automatic** - works transparently if go.dev API supports ETags
+- ✅ **Graceful fallback** - falls back to full fetch if server doesn't support ETags
+
+**Debugging:**
+```bash
+$ GOENV_DEBUG=1 goenv install --list
+Debug: Fetching all releases from go.dev API...
+Debug: Using ETag for conditional request: "abc123"
+Debug: Server returned 304 Not Modified
+Debug: Using cached data
+```
+
+### SHA256 Integrity Verification
+
+All cached data is now protected with SHA256 integrity checks:
+
+**Features:**
+- ✅ **Automatic verification** - SHA256 computed on write, verified on read
+- ✅ **Detects corruption** - Bit rot, partial writes, storage errors
+- ✅ **Prevents tampering** - Cache modification detection
+- ✅ **Zero overhead** - SHA256 computed in-memory during marshaling
+
+**What's protected:**
+- `releases-cache.json` - Full release metadata
+- `versions-cache.json` - Version list cache
+
+**Example cache file:**
+```json
+{
+  "last_updated": "2025-10-23T10:30:00Z",
+  "releases": [...],
+  "etag": "\"abc123\"",
+  "sha256": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b"
+}
+```
+
+**Error on corruption:**
+```bash
+$ goenv install --list
+Error: cache integrity check failed: SHA256 mismatch:
+  expected 3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b
+  got      deadbeef00000000000000000000000000000000000000000000000000000000
+
+💡 Cache file may be corrupted. Run: goenv refresh
+```
+
+### Secure Permissions
+
+Cache files are now created with secure permissions to prevent unauthorized access:
+
+**Unix/Linux/macOS:**
+- Cache directory: `0700` (owner-only access)
+- Cache files: `0600` (owner read/write only)
+
+**Windows:**
+- Inherits ACLs from parent directory (typically secure by default)
+- No-op permission checks (Windows uses ACL-based security)
+
+**Auto-fixing:**
+```bash
+# If insecure permissions detected:
+$ goenv install --list
+Warning: Cache file has insecure permissions: 0644 (should be 0600)
+Auto-fixing permissions...
+✓ Permissions fixed
+
+# Verify permissions:
+$ ls -la ~/.goenv/releases-cache.json
+-rw-------  1 user  staff  2097152  Oct 23 10:30  releases-cache.json
+```
+
+**Why this matters:**
+- ✅ Prevents other users from reading cached version info
+- ✅ Protects against local privilege escalation
+- ✅ Follows security best practices
+- ✅ Automatic - no user action required
+
+### Background Cache Refresh
+
+Opt-in background refresh keeps your cache current without waiting:
+
+**Enable background refresh:**
+```bash
+export GOENV_CACHE_BG_REFRESH=1
+```
+
+**How it works:**
+```
+User runs command:
+  → Check cache + ETag
+  → Return cached data immediately (fast!)
+  → In background goroutine:
+     - Check for updates
+     - Update cache if new versions available
+  → Next command uses fresher cache
+```
+
+**Benefits:**
+- ✅ **Zero latency** - Returns cached data instantly
+- ✅ **Always fresh** - Cache stays current automatically
+- ✅ **Non-blocking** - Updates happen in background
+- ✅ **Graceful failure** - Background errors don't affect user
+- ✅ **Bandwidth efficient** - Uses ETag to minimize transfers
+
+**Debugging:**
+```bash
+$ GOENV_CACHE_BG_REFRESH=1 GOENV_DEBUG=1 goenv install --list
+Debug: Server returned 304 Not Modified, using cached data
+Debug: Starting background cache refresh...
+Debug: Using ETag for conditional request: "abc123"
+Debug: Server returned 304 Not Modified
+Debug: Background cache refresh completed
+```
+
+**When to use:**
+- Active development with frequent version checks
+- CI/CD systems that run often
+- Want zero-latency responses with automatic updates
+- Don't mind extra background network activity
+
+**When NOT to use:**
+- Metered/expensive bandwidth
+- Battery-constrained devices
+- Strict offline requirements
+- Minimal network activity desired
+
 ## Future Enhancements
 
 ### Potential Improvements
 
-1. **Background refresh**: Update cache in background after returning cached data
-2. **Incremental updates**: Fetch only versions newer than cached latest
-3. **Multiple caches**: Separate cache per major version (1.21.x, 1.22.x)
-4. **Compression**: gzip cache files (2MB → 200KB)
-5. **ETag support**: Use HTTP ETags if API supports it
+1. **Incremental updates**: Fetch only versions newer than cached latest
+2. **Multiple caches**: Separate cache per major version (1.21.x, 1.22.x)
+3. **Compression**: gzip cache files (2MB → 200KB)
+4. **Cache TTL configuration**: User-configurable freshness thresholds
 
 ### Not Planned
 
@@ -413,6 +561,61 @@ fork/exec /Users/username/Library/Caches/go-build/.../staticcheck: exec format e
 **Other causes:**
 - Migration from Intel to Apple Silicon (cached x86_64 binaries on new arm64 machine)
 - Running Go under Rosetta vs natively on Apple Silicon
+
+#### Reproducing the Issues
+
+You can demonstrate these cache conflicts with these commands:
+
+**Version conflict example:**
+
+```bash
+# Use shared cache (no goenv isolation)
+$ export GOCACHE=~/Library/Caches/go-build
+
+# Build with Go 1.23.2
+$ goenv local 1.23.2
+$ goenv exec go build ./...
+
+# Switch to Go 1.24.4 and try to build (using same cache)
+$ goenv local 1.24.4
+$ goenv exec go build ./...
+# ERROR: compile: version "go1.23.2" does not match go tool version "go1.24.4"
+```
+
+**Architecture conflict example (cross-compilation):**
+
+```bash
+# Use shared cache
+$ export GOCACHE=~/Library/Caches/go-build
+
+# Cross-compile for Linux (on macOS)
+$ GOOS=linux GOARCH=amd64 go build ./...
+
+# Later, run a linter or tool that got cached
+$ staticcheck ./...
+# ERROR: fork/exec .../staticcheck: exec format error
+# (staticcheck was cached as linux/amd64 but needs darwin/arm64)
+```
+
+**With goenv's cache isolation (no errors):**
+
+```bash
+# Remove GOCACHE override - let goenv manage it
+$ unset GOCACHE
+
+# Build with Go 1.23.2 (uses: ~/.goenv/versions/1.23.2/go-build-host-host)
+$ goenv local 1.23.2
+$ goenv exec go build ./...
+
+# Switch to Go 1.24.4 (uses: ~/.goenv/versions/1.24.4/go-build-host-host)
+$ goenv local 1.24.4
+$ goenv exec go build ./...
+# ✅ Works! Each version has its own isolated cache
+
+# Cross-compile (uses: ~/.goenv/versions/1.24.4/go-build-linux-amd64)
+$ GOOS=linux GOARCH=amd64 goenv exec go build ./...
+# ✅ Works! Cross-compile cache is separate from host cache
+```
 
 ### Solution: Version AND Architecture-Specific Cache Isolation
 
@@ -495,24 +698,29 @@ export GOENV_GOMODCACHE_DIR=/custom/path/gomodcache
 
 ### Diagnosing Cache Issues
 
-Use the `goenv clean --diagnose` command to check your cache configuration:
+Use `goenv cache status` and `goenv doctor` to check your cache configuration:
 
 ```bash
-$ goenv clean --diagnose
-🔍 Diagnosing cache issues...
+$ goenv cache status
+📊 Cache Status
 
-Current architecture: darwin/arm64
-Current Go version: 1.23.2
+🔨 Build Caches:
+  Go 1.23.2   (darwin-arm64):   1.24 GB, 3,421 files
+  Go 1.24.4   (darwin-arm64):   0.56 GB, 1,234 files
 
-GOCACHE location: /Users/username/.goenv/versions/1.23.2/go-build
-✅ Using version-specific cache (goenv managed)
+📦 Module Caches:
+  Go 1.23.2:  0.34 GB, 456 modules/files
+  Go 1.24.4:  0.28 GB, 389 modules/files
 
-GOMODCACHE location: /Users/username/.goenv/versions/1.23.2/go-mod
-✅ Using version-specific module cache (goenv managed)
+Total: 2.42 GB
 
-Cache isolation settings:
-  ✅ GOENV_DISABLE_GOCACHE not set (cache isolation enabled)
-  ✅ GOENV_DISABLE_GOMODCACHE not set (module cache isolation enabled)
+$ goenv doctor
+...
+✓ Build cache isolation
+  Version-specific cache: ~/.goenv/versions/1.23.2/go-build-darwin-arm64
+
+✓ Cache architecture
+  Using version-specific cache for darwin/arm64
 ```
 
 ### Cleaning Caches
@@ -520,14 +728,19 @@ Cache isolation settings:
 If you need to clean caches (e.g., to free disk space):
 
 ```bash
-# Clean build cache for current version
-$ goenv clean build
+# Clean build cache for current version (default if no arg)
+$ goenv cache clean
+$ goenv cache clean build
 
 # Clean module cache for current version
-$ goenv clean modcache
+$ goenv cache clean mod
 
 # Clean both caches
-$ goenv clean all
+$ goenv cache clean all
+
+# Advanced: clean old caches or prune by size/age
+$ goenv cache clean build --older-than 30d
+$ goenv cache clean build --max-bytes 1GB
 ```
 
 ### Troubleshooting
@@ -568,7 +781,7 @@ $ goenv uninstall 1.21.5
 
 # Or clean caches for all versions
 $ for v in $(goenv list); do
-    GOENV_VERSION=$v goenv clean all
+    GOENV_VERSION=$v goenv cache clean all
   done
 ```
 

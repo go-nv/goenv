@@ -269,7 +269,7 @@ func TestSyncToolsHelp(t *testing.T) {
 
 	// Check for key help text elements
 	expectedStrings := []string{
-		"sync-tools",
+		"tools", "sync",
 		"source-version",
 		"target-version",
 		"--dry-run",

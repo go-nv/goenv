@@ -11,13 +11,13 @@ import (
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/tooldetect"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var syncToolsCmd = &cobra.Command{
 	Use:   "sync-tools [source-version] [target-version]",
 	Short: "Sync/replicate installed Go tools between versions",
-	GroupID: "tools",
 	Long: `Replicates all installed Go tools from a source Go version to a target version.
 
 This command discovers tools in the source version and reinstalls them (from source)
@@ -33,13 +33,13 @@ This is useful when upgrading Go versions and wanting to maintain your tool
 environment across versions.
 
 Examples:
-  goenv sync-tools                         # Auto: best source → current version
-  goenv sync-tools 1.24.1                  # From 1.24.1 → current version
-  goenv sync-tools 1.24.1 1.25.2           # From 1.24.1 → 1.25.2 (explicit)
-  goenv sync-tools --dry-run               # Preview auto-sync
-  goenv sync-tools 1.24.1 --dry-run        # Preview sync from 1.24.1
-  goenv sync-tools --select gopls,delve    # Only sync specific tools
-  goenv sync-tools --exclude staticcheck   # Exclude certain tools`,
+  goenv tools sync                         # Auto: best source → current version
+  goenv tools sync 1.24.1                  # From 1.24.1 → current version
+  goenv tools sync 1.24.1 1.25.2           # From 1.24.1 → 1.25.2 (explicit)
+  goenv tools sync --dry-run               # Preview auto-sync
+  goenv tools sync 1.24.1 --dry-run        # Preview sync from 1.24.1
+  goenv tools sync --select gopls,delve    # Only sync specific tools
+  goenv tools sync --exclude staticcheck   # Exclude certain tools`,
 	Args: cobra.MaximumNArgs(2),
 	RunE: runSyncTools,
 }
@@ -51,10 +51,10 @@ var syncToolsFlags struct {
 }
 
 func init() {
+	// Now registered as subcommand in tools.go
 	syncToolsCmd.Flags().BoolVarP(&syncToolsFlags.dryRun, "dry-run", "n", false, "Show what would be synced without actually syncing")
 	syncToolsCmd.Flags().StringVar(&syncToolsFlags.select_, "select", "", "Comma-separated list of tools to sync (e.g., gopls,delve)")
 	syncToolsCmd.Flags().StringVar(&syncToolsFlags.exclude, "exclude", "", "Comma-separated list of tools to exclude from sync")
-	rootCmd.AddCommand(syncToolsCmd)
 }
 
 func runSyncTools(cmd *cobra.Command, args []string) error {
@@ -72,7 +72,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("🔍 Auto-detected: syncing from Go %s → Go %s\n", sourceVersion, targetVersion)
+		fmt.Fprintf(cmd.OutOrStdout(), "%sAuto-detected: syncing from Go %s → Go %s\n", utils.Emoji("🔍 "), sourceVersion, targetVersion)
 
 	case 1:
 		// One arg: source → current version
@@ -84,7 +84,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 		if targetVersion == "system" {
 			return fmt.Errorf("cannot sync tools to 'system' version")
 		}
-		fmt.Printf("📦 Syncing from Go %s → current Go %s\n", sourceVersion, targetVersion)
+		fmt.Fprintf(cmd.OutOrStdout(), "%sSyncing from Go %s → current Go %s\n", utils.Emoji("📦 "), sourceVersion, targetVersion)
 
 	case 2:
 		// Two args: explicit source → target
@@ -110,7 +110,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 	}
 
 	// Discover tools in source version
-	fmt.Printf("🔍 Discovering tools in Go %s...\n", sourceVersion)
+	fmt.Fprintf(cmd.OutOrStdout(), "%sDiscovering tools in Go %s...\n", utils.Emoji("🔍 "), sourceVersion)
 	sourceTools, err := tooldetect.ListInstalledTools(cfg.Root, sourceVersion)
 	if err != nil {
 		return fmt.Errorf("failed to list tools in source version: %w", err)
@@ -130,7 +130,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display summary
-	fmt.Printf("\n📦 Found %d tool(s) to sync:\n", len(toolsToSync))
+	fmt.Fprintf(cmd.OutOrStdout(), "\n%sFound %d tool(s) to sync:\n", utils.Emoji("📦 "), len(toolsToSync))
 	for _, tool := range toolsToSync {
 		version := tool.Version
 		if version == "" {
@@ -141,7 +141,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	if syncToolsFlags.dryRun {
-		fmt.Println("🏃 Dry run mode - no tools will be installed")
+		fmt.Fprintf(cmd.OutOrStdout(), "%sDry run mode - no tools will be installed\n", utils.Emoji("🏃 "))
 		fmt.Printf("Would install %d tool(s) in Go %s\n", len(toolsToSync), targetVersion)
 		return nil
 	}
@@ -190,17 +190,17 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 		installCmd.Stderr = os.Stderr
 
 		if err := installCmd.Run(); err != nil {
-			fmt.Printf("  ❌ Failed to install %s: %v\n", tool.Name, err)
+			fmt.Fprintf(cmd.OutOrStdout(), "  %sFailed to install %s: %v\n", utils.Emoji("❌ "), tool.Name, err)
 			failCount++
 			continue
 		}
 
-		fmt.Printf("  ✅ Successfully installed %s\n", tool.Name)
+		fmt.Fprintf(cmd.OutOrStdout(), "  %sSuccessfully installed %s\n", utils.Emoji("✅ "), tool.Name)
 		successCount++
 	}
 
 	// Summary
-	fmt.Printf("\n✨ Sync complete!\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "\n%sSync complete!\n", utils.Emoji("✨ "))
 	fmt.Printf("  • Successfully synced: %d tool(s)\n", successCount)
 	if failCount > 0 {
 		fmt.Printf("  • Failed: %d tool(s)\n", failCount)
@@ -209,7 +209,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 	// Trigger rehash for target version if it's the current version
 	currentVersion, _, err := mgr.GetCurrentVersion()
 	if err == nil && currentVersion == targetVersion {
-		fmt.Println("\n🔄 Rehashing shims for current version...")
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%sRehashing shims for current version...\n", utils.Emoji("🔄 "))
 		if err := runRehash(cmd, []string{}); err != nil {
 			fmt.Printf("Warning: Failed to rehash: %v\n", err)
 		}

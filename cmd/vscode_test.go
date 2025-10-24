@@ -48,10 +48,23 @@ func TestVSCodeGenerateSettingsBasic(t *testing.T) {
 	}
 
 	// Verify required keys exist
-	requiredKeys := []string{"go.goroot", "go.gopath", "go.toolsGopath", "go.useLanguageServer"}
+	// Note: go.useLanguageServer removed - modern Go extension (v0.30.0+) defaults to gopls
+	// Legacy settings like go.useLanguageServer are intentionally omitted
+	requiredKeys := []string{"go.goroot", "go.gopath", "go.toolsGopath"}
 	for _, key := range requiredKeys {
 		if _, ok := settings[key]; !ok {
 			t.Errorf("Basic template missing required key: %s", key)
+		}
+	}
+
+	// Verify legacy settings are NOT included (modern VS Code Go extension doesn't need them)
+	legacySettings := []string{
+		"go.useLanguageServer", // Removed in Go extension v0.30.0+ (2022)
+		"go.languageServerFlags", // Replaced by gopls configuration
+	}
+	for _, key := range legacySettings {
+		if _, ok := settings[key]; ok {
+			t.Errorf("Basic template should not include legacy setting: %s", key)
 		}
 	}
 
@@ -72,14 +85,26 @@ func TestVSCodeGenerateSettingsAdvanced(t *testing.T) {
 		t.Fatalf("Failed to generate advanced template: %v", err)
 	}
 
-	// Verify gopls settings exist
+	// Verify gopls settings exist (modern language server configuration)
 	if _, ok := settings["gopls"]; !ok {
 		t.Error("Advanced template missing gopls configuration")
 	}
 
-	// Verify autoUpdate is enabled
+	// Verify modern tool management settings
 	if settings["go.toolsManagement.autoUpdate"] != true {
 		t.Error("Advanced template should have autoUpdate enabled")
+	}
+
+	// Verify gopls settings are properly structured
+	gopls, ok := settings["gopls"].(map[string]interface{})
+	if ok {
+		// Modern gopls settings should be present
+		t.Logf("Gopls settings configured: %v", gopls)
+	}
+
+	// Ensure legacy settings are not mixed with modern configuration
+	if _, ok := settings["go.useLanguageServer"]; ok {
+		t.Error("Advanced template should not mix legacy settings with modern gopls config")
 	}
 }
 

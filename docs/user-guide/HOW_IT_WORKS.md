@@ -155,4 +155,4 @@ goenv is written in Go and consists of:
   - `.go-version` - Per-directory version setting
   - `GOENV_VERSION` - Environment variable override
 
-For more details on the Go-based implementation and Windows support, see [WINDOWS_SUPPORT.md](./WINDOWS_SUPPORT.md).
+For more details on the Go-based implementation and Windows support, see [WINDOWS_SUPPORT.md](../../WINDOWS_SUPPORT.md).

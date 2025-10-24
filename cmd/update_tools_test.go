@@ -15,7 +15,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupVersion   string
-		setupTools     []toolInfo
+		setupTools     []testToolInfo
 		flags          map[string]string
 		expectedError  string
 		expectedOutput string
@@ -38,7 +38,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 		{
 			name:         "tools up to date",
 			setupVersion: "1.21.0",
-			setupTools: []toolInfo{
+			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v1.0.0"},
 			},
 			expectedOutput: "Found 1 tool(s)",
@@ -46,7 +46,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 		{
 			name:         "tool needs update - skipped without package path",
 			setupVersion: "1.21.0",
-			setupTools: []toolInfo{
+			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
 			expectedOutput: "unknown package path, skipping",
@@ -54,7 +54,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 		{
 			name:         "check mode",
 			setupVersion: "1.21.0",
-			setupTools: []toolInfo{
+			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
 			flags: map[string]string{
@@ -65,7 +65,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 		{
 			name:         "dry-run mode",
 			setupVersion: "1.21.0",
-			setupTools: []toolInfo{
+			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
 			flags: map[string]string{
@@ -76,7 +76,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 		{
 			name:         "update specific tool",
 			setupVersion: "1.21.0",
-			setupTools: []toolInfo{
+			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 				{name: "mockdelve", pkgPath: "github.com/go-delve/delve/cmd/dlv", version: "v1.0.0"},
 			},
@@ -88,7 +88,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 		{
 			name:         "tool not found",
 			setupVersion: "1.21.0",
-			setupTools: []toolInfo{
+			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
 			flags: map[string]string{
@@ -99,7 +99,7 @@ func TestUpdateToolsCommand(t *testing.T) {
 		{
 			name:         "tool without package path",
 			setupVersion: "1.21.0",
-			setupTools: []toolInfo{
+			setupTools: []testToolInfo{
 				{name: "mocktool", pkgPath: "", version: "unknown"},
 			},
 			expectedOutput: "unknown package path, skipping",
@@ -245,7 +245,7 @@ func TestUpdateToolsHelp(t *testing.T) {
 
 	// Check for key help text elements
 	expectedStrings := []string{
-		"update-tools",
+		"tools", "update",
 		"Updates all installed Go tools",
 		"--check",
 		"--tool",
@@ -312,7 +312,7 @@ func TestUpdateToolsVersionFlag(t *testing.T) {
 }
 
 // Helper struct for test setup
-type toolInfo struct {
+type testToolInfo struct {
 	name    string
 	pkgPath string
 	version string

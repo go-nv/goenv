@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // IsVersionCorrupted checks if an installed version is missing its go binary
@@ -78,7 +79,7 @@ func PromptForInstall(version string, reason string) bool {
 
 // PromptForReinstall asks the user if they want to reinstall a corrupted version
 func PromptForReinstall(version string) bool {
-	fmt.Printf("\n⚠️  Go %s installation is CORRUPTED (missing go binary)\n", version)
+	fmt.Printf("\n%sGo %s installation is CORRUPTED (missing go binary)\n", utils.Emoji("⚠️  "), version)
 	fmt.Printf("Reinstall it now? [Y/n]: ")
 
 	reader := bufio.NewReader(os.Stdin)

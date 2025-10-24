@@ -34,6 +34,7 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
 - **Update tools** (`goenv update-tools`) - keep all installed Go tools current
 - **Sync tools** (`goenv sync-tools`) - replicate tools when upgrading Go versions (with smart auto-detection)
 - **Version aliases** (`goenv alias`) - create convenient shorthand names for versions
+- **VS Code integration** (`goenv vscode`) - sync Go settings with workspace-relative paths and security validation
 
 ### goenv compared to others:
 
@@ -140,9 +141,15 @@ goenv install 1.22.0
 
 # Verify
 go version
+
+# Install tools (automatically isolated per version)
+go install golang.org/x/tools/cmd/goimports@latest
+goenv rehash  # Makes tools available as shims
 ```
 
-See [Installation Guide](docs/user-guide/INSTALL.md) for more details.
+**Tools per version:** Tools installed with `go install` are automatically isolated per Go version in version-specific GOPATH directories. After installation, run `goenv rehash` to create shims, making tools available in your PATH.
+
+See [Installation Guide](docs/user-guide/INSTALL.md) and [GOPATH Integration](docs/advanced/GOPATH_INTEGRATION.md) for more details.
 
 ---
 

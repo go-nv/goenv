@@ -73,8 +73,7 @@ var rootCmd = &cobra.Command{
 							// Install latest with additional flags if provided
 							args := []string{}
 							if additionalFlags != "" {
-								// Simple space split - TODO: handle quoted args properly
-								args = append(args, strings.Fields(additionalFlags)...)
+								args = append(args, splitArgs(additionalFlags)...)
 							}
 							installCmd.SetArgs(args)
 						}
@@ -215,6 +214,8 @@ func init() {
 
 	// Add global flags here if needed
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug mode")
+	rootCmd.PersistentFlags().BoolVar(&NoColor, "no-color", false, "Disable colored output")
+	rootCmd.PersistentFlags().BoolVar(&Plain, "plain", false, "Plain output (no colors, no emojis)")
 
 	// Add version flag
 	var showVersion bool
@@ -222,6 +223,9 @@ func init() {
 
 	// Override the default version behavior
 	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		// Propagate output options to utils package
+		utils.SetOutputOptions(NoColor, Plain)
+
 		if showVersion {
 			// Simple format for --version flag (matches bash version)
 			fmt.Printf("goenv %s\n", appVersion)
@@ -232,6 +236,8 @@ func init() {
 }
 
 var Debug bool
+var NoColor bool
+var Plain bool
 
 // Version information
 var (
@@ -245,4 +251,57 @@ func SetVersionInfo(v, c, bt string) {
 	appVersion = v
 	appCommit = c
 	appBuildTime = bt
+}
+
+// splitArgs splits a string into arguments, respecting quoted strings
+// Handles single quotes, double quotes, and escaped characters
+func splitArgs(s string) []string {
+	var args []string
+	var current strings.Builder
+	var inQuote rune // ' or " or 0
+	var escape bool
+
+	for _, ch := range s {
+		if escape {
+			// Previous char was backslash, add this char literally
+			current.WriteRune(ch)
+			escape = false
+			continue
+		}
+
+		switch ch {
+		case '\\':
+			// Escape next character
+			escape = true
+		case '\'', '"':
+			if inQuote == 0 {
+				// Start quote
+				inQuote = ch
+			} else if inQuote == ch {
+				// End quote
+				inQuote = 0
+			} else {
+				// Different quote type, add literally
+				current.WriteRune(ch)
+			}
+		case ' ', '\t', '\n':
+			if inQuote != 0 {
+				// Inside quotes, add whitespace literally
+				current.WriteRune(ch)
+			} else if current.Len() > 0 {
+				// End of argument
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(ch)
+		}
+	}
+
+	// Add final argument if any
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+
+	return args
 }

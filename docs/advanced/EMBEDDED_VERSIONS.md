@@ -2,25 +2,7 @@
 
 ## Overview
 
-goenv embeds a complete list of all Go versions directly into t.\build.ps1 generate-embedded
-
-# Method 2: Direct run
-
-go run scripts/generate_embedded_versions/main.go
-
-# Method 3: As part of cross-build
-
-.\build.ps1 cross-build # Automatically regenerates
-
-````
-
-**Windows (Batch):**
-```batch
-REM Method 1: Using build script
-build.bat generate-embedded
-
-REM Method 2: Direct run
-go run scripts/generate_embedded_versions/main.gory at build time. This serves as a **last-resort fallback** when both network and cache are unavailable.
+goenv embeds a complete list of all Go versions directly into the binary at build time. This serves as a **last-resort fallback** when both network and cache are unavailable.
 
 ## Why Embed Versions?
 
@@ -49,7 +31,7 @@ go run scripts/generate_embedded_versions/main.gory at build time. This serves a
 // Generates: internal/version/embedded_versions.go
 // Time: ~2.5 seconds
 // Works on: Linux, macOS, Windows, FreeBSD
-````
+```
 
 Previously implemented as a bash script, but rewritten in Go for:
 
@@ -119,16 +101,6 @@ make cross-build  # Automatically regenerates
 
 # Method 2: Direct run
 go run scripts/generate_embedded_versions/main.go
-```
-
-**Windows (PowerShell):**
-
-```powershell
-# Method 1: Using build script
-.\build.ps1 generate-embedded
-
-# Method 2: Direct run
-go run scripts/generate_embedded_versions.go
 
 # Method 3: As part of cross-build
 .\build.ps1 cross-build  # Automatically regenerates
@@ -142,6 +114,9 @@ build.bat generate-embedded
 
 REM Method 2: Direct run
 go run scripts/generate_embedded_versions/main.go
+
+REM Method 3: As part of cross-build
+build.bat cross-build
 ```
 
 #### When to Regenerate
@@ -344,16 +319,12 @@ If 817 KB is too large for your use case:
 
 Example - only last 50 versions:
 
-````go
-Example - only last 50 versions:
 ```go
 // In scripts/generate_embedded_versions/main.go
 if len(releases) > 50 {
     releases = releases[:50]  // Keep only first 50 (newest)
 }
-````
-
-````
+```
 
 ### Stale Embedded Data
 
@@ -363,7 +334,7 @@ If your binary has very old embedded data:
 # Users can always force a fresh fetch
 rm ~/.goenv/*.json
 goenv install --list  # Will fetch fresh from API
-````
+```
 
 ## Future Enhancements
 

@@ -3,9 +3,14 @@ package hooks
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // Executor manages hook execution
@@ -102,18 +107,18 @@ func (e *Executor) TestExecute(hookPoint HookPoint, variables map[string]string)
 	for i, action := range actions {
 		executor, exists := e.registry.Get(action.Action)
 		if !exists {
-			results = append(results, fmt.Sprintf("✗ %s: unknown action", action.Action))
+			results = append(results, fmt.Sprintf("%s%s: unknown action", utils.Emoji("✗ "), action.Action))
 			continue
 		}
 
 		// Validate parameters
 		if err := executor.Validate(action.Params); err != nil {
-			results = append(results, fmt.Sprintf("✗ %s: validation failed: %v", action.Action, err))
+			results = append(results, fmt.Sprintf("%s%s: validation failed: %v", utils.Emoji("✗ "), action.Action, err))
 			continue
 		}
 
 		// Describe what would happen
-		description := fmt.Sprintf("✓ %s: %s", action.Action, executor.Description())
+		description := fmt.Sprintf("%s%s: %s", utils.Emoji("✓ "), action.Action, executor.Description())
 		results = append(results, description)
 
 		// Show interpolated values
@@ -154,10 +159,26 @@ func interpolateString(s string, variables map[string]string) string {
 	return result
 }
 
-// logError logs an error message (placeholder for future logging)
+// logError logs an error message to both stderr and optional log file
 func logError(message string) {
-	// TODO: Implement proper logging to hooks.log
+	timestamped := fmt.Sprintf("[%s] %s", time.Now().Format("2006-01-02 15:04:05"), message)
+
+	// Always write to stderr
 	fmt.Fprintf(stderr(), "goenv hooks: %s\n", message)
+
+	// Optionally write to log file if GOENV_HOOKS_LOG is set
+	if logPath := os.Getenv("GOENV_HOOKS_LOG"); logPath != "" {
+		// Open or create log file with append mode
+		f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			// Can't log the error without recursing, so just skip
+			return
+		}
+		defer f.Close()
+
+		// Write timestamped message
+		fmt.Fprintf(f, "%s\n", timestamped)
+	}
 }
 
 // stderr returns a writer for error output (allows testing)
@@ -168,9 +189,8 @@ var stderr = func() interface{ Write([]byte) (int, error) } {
 type stderrWriter struct{}
 
 func (w *stderrWriter) Write(p []byte) (int, error) {
-	// In production, this would write to os.Stderr or log file
-	// For now, just return success
-	return len(p), nil
+	// In production, write to os.Stderr
+	return os.Stderr.Write(p)
 }
 
 // Common validation patterns
@@ -197,37 +217,125 @@ func ValidateString(s string) error {
 
 // ValidateURL checks if a URL is allowed
 func ValidateURL(urlStr string, allowHTTP, allowInternalIPs bool) error {
+	return ValidateURLWithStrictDNS(urlStr, allowHTTP, allowInternalIPs, false)
+}
+
+// ValidateURLWithStrictDNS checks if a URL is allowed with optional strict DNS mode
+func ValidateURLWithStrictDNS(urlStr string, allowHTTP, allowInternalIPs, strictDNS bool) error {
 	if urlStr == "" {
 		return fmt.Errorf("URL is empty")
 	}
 
-	// Basic validation
-	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
-		return fmt.Errorf("URL must start with http:// or https://")
+	// Parse URL properly
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Validate scheme
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("URL must use http or https scheme")
 	}
 
 	// HTTPS enforcement
-	if !allowHTTP && strings.HasPrefix(urlStr, "http://") {
+	if !allowHTTP && parsedURL.Scheme == "http" {
 		return fmt.Errorf("HTTP URLs are not allowed (use HTTPS or set allow_http: true)")
 	}
 
-	// SSRF protection (check for internal IPs)
+	// SSRF protection - check if target resolves to internal/private IPs
 	if !allowInternalIPs {
-		// Extract hostname and check if it's internal
-		// This is a simplified check - production would use proper URL parsing
-		lowerURL := strings.ToLower(urlStr)
-		internalPatterns := []string{
-			"localhost", "127.0.0.1", "0.0.0.0",
-			"10.", "192.168.", "172.16.", "172.31.",
-			"169.254.", // Link-local
-			"::1",      // IPv6 localhost
+		hostname := parsedURL.Hostname()
+		if hostname == "" {
+			return fmt.Errorf("URL must have a hostname")
 		}
-		for _, pattern := range internalPatterns {
-			if strings.Contains(lowerURL, pattern) {
+
+		// First check: literal IP addresses in hostname
+		if ip := net.ParseIP(hostname); ip != nil {
+			if isPrivateIP(ip) {
 				return fmt.Errorf("internal/private IP addresses are not allowed (set allow_internal_ips: true)")
+			}
+			return nil
+		}
+
+		// Second check: resolve hostname to IP addresses and validate each
+		ips, err := net.LookupIP(hostname)
+		if err != nil {
+			// DNS resolution failed
+			if strictDNS {
+				// Strict mode: reject when DNS fails and internal IPs are not allowed
+				return fmt.Errorf("DNS resolution failed and strict_dns is enabled: %w", err)
+			}
+			
+			// Non-strict mode (default): fall back to substring checks as defense in depth
+			// This catches some obvious cases even if DNS is unavailable
+			lowerHost := strings.ToLower(hostname)
+			suspiciousPatterns := []string{
+				"localhost", "127.0.0.1", "0.0.0.0",
+				".local", ".internal", ".lan",
+			}
+			for _, pattern := range suspiciousPatterns {
+				if strings.Contains(lowerHost, pattern) {
+					return fmt.Errorf("hostname appears to target internal resources (set allow_internal_ips: true)")
+				}
+			}
+			// DNS failure but no obvious internal patterns - allow but could log warning
+			return nil
+		}
+
+		// Check all resolved IPs
+		for _, ip := range ips {
+			if isPrivateIP(ip) {
+				return fmt.Errorf("hostname resolves to internal/private IP %s (set allow_internal_ips: true)", ip.String())
 			}
 		}
 	}
 
 	return nil
+}
+
+// isPrivateIP checks if an IP address is private/internal according to RFCs
+func isPrivateIP(ip net.IP) bool {
+	// Define private/internal IP ranges
+	privateIPBlocks := []string{
+		// IPv4 private ranges (RFC1918)
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+
+		// IPv4 carrier-grade NAT (RFC6598)
+		"100.64.0.0/10",
+
+		// IPv4 loopback (RFC1122)
+		"127.0.0.0/8",
+		
+		// IPv4 link-local (RFC3927)
+		"169.254.0.0/16",
+		
+		// IPv4 broadcast
+		"255.255.255.255/32",
+		
+		// IPv6 loopback (RFC4291)
+		"::1/128",
+		
+		// IPv6 link-local (RFC4291)
+		"fe80::/10",
+		
+		// IPv6 unique local (RFC4193)
+		"fc00::/7",
+		
+		// IPv6 documentation (RFC3849)
+		"2001:db8::/32",
+	}
+
+	for _, block := range privateIPBlocks {
+		_, ipNet, err := net.ParseCIDR(block)
+		if err != nil {
+			continue
+		}
+		if ipNet.Contains(ip) {
+			return true
+		}
+	}
+
+	return false
 }

@@ -26,17 +26,18 @@ const (
 	// #endregion
 
 	// #region Bool Env Vars
-	GoenvEnvVarDisableGoroot GoenvBoolEnv = "GOENV_DISABLE_GOROOT"
-	GoenvEnvVarDisableGopath GoenvBoolEnv = "GOENV_DISABLE_GOPATH"
-	GoenvEnvVarGopathPrefix  GoenvBoolEnv = "GOENV_GOPATH_PREFIX"
-	GoenvEnvVarAppendGopath  GoenvBoolEnv = "GOENV_APPEND_GOPATH"
-	GoenvEnvVarPrependGopath GoenvBoolEnv = "GOENV_PREPEND_GOPATH"
-	GoenvEnvVarAutoInstall   GoenvBoolEnv = "GOENV_AUTO_INSTALL"
-	GoenvEnvVarNoAutoRehash     GoenvBoolEnv = "GOENV_NO_AUTO_REHASH"
-	GoenvEnvVarOffline          GoenvBoolEnv = "GOENV_OFFLINE"
-	GoenvEnvVarAutoRehash       GoenvBoolEnv = "GOENV_AUTO_REHASH"
-	GoenvEnvVarDisableGocache   GoenvBoolEnv = "GOENV_DISABLE_GOCACHE"
+	GoenvEnvVarDisableGoroot     GoenvBoolEnv = "GOENV_DISABLE_GOROOT"
+	GoenvEnvVarDisableGopath     GoenvBoolEnv = "GOENV_DISABLE_GOPATH"
+	GoenvEnvVarGopathPrefix      GoenvBoolEnv = "GOENV_GOPATH_PREFIX"
+	GoenvEnvVarAppendGopath      GoenvBoolEnv = "GOENV_APPEND_GOPATH"
+	GoenvEnvVarPrependGopath     GoenvBoolEnv = "GOENV_PREPEND_GOPATH"
+	GoenvEnvVarAutoInstall       GoenvBoolEnv = "GOENV_AUTO_INSTALL"
+	GoenvEnvVarNoAutoRehash      GoenvBoolEnv = "GOENV_NO_AUTO_REHASH"
+	GoenvEnvVarOffline           GoenvBoolEnv = "GOENV_OFFLINE"
+	GoenvEnvVarAutoRehash        GoenvBoolEnv = "GOENV_AUTO_REHASH"
+	GoenvEnvVarDisableGocache    GoenvBoolEnv = "GOENV_DISABLE_GOCACHE"
 	GoenvEnvVarDisableGomodcache GoenvBoolEnv = "GOENV_DISABLE_GOMODCACHE"
+	GoenvEnvVarCacheBgRefresh    GoenvBoolEnv = "GOENV_CACHE_BG_REFRESH"
 	// #endregion
 )
 

@@ -79,8 +79,8 @@ func (a *HTTPWebhookAction) Execute(ctx *HookContext, params map[string]interfac
 	// Interpolate URL
 	url = interpolateString(url, ctx.Variables)
 
-	// Validate URL with settings
-	if err := ValidateURL(url, ctx.Settings.AllowHTTP, ctx.Settings.AllowInternalIPs); err != nil {
+	// Validate URL with settings including strict DNS mode
+	if err := ValidateURLWithStrictDNS(url, ctx.Settings.AllowHTTP, ctx.Settings.AllowInternalIPs, ctx.Settings.StrictDNS); err != nil {
 		return err
 	}
 

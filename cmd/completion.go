@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/completions"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -253,7 +254,7 @@ func appendToFile(path, content string) error {
 		return fmt.Errorf("failed to write completion: %w", err)
 	}
 
-	fmt.Printf("✅ Completion installed to %s\n", path)
+	fmt.Printf("%sCompletion installed to %s\n", utils.Emoji("✅ "), path)
 	fmt.Println("Run 'source " + path + "' to activate")
 	return nil
 }

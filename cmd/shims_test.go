@@ -164,3 +164,118 @@ func TestShimsCompletion(t *testing.T) {
 		t.Errorf("Expected completion output to be '--short', got %q", got)
 	}
 }
+
+func TestFindInSystemPath(t *testing.T) {
+	// Create a temporary directory structure for testing
+	tmpDir := t.TempDir()
+
+	// Create GOENV_ROOT/shims directory
+	goenvRoot := filepath.Join(tmpDir, "goenv")
+	shimsDir := filepath.Join(goenvRoot, "shims")
+	if err := os.MkdirAll(shimsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create other directories with similar names (edge cases)
+	similarDir := filepath.Join(tmpDir, "goenv_shims_backup") // Contains "shims" substring
+	otherDir := filepath.Join(tmpDir, "bin")                  // Normal bin directory
+	nestedShimsDir := filepath.Join(shimsDir, "subdir")       // Subdirectory of shims
+
+	for _, dir := range []string{similarDir, otherDir, nestedShimsDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create test executables in different directories
+	createTestExecutable := func(dir, name string) {
+		path := filepath.Join(dir, name)
+		if runtime.GOOS == "windows" {
+			path += ".exe"
+		}
+		if err := os.WriteFile(path, []byte("#!/bin/bash\necho test\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create "go" executable in each directory
+	createTestExecutable(shimsDir, "go")       // Should be excluded
+	createTestExecutable(similarDir, "go")     // Should NOT be excluded (different path)
+	createTestExecutable(otherDir, "go")       // Should NOT be excluded
+	createTestExecutable(nestedShimsDir, "go") // Should be excluded (subdirectory of shims)
+
+	tests := []struct {
+		name        string
+		pathEnv     string
+		commandName string
+		expectFound bool
+		expectDir   string // Which directory should it be found in
+	}{
+		{
+			name:        "excludes shims directory",
+			pathEnv:     shimsDir + string(os.PathListSeparator) + otherDir,
+			commandName: "go",
+			expectFound: true,
+			expectDir:   otherDir,
+		},
+		{
+			name:        "does not exclude similar named directory",
+			pathEnv:     shimsDir + string(os.PathListSeparator) + similarDir,
+			commandName: "go",
+			expectFound: true,
+			expectDir:   similarDir,
+		},
+		{
+			name:        "excludes nested subdirectory of shims",
+			pathEnv:     nestedShimsDir + string(os.PathListSeparator) + otherDir,
+			commandName: "go",
+			expectFound: true,
+			expectDir:   otherDir,
+		},
+		{
+			name:        "finds command in first non-shims directory",
+			pathEnv:     shimsDir + string(os.PathListSeparator) + similarDir + string(os.PathListSeparator) + otherDir,
+			commandName: "go",
+			expectFound: true,
+			expectDir:   similarDir, // First non-shims directory
+		},
+		{
+			name:        "returns not found when only shims directory",
+			pathEnv:     shimsDir,
+			commandName: "go",
+			expectFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set PATH environment variable
+			originalPath := os.Getenv("PATH")
+			defer os.Setenv("PATH", originalPath)
+			os.Setenv("PATH", tt.pathEnv)
+
+			// Call findInSystemPath
+			foundPath, err := findInSystemPath(tt.commandName, goenvRoot)
+
+			if tt.expectFound {
+				if err != nil {
+					t.Errorf("Expected to find command, got error: %v", err)
+				} else {
+					// Check if found in expected directory
+					expectedPrefix := tt.expectDir
+					foundDir := filepath.Dir(foundPath)
+					// Normalize both paths for comparison
+					expectedAbs, _ := filepath.Abs(expectedPrefix)
+					foundAbs, _ := filepath.Abs(foundDir)
+					if expectedAbs != foundAbs {
+						t.Errorf("Expected to find in %s, but found in %s (full path: %s)", expectedAbs, foundAbs, foundPath)
+					}
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error (not found), but found: %s", foundPath)
+				}
+			}
+		})
+	}
+}

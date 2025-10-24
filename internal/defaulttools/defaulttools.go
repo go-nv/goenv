@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -117,7 +118,8 @@ func ConfigPath(goenvRoot string) string {
 }
 
 // InstallTools installs all configured tools for a specific Go version
-func InstallTools(config *Config, goVersion string, goenvRoot string, verbose bool) error {
+// Tools are installed to the host-specific GOPATH to enable cross-architecture dotfile syncing
+func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath string, verbose bool) error {
 	if !config.Enabled {
 		if verbose {
 			fmt.Println("Default tools installation is disabled")
@@ -145,6 +147,7 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, verbose bo
 
 	if verbose {
 		fmt.Printf("Installing %d default tool(s) for Go %s...\n", len(config.Tools), goVersion)
+		fmt.Printf("  Tools will be installed to: %s/bin\n", hostGopath)
 	}
 
 	// Track results
@@ -168,26 +171,26 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, verbose bo
 		cmd := exec.Command(goBin, "install", pkg)
 		cmd.Env = append(os.Environ(),
 			"GOROOT="+goRoot,
-			"GOPATH="+filepath.Join(versionPath, "gopath"),
+			"GOPATH="+hostGopath, // Use host-specific GOPATH
 		)
 		cmd.Stdout = nil // Suppress output unless there's an error
 		cmd.Stderr = nil
 
 		if err := cmd.Run(); err != nil {
 			if verbose {
-				fmt.Printf(" ❌ FAILED\n")
+				fmt.Printf(" %sFAILED\n", utils.Emoji("❌ "))
 			}
 			failed = append(failed, tool.Name)
 		} else {
 			if verbose {
-				fmt.Printf(" ✅\n")
+				fmt.Printf(" %s\n", utils.Emoji("✅"))
 			}
 			installed = append(installed, tool.Name)
 		}
 	}
 
 	if verbose && len(installed) > 0 {
-		fmt.Printf("\n✅ Installed %d tool(s): %s\n", len(installed), strings.Join(installed, ", "))
+		fmt.Printf("\n%sInstalled %d tool(s): %s\n", utils.Emoji("✅ "), len(installed), strings.Join(installed, ", "))
 	}
 
 	if len(failed) > 0 {

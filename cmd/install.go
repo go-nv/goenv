@@ -182,14 +182,14 @@ func installDefaultTools(cmd *cobra.Command, goVersion string) {
 
 	// Show message if verbose or not quiet
 	if !installFlags.quiet {
-		fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing default tools...\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%sInstalling default tools...\n", utils.Emoji("📦 "))
 	}
 
 	// Install tools (non-verbose to avoid clutter)
-	if err := defaulttools.InstallTools(toolConfig, goVersion, cfg.Root, !installFlags.quiet); err != nil {
+	if err := defaulttools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.HostGopath(), !installFlags.quiet); err != nil {
 		// Don't fail the whole install if default tools fail
 		if !installFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStderr(), "⚠️  Some default tools failed to install: %v\n", err)
+			fmt.Fprintf(cmd.OutOrStderr(), "%sSome default tools failed to install: %v\n", utils.Emoji("⚠️  "), err)
 		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -89,14 +90,14 @@ func runGlobal(cmd *cobra.Command, args []string) error {
 
 		// Prompt for installation
 		if manager.PromptForInstall(resolvedVersion, fmt.Sprintf("Setting global version to %s", resolvedVersion)) {
-			fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing Go %s...\n", resolvedVersion)
+			fmt.Fprintf(cmd.OutOrStdout(), "\n%sInstalling Go %s...\n", utils.Emoji("📦 "), resolvedVersion)
 
 			installer := install.NewInstaller(cfg)
 			if err := installer.Install(resolvedVersion, false); err != nil {
 				return fmt.Errorf("installation failed: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "✅ Installation complete\n\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
 		} else {
 			fmt.Fprintf(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "global"))
 			return fmt.Errorf("installation cancelled")
@@ -107,7 +108,7 @@ func runGlobal(cmd *cobra.Command, args []string) error {
 			if err := installer.Install(resolvedVersion, true); err != nil {
 				return fmt.Errorf("reinstallation failed: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "✅ Reinstallation complete\n\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "%sReinstallation complete\n\n", utils.Emoji("✅ "))
 		} else {
 			return fmt.Errorf("corrupted installation - reinstall cancelled")
 		}

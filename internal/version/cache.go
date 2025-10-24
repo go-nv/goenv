@@ -1,6 +1,8 @@
 package version
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,10 +17,13 @@ type Cache struct {
 	cachePath string
 }
 
-// CachedData represents cached version information
+// CachedData represents cached version information with integrity and ETag support
 type CachedData struct {
 	LastUpdated time.Time   `json:"last_updated"`
 	Releases    []GoRelease `json:"releases"`
+	ETag        string      `json:"etag,omitempty"`        // HTTP ETag for conditional requests
+	SHA256      string      `json:"sha256,omitempty"`      // SHA256 hash of the releases data
+	Checksum    string      `json:"checksum,omitempty"`    // Legacy field, kept for compatibility
 }
 
 // NewCache creates a new cache instance
@@ -28,8 +33,16 @@ func NewCache(goenvRoot string) *Cache {
 	return &Cache{cachePath: cachePath}
 }
 
-// Get retrieves cached version data
+// Get retrieves cached version data with integrity verification
 func (c *Cache) Get() (*CachedData, error) {
+	// Check file permissions first
+	if err := c.checkPermissions(); err != nil {
+		// Log warning but don't fail - try to fix permissions
+		if fixErr := c.ensureSecurePermissions(); fixErr != nil {
+			return nil, fmt.Errorf("cache file has insecure permissions and cannot be fixed: %w", err)
+		}
+	}
+
 	data, err := os.ReadFile(c.cachePath)
 	if err != nil {
 		return nil, err
@@ -40,27 +53,84 @@ func (c *Cache) Get() (*CachedData, error) {
 		return nil, err
 	}
 
+	// Verify SHA256 integrity if present
+	if cached.SHA256 != "" {
+		if err := c.verifySHA256(&cached); err != nil {
+			return nil, fmt.Errorf("cache integrity check failed: %w", err)
+		}
+	}
+
 	return &cached, nil
 }
 
-// Set stores version data in cache
-func (c *Cache) Set(releases []GoRelease) error {
-	// Ensure cache directory exists
-	if err := os.MkdirAll(filepath.Dir(c.cachePath), 0755); err != nil {
-		return err
+// verifySHA256 verifies the SHA256 hash of the releases data
+func (c *Cache) verifySHA256(cached *CachedData) error {
+	// Compute SHA256 of releases data
+	releasesJSON, err := json.Marshal(cached.Releases)
+	if err != nil {
+		return fmt.Errorf("failed to marshal releases for verification: %w", err)
 	}
+
+	hash := sha256.Sum256(releasesJSON)
+	computed := hex.EncodeToString(hash[:])
+
+	if computed != cached.SHA256 {
+		return fmt.Errorf("SHA256 mismatch: expected %s, got %s", cached.SHA256, computed)
+	}
+
+	return nil
+}
+
+// checkPermissions and ensureSecurePermissions are implemented in:
+// - cache_unix.go for Unix/Linux/macOS (strict permission checks)
+// - cache_windows.go for Windows (no-op due to ACL-based security)
+
+// Set stores version data in cache with SHA256 integrity and secure permissions
+func (c *Cache) Set(releases []GoRelease) error {
+	return c.SetWithETag(releases, "")
+}
+
+// SetWithETag stores version data in cache with ETag support
+func (c *Cache) SetWithETag(releases []GoRelease, etag string) error {
+	// Ensure cache directory exists with secure permissions (0700)
+	cacheDir := filepath.Dir(c.cachePath)
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
+		return fmt.Errorf("failed to create cache directory: %w", err)
+	}
+
+	// Compute SHA256 hash of releases data for integrity
+	releasesJSON, err := json.Marshal(releases)
+	if err != nil {
+		return fmt.Errorf("failed to marshal releases for hashing: %w", err)
+	}
+
+	hash := sha256.Sum256(releasesJSON)
+	sha256Hash := hex.EncodeToString(hash[:])
 
 	cached := CachedData{
 		LastUpdated: time.Now(),
 		Releases:    releases,
+		ETag:        etag,
+		SHA256:      sha256Hash,
 	}
 
 	data, err := json.MarshalIndent(cached, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal cache data: %w", err)
 	}
 
-	return os.WriteFile(c.cachePath, data, 0644)
+	// Write with secure permissions (0600)
+	if err := os.WriteFile(c.cachePath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write cache file: %w", err)
+	}
+
+	// Verify permissions were set correctly
+	if err := c.checkPermissions(); err != nil {
+		// Try to fix if they weren't set correctly
+		return c.ensureSecurePermissions()
+	}
+
+	return nil
 }
 
 // IsStale checks if cached data is older than the specified duration
@@ -68,7 +138,7 @@ func (c *CachedData) IsStale(maxAge time.Duration) bool {
 	return time.Since(c.LastUpdated) > maxAge
 }
 
-// FetchWithFallback tries to fetch all versions online, falls back to cache, then embedded data
+// FetchWithFallback tries to fetch all versions online with ETag support, falls back to cache, then embedded data
 func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 	cache := NewCache(goenvRoot)
 
@@ -81,15 +151,37 @@ func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 		return EmbeddedVersions, nil
 	}
 
-	// Try to fetch ALL versions online first (using FetchAllReleases)
-	releases, err := f.FetchAllReleases()
+	// Try to get cached data first for ETag support
+	cached, cacheErr := cache.Get()
+	var etag string
+	if cacheErr == nil {
+		etag = cached.ETag
+	}
+
+	// Try to fetch ALL versions online with ETag for conditional request
+	releases, newETag, err := f.FetchAllReleasesWithETag(etag)
 	if err == nil {
-		// Success! Cache the result for future offline use
-		if cacheErr := cache.Set(releases); cacheErr != nil && f.debug {
-			// Non-fatal error, just log if debug is enabled
-			fmt.Printf("Debug: Failed to cache versions: %v\n", cacheErr)
+		// Check if content was modified (newETag will be empty if 304 Not Modified)
+		if newETag == "" && etag != "" {
+			// Server returned 304 Not Modified - use cached data
+			if f.debug {
+				fmt.Println("Debug: Server returned 304 Not Modified, using cached data")
+			}
+			if cacheErr == nil {
+				// Optionally trigger background refresh if enabled
+				if utils.GoenvEnvVarCacheBgRefresh.IsTrue() {
+					go f.backgroundRefresh(cache, goenvRoot)
+				}
+				return cached.Releases, nil
+			}
+		} else {
+			// Success! Cache the result with ETag for future use
+			if cacheErr := cache.SetWithETag(releases, newETag); cacheErr != nil && f.debug {
+				// Non-fatal error, just log if debug is enabled
+				fmt.Printf("Debug: Failed to cache versions: %v\n", cacheErr)
+			}
+			return releases, nil
 		}
-		return releases, nil
 	}
 
 	// Online fetch failed, try cache
@@ -97,7 +189,6 @@ func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 		fmt.Printf("Debug: Online fetch failed (%v), trying cache...\n", err)
 	}
 
-	cached, cacheErr := cache.Get()
 	if cacheErr == nil && !cached.IsStale(24*time.Hour) {
 		if f.debug {
 			fmt.Printf("Debug: Using cached versions (last updated: %s)\n", cached.LastUpdated.Format(time.RFC3339))
@@ -121,4 +212,35 @@ func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 	// EmbeddedVersions is defined in embedded_versions.go (generated at build time)
 	// To regenerate: go run scripts/generate_embedded_versions.go
 	return EmbeddedVersions, nil
+}
+
+// backgroundRefresh performs a background refresh of the cache
+func (f *Fetcher) backgroundRefresh(cache *Cache, goenvRoot string) {
+	if f.debug {
+		fmt.Println("Debug: Starting background cache refresh...")
+	}
+
+	// Get current cached data for ETag
+	cached, err := cache.Get()
+	if err != nil {
+		return // Can't refresh without current cache
+	}
+
+	// Try to fetch with ETag
+	releases, newETag, err := f.FetchAllReleasesWithETag(cached.ETag)
+	if err != nil {
+		if f.debug {
+			fmt.Printf("Debug: Background refresh failed: %v\n", err)
+		}
+		return
+	}
+
+	// Only update if content changed
+	if newETag != "" && newETag != cached.ETag {
+		if err := cache.SetWithETag(releases, newETag); err != nil && f.debug {
+			fmt.Printf("Debug: Background cache update failed: %v\n", err)
+		} else if f.debug {
+			fmt.Println("Debug: Background cache refresh completed")
+		}
+	}
 }

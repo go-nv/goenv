@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -482,5 +483,340 @@ func TestInterpolateParams(t *testing.T) {
 	}
 	if result["bool_param"] != true {
 		t.Errorf("interpolateParams() bool_param = %v, want true", result["bool_param"])
+	}
+}
+
+// TestValidateURL_PrivateIPRanges tests SSRF protection against various private IP ranges
+func TestValidateURL_PrivateIPRanges(t *testing.T) {
+	tests := []struct {
+		name          string
+		url           string
+		allowInternal bool
+		shouldError   bool
+		errorContains string
+	}{
+		// RFC1918 private ranges
+		{
+			name:          "RFC1918 10.0.0.0/8",
+			url:           "http://10.0.0.1",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+		{
+			name:          "RFC1918 172.16.0.0/12",
+			url:           "http://172.16.0.1",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+		{
+			name:          "RFC1918 192.168.0.0/16",
+			url:           "http://192.168.1.1",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+
+		// RFC6598 CGNAT range (carrier-grade NAT)
+		{
+			name:          "RFC6598 CGNAT 100.64.0.0/10 - start",
+			url:           "http://100.64.0.1",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+		{
+			name:          "RFC6598 CGNAT 100.64.0.0/10 - middle",
+			url:           "http://100.80.0.1",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+		{
+			name:          "RFC6598 CGNAT 100.64.0.0/10 - end",
+			url:           "http://100.127.255.254",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+
+		// Loopback
+		{
+			name:          "Loopback 127.0.0.1",
+			url:           "http://127.0.0.1",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+		{
+			name:          "Loopback 127.0.0.0/8 range",
+			url:           "http://127.255.255.255",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+
+		// Link-local
+		{
+			name:          "Link-local 169.254.0.0/16",
+			url:           "http://169.254.1.1",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "internal/private IP",
+		},
+
+		// Public IPs should be allowed
+		{
+			name:          "Public IP 8.8.8.8",
+			url:           "http://8.8.8.8",
+			allowInternal: false,
+			shouldError:   false,
+		},
+		{
+			name:          "Public IP 1.1.1.1",
+			url:           "http://1.1.1.1",
+			allowInternal: false,
+			shouldError:   false,
+		},
+
+		// Allow internal when flag is set
+		{
+			name:          "Private IP allowed with flag",
+			url:           "http://192.168.1.1",
+			allowInternal: true,
+			shouldError:   false,
+		},
+		{
+			name:          "CGNAT allowed with flag",
+			url:           "http://100.64.0.1",
+			allowInternal: true,
+			shouldError:   false,
+		},
+
+		// HTTPS enforcement
+		{
+			name:          "HTTP not allowed by default",
+			url:           "http://example.com",
+			allowInternal: false,
+			shouldError:   true,
+			errorContains: "HTTP URLs are not allowed",
+		},
+
+		// Valid HTTPS URLs
+		{
+			name:          "HTTPS allowed",
+			url:           "https://example.com",
+			allowInternal: false,
+			shouldError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// For HTTP URLs, we need to set allowHTTP to true to test IP blocking
+			allowHTTP := strings.HasPrefix(tt.url, "http://") && !strings.Contains(tt.errorContains, "HTTP URLs")
+
+			err := ValidateURL(tt.url, allowHTTP, tt.allowInternal)
+
+			if tt.shouldError {
+				if err == nil {
+					t.Errorf("ValidateURL(%q) expected error, got nil", tt.url)
+				} else if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("ValidateURL(%q) error = %v, should contain %q", tt.url, err, tt.errorContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("ValidateURL(%q) unexpected error: %v", tt.url, err)
+				}
+			}
+		})
+	}
+}
+
+// TestValidateURL_EdgeCases tests edge cases and boundary conditions
+func TestValidateURL_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		url         string
+		shouldError bool
+		description string
+	}{
+		{
+			name:        "Empty URL",
+			url:         "",
+			shouldError: true,
+			description: "Empty URL should be rejected",
+		},
+		{
+			name:        "Invalid scheme",
+			url:         "ftp://example.com",
+			shouldError: true,
+			description: "Non-HTTP(S) schemes should be rejected",
+		},
+		{
+			name:        "URL without scheme",
+			url:         "example.com",
+			shouldError: true,
+			description: "URLs without scheme should be rejected",
+		},
+		{
+			name:        "CGNAT boundary - just before range",
+			url:         "http://100.63.255.255",
+			shouldError: false,
+			description: "100.63.255.255 is outside CGNAT range (public)",
+		},
+		{
+			name:        "CGNAT boundary - just after range",
+			url:         "http://100.128.0.0",
+			shouldError: false,
+			description: "100.128.0.0 is outside CGNAT range (public)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateURL(tt.url, true, false)
+
+			if tt.shouldError && err == nil {
+				t.Errorf("%s: expected error, got nil", tt.description)
+			} else if !tt.shouldError && err != nil {
+				t.Errorf("%s: unexpected error: %v", tt.description, err)
+			}
+		})
+	}
+}
+
+// TestValidateURL_StrictDNS tests the strict DNS mode for SSRF protection
+func TestValidateURL_StrictDNS(t *testing.T) {
+	tests := []struct {
+		name        string
+		url         string
+		strictDNS   bool
+		shouldError bool
+		description string
+	}{
+		{
+			name:        "Valid public domain - non-strict",
+			url:         "https://go.dev",
+			strictDNS:   false,
+			shouldError: false,
+			description: "Public domain should work in non-strict mode",
+		},
+		{
+			name:        "Valid public domain - strict",
+			url:         "https://go.dev",
+			strictDNS:   true,
+			shouldError: false,
+			description: "Public domain should work in strict mode",
+		},
+		{
+			name:        "Invalid domain with DNS failure - non-strict",
+			url:         "https://thisdoesnotexistandneverwill123456789.example",
+			strictDNS:   false,
+			shouldError: false,
+			description: "DNS failure without suspicious patterns should be allowed in non-strict mode",
+		},
+		{
+			name:        "Invalid domain with DNS failure - strict",
+			url:         "https://thisdoesnotexistandneverwill123456789.example",
+			strictDNS:   true,
+			shouldError: true,
+			description: "DNS failure should be rejected in strict mode",
+		},
+		{
+			name:        "Localhost pattern - non-strict",
+			url:         "https://my-localhost.example",
+			strictDNS:   false,
+			shouldError: true,
+			description: "Localhost pattern should be caught even in non-strict mode",
+		},
+		{
+			name:        "Internal pattern - non-strict",
+			url:         "https://api.internal",
+			strictDNS:   false,
+			shouldError: true,
+			description: "Internal pattern should be caught even in non-strict mode",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use HTTPS only, disallow internal IPs, vary strict DNS mode
+			err := ValidateURLWithStrictDNS(tt.url, false, false, tt.strictDNS)
+
+			if tt.shouldError && err == nil {
+				t.Errorf("%s: expected error, got nil", tt.description)
+			} else if !tt.shouldError && err != nil {
+				t.Errorf("%s: unexpected error: %v", tt.description, err)
+			}
+		})
+	}
+}
+
+// TestIsPrivateIP tests the isPrivateIP helper function directly
+func TestIsPrivateIP(t *testing.T) {
+	tests := []struct {
+		name      string
+		ip        string
+		isPrivate bool
+	}{
+		// RFC1918
+		{"10.0.0.0", "10.0.0.0", true},
+		{"10.255.255.255", "10.255.255.255", true},
+		{"172.16.0.0", "172.16.0.0", true},
+		{"172.31.255.255", "172.31.255.255", true},
+		{"192.168.0.0", "192.168.0.0", true},
+		{"192.168.255.255", "192.168.255.255", true},
+
+		// RFC6598 CGNAT
+		{"100.64.0.0", "100.64.0.0", true},
+		{"100.64.0.1", "100.64.0.1", true},
+		{"100.127.255.254", "100.127.255.254", true},
+		{"100.127.255.255", "100.127.255.255", true},
+
+		// Boundaries (should be public)
+		{"100.63.255.255", "100.63.255.255", false},
+		{"100.128.0.0", "100.128.0.0", false},
+
+		// Loopback
+		{"127.0.0.1", "127.0.0.1", true},
+		{"127.255.255.255", "127.255.255.255", true},
+
+		// Link-local
+		{"169.254.0.1", "169.254.0.1", true},
+		{"169.254.255.254", "169.254.255.254", true},
+
+		// Public
+		{"8.8.8.8", "8.8.8.8", false},
+		{"1.1.1.1", "1.1.1.1", false},
+		{"9.9.9.9", "9.9.9.9", false},
+
+		// IPv6 loopback
+		{"::1", "::1", true},
+
+		// IPv6 link-local
+		{"fe80::1", "fe80::1", true},
+
+		// IPv6 unique local
+		{"fc00::1", "fc00::1", true},
+		{"fd00::1", "fd00::1", true},
+
+		// IPv6 public
+		{"2001:4860:4860::8888", "2001:4860:4860::8888", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ip := net.ParseIP(tt.ip)
+			if ip == nil {
+				t.Fatalf("Failed to parse IP: %s", tt.ip)
+			}
+
+			result := isPrivateIP(ip)
+			if result != tt.isPrivate {
+				t.Errorf("isPrivateIP(%s) = %v, want %v", tt.ip, result, tt.isPrivate)
+			}
+		})
 	}
 }

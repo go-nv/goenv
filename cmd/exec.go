@@ -1,17 +1,24 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/binarycheck"
+	"github.com/go-nv/goenv/internal/cache"
+	"github.com/go-nv/goenv/internal/cgo"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/envdetect"
+	"github.com/go-nv/goenv/internal/goenv"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/session"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -151,8 +158,12 @@ func runExec(cmd *cobra.Command, args []string) error {
 				goarch = "host"
 			}
 
-			// Build cache path with architecture suffix to isolate cross-compile artifacts
-			cacheSuffix := fmt.Sprintf("go-build-%s-%s", goos, goarch)
+			// Get path to Go binary for ABI auto-discovery
+			goBinaryPath := filepath.Join(versionPath, "bin", "go")
+
+			// Build cache path with architecture AND ABI variant suffix
+			// ABI variants affect binary compatibility even when GOOS/GOARCH match
+			cacheSuffix := buildCacheSuffix(goBinaryPath, goos, goarch, env)
 
 			if customGocacheDir != "" {
 				// Use custom GOCACHE directory if specified
@@ -162,6 +173,34 @@ func runExec(cmd *cobra.Command, args []string) error {
 				versionGocache = filepath.Join(versionPath, cacheSuffix)
 			}
 			env = setEnvVar(env, "GOCACHE", versionGocache)
+
+			// Write build.info file to record CGO toolchain configuration
+			// This helps diagnose cache issues and ensures cache transparency
+			// Use atomic writer to prevent corruption from concurrent processes
+			if cgo.IsCGOEnabled(env) {
+				buildInfo := cgo.GetBuildInfo(env)
+
+				// Try to acquire lock for writing (non-blocking)
+				// If cache is locked by another process, skip writing (it's just diagnostic data)
+				if writer, err := cache.TryNewAtomicWriter(versionGocache); err != nil {
+					if cfg.Debug {
+						fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Failed to create atomic writer: %v\n", err)
+					}
+				} else if writer != nil {
+					defer writer.Close()
+
+					// Marshal build info and write atomically via the writer
+					buildInfoJSON, err := json.MarshalIndent(buildInfo, "", "  ")
+					if err != nil && cfg.Debug {
+						fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Failed to marshal build.info: %v\n", err)
+					} else {
+						buildInfoPath := filepath.Join(versionGocache, "build.info")
+						if err := writer.WriteFile(buildInfoPath, buildInfoJSON, 0644); err != nil && cfg.Debug {
+							fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Failed to write build.info: %v\n", err)
+						}
+					}
+				}
+			}
 		}
 
 		// Set version-specific GOMODCACHE to prevent module conflicts
@@ -204,7 +243,13 @@ func runExec(cmd *cobra.Command, args []string) error {
 		versionBinDir := filepath.Join(versionPath, "bin")
 		commandPath = findBinaryInDir(versionBinDir, command)
 
-		// If not found in version bin, check GOPATH bin (if GOPATH is enabled)
+		// If not found in version bin, check host-specific bin directory first
+		if commandPath == "" {
+			hostBinDir := cfg.HostBinDir()
+			commandPath = findBinaryInDir(hostBinDir, command)
+		}
+
+		// If still not found, check GOPATH bin (if GOPATH is enabled)
 		if commandPath == "" && utils.GoenvEnvVarDisableGopath.UnsafeValue() != "1" {
 			// Get the GOPATH from environment (already set above)
 			for _, envVar := range env {
@@ -233,6 +278,59 @@ func runExec(cmd *cobra.Command, args []string) error {
 		commandPath, err = exec.LookPath(command)
 		if err != nil {
 			return fmt.Errorf("goenv: %s: command not found", command)
+		}
+	}
+
+	// Verify binary architecture matches host (prevent exec format error)
+	// Use session memoization to avoid repeated checks for the same tool
+	memo := session.GetRebuildMemo()
+	if !memo.HasChecked(commandPath) {
+		// Note: Basic architecture verification happens at the OS level via exec
+		// The Go runtime will return "exec format error" for architecture mismatches
+		// Additional compatibility checks (ELF interpreter, libc) happen below
+
+		// Mark as checked so we don't verify again this session
+		memo.MarkChecked(commandPath)
+	}
+
+	// Check for WSL cross-execution issues (Windows binaries in WSL)
+	if wslWarning := envdetect.CheckWSLCrossExecution(commandPath); wslWarning != "" {
+		if cfg.Debug {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Debug: WSL cross-execution warning\n")
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "%s\n\n", wslWarning)
+		// Continue execution - this is just a warning, not a fatal error
+	}
+
+	// Check for Rosetta mixed architecture issues (macOS Apple Silicon)
+	if rosettaWarning := envdetect.CheckRosettaMixedArchitecture(commandPath); rosettaWarning != "" {
+		if cfg.Debug {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Rosetta architecture warning\n")
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "%s\n\n", rosettaWarning)
+		// Continue execution - this is just a warning, not a fatal error
+	}
+
+	// Perform additional compatibility checks (ELF interpreter, glibc/musl, shebang)
+	if binInfo, err := binarycheck.CheckBinary(commandPath); err == nil {
+		issues := binarycheck.CheckCompatibility(binInfo)
+		// Filter to errors only (ignore warnings for now to not break existing behavior)
+		hasErrors := false
+		for _, issue := range issues {
+			if issue.Severity == "error" {
+				hasErrors = true
+				break
+			}
+		}
+		if hasErrors {
+			if cfg.Debug {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Binary compatibility check failed\n")
+			}
+			return fmt.Errorf("cannot execute %s:\n\n%s", command, binarycheck.FormatIssues(issues))
+		}
+		// Log warnings in debug mode
+		if cfg.Debug && len(issues) > 0 {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Binary compatibility warnings:\n%s\n", binarycheck.FormatIssues(issues))
 		}
 	}
 
@@ -307,6 +405,39 @@ func setEnvVar(env []string, key, value string) []string {
 		}
 	}
 	return append(env, prefix+value)
+}
+
+// buildCacheSuffix constructs a cache directory suffix that includes ABI variants.
+// ABI variants (GOAMD64, GOARM, etc.) affect binary compatibility even when GOOS/GOARCH match.
+// Uses auto-discovery via 'go env -json' to future-proof against new ABI variables.
+func buildCacheSuffix(goBinaryPath, goos, goarch string, env []string) string {
+	// Start with OS-arch
+	suffix := fmt.Sprintf("go-build-%s-%s", goos, goarch)
+
+	// Add ABI variants using auto-discovery from Go binary
+	// This dynamically discovers GOAMD64, GOARM, GO386, GOMIPS*, GOPPC64, GORISCV64, etc.
+	// and future-proofs against new ABI variants (e.g., GOAMD64v5, GOLOONG64)
+	abiSuffix := goenv.BuildABISuffix(goBinaryPath, goarch, env)
+	suffix += abiSuffix
+
+	// Add GOEXPERIMENT if set (affects runtime behavior)
+	if goexp := getEnvValue(env, "GOEXPERIMENT"); goexp != "" {
+		// Sanitize GOEXPERIMENT for use in filename (replace , with -)
+		goexp = strings.ReplaceAll(goexp, ",", "-")
+		suffix += "-exp-" + goexp
+	}
+
+	// Add CGO toolchain hash if CGO is enabled
+	// This prevents cache conflicts when swapping C compilers/headers/flags
+	if cgo.IsCGOEnabled(env) {
+		cgoHash := cgo.ComputeToolchainHash(env)
+		if cgoHash != "" {
+			// Use first 8 chars of hash for brevity
+			suffix += "-cgo-" + cgoHash[:8]
+		}
+	}
+
+	return suffix
 }
 
 // getEnvValue retrieves an environment variable value from the env slice

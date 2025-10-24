@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/hooks"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -144,8 +145,8 @@ func runHooksInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write configuration: %w", err)
 	}
 
-	fmt.Printf("✅ Created hooks configuration template at: %s\n\n", configPath)
-	fmt.Println("⚠️  IMPORTANT: Hooks are DISABLED by default for security.")
+	fmt.Printf("%sCreated hooks configuration template at: %s\n\n", utils.Emoji("✅ "), configPath)
+	fmt.Printf("%sIMPORTANT: Hooks are DISABLED by default for security.\n", utils.Emoji("⚠️  "))
 	fmt.Println("\nTo enable hooks:")
 	fmt.Println("  1. Review the configuration carefully")
 	fmt.Println("  2. Set 'enabled: true'")
@@ -225,13 +226,13 @@ func runHooksValidate(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	config, err := hooks.LoadConfig(configPath)
 	if err != nil {
-		fmt.Printf("❌ Configuration validation FAILED\n\n")
+		fmt.Printf("%sConfiguration validation FAILED\n\n", utils.Emoji("❌ "))
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	// Validate configuration
 	if err := config.Validate(); err != nil {
-		fmt.Printf("❌ Configuration validation FAILED\n\n")
+		fmt.Printf("%sConfiguration validation FAILED\n\n", utils.Emoji("❌ "))
 		return fmt.Errorf("validation error: %w", err)
 	}
 
@@ -244,26 +245,26 @@ func runHooksValidate(cmd *cobra.Command, args []string) error {
 			// Check action exists
 			executor, ok := registry.Get(action.Action)
 			if !ok {
-				fmt.Printf("❌ Hook '%s' action %d: unknown action '%s'\n", hookPoint, i+1, action.Action)
+				fmt.Printf("%sHook '%s' action %d: unknown action '%s'\n", utils.Emoji("❌ "), hookPoint, i+1, action.Action)
 				errorCount++
 				continue
 			}
 
 			// Validate action parameters
 			if err := executor.Validate(action.Params); err != nil {
-				fmt.Printf("❌ Hook '%s' action %d (%s): %v\n", hookPoint, i+1, action.Action, err)
+				fmt.Printf("%sHook '%s' action %d (%s): %v\n", utils.Emoji("❌ "), hookPoint, i+1, action.Action, err)
 				errorCount++
 			}
 		}
 	}
 
 	if errorCount > 0 {
-		fmt.Printf("\n❌ Configuration validation FAILED with %d error(s)\n", errorCount)
+		fmt.Printf("\n%sConfiguration validation FAILED with %d error(s)\n", utils.Emoji("❌ "), errorCount)
 		return fmt.Errorf("validation failed")
 	}
 
 	// Success
-	fmt.Printf("✅ Configuration validation PASSED\n\n")
+	fmt.Printf("%sConfiguration validation PASSED\n\n", utils.Emoji("✅ "))
 	fmt.Printf("Configuration file: %s\n", configPath)
 	fmt.Printf("Status: %s\n", formatStatus(config))
 	fmt.Printf("Hook points: %d\n", len(config.Hooks))
@@ -275,7 +276,7 @@ func runHooksValidate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Total actions: %d\n", totalActions)
 
 	if !config.IsEnabled() {
-		fmt.Println("\n⚠️  Note: Hooks are currently DISABLED")
+		fmt.Printf("\n%sNote: Hooks are currently DISABLED\n", utils.Emoji("⚠️  "))
 		fmt.Println("To enable: set 'enabled: true' and 'acknowledged_risks: true'")
 	}
 
@@ -327,13 +328,13 @@ func runHooksTest(cmd *cobra.Command, args []string) error {
 	executor := hooks.NewExecutor(config)
 
 	// Test each hook point
-	fmt.Printf("🧪 Testing hooks (dry-run mode)\n\n")
+	fmt.Printf("%sTesting hooks (dry-run mode)\n\n", utils.Emoji("🧪 "))
 
 	for _, hookPoint := range hookPoints {
 		// Get actions directly from config (bypass IsEnabled check for testing)
 		actions := config.Hooks[hookPoint]
 		if len(actions) == 0 {
-			fmt.Printf("⚠️  No actions configured for hook point: %s\n\n", hookPoint)
+			fmt.Printf("%sNo actions configured for hook point: %s\n\n", utils.Emoji("⚠️  "), hookPoint)
 			continue
 		}
 
@@ -349,15 +350,15 @@ func runHooksTest(cmd *cobra.Command, args []string) error {
 
 		// Validate hook point
 		if !hooks.IsValidHookPoint(hookPoint) {
-			fmt.Printf("⚠️  Invalid hook point: %s\n\n", hookPoint)
+			fmt.Printf("%sInvalid hook point: %s\n\n", utils.Emoji("⚠️  "), hookPoint)
 			continue
 		}
 
 		messages, err := executor.TestExecute(hooks.HookPoint(hookPoint), testVars)
 		if err != nil {
-			fmt.Printf("❌ Test FAILED: %v\n\n", err)
+			fmt.Printf("%sTest FAILED: %v\n\n", utils.Emoji("❌ "), err)
 		} else {
-			fmt.Printf("✅ Test PASSED\n")
+			fmt.Printf("%sTest PASSED\n", utils.Emoji("✅ "))
 			if len(messages) > 0 {
 				fmt.Println("   Actions that would be executed:")
 				for _, msg := range messages {
@@ -368,7 +369,7 @@ func runHooksTest(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Println("🧪 Dry-run testing complete")
+	fmt.Printf("%sDry-run testing complete\n", utils.Emoji("🧪 "))
 	fmt.Println("\nNote: This was a simulation. No actual actions were performed.")
 
 	return nil
@@ -377,12 +378,12 @@ func runHooksTest(cmd *cobra.Command, args []string) error {
 // formatStatus returns a formatted status string
 func formatStatus(config *hooks.Config) string {
 	if config.IsEnabled() {
-		return "✅ ENABLED"
+		return utils.Emoji("✅ ") + "ENABLED"
 	}
 	if config.Enabled && !config.AcknowledgedRisks {
-		return "⚠️  DISABLED (risks not acknowledged)"
+		return utils.Emoji("⚠️  ") + "DISABLED (risks not acknowledged)"
 	}
-	return "❌ DISABLED"
+	return utils.Emoji("❌ ") + "DISABLED"
 }
 
 // generateTemplateConfig generates a template hooks.yaml

@@ -30,7 +30,7 @@ func TestDefaultToolsList_NoConfig(t *testing.T) {
 	if !strings.Contains(output, "No default tools configuration found") {
 		t.Errorf("Expected 'No default tools configuration found' message, got: %s", output)
 	}
-	if !strings.Contains(output, "goenv default-tools init") {
+	if !strings.Contains(output, "goenv tools default init") {
 		t.Errorf("Expected init suggestion, got: %s", output)
 	}
 }
@@ -483,7 +483,7 @@ func TestDefaultToolsHelp(t *testing.T) {
 
 	output := buf.String()
 	expectedStrings := []string{
-		"default-tools",
+		"tools", "default",
 		"Manages the list of tools",
 		"list",
 		"init",

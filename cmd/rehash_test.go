@@ -154,9 +154,9 @@ func TestRehashCommand(t *testing.T) {
 			name:          "fails when shims directory is not writable",
 			setupVersions: []string{"1.11.1"},
 			setupBinaries: map[string][]string{"1.11.1": {"go"}},
-			shimsDirPerms: 0444, // Read-only
-			expectedError: "shims",  // Platform-agnostic check - just verify error mentions shims
-			skipOnRoot:    true, // Root can write to read-only dirs
+			shimsDirPerms: 0444,    // Read-only
+			expectedError: "shims", // Platform-agnostic check - just verify error mentions shims
+			skipOnRoot:    true,    // Root can write to read-only dirs
 		},
 		// Note: Lock file test removed - Go implementation doesn't use lock files
 		// (this is an acceptable difference from bash version)
@@ -229,14 +229,14 @@ func TestRehashCommand(t *testing.T) {
 				os.MkdirAll(shimsDir, 0755)
 				for _, shim := range tt.existingShims {
 					shimPath := filepath.Join(shimsDir, shim)
-				var shimContent string
-				if runtime.GOOS == "windows" {
-					shimPath += ".bat"
-					shimContent = "@echo off\necho old shim\n"
-				} else {
-					shimContent = "#!/bin/bash\necho old shim\n"
-				}
-				os.WriteFile(shimPath, []byte(shimContent), 0755)
+					var shimContent string
+					if runtime.GOOS == "windows" {
+						shimPath += ".bat"
+						shimContent = "@echo off\necho old shim\n"
+					} else {
+						shimContent = "#!/bin/bash\necho old shim\n"
+					}
+					os.WriteFile(shimPath, []byte(shimContent), 0755)
 				}
 			}
 
@@ -249,15 +249,15 @@ func TestRehashCommand(t *testing.T) {
 
 			// Setup permissions if specified
 			if tt.shimsDirPerms != 0 {
-			if runtime.GOOS == "windows" {
-				t.Skip("skipping permission test on Windows")
-			}
-			os.MkdirAll(shimsDir, 0755)
-			if err := os.Chmod(shimsDir, os.FileMode(tt.shimsDirPerms)); err != nil {
-				t.Fatalf("Failed to change shims directory permissions: %v", err)
-			}
-			// Ensure cleanup restores permissions
-			defer os.Chmod(shimsDir, 0755)
+				if runtime.GOOS == "windows" {
+					t.Skip("skipping permission test on Windows")
+				}
+				os.MkdirAll(shimsDir, 0755)
+				if err := os.Chmod(shimsDir, os.FileMode(tt.shimsDirPerms)); err != nil {
+					t.Fatalf("Failed to change shims directory permissions: %v", err)
+				}
+				// Ensure cleanup restores permissions
+				defer os.Chmod(shimsDir, 0755)
 			}
 
 			// Create and execute command

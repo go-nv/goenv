@@ -30,6 +30,7 @@ type Settings struct {
 	ContinueOnError  bool   `yaml:"continue_on_error"`  // Default: true
 	AllowHTTP        bool   `yaml:"allow_http"`         // Default: false (HTTPS only)
 	AllowInternalIPs bool   `yaml:"allow_internal_ips"` // Default: false (SSRF protection)
+	StrictDNS        bool   `yaml:"strict_dns"`         // Default: false (reject on DNS failure when allow_internal_ips=false)
 }
 
 // Action represents a single hook action
@@ -72,6 +73,7 @@ func DefaultConfig() *Config {
 			ContinueOnError:  true,
 			AllowHTTP:        false,
 			AllowInternalIPs: false,
+			StrictDNS:        false,
 		},
 		Hooks: make(map[string][]Action),
 	}

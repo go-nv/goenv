@@ -9,6 +9,7 @@ import (
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -93,7 +94,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 			// Check if installed
 			if !mgr.IsVersionInstalled(version) {
-				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Go %s is not installed\n", version)
+				fmt.Fprintf(cmd.OutOrStdout(), "%sGo %s is not installed\n", utils.Emoji("⚠️  "), version)
 				fmt.Fprintf(cmd.OutOrStdout(), "Installing Go %s...\n", version)
 
 				// Find and execute install command
@@ -111,7 +112,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 					return fmt.Errorf("installation failed: %w", err)
 				}
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "✓ Go %s is installed\n", version)
+				fmt.Fprintf(cmd.OutOrStdout(), "%sGo %s is installed\n", utils.Emoji("✓ "), version)
 			}
 
 			return nil
@@ -152,14 +153,14 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 			// Prompt for installation
 			if manager.PromptForInstall(resolvedVersion, "Setting local version from go.mod") {
-				fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing Go %s...\n", resolvedVersion)
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%sInstalling Go %s...\n", utils.Emoji("📦 "), resolvedVersion)
 
 				installer := install.NewInstaller(cfg)
 				if err := installer.Install(resolvedVersion, false); err != nil {
 					return fmt.Errorf("installation failed: %w", err)
 				}
 
-				fmt.Fprintf(cmd.OutOrStdout(), "✅ Installation complete\n\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
 			} else {
 				fmt.Fprintf(cmd.OutOrStdout(), "\nTo install later:\n")
 				fmt.Fprintf(cmd.OutOrStdout(), "  goenv install %s && goenv local %s\n", resolvedVersion, resolvedVersion)
@@ -171,7 +172,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 				if err := installer.Install(resolvedVersion, true); err != nil {
 					return fmt.Errorf("reinstallation failed: %w", err)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "✅ Reinstallation complete\n\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "%sReinstallation complete\n\n", utils.Emoji("✅ "))
 			} else {
 				return fmt.Errorf("corrupted installation - reinstall cancelled")
 			}
@@ -200,14 +201,14 @@ func runLocal(cmd *cobra.Command, args []string) error {
 
 			// Prompt for installation
 			if manager.PromptForInstall(resolvedVersion, fmt.Sprintf("Setting local version to %s", resolvedVersion)) {
-				fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing Go %s...\n", resolvedVersion)
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%sInstalling Go %s...\n", utils.Emoji("📦 "), resolvedVersion)
 
 				installer := install.NewInstaller(cfg)
 				if err := installer.Install(resolvedVersion, false); err != nil {
 					return fmt.Errorf("installation failed: %w", err)
 				}
 
-				fmt.Fprintf(cmd.OutOrStdout(), "✅ Installation complete\n\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
 			} else {
 				fmt.Fprintf(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "local"))
 				return fmt.Errorf("installation cancelled")
@@ -218,7 +219,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 				if err := installer.Install(resolvedVersion, true); err != nil {
 					return fmt.Errorf("reinstallation failed: %w", err)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "✅ Reinstallation complete\n\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "%sReinstallation complete\n\n", utils.Emoji("✅ "))
 			} else {
 				return fmt.Errorf("corrupted installation - reinstall cancelled")
 			}
@@ -242,7 +243,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		if err == nil {
 			if !manager.VersionSatisfies(resolvedVersion, requiredVersion) {
 				fmt.Fprintln(cmd.OutOrStdout())
-				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: go.mod requires Go %s but you set version to %s\n", requiredVersion, resolvedVersion)
+				fmt.Fprintf(cmd.OutOrStdout(), "%sWarning: go.mod requires Go %s but you set version to %s\n", utils.Emoji("⚠️  "), requiredVersion, resolvedVersion)
 				fmt.Fprintln(cmd.OutOrStdout(), "   This may cause build errors.")
 				fmt.Fprintln(cmd.OutOrStdout())
 				fmt.Fprintln(cmd.OutOrStdout(), "   To use the version from go.mod:")
@@ -266,7 +267,7 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		// Call vscode init functionality with the resolved version
 		if err := initializeVSCodeWorkspaceWithVersion(cmd, resolvedVersion); err != nil {
 			// Don't fail the whole command if VS Code init fails
-			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: VS Code initialization failed: %v\n", err)
+			fmt.Fprintf(cmd.OutOrStdout(), "%sWarning: VS Code initialization failed: %v\n", utils.Emoji("⚠️  "), err)
 			fmt.Fprintln(cmd.OutOrStdout(), "   You can manually run: goenv vscode init")
 		}
 
@@ -276,11 +277,11 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		// Note about updating when version changes (only for absolute paths mode)
 		if !localFlags.vscodeEnvVars {
 			fmt.Fprintln(cmd.OutOrStdout())
-			fmt.Fprintln(cmd.OutOrStdout(), "💡 Tip: When you change Go versions, re-run 'goenv local VERSION --vscode' to update VS Code")
+			fmt.Fprintf(cmd.OutOrStdout(), "%sTip: When you change Go versions, re-run 'goenv local VERSION --vscode' to update VS Code\n", utils.Emoji("💡 "))
 		} else {
 			// Important note about environment refresh for env vars mode
 			fmt.Fprintln(cmd.OutOrStdout())
-			fmt.Fprintln(cmd.OutOrStdout(), "⚠️  Important: To use Go "+resolvedVersion+" in VS Code:")
+			fmt.Fprintf(cmd.OutOrStdout(), "%sImportant: To use Go %s in VS Code:\n", utils.Emoji("⚠️  "), resolvedVersion)
 			fmt.Fprintln(cmd.OutOrStdout(), "   1. Close VS Code completely")
 			fmt.Fprintln(cmd.OutOrStdout(), "   2. Reopen from terminal:  code .")
 			fmt.Fprintln(cmd.OutOrStdout())

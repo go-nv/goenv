@@ -213,6 +213,121 @@ Send HTTP POST requests with JSON payloads. Perfect for team notifications and i
 - Only HTTP and HTTPS protocols allowed
 - No authentication secrets in config (use environment variables in URL)
 - Timeout protection against hanging requests
+- SSRF protection (see Security Model below)
+
+#### Security Model
+
+The `http_webhook` action includes comprehensive security controls to prevent Server-Side Request Forgery (SSRF) attacks and protect against malicious URLs.
+
+**Default Security Settings:**
+
+All security features are **enabled by default** and configured via global settings:
+
+```yaml
+settings:
+  allow_http: false         # Default: HTTPS only
+  allow_internal_ips: false # Default: block private IPs
+  strict_dns: false         # Default: lenient DNS validation
+```
+
+**Security Features:**
+
+1. **HTTPS Enforcement** (`allow_http`)
+   - Default: `false` (HTTPS required)
+   - When `false`: HTTP URLs are rejected
+   - When `true`: Both HTTP and HTTPS allowed
+   - Recommendation: Keep at `false` for production
+
+2. **SSRF Protection** (`allow_internal_ips`)
+   - Default: `false` (blocks internal/private IPs)
+   - Blocks access to:
+     - RFC1918 private ranges: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
+     - Carrier-grade NAT (CGNAT): `100.64.0.0/10`
+     - Loopback: `127.0.0.0/8`
+     - Link-local: `169.254.0.0/16`
+     - IPv6 private ranges: `::1/128`, `fe80::/10`, `fc00::/7`
+   - DNS resolution: Resolves hostnames and checks all returned IPs
+   - Pattern matching: Catches `localhost`, `.internal`, `.lan` patterns even if DNS fails
+
+3. **Strict DNS Mode** (`strict_dns`)
+   - Default: `false` (lenient mode)
+   - **Lenient mode** (`strict_dns: false`):
+     - If DNS resolution fails, falls back to hostname pattern checks
+     - Allows URLs with DNS failures if no suspicious patterns detected
+     - Recommended for most users
+   - **Strict mode** (`strict_dns: true`):
+     - Rejects URLs when DNS resolution fails (if `allow_internal_ips: false`)
+     - Provides maximum SSRF protection
+     - May block legitimate URLs with temporary DNS issues
+
+**Configuration Examples:**
+
+```yaml
+# Maximum security (recommended for production)
+settings:
+  allow_http: false         # HTTPS only
+  allow_internal_ips: false # Block internal IPs
+  strict_dns: true          # Reject on DNS failure
+
+hooks:
+  post_install:
+    - action: http_webhook
+      url: https://webhooks.example.com/notify
+      body: '{"version": "{version}"}'
+```
+
+```yaml
+# Development/testing (allow internal webhooks)
+settings:
+  allow_http: true          # Allow HTTP for local testing
+  allow_internal_ips: true  # Allow internal IPs
+  strict_dns: false         # Lenient DNS
+
+hooks:
+  post_install:
+    - action: http_webhook
+      url: http://localhost:8080/webhook
+      body: '{"version": "{version}"}'
+```
+
+```yaml
+# Balanced (public HTTPS webhooks with lenient DNS)
+settings:
+  allow_http: false         # HTTPS only
+  allow_internal_ips: false # Block internal IPs
+  strict_dns: false         # Allow DNS failures for legitimate services
+
+hooks:
+  post_install:
+    - action: http_webhook
+      url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+      body: '{"text": "Installed {version}"}'
+```
+
+**What Gets Blocked:**
+
+```yaml
+# ❌ Blocked by default (allow_internal_ips: false)
+- http://localhost:3000/webhook
+- https://192.168.1.10/api
+- http://internal.company.local/notify
+- https://10.0.0.5/webhook
+- http://100.64.1.1/api          # CGNAT range
+- https://api.internal/v1/hook
+
+# ✅ Allowed by default
+- https://hooks.slack.com/services/...
+- https://discord.com/api/webhooks/...
+- https://api.example.com/webhooks
+- https://webhook.site/unique-url
+```
+
+**Security Notes:**
+
+- **CGNAT ranges** (`100.64.0.0/10`) are blocked by default to prevent attacks via carrier-grade NAT networks
+- DNS rebinding attacks are mitigated by resolving hostnames and checking all returned IPs
+- If you need to send webhooks to internal services, explicitly set `allow_internal_ips: true` and understand the risks
+- For maximum security in untrusted environments, enable `strict_dns: true`
 
 **Slack Example:**
 
@@ -442,6 +557,29 @@ hooks:
 
 Execute shell commands during hook execution. Enables custom validation, automation, and integration.
 
+**⚠️ SECURITY FIRST: Always Use Args Array**
+
+The `args` array form is the **secure pattern** for running commands. It prevents shell injection by passing arguments directly without shell interpretation.
+
+```yaml
+# ✅ SECURE: Args array (recommended)
+- action: run_command
+  params:
+    command: "go"
+    args: ["build", "-o", "/tmp/app"]
+
+# ⚠️ AVOID: Shell string (only for simple, trusted commands)
+- action: run_command
+  params:
+    command: "go build -o /tmp/app"  # Shell interprets spaces, quotes, etc.
+```
+
+**Why args array matters:**
+- **No shell injection**: Arguments can't contain shell metacharacters (`;`, `|`, `$()`, etc.)
+- **Predictable behavior**: Spaces and quotes are treated as literals
+- **Template safety**: Even template variables with special chars are safe
+- **Cross-platform**: Works consistently on Windows, macOS, Linux
+
 **Parameters:**
 
 | Parameter | Type | Required | Description |
@@ -471,20 +609,53 @@ Execute shell commands during hook execution. Enables custom validation, automat
 4. Optionally captures output to context variables
 5. Returns error or continues based on `fail_on_error`
 
-**Example: Verify Go Installation**
+**Example 1: Basic Command with Args (Recommended Pattern)**
 
 ```yaml
 hooks:
   post_install:
     - action: run_command
       params:
-        command: "go version"
+        command: "go"
+        args: ["version"]
         capture_output: true
         log_output: true
-        fail_on_error: true
 ```
 
-**Example: Custom Validation Script**
+**Example 2: Command with Multiple Arguments (Secure)**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "go"
+        args:
+          - "build"
+          - "-o"
+          - "/tmp/test-{version}"
+          - "."
+        working_dir: "/tmp"
+        timeout: "1m"
+```
+
+**Example 3: Template Variables in Args (Safe)**
+
+```yaml
+hooks:
+  post_install:
+    # Templates in args array are safe from injection
+    - action: run_command
+      params:
+        command: "echo"
+        args:
+          - "Installed version {version} at {timestamp}"
+        log_output: true
+```
+
+**Example 4: Shell Script (When Necessary)**
+
+If you need shell features (pipes, redirects, env var expansion), use `bash -c`:
 
 ```yaml
 hooks:
@@ -497,6 +668,37 @@ hooks:
           - "go version && go env GOROOT"
         capture_output: true
         timeout: "30s"
+```
+
+**Example 5: Simple Command String (Only for Trusted, Static Commands)**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "go version"  # ⚠️ OK only if: no user input, no templates, fully trusted
+        capture_output: true
+```
+
+**Security Anti-Patterns (DO NOT USE):**
+
+```yaml
+# ❌ INSECURE: Template in command string
+- action: run_command
+  params:
+    command: "go install {package}@latest"  # {package} could contain shell metacharacters
+
+# ❌ INSECURE: User input in command string
+- action: run_command
+  params:
+    command: "git clone {repo_url}"  # {repo_url} could contain "; rm -rf /"
+
+# ✅ SECURE: Use args array instead
+- action: run_command
+  params:
+    command: "git"
+    args: ["clone", "{repo_url}"]  # Safe: repo_url treated as literal string
 ```
 
 **Example: Test Compilation**
@@ -636,6 +838,9 @@ acknowledged_risks: true
 settings:
   timeout: "5s"
   continue_on_error: true
+  allow_http: false
+  allow_internal_ips: false
+  strict_dns: false
 ```
 
 **`enabled`** (boolean, required)
@@ -648,16 +853,95 @@ settings:
 - Both `enabled` and `acknowledged_risks` must be `true` for hooks to run
 - Default: `false`
 
+### Operational Limits
+
+The hooks system includes built-in limits to prevent abuse and ensure reliable operation:
+
+| Limit | Default | Maximum | Description |
+|-------|---------|---------|-------------|
+| **Action Timeout** | `5s` | `10m` | Maximum time for each action to complete |
+| **Actions per Hook** | Unlimited | ~1000 | Number of actions per hook point (soft limit) |
+| **Total Hooks** | Unlimited | ~50 | Number of configured hooks across all hook points |
+| **Webhook Body Size** | 64KB | 1MB | Maximum size for HTTP webhook payloads |
+| **Log File Size** | Unlimited | N/A | No size limit for log_to_file actions |
+
+**Notes:**
+- Timeouts are enforced per-action, not per-hook-point
+- Multiple actions on the same hook point run sequentially
+- Failed actions don't count against limits when `continue_on_error: true`
+- Limits are designed to prevent misconfiguration, not malicious use
+
+**Example configuration with custom limits:**
+
+```yaml
+settings:
+  timeout: "10s"  # Increase for slow webhooks or commands
+  continue_on_error: true  # Don't break goenv on hook failures
+
+hooks:
+  post_install:
+    # Keep action lists reasonable (< 10 actions per hook is a good rule)
+    - action: log_to_file
+      params:
+        path: ~/.goenv/install.log
+        message: "Installed Go {version}"
+
+    - action: http_webhook
+      params:
+        url: https://webhooks.example.com/notify
+        body: '{"version": "{version}", "timestamp": "{timestamp}"}'
+```
+
 **`settings.timeout`** (string, default: "5s")
 - Maximum time for each action to complete
 - Valid units: `s` (seconds), `m` (minutes), `h` (hours)
 - Examples: `"5s"`, `"30s"`, `"1m"`, `"2m30s"`
 - Actions exceeding timeout are terminated
+- Recommended: `5s` for webhooks, `10s` for commands, `30s` for disk checks
 
 **`settings.continue_on_error`** (boolean, default: true)
 - If `true`: Log errors but continue executing remaining hooks
 - If `false`: Stop executing hooks on first error
 - Recommended: `true` (hooks shouldn't break normal operations)
+
+**`settings.allow_http`** (boolean, default: false)
+- Controls whether HTTP URLs are allowed in `http_webhook` actions
+- When `false`: Only HTTPS URLs accepted (recommended for production)
+- When `true`: Both HTTP and HTTPS URLs allowed
+- See [http_webhook Security Model](#security-model) for details
+
+**`settings.allow_internal_ips`** (boolean, default: false)
+- Controls SSRF protection for `http_webhook` actions
+- When `false`: Blocks requests to private/internal IP ranges (RFC1918, CGNAT, loopback, link-local)
+- When `true`: Allows requests to any IP address
+- Protects against Server-Side Request Forgery (SSRF) attacks
+- See [http_webhook Security Model](#security-model) for complete list of blocked ranges
+
+**`settings.strict_dns`** (boolean, default: false)
+-- Enhanced DNS validation for `http_webhook` actions
+-- When `true`: More strict DNS checking to prevent DNS rebinding attacks
+-- When `false`: Standard DNS resolution
+-- Recommended for high-security environments
+
+### Operational Limits
+
+To prevent abuse and ensure system stability, the following limits are enforced:
+
+| Limit | Default | Description |
+|-------|---------|-------------|
+| **Max Actions per Hook** | 10 | Maximum number of actions that can be defined for a single hook point |
+| **Default Timeout** | 5s | Default timeout for each action if not specified |
+| **Max Timeout** | 10m | Maximum timeout value allowed for any action |
+| **Command Timeout** | 2m | Default timeout for `run_command` actions |
+| **Webhook Timeout** | 10s | Maximum timeout for `http_webhook` requests |
+| **Max Retries** | 3 | Maximum retry attempts for failed actions (if retry is enabled) |
+
+**Notes:**
+- Timeouts are enforced per-action, not per-hook
+- Actions exceeding timeout are terminated gracefully
+- `continue_on_error: true` (default) ensures one failing action doesn't block others
+- Limits prevent runaway hooks from degrading system performance
+- See [http_webhook Security Model](#security-model) for detailed behavior
 
 ### Hook Configuration
 

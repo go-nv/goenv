@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,10 +10,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -48,7 +52,7 @@ func init() {
 func runUpdate(cmd *cobra.Command, args []string) error {
 	cfg := config.Load()
 
-	fmt.Fprintln(cmd.OutOrStdout(), "🔄 Checking for goenv updates...")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sChecking for goenv updates...\n", utils.Emoji("🔄 "))
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Detect installation method
@@ -118,7 +122,20 @@ func isGitRepo(dir string) bool {
 func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot string) error {
 	// Check git is available
 	if _, err := exec.LookPath("git"); err != nil {
-		return fmt.Errorf("git not found in PATH - cannot update git-based installation")
+		errMsg := "git not found in PATH - cannot update git-based installation\n\n"
+		errMsg += "To fix this:\n"
+		if runtime.GOOS == "windows" {
+			errMsg += "  • Install Git for Windows: https://git-scm.com/download/win\n"
+			errMsg += "  • Or install via winget: winget install Git.Git\n"
+		} else if runtime.GOOS == "darwin" {
+			errMsg += "  • Install Xcode Command Line Tools: xcode-select --install\n"
+			errMsg += "  • Or install via Homebrew: brew install git\n"
+		} else {
+			errMsg += "  • Install git using your package manager (apt-get, yum, pacman, etc.)\n"
+		}
+		errMsg += "\nAlternatively, if you don't have write permissions to update:\n"
+		errMsg += "  • Download the latest binary from: https://github.com/go-nv/goenv/releases"
+		return fmt.Errorf(errMsg)
 	}
 
 	// Get current commit
@@ -139,7 +156,7 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 	}
 
 	// Fetch latest changes
-	fmt.Fprintln(cmd.OutOrStdout(), "📡 Fetching latest changes...")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sFetching latest changes...\n", utils.Emoji("📡 "))
 	if err := runGitCommand(gitRoot, "fetch", "origin"); err != nil {
 		return fmt.Errorf("git fetch failed: %w", err)
 	}
@@ -151,13 +168,13 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 	}
 
 	if currentCommit == remoteCommit && !updateForce {
-		fmt.Fprintln(cmd.OutOrStdout(), "✅ goenv is already up-to-date!")
+		fmt.Fprintf(cmd.OutOrStdout(), "%sgoenv is already up-to-date!\n", utils.Emoji("✅ "))
 		fmt.Fprintf(cmd.OutOrStdout(), "   Current version: %s\n", currentCommit[:7])
 		return nil
 	}
 
 	if updateCheckOnly {
-		fmt.Fprintln(cmd.OutOrStdout(), "🆕 Update available!")
+		fmt.Fprintf(cmd.OutOrStdout(), "%sUpdate available!\n", utils.Emoji("🆕 "))
 		fmt.Fprintf(cmd.OutOrStdout(), "   Current:  %s\n", currentCommit[:7])
 		fmt.Fprintf(cmd.OutOrStdout(), "   Latest:   %s\n", remoteCommit[:7])
 		fmt.Fprintln(cmd.OutOrStdout())
@@ -167,7 +184,7 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 
 	// Show what will be updated
 	if currentCommit != remoteCommit {
-		fmt.Fprintln(cmd.OutOrStdout(), "📝 Changes:")
+		fmt.Fprintf(cmd.OutOrStdout(), "%sChanges:\n", utils.Emoji("📝 "))
 		if err := showGitLog(cmd, gitRoot, currentCommit, remoteCommit); err != nil {
 			fmt.Fprintf(cmd.OutOrStdout(), "   (Unable to show changes: %v)\n", err)
 		}
@@ -176,7 +193,7 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 
 	// Check for uncommitted changes
 	if hasUncommittedChanges(gitRoot) {
-		fmt.Fprintln(cmd.OutOrStderr(), "⚠️  Warning: You have uncommitted changes in goenv directory")
+		fmt.Fprintf(cmd.OutOrStderr(), "%sWarning: You have uncommitted changes in goenv directory\n", utils.Emoji("⚠️  "))
 		fmt.Fprintln(cmd.OutOrStderr(), "   The update may fail or overwrite your changes.")
 		fmt.Fprintln(cmd.OutOrStderr())
 		if !updateForce {
@@ -186,7 +203,7 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 	}
 
 	// Perform the update
-	fmt.Fprintln(cmd.OutOrStdout(), "⬇️  Updating goenv...")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sUpdating goenv...\n", utils.Emoji("⬇️  "))
 	if err := runGitCommand(gitRoot, "pull", "origin", currentBranch); err != nil {
 		return fmt.Errorf("git pull failed: %w", err)
 	}
@@ -198,10 +215,10 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "✅ goenv updated successfully!")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sgoenv updated successfully!\n", utils.Emoji("✅ "))
 	fmt.Fprintf(cmd.OutOrStdout(), "   Updated from %s to %s\n", currentCommit[:7], newCommit[:7])
 	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "💡 Restart your shell to use the new version:")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sRestart your shell to use the new version:\n", utils.Emoji("💡 "))
 	fmt.Fprintln(cmd.OutOrStdout(), "   exec $SHELL")
 
 	return nil
@@ -209,12 +226,12 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 
 // updateBinaryInstallation updates a standalone binary installation
 func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath string) error {
-	fmt.Fprintln(cmd.OutOrStdout(), "📦 Detected binary installation")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sDetected binary installation\n", utils.Emoji("📦 "))
 	fmt.Fprintf(cmd.OutOrStdout(), "   Binary location: %s\n", binaryPath)
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Get latest release from GitHub
-	fmt.Fprintln(cmd.OutOrStdout(), "🔍 Checking GitHub releases...")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sChecking GitHub releases...\n", utils.Emoji("🔍 "))
 	latestVersion, downloadURL, err := getLatestRelease()
 	if err != nil {
 		return fmt.Errorf("failed to get latest release: %w", err)
@@ -228,17 +245,17 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	// Check current version
 	currentVersion := getCurrentVersion()
 	if currentVersion == latestVersion && !updateForce {
-		fmt.Fprintln(cmd.OutOrStdout(), "✅ goenv is already up-to-date!")
+		fmt.Fprintf(cmd.OutOrStdout(), "%sgoenv is already up-to-date!\n", utils.Emoji("✅ "))
 		fmt.Fprintf(cmd.OutOrStdout(), "   Current version: %s\n", currentVersion)
 		return nil
 	}
 
 	if updateCheckOnly {
 		if currentVersion == latestVersion {
-			fmt.Fprintln(cmd.OutOrStdout(), "✅ goenv is up-to-date!")
+			fmt.Fprintf(cmd.OutOrStdout(), "%sgoenv is up-to-date!\n", utils.Emoji("✅ "))
 			fmt.Fprintf(cmd.OutOrStdout(), "   Current version: %s\n", currentVersion)
 		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "🆕 Update available!")
+			fmt.Fprintf(cmd.OutOrStdout(), "%sUpdate available!\n", utils.Emoji("🆕 "))
 			fmt.Fprintf(cmd.OutOrStdout(), "   Current:  %s\n", currentVersion)
 			fmt.Fprintf(cmd.OutOrStdout(), "   Latest:   %s\n", latestVersion)
 			fmt.Fprintln(cmd.OutOrStdout())
@@ -249,26 +266,52 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 
 	// Check write permissions
 	if err := checkWritePermission(binaryPath); err != nil {
-		return fmt.Errorf("cannot update binary: %w\nTry running with sudo or updating manually", err)
+		errMsg := fmt.Sprintf("cannot update binary: %v\n\n", err)
+		errMsg += "To fix this:\n"
+		if runtime.GOOS == "windows" {
+			errMsg += "  • Run PowerShell as Administrator, or\n"
+			errMsg += "  • Install goenv to a user-writeable path like %LOCALAPPDATA%\\goenv\n"
+			errMsg += "    (e.g., C:\\Users\\YourName\\AppData\\Local\\goenv)\n"
+		} else {
+			errMsg += "  • Run with elevated permissions: sudo goenv update\n"
+			errMsg += "  • Or install goenv to a user-writeable path (e.g., ~/.local/bin/)\n"
+		}
+		errMsg += "\nAlternatively, download and install manually:\n"
+		errMsg += "  • https://github.com/go-nv/goenv/releases"
+		return fmt.Errorf(errMsg)
 	}
 
 	// Download new binary
-	fmt.Fprintf(cmd.OutOrStdout(), "⬇️  Downloading goenv %s...\n", latestVersion)
+	fmt.Fprintf(cmd.OutOrStdout(), "%sDownloading goenv %s...\n", utils.Emoji("⬇️  "), latestVersion)
 	tmpFile, err := downloadBinary(downloadURL)
 	if err != nil {
 		return fmt.Errorf("failed to download update: %w", err)
 	}
 	defer os.Remove(tmpFile)
 
+	// Verify checksum if available
+	fmt.Fprintf(cmd.OutOrStdout(), "%sVerifying checksum...\n", utils.Emoji("🔐 "))
+	checksumURL := fmt.Sprintf("https://github.com/go-nv/goenv/releases/download/%s/SHA256SUMS", latestVersion)
+	if err := verifyChecksum(tmpFile, checksumURL, filepath.Base(downloadURL)); err != nil {
+		if cfg.Debug {
+			fmt.Fprintf(cmd.OutOrStdout(), "Debug: Checksum verification: %v\n", err)
+		}
+		// Warn but don't block (for older releases without checksums)
+		fmt.Fprintf(cmd.OutOrStdout(), "%sWarning: Could not verify checksum (proceeding anyway)\n", utils.Emoji("⚠️  "))
+		fmt.Fprintln(cmd.OutOrStdout(), "   This may indicate the release doesn't have checksums published")
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sChecksum verified\n", utils.Emoji("✅ "))
+	}
+
 	// Backup current binary
 	backupPath := binaryPath + ".backup"
-	fmt.Fprintln(cmd.OutOrStdout(), "💾 Creating backup...")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sCreating backup...\n", utils.Emoji("💾 "))
 	if err := copyFile(binaryPath, backupPath); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
 	// Replace binary
-	fmt.Fprintln(cmd.OutOrStdout(), "🔄 Replacing binary...")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sReplacing binary...\n", utils.Emoji("🔄 "))
 	if err := os.Chmod(tmpFile, 0755); err != nil {
 		return fmt.Errorf("failed to set permissions: %w", err)
 	}
@@ -283,7 +326,7 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	os.Remove(backupPath)
 
 	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "✅ goenv updated successfully!")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sgoenv updated successfully!\n", utils.Emoji("✅ "))
 	fmt.Fprintf(cmd.OutOrStdout(), "   Updated from %s to %s\n", currentVersion, latestVersion)
 
 	return nil
@@ -355,20 +398,121 @@ func hasUncommittedChanges(gitRoot string) bool {
 
 func getLatestRelease() (version string, downloadURL string, err error) {
 	// GitHub API endpoint for latest release
-	url := "https://api.github.com/repos/go-nv/goenv/releases/latest"
+	apiURL := "https://api.github.com/repos/go-nv/goenv/releases/latest"
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+	// Try to load cached ETag
+	cfg := config.Load()
+	etagFile := filepath.Join(cfg.Root, "cache", "update-etag")
+	cachedETag, _ := os.ReadFile(etagFile)
+
+	// Create request with ETag support
+	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if len(cachedETag) > 0 {
+		req.Header.Set("If-None-Match", strings.TrimSpace(string(cachedETag)))
+	}
+
+	// Check for GitHub token for higher rate limits
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "Using GitHub token for higher rate limits\n")
+		}
+	}
+
+	// Make request with retries for rate limiting
+	client := &http.Client{Timeout: 10 * time.Second}
+	var resp *http.Response
+
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		resp, err = client.Do(req)
+		if err != nil {
+			return "", "", fmt.Errorf("request failed: %w", err)
+		}
+
+		// Handle rate limiting
+		if resp.StatusCode == 403 || resp.StatusCode == 429 {
+			resp.Body.Close()
+
+			// Check rate limit headers
+			remaining := resp.Header.Get("X-RateLimit-Remaining")
+			resetTime := resp.Header.Get("X-RateLimit-Reset")
+
+			if remaining == "0" && resetTime != "" {
+				if reset, err := strconv.ParseInt(resetTime, 10, 64); err == nil {
+					resetAt := time.Unix(reset, 0)
+					waitDuration := time.Until(resetAt)
+					if waitDuration > 0 && waitDuration < 5*time.Minute {
+						return "", "", fmt.Errorf("GitHub API rate limit exceeded. Resets at %s (in %v)",
+							resetAt.Format(time.RFC3339), waitDuration.Round(time.Second))
+					}
+				}
+				return "", "", fmt.Errorf("GitHub API rate limit exceeded. Try again later")
+			}
+
+			// Handle 429 with Retry-After
+			if resp.StatusCode == 429 {
+				retryAfter := resp.Header.Get("Retry-After")
+				if retryAfter != "" {
+					if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds < 60 {
+						if attempt < maxRetries-1 {
+							time.Sleep(time.Duration(seconds) * time.Second)
+							continue
+						}
+					}
+				}
+			}
+
+			// Exponential backoff
+			if attempt < maxRetries-1 {
+				backoff := time.Duration(1<<uint(attempt)) * time.Second
+				time.Sleep(backoff)
+				continue
+			}
+
+			return "", "", fmt.Errorf("GitHub API rate limit exceeded after %d attempts", maxRetries)
+		}
+
+		break
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	// Handle 304 Not Modified
+	if resp.StatusCode == http.StatusNotModified {
+		return "", "", fmt.Errorf("no updates available (cached)")
 	}
 
-	// Parse JSON response (simplified - in production use encoding/json)
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return "", "", fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Save ETag for next request
+	if etag := resp.Header.Get("ETag"); etag != "" {
+		// Ensure cache directory exists with secure permissions
+		if err := os.MkdirAll(filepath.Dir(etagFile), 0700); err != nil {
+			// Non-fatal: log but continue
+			if cfg.Debug {
+				fmt.Fprintf(os.Stderr, "Warning: failed to create cache directory: %v\n", err)
+			}
+		} else {
+			// Write ETag file with secure permissions
+			if err := os.WriteFile(etagFile, []byte(etag), 0600); err != nil {
+				// Non-fatal: log but continue
+				if cfg.Debug {
+					fmt.Fprintf(os.Stderr, "Warning: failed to save ETag cache: %v\n", err)
+				}
+			}
+		}
+	}
+
+	// Parse JSON response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", "", err
@@ -472,4 +616,68 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.Chmod(dst, srcInfo.Mode())
+}
+
+// verifyChecksum downloads SHA256SUMS and verifies the binary matches
+func verifyChecksum(binaryPath, checksumURL, filename string) error {
+	// Download checksum file
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(checksumURL)
+	if err != nil {
+		return fmt.Errorf("failed to download checksums: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("checksums file not found (release may not have published checksums)")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("checksum download failed with status %d", resp.StatusCode)
+	}
+
+	checksums, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read checksums: %w", err)
+	}
+
+	// Parse SHA256SUMS file format: "<hash>  <filename>"
+	lines := strings.Split(string(checksums), "\n")
+	var expectedHash string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 && parts[1] == filename {
+			expectedHash = parts[0]
+			break
+		}
+	}
+
+	if expectedHash == "" {
+		return fmt.Errorf("checksum not found for %s", filename)
+	}
+
+	// Calculate actual hash of downloaded binary
+	file, err := os.Open(binaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to open binary: %w", err)
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return fmt.Errorf("failed to calculate hash: %w", err)
+	}
+
+	actualHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// Compare hashes
+	if actualHash != expectedHash {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s (possible tampering!)", expectedHash, actualHash)
+	}
+
+	return nil
 }

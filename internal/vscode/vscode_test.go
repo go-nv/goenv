@@ -323,7 +323,7 @@ func TestUpdateJSONKeys(t *testing.T) {
 	}
 
 	// Update keys
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"go.goroot":      "/new/path",
 		"go.toolsGopath": "~/go/tools",
 	}
@@ -364,7 +364,7 @@ func TestUpdateJSONKeys_PreservesIndentation(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"go.goroot": "/new/path",
 	}
 
@@ -600,6 +600,234 @@ func TestWriteJSONFile_PreservesIndentation(t *testing.T) {
 
 			if len(result.Recommendations) != 2 {
 				t.Errorf("Expected 2 recommendations, got %d", len(result.Recommendations))
+			}
+		})
+	}
+}
+
+func TestValidateSettingsKeys(t *testing.T) {
+	tests := []struct {
+		name         string
+		keys         map[string]any
+		wantErr      bool
+		wantWarnings int
+		errContains  string
+	}{
+		{
+			name: "valid go keys",
+			keys: map[string]any{
+				"go.goroot":      "/path/to/go",
+				"go.gopath":      "/path/to/gopath",
+				"go.toolsGopath": "/path/to/tools",
+			},
+			wantErr:      false,
+			wantWarnings: 0,
+		},
+		{
+			name: "valid gopls keys",
+			keys: map[string]any{
+				"gopls": map[string]any{
+					"formatting.gofumpt": true,
+				},
+				"gopls.ui.completion.usePlaceholders": true,
+			},
+			wantErr:      false,
+			wantWarnings: 0,
+		},
+		{
+			name: "invalid non-go key",
+			keys: map[string]any{
+				"editor.fontSize": 14,
+				"go.goroot":       "/path/to/go",
+			},
+			wantErr:     true,
+			errContains: "refusing to modify non-Go setting: editor.fontSize",
+		},
+		{
+			name: "deprecated key",
+			keys: map[string]any{
+				"go.useLanguageServer": true,
+			},
+			wantErr:      false,
+			wantWarnings: 1,
+		},
+		{
+			name: "multiple deprecated keys",
+			keys: map[string]any{
+				"go.useLanguageServer":                  true,
+				"go.languageServerExperimentalFeatures": map[string]bool{},
+			},
+			wantErr:      false,
+			wantWarnings: 2,
+		},
+		{
+			name: "mixed valid and deprecated",
+			keys: map[string]any{
+				"go.goroot":            "/path/to/go",
+				"go.useLanguageServer": true,
+			},
+			wantErr:      false,
+			wantWarnings: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings, err := ValidateSettingsKeys(tt.keys)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error but got none")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("Expected error containing %q, got %q", tt.errContains, err.Error())
+				}
+			} else if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if len(warnings) != tt.wantWarnings {
+				t.Errorf("Expected %d warnings, got %d: %v", tt.wantWarnings, len(warnings), warnings)
+			}
+		})
+	}
+}
+
+func TestIsGoRelatedKey(t *testing.T) {
+	tests := []struct {
+		key  string
+		want bool
+	}{
+		{"go.goroot", true},
+		{"go.gopath", true},
+		{"go.toolsGopath", true},
+		{"gopls", true},
+		{"gopls.formatting.gofumpt", true},
+		{"gopls.ui.completion.usePlaceholders", true},
+		{"editor.fontSize", false},
+		{"python.pythonPath", false},
+		{"terminal.integrated.shell.linux", false},
+		{"files.autoSave", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			got := IsGoRelatedKey(tt.key)
+			if got != tt.want {
+				t.Errorf("IsGoRelatedKey(%q) = %v, want %v", tt.key, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFilterGoKeys(t *testing.T) {
+	input := map[string]any{
+		"go.goroot":                       "/path/to/go",
+		"gopls.formatting.gofumpt":        true,
+		"editor.fontSize":                 14,
+		"python.pythonPath":               "/usr/bin/python3",
+		"go.toolsGopath":                  "/path/to/tools",
+		"terminal.integrated.shell.linux": "/bin/bash",
+	}
+
+	result := FilterGoKeys(input)
+
+	// Should only have Go-related keys
+	if len(result) != 3 {
+		t.Errorf("Expected 3 keys, got %d: %v", len(result), result)
+	}
+
+	expectedKeys := []string{"go.goroot", "gopls.formatting.gofumpt", "go.toolsGopath"}
+	for _, key := range expectedKeys {
+		if _, exists := result[key]; !exists {
+			t.Errorf("Expected key %q to be in result", key)
+		}
+	}
+
+	// Should NOT have non-Go keys
+	unexpectedKeys := []string{"editor.fontSize", "python.pythonPath", "terminal.integrated.shell.linux"}
+	for _, key := range unexpectedKeys {
+		if _, exists := result[key]; exists {
+			t.Errorf("Did not expect key %q to be in result", key)
+		}
+	}
+}
+
+func TestConvertToWorkspacePaths(t *testing.T) {
+	workspaceRoot := "/Users/adam/projects/myapp"
+
+	tests := []struct {
+		name     string
+		settings map[string]any
+		expected map[string]any
+	}{
+		{
+			name: "convert absolute paths",
+			settings: map[string]any{
+				"go.goroot": "/Users/adam/projects/myapp/sdk/go",
+				"go.gopath": "/Users/adam/projects/myapp/gopath",
+			},
+			expected: map[string]any{
+				"go.goroot": "${workspaceFolder}/sdk/go",
+				"go.gopath": "${workspaceFolder}/gopath",
+			},
+		},
+		{
+			name: "leave external paths unchanged",
+			settings: map[string]any{
+				"go.goroot":      "/usr/local/go",
+				"go.toolsGopath": "/Users/adam/go/tools",
+			},
+			expected: map[string]any{
+				"go.goroot":      "/usr/local/go",
+				"go.toolsGopath": "/Users/adam/go/tools",
+			},
+		},
+		{
+			name: "handle nested maps",
+			settings: map[string]any{
+				"gopls": map[string]any{
+					"build.env": map[string]any{
+						"GOROOT": "/Users/adam/projects/myapp/sdk/go",
+					},
+				},
+			},
+			expected: map[string]any{
+				"gopls": map[string]any{
+					"build.env": map[string]any{
+						"GOROOT": "${workspaceFolder}/sdk/go",
+					},
+				},
+			},
+		},
+		{
+			name: "preserve non-string values",
+			settings: map[string]any{
+				"go.goroot":                     "/Users/adam/projects/myapp/go",
+				"go.toolsManagement.autoUpdate": true,
+				"gopls": map[string]any{
+					"formatting.gofumpt": true,
+				},
+			},
+			expected: map[string]any{
+				"go.goroot":                     "${workspaceFolder}/go",
+				"go.toolsManagement.autoUpdate": true,
+				"gopls": map[string]any{
+					"formatting.gofumpt": true,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ConvertToWorkspacePaths(tt.settings, workspaceRoot)
+
+			// Compare results
+			resultJSON, _ := json.MarshalIndent(result, "", "  ")
+			expectedJSON, _ := json.MarshalIndent(tt.expected, "", "  ")
+
+			if string(resultJSON) != string(expectedJSON) {
+				t.Errorf("Result mismatch:\nGot:\n%s\n\nExpected:\n%s", resultJSON, expectedJSON)
 			}
 		})
 	}

@@ -6,6 +6,7 @@ This guide shows how to use goenv seamlessly with Visual Studio Code and the off
 
 - [Quick Start](#quick-start)
 - [How It Works](#how-it-works)
+- [VS Code Commands](#vscode-commands)
 - [Setup Methods](#setup-methods)
 - [Project Configuration](#project-configuration)
 - [Troubleshooting](#troubleshooting)
@@ -203,7 +204,106 @@ goenv doctor
 - Whether it's using goenv environment variables
 - Provides actionable advice if misconfigured
 
+## VS Code Commands
+
+goenv includes dedicated commands for managing VS Code integration:
+
+### `goenv vscode init`
+
+Initialize VS Code workspace configuration.
+
+```bash
+goenv vscode init                    # Basic template
+goenv vscode init --template advanced  # Advanced settings
+goenv vscode init --template monorepo  # Monorepo settings
+goenv vscode init --force            # Overwrite existing
+goenv vscode init --dry-run          # Preview changes
+```
+
+### `goenv vscode sync`
+
+Re-sync settings after changing Go version.
+
+```bash
+goenv local 1.24.0
+goenv vscode sync              # Update paths to new version
+goenv vscode sync --dry-run    # Preview changes
+```
+
+### `goenv vscode status`
+
+Check integration status.
+
+```bash
+goenv vscode status            # Human-readable
+goenv vscode status --json     # Machine-readable for CI
+```
+
+### `goenv vscode doctor`
+
+Run comprehensive health checks.
+
+```bash
+goenv vscode doctor            # Check everything
+goenv vscode doctor --json     # JSON output for automation
+```
+
+**What it checks:**
+
+- VS Code settings file exists
+- Go version is configured
+- Go installation is present
+- gopls is available
+- Tools directory is writable
+- Workspace structure (go.mod/go.work)
+- Settings match current version
+- Go extension is recommended
+
+### `goenv vscode revert`
+
+Restore settings from backup.
+
+```bash
+goenv vscode revert    # Rollback to previous settings
+```
+
+> **Note:** For complete command reference, see [VSCODE_QUICK_REFERENCE.md](../reference/VSCODE_QUICK_REFERENCE.md)
+
 ## Setup Methods
+
+### 📊 Quick Decision Guide: Which Setup Method Should I Use?
+
+Choose your setup method based on how you launch VS Code:
+
+| **Launch Method**                                | **Recommended Setup**          | **Configuration Mode** | **When to Refresh**                            |
+| ------------------------------------------------ | ------------------------------ | ---------------------- | ---------------------------------------------- |
+| 🖥️ **Terminal** (`code .`)                       | Method 1 (Terminal Launch)     | Environment variables  | Quit VS Code, restart from terminal            |
+| 🖱️ **GUI** (Dock/Finder/Start Menu)              | Method 2 with absolute paths   | Hardcoded paths        | Update settings.json when changing Go version  |
+| 👥 **Team project** (version controlled)         | Method 2 with env vars         | Environment variables  | Team members restart VS Code from terminal     |
+| 🔀 **Mixed** (sometimes terminal, sometimes GUI) | Method 2 with absolute paths   | Hardcoded paths        | Run `goenv vscode sync` when changing versions |
+| 🚀 **Quick project setup**                       | `goenv use <version> --vscode` | Environment variables  | Quit VS Code, restart from terminal            |
+
+### 🔄 Reload vs. Restart Decision Matrix
+
+**Common confusion:** "Developer: Reload Window" is NOT the same as restarting VS Code!
+
+| **Action**                              | **Reloads UI** | **Refreshes Env Vars** | **When to Use**                                |
+| --------------------------------------- | -------------- | ---------------------- | ---------------------------------------------- |
+| ⌘+Shift+P → "Developer: Reload Window"  | ✅             | ❌                     | Testing extension updates, UI fixes            |
+| Quit VS Code + Relaunch from terminal   | ✅             | ✅                     | **After changing Go versions** (env var mode)  |
+| Quit VS Code + Relaunch from GUI        | ✅             | ❌                     | Only works with absolute path mode             |
+| `goenv vscode sync` then Reload Window  | ✅             | ❌                     | **After changing Go versions** (absolute mode) |
+| Open new integrated terminal in VS Code | ❌             | ✅ (new terminal only) | Quick check, but extension still uses old env  |
+
+### 💡 Troubleshooting Quick Reference
+
+| **Symptom**                                                  | **Likely Cause**                        | **Solution**                                                 |
+| ------------------------------------------------------------ | --------------------------------------- | ------------------------------------------------------------ |
+| 🔴 Wrong Go version after `goenv use`                        | Used "Reload Window" instead of restart | Quit VS Code completely, relaunch from terminal              |
+| 🔴 `go version` in terminal is correct, but VS Code is wrong | VS Code launched from GUI, not terminal | Either: (1) Restart from terminal, or (2) Use absolute paths |
+| 🔴 `$GOROOT` is empty in integrated terminal                 | `goenv init` not in shell config        | Add `eval "$(goenv init -)"` to ~/.bashrc/~/.zshrc           |
+| 🟡 Settings don't update when changing versions              | Using absolute paths, not env vars      | Run `goenv vscode sync` after changing versions              |
+| 🟡 Team members see different Go versions                    | Using absolute paths in version control | Switch to env vars mode: `"go.goroot": "${env:GOROOT}"`      |
 
 ### Method 1: Terminal Launch (Simplest)
 
@@ -415,7 +515,56 @@ cat .go-version
 
 **Alternative:** If you don't want to restart VS Code, open a new integrated terminal in VS Code. New terminals get fresh environment variables, though the Go extension might still use the old environment until VS Code restarts.
 
-**⚠️ Common mistake:** "Developer: Reload Window" only reloads the UI - it does NOT refresh environment variables. You must completely quit and relaunch VS Code.
+**⚠️ Critical:** "Developer: Reload Window" only reloads the UI - it does NOT refresh environment variables. You must completely quit and relaunch VS Code from your terminal.
+
+**💡 Prefer GUI launches?** If you regularly open VS Code via Finder/Dock/Spotlight/Start Menu instead of the terminal, use **absolute path mode** (the default) to avoid environment variable dependency:
+
+```bash
+# Initialize VS Code with absolute paths (DEFAULT - no environment dependency)
+goenv vscode init
+
+# Or use advanced template with absolute paths
+goenv vscode init --template advanced
+
+# Example of what this creates in .vscode/settings.json:
+{
+  "go.goroot": "/Users/you/.goenv/versions/1.22.0/go",
+  "go.gopath": "/Users/you/go/1.22.0"
+}
+```
+
+**For terminal-only workflows,** you can use environment variables instead:
+
+```bash
+# Use environment variables (requires terminal launch)
+goenv vscode init --env-vars
+
+# This creates:
+{
+  "go.goroot": "${env:GOROOT}",
+  "go.gopath": "${env:GOPATH}"
+}
+```
+
+**Absolute path mode trade-offs:**
+
+- ✅ Works from GUI launches (Dock, Finder, Start Menu)
+- ✅ No dependency on terminal environment
+- ✅ Consistent regardless of how VS Code is opened
+- ❌ Must run `goenv vscode sync` when changing Go versions
+- ❌ Paths are user-specific (not great for team sharing)
+
+**When to use absolute paths:**
+
+- You primarily launch VS Code from GUI (not terminal)
+- You rarely change Go versions
+- You're on a single-user machine
+
+**When to use environment variables:**
+
+- You launch VS Code from terminal (`code .`)
+- You frequently switch Go versions
+- You're sharing settings with a team (via git)
 
 See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed troubleshooting.
 
@@ -679,7 +828,7 @@ Create a checklist for new team members:
 ```markdown
 ## Go Development Setup
 
-- [ ] Install goenv: `brew install goenv` (or see [install docs](./docs/user-guide/INSTALL.md))
+- [ ] Install goenv: `brew install goenv` (or see [install docs](./INSTALL.md))
 - [ ] Add goenv to shell: `eval "$(goenv init -)"`
 - [ ] Install project Go version: `goenv install`
 - [ ] Install VS Code: https://code.visualstudio.com/

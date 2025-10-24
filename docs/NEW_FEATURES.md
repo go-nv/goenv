@@ -4,15 +4,17 @@ This document summarizes all the new features and improvements in the Go impleme
 
 ## Quick Overview
 
-| Feature                      | Status in Bash | Status in Go        | Priority | Documentation                                                 |
-| ---------------------------- | -------------- | ------------------- | -------- | ------------------------------------------------------------- |
-| Smart Caching & Offline Mode | Not Available  | ✅ Fully Functional | High     | [Smart Caching Guide](advanced/SMART_CACHING.md)              |
-| Hook Execution               | Non-functional | ✅ Fully Functional | High     | [Hooks Guide](HOOKS.md)                                       |
-| GOPATH Integration           | Not Available  | ✅ Fully Functional | High     | [GOPATH Integration](advanced/GOPATH_INTEGRATION.md)          |
-| Auto-Rehash Control          | Always On      | ✅ Configurable     | High     | [Commands Reference](reference/COMMANDS.md#install)           |
-| Version Shorthand            | Not Available  | ✅ Fully Functional | Medium   | [Commands Reference](reference/COMMANDS.md#version-shorthand) |
-| File Arg Detection           | Not Available  | ✅ Fully Functional | Low      | [Hooks Guide](HOOKS.md#environment-variables)                 |
-| Shell Completion             | Partial        | ✅ Complete         | Medium   | [Commands Reference](reference/COMMANDS.md)                   |
+| Feature                      | Status in Bash         | Status in Go          | Priority | Documentation                                                 |
+| ---------------------------- | ---------------------- | --------------------- | -------- | ------------------------------------------------------------- |
+| SBOM Generation & Inventory  | Not Available          | ✅ Fully Functional   | High     | [Commands Reference](reference/COMMANDS.md#goenv-sbom)        |
+| Smart Caching & Offline Mode | Not Available          | ✅ Fully Functional   | High     | [Smart Caching Guide](advanced/SMART_CACHING.md)              |
+| Configuration Hooks          | Shell scripts (broken) | ✅ YAML config (safe) | High     | [Hooks Guide](HOOKS.md)                                       |
+| GOPATH Integration           | Not Available          | ✅ Fully Functional   | High     | [GOPATH Integration](advanced/GOPATH_INTEGRATION.md)          |
+| Auto-Rehash Control          | Always On              | ✅ Configurable       | High     | [Commands Reference](reference/COMMANDS.md#install)           |
+| Version Shorthand            | Not Available          | ✅ Fully Functional   | Medium   | [Commands Reference](reference/COMMANDS.md#version-shorthand) |
+| File Arg Detection           | Not Available          | ✅ Fully Functional   | Low      | [Hooks Guide](HOOKS.md#environment-variables)                 |
+| Shell Completion             | Partial                | ✅ Complete           | Medium   | [Commands Reference](reference/COMMANDS.md)                   |
+| VS Code Integration          | Not Available          | ✅ Fully Functional   | Medium   | [VS Code Guide](user-guide/VSCODE_INTEGRATION.md)             |
 
 ## 1. Smart Caching & Offline Mode 🚀
 
@@ -261,20 +263,20 @@ goenv install 1.22.5
 
 ---
 
-## 2. Declarative Hooks System ⚡
+## 2. YAML-Based Configuration Hooks ⚡
 
 ### What It Does
 
-Modern YAML-based hooks system that allows you to execute automated actions at specific points in the goenv lifecycle. Uses declarative configuration instead of shell scripts for better safety and cross-platform compatibility.
+YAML-based configuration system with predefined safe actions at specific goenv lifecycle points. Uses declarative configuration with limited, predefined actions—**not arbitrary shell scripts**—for security and cross-platform compatibility.
 
 ### Why It Matters
 
-- **Safety:** Predefined actions prevent arbitrary code execution
-- **Declarative:** Define what should happen, not how to do it
+- **Security:** Limited to 6 predefined actions - no arbitrary code execution
+- **Declarative:** Define what should happen with configuration, not scripts
 - **Cross-Platform:** Works identically on Windows, macOS, and Linux
 - **Template Support:** Dynamic variable interpolation in all actions
 - **Non-blocking:** Hook failures don't break goenv commands
-- **Audit Trail:** Log version installations and usage
+- **Safe by Design:** Configuration-based system prevents security risks
 
 ### Available Actions
 
@@ -548,7 +550,7 @@ echo "Installed and rehashed all versions"
 **Environment Variable:**
 
 - `GOENV_NO_AUTO_REHASH=1` - Disable auto-rehash globally
-- Applies to: `goenv install`, `goenv exec go install`, `goenv sync-tools`
+- Applies to: `goenv install`, `goenv exec go install`, `goenv tools sync`
 
 ### When to Use
 
@@ -735,38 +737,106 @@ if fileArg != "" {
 
 ### What It Does
 
-All commands now support the `--complete` flag for shell completion, providing context-aware suggestions.
+Comprehensive tab completion support for all shells (bash, zsh, fish, PowerShell) with command-specific completion logic.
 
 ### Why It Matters
 
-- **Better UX:** Tab completion works everywhere
-- **Discoverability:** See available options via completion
-- **Fewer Errors:** Correct spelling of versions and commands
+- **Productivity:** Faster command entry with intelligent suggestions
+- **Discovery:** Find available commands and options easily
+- **Accuracy:** Reduce typos and command errors
 
-### Commands with Completion
+### How It Works
 
-- `goenv local --complete` - Lists installed versions
-- `goenv global --complete` - Lists installed versions
-- `goenv install --complete` - Lists available versions
-- `goenv uninstall --complete` - Lists installed versions
-- `goenv hooks --complete` - Lists hook types
-- All other commands with flags/options
+The Go implementation provides native completion generators for each shell format with command-specific logic for version names, file paths, and flags.
 
-### Quick Test
+### Quick Start
+
+See shell-specific setup in [INSTALL.md](INSTALL.md#shell-configuration).
+
+---
+
+## 9. VS Code Integration 🎯
+
+### What It Does
+
+Native Visual Studio Code integration with 5 commands to manage Go settings in `.vscode/settings.json` files. Features security validation, workspace-relative paths, and comprehensive health checks.
+
+### Why It Matters
+
+- **Team Collaboration:** Share consistent Go settings across team members
+- **Portability:** Workspace-relative paths work across different machines
+- **Security:** Schema validation prevents accidental modification of non-Go settings
+- **Reliability:** Doctor command provides 8 health checks for troubleshooting
+- **Productivity:** Automatic sync when switching Go versions
+
+### Commands
+
+1. **`goenv vscode init`** - Initialize VS Code settings with current Go environment
+2. **`goenv vscode sync`** - Sync settings with current Go version
+3. **`goenv vscode status`** - Show current VS Code configuration
+4. **`goenv vscode doctor`** - Run 8 comprehensive health checks
+5. **`goenv vscode revert`** - Restore settings from backup
+
+### Security Features
+
+- **Key Allowlist:** Only `go.*` and `gopls.*` keys can be modified
+- **Schema Validation:** Validates all keys before writing
+- **Deprecated Warnings:** Alerts about obsolete settings
+- **Backup/Restore:** Automatic backups before any changes
+
+### Quick Start
 
 ```bash
-# Test completion (manually)
-goenv local --complete
-goenv install --complete
+# Initialize with workspace-relative paths
+goenv vscode init --goroot --gopath --workspace-paths
 
-# In your shell with tab completion enabled
-goenv local <TAB>
-goenv install <TAB>
+# Sync when switching Go versions
+goenv local 1.22.5
+goenv vscode sync
+
+# Check health
+goenv vscode doctor
+
+# View current status
+goenv vscode status
 ```
+
+### Example: Portable Team Settings
+
+```json
+{
+  "go.goroot": "${workspaceFolder}/.goenv/versions/1.22.5",
+  "go.gopath": "${workspaceFolder}/.goenv/gopath/1.22.5",
+  "go.toolsGopath": "${workspaceFolder}/.goenv/gopath/1.22.5/tools"
+}
+```
+
+These paths work for all team members regardless of their home directory or OS (Windows/macOS/Linux).
+
+### Doctor Command Checks
+
+The `goenv vscode doctor` command performs 8 comprehensive health checks:
+
+1. ✅ Workspace has `.vscode` directory
+2. ✅ Settings file exists and is valid JSON
+3. ✅ Go settings match current goenv version
+4. ✅ Environment variables expand correctly
+5. ✅ Paths exist on filesystem
+6. ✅ No duplicate settings in workspace/folder levels
+7. ✅ `gopls` is available
+8. ✅ Current Go version is compatible
+
+### Cross-Platform Compatibility
+
+- **Windows:** Uses `${env:USERPROFILE}` for home directory
+- **Unix/macOS:** Uses `${env:HOME}` for home directory
+- **Path Normalization:** Converts backslashes to forward slashes in VS Code settings
 
 ### Documentation
 
-- [Commands Reference](reference/COMMANDS.md)
+- **[VS Code Integration Guide](user-guide/VSCODE_INTEGRATION.md)** - Complete usage guide
+- **[VS Code Quick Reference](reference/VSCODE_QUICK_REFERENCE.md)** - Command reference
+- [Commands Reference](reference/COMMANDS.md) - All goenv commands
 
 ---
 
@@ -878,7 +948,7 @@ Key points:
 
 ## Summary
 
-The Go implementation adds **8 major features** that enhance goenv's functionality:
+The Go implementation adds **9 major features** that enhance goenv's functionality:
 
 1. 🚀 **Smart Caching & Offline Mode** - 10-50x faster with intelligent caching and complete offline support
 2. ⚡ **Hook System** - Extend goenv with custom scripts at 7 execution points
@@ -888,6 +958,7 @@ The Go implementation adds **8 major features** that enhance goenv's functionali
 6. ⚡ **Version Shorthand** - Faster version switching with intuitive syntax
 7. 📄 **File Arg Detection** - Context-aware hooks with automatic file detection
 8. 🔄 **Complete Completion** - Better shell integration with comprehensive tab completion
+9. 🎯 **VS Code Integration** - Native VS Code settings management with security validation and portability
 
 ### Key Improvements
 

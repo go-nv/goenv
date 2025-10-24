@@ -9,6 +9,7 @@ import (
 	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -74,7 +75,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 	}
 
 	if !useFlags.quiet {
-		fmt.Fprintf(cmd.OutOrStdout(), "🎯 Target version: %s\n", version)
+		fmt.Fprintf(cmd.OutOrStdout(), "%sTarget version: %s\n", utils.Emoji("🎯 "), version)
 	}
 
 	// Check installation status
@@ -89,21 +90,21 @@ func runUse(cmd *cobra.Command, args []string) error {
 	if !status.Installed {
 		needsInstall = true
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "❌ Go %s is not installed\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "%sGo %s is not installed\n", utils.Emoji("❌ "), version)
 		}
 	} else if status.Corrupted {
 		needsReinstall = true
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Go %s is CORRUPTED (missing go binary)\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "%sGo %s is CORRUPTED (missing go binary)\n", utils.Emoji("⚠️  "), version)
 		}
 	} else if useFlags.force {
 		needsReinstall = true
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "🔄 Force reinstall requested\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "%sForce reinstall requested\n", utils.Emoji("🔄 "))
 		}
 	} else {
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "✅ Go %s is installed\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "%sGo %s is installed\n", utils.Emoji("✅ "), version)
 		}
 	}
 
@@ -128,7 +129,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 
 		// Install the version
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "\n📦 Installing Go %s...\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "\n%sInstalling Go %s...\n", utils.Emoji("📦 "), version)
 		}
 
 		installer := install.NewInstaller(cfg)
@@ -140,21 +141,21 @@ func runUse(cmd *cobra.Command, args []string) error {
 		}
 
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "✅ Installation complete\n\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
 		}
 	}
 
 	// Set the version (local or global)
 	if useFlags.global {
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "🌍 Setting global version to %s\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "%sSetting global version to %s\n", utils.Emoji("🌍 "), version)
 		}
 		if err := mgr.SetGlobalVersion(version); err != nil {
 			return fmt.Errorf("failed to set global version: %w", err)
 		}
 	} else {
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "📁 Setting local version to %s\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "%sSetting local version to %s\n", utils.Emoji("📁 "), version)
 		}
 		if err := mgr.SetLocalVersion(version); err != nil {
 			return fmt.Errorf("failed to set local version: %w", err)
@@ -164,16 +165,16 @@ func runUse(cmd *cobra.Command, args []string) error {
 	// Configure VS Code if requested
 	if useFlags.vscode {
 		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "\n🔧 Configuring VS Code...\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "\n%sConfiguring VS Code...\n", utils.Emoji("🔧 "))
 		}
 
 		vscodeInitFlags.envVars = useFlags.vscodeEnv
 		if err := initializeVSCodeWorkspaceWithVersion(cmd, version); err != nil {
-			fmt.Fprintf(cmd.OutOrStderr(), "⚠️  Warning: VS Code configuration failed: %v\n", err)
+			fmt.Fprintf(cmd.OutOrStderr(), "%sWarning: VS Code configuration failed: %v\n", utils.Emoji("⚠️  "), err)
 			fmt.Fprintf(cmd.OutOrStderr(), "   You can manually run: goenv vscode init\n")
 		} else {
 			if !useFlags.quiet {
-				fmt.Fprintf(cmd.OutOrStdout(), "✅ VS Code configured\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "%sVS Code configured\n", utils.Emoji("✅ "))
 			}
 		}
 		vscodeInitFlags.envVars = false
@@ -181,17 +182,17 @@ func runUse(cmd *cobra.Command, args []string) error {
 
 	// Run rehash to update shims
 	if !useFlags.quiet {
-		fmt.Fprintf(cmd.OutOrStdout(), "\n🔄 Updating shims...\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%sUpdating shims...\n", utils.Emoji("🔄 "))
 	}
 	if err := runRehashForUse(cfg); err != nil {
-		fmt.Fprintf(cmd.OutOrStderr(), "⚠️  Warning: Failed to update shims: %v\n", err)
+		fmt.Fprintf(cmd.OutOrStderr(), "%sWarning: Failed to update shims: %v\n", utils.Emoji("⚠️  "), err)
 	}
 
 	// Success message
 	if !useFlags.quiet {
 		fmt.Fprintf(cmd.OutOrStdout(), "\n")
 		fmt.Fprintf(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-		fmt.Fprintf(cmd.OutOrStdout(), "✨ Success! Now using Go %s\n", version)
+		fmt.Fprintf(cmd.OutOrStdout(), "%sSuccess! Now using Go %s\n", utils.Emoji("✨ "), version)
 		fmt.Fprintf(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 		fmt.Fprintf(cmd.OutOrStdout(), "\n")
 		fmt.Fprintf(cmd.OutOrStdout(), "Verify: go version\n")
@@ -205,9 +206,9 @@ func runUse(cmd *cobra.Command, args []string) error {
 
 		if useFlags.vscode {
 			if useFlags.vscodeEnv {
-				fmt.Fprintf(cmd.OutOrStdout(), "\n⚠️  Remember: Reopen VS Code from terminal (code .) to use env vars\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%sRemember: Reopen VS Code from terminal (code .) to use env vars\n", utils.Emoji("⚠️  "))
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "\n💡 Tip: Reload VS Code window (Cmd+Shift+P → Reload Window)\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%sTip: Reload VS Code window (Cmd+Shift+P → Reload Window)\n", utils.Emoji("💡 "))
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -22,12 +23,14 @@ var versionsFlags struct {
 	bare        bool
 	skipAliases bool
 	complete    bool
+	json        bool
 }
 
 func init() {
 	rootCmd.AddCommand(versionsCmd)
 	versionsCmd.Flags().BoolVarP(&versionsFlags.bare, "bare", "b", false, "Display bare version numbers only")
 	versionsCmd.Flags().BoolVar(&versionsFlags.skipAliases, "skip-aliases", false, "Skip aliases")
+	versionsCmd.Flags().BoolVar(&versionsFlags.json, "json", false, "Output in JSON format")
 	versionsCmd.Flags().BoolVar(&versionsFlags.complete, "complete", false, "Internal flag for shell completions")
 	_ = versionsCmd.Flags().MarkHidden("complete")
 	helptext.SetCommandHelp(versionsCmd)
@@ -73,8 +76,22 @@ func runVersions(cmd *cobra.Command, args []string) error {
 	// Handle case when no versions installed
 	if len(versions) == 0 {
 		if !hasSystemGo {
-			if versionsFlags.bare {
+			if versionsFlags.bare || versionsFlags.json {
 				// BATS test: bare mode prints empty output when no versions and no system go
+				// JSON mode: return empty array
+				if versionsFlags.json {
+					type versionsOutput struct {
+						SchemaVersion string        `json:"schema_version"`
+						Versions      []interface{} `json:"versions"`
+					}
+					output := versionsOutput{
+						SchemaVersion: "1",
+						Versions:      []interface{}{},
+					}
+					encoder := json.NewEncoder(cmd.OutOrStdout())
+					encoder.SetIndent("", "  ")
+					return encoder.Encode(output)
+				}
 				return nil
 			}
 			return fmt.Errorf("Warning: no Go detected on the system")
@@ -105,6 +122,56 @@ func runVersions(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		// If no version is set, default to empty (no highlighting)
 		currentVersion = ""
+	}
+
+	// Handle JSON output
+	if versionsFlags.json {
+		type versionInfo struct {
+			Version  string `json:"version"`
+			Active   bool   `json:"active"`
+			Source   string `json:"source,omitempty"`
+			IsSystem bool   `json:"is_system,omitempty"`
+		}
+
+		type versionsOutput struct {
+			SchemaVersion string        `json:"schema_version"`
+			Versions      []versionInfo `json:"versions"`
+		}
+
+		var items []versionInfo
+
+		// Add system version if available
+		if hasSystemGo || currentVersion == "system" {
+			displaySource := simplifySource(source, cfg)
+			items = append(items, versionInfo{
+				Version:  "system",
+				Active:   currentVersion == "system",
+				Source:   displaySource,
+				IsSystem: true,
+			})
+		}
+
+		// Add installed versions
+		for _, v := range versions {
+			displaySource := ""
+			if v == currentVersion {
+				displaySource = simplifySource(source, cfg)
+			}
+			items = append(items, versionInfo{
+				Version: v,
+				Active:  v == currentVersion,
+				Source:  displaySource,
+			})
+		}
+
+		output := versionsOutput{
+			SchemaVersion: "1",
+			Versions:      items,
+		}
+
+		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(output)
 	}
 
 	// Show system version first (if available and not bare mode)

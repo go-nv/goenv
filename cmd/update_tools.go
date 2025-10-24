@@ -9,24 +9,24 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/tooldetect"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var updateToolsCmd = &cobra.Command{
-	Use:     "update-tools",
-	Short:   "Update installed Go tools to their latest versions",
-	GroupID: "tools",
+	Use:   "update-tools",
+	Short: "Update installed Go tools to their latest versions",
 	Long: `Updates all installed Go tools to their latest versions.
 
 This command checks all tools installed in the current Go version's GOPATH
 and updates them to the latest available versions from the Go module proxy.
 
 Examples:
-  goenv update-tools                    # Update all tools to latest
-  goenv update-tools --check            # Check for updates without installing
-  goenv update-tools --tool gopls       # Update only gopls
-  goenv update-tools --version v0.12.0  # Update to specific version
-  goenv update-tools --dry-run          # Show what would be updated`,
+  goenv tools update                    # Update all tools to latest
+  goenv tools update --check            # Check for updates without installing
+  goenv tools update --tool gopls       # Update only gopls
+  goenv tools update --version v0.12.0  # Update to specific version
+  goenv tools update --dry-run          # Show what would be updated`,
 	RunE: runUpdateTools,
 }
 
@@ -38,11 +38,11 @@ var updateToolsFlags struct {
 }
 
 func init() {
+	// Now registered as subcommand in tools.go
 	updateToolsCmd.Flags().BoolVarP(&updateToolsFlags.check, "check", "c", false, "Check for updates without installing")
 	updateToolsCmd.Flags().StringVarP(&updateToolsFlags.tool, "tool", "t", "", "Update only the specified tool")
 	updateToolsCmd.Flags().BoolVarP(&updateToolsFlags.dryRun, "dry-run", "n", false, "Show what would be updated without actually updating")
 	updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "Target version (default: latest)")
-	rootCmd.AddCommand(updateToolsCmd)
 }
 
 func runUpdateTools(cmd *cobra.Command, args []string) error {
@@ -64,7 +64,7 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Go version %s is not installed", goVersion)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "🔄 Checking for tool updates in Go %s...\n", goVersion)
+	fmt.Fprintf(cmd.OutOrStdout(), "%sChecking for tool updates in Go %s...\n", utils.Emoji("🔄 "), goVersion)
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// List installed tools
@@ -124,9 +124,9 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 		needsUpdate := tooldetect.CompareVersions(tool.Version, latestVersion) < 0
 
 		if needsUpdate {
-			fmt.Fprintf(cmd.OutOrStdout(), "  • %s (%s) → %s available ⬆️\n", tool.Name, tool.Version, latestVersion)
+			fmt.Fprintf(cmd.OutOrStdout(), "  • %s (%s) → %s available %s\n", tool.Name, tool.Version, latestVersion, utils.Emoji("⬆️"))
 		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "  • %s (%s) - up to date ✅\n", tool.Name, tool.Version)
+			fmt.Fprintf(cmd.OutOrStdout(), "  • %s (%s) - up to date %s\n", tool.Name, tool.Version, utils.Emoji("✅"))
 		}
 
 		if needsUpdate {
@@ -140,21 +140,21 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 
 	if len(updates) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintln(cmd.OutOrStdout(), "✅ All tools are up to date!")
+		fmt.Fprintf(cmd.OutOrStdout(), "%sAll tools are up to date!\n", utils.Emoji("✅ "))
 		return nil
 	}
 
 	// If check-only mode, stop here
 	if updateToolsFlags.check {
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintf(cmd.OutOrStdout(), "💡 Run 'goenv update-tools' to update %d tool(s)\n", len(updates))
+		fmt.Fprintf(cmd.OutOrStdout(), "%sRun 'goenv tools update' to update %d tool(s)\n", utils.Emoji("💡 "), len(updates))
 		return nil
 	}
 
 	// If dry-run mode, show what would be updated
 	if updateToolsFlags.dryRun {
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintln(cmd.OutOrStdout(), "🔍 Dry run - would update:")
+		fmt.Fprintf(cmd.OutOrStdout(), "%sDry run - would update:\n", utils.Emoji("🔍 "))
 		for _, update := range updates {
 			// Determine target version
 			targetVersion := updateToolsFlags.version
@@ -170,7 +170,7 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 
 	// Perform updates
 	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "📦 Updating tools...")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sUpdating tools...\n", utils.Emoji("📦 "))
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	versionPath := filepath.Join(cfg.Root, "versions", goVersion)
@@ -200,20 +200,20 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 		)
 
 		if err := installCmd.Run(); err != nil {
-			fmt.Fprintln(cmd.OutOrStdout(), " ❌")
+			fmt.Fprintf(cmd.OutOrStdout(), " %s\n", utils.Emoji("❌"))
 			failCount++
 		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), " ✅")
+			fmt.Fprintf(cmd.OutOrStdout(), " %s\n", utils.Emoji("✅"))
 			successCount++
 		}
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())
 	if successCount > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "✅ Updated %d tool(s) successfully\n", successCount)
+		fmt.Fprintf(cmd.OutOrStdout(), "%sUpdated %d tool(s) successfully\n", utils.Emoji("✅ "), successCount)
 	}
 	if failCount > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "❌ Failed to update %d tool(s)\n", failCount)
+		fmt.Fprintf(cmd.OutOrStdout(), "%sFailed to update %d tool(s)\n", utils.Emoji("❌ "), failCount)
 		return fmt.Errorf("%d tool(s) failed to update", failCount)
 	}
 

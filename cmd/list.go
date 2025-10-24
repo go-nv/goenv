@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -29,6 +30,7 @@ var listFlags struct {
 	skipAliases bool
 	remote      bool
 	stable      bool
+	json        bool
 }
 
 func init() {
@@ -37,6 +39,7 @@ func init() {
 	// Flags for installed versions (when --remote is not used)
 	listCmd.Flags().BoolVarP(&listFlags.bare, "bare", "b", false, "Display bare version numbers only")
 	listCmd.Flags().BoolVar(&listFlags.skipAliases, "skip-aliases", false, "Skip aliases")
+	listCmd.Flags().BoolVar(&listFlags.json, "json", false, "Output in JSON format")
 
 	// Flags for remote versions (when --remote is used)
 	listCmd.Flags().BoolVarP(&listFlags.remote, "remote", "r", false, "List available versions from golang.org")
@@ -64,6 +67,7 @@ func runListInstalled(cmd *cobra.Command) error {
 	// Copy flags to versionsFlags so we can reuse runVersions
 	versionsFlags.bare = listFlags.bare
 	versionsFlags.skipAliases = listFlags.skipAliases
+	versionsFlags.json = listFlags.json
 
 	// Reuse the versions command implementation
 	return runVersions(cmd, []string{})
@@ -96,6 +100,37 @@ func runListRemote(cmd *cobra.Command) error {
 			}
 		}
 		versions = stableVersions
+	}
+
+	// Handle JSON output
+	if listFlags.json {
+		type remoteVersionsOutput struct {
+			SchemaVersion string   `json:"schema_version"`
+			Remote        bool     `json:"remote"`
+			StableOnly    bool     `json:"stable_only"`
+			Versions      []string `json:"versions"`
+		}
+
+		// Strip "go" prefix from all versions for JSON output
+		strippedVersions := make([]string, len(versions))
+		for i, v := range versions {
+			if len(v) > 2 && v[:2] == "go" {
+				strippedVersions[i] = v[2:]
+			} else {
+				strippedVersions[i] = v
+			}
+		}
+
+		output := remoteVersionsOutput{
+			SchemaVersion: "1",
+			Remote:        true,
+			StableOnly:    listFlags.stable,
+			Versions:      strippedVersions,
+		}
+
+		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(output)
 	}
 
 	// Match bash goenv install --list format:
