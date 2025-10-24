@@ -223,6 +223,9 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 			execCmd.Process.Kill()
 		}
 
+		// Drain the done channel to avoid race where exit error arrives after kill
+		go func() { <-done }()
+
 		errMsg := fmt.Sprintf("command timed out after %s", timeout)
 		if logOutput {
 			logError(errMsg)

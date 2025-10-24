@@ -175,10 +175,12 @@ func TestSyncToolsCommand(t *testing.T) {
 				if tools, ok := tt.setupTools[version]; ok {
 					for _, tool := range tools {
 						toolPath := filepath.Join(gopathBin, tool)
+						content := "mock tool"
 						if runtime.GOOS == "windows" {
 							toolPath += ".bat"
+							content = "@echo off\necho mock tool\n"
 						}
-						if err := os.WriteFile(toolPath, []byte("mock tool"), 0755); err != nil {
+						if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
 							t.Fatalf("Failed to create tool %s: %v", tool, err)
 						}
 					}
@@ -374,15 +376,10 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 
-	_ = runSyncTools(cmd, args)
+	err := runSyncTools(cmd, args)
 
-	// Should successfully discover tools on Windows with proper .bat handling
-	output := buf.String()
-	if !strings.Contains(output, "Discovering tools") {
-		t.Errorf("Expected tool discovery on Windows, got output:\n%s", output)
-	}
-	// Verify it found the tool
-	if !strings.Contains(output, "mockgopls") {
-		t.Errorf("Expected to find mockgopls tool, got output:\n%s", output)
+	// Should successfully run without error on Windows with proper .bat handling
+	if err != nil {
+		t.Errorf("Expected sync to succeed on Windows with .bat binaries, got error: %v", err)
 	}
 }

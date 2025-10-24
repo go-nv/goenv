@@ -159,12 +159,13 @@ func TestUpdateToolsCommand(t *testing.T) {
 				// Create tools
 				for _, tool := range tt.setupTools {
 					toolPath := filepath.Join(gopathBin, tool.name)
+					mockContent := "mock tool binary"
 					if runtime.GOOS == "windows" {
 						toolPath += ".bat"
+						mockContent = "@echo off\necho mock tool binary\n"
 					}
 
 					// Create mock binary with module info
-					mockContent := "mock tool binary"
 					if err := os.WriteFile(toolPath, []byte(mockContent), 0755); err != nil {
 						t.Fatalf("Failed to create tool %s: %v", tool.name, err)
 					}

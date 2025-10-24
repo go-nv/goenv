@@ -51,6 +51,10 @@ func main() {
 	testHardcodedShebangInTests()
 	testShimCreationPatterns()
 	testExtensionStrippingForDisplay()
+	testExeFilesWithScriptContent()
+	testBatFilesProperSyntax()
+	testBatchEchoQuotes()
+	testContainsPathComparisons()
 
 	// Summary
 	fmt.Println()
@@ -1517,6 +1521,336 @@ func testExtensionStrippingForDisplay() {
 			}
 		}
 		// Don't count as warnings, just informational
+	}
+	fmt.Println()
+}
+
+func testExeFilesWithScriptContent() {
+	fmt.Println("Test 22: .exe Files Should Not Have Script Content")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Look for += ".exe" assignments
+			if strings.Contains(line, `+= ".exe"`) {
+				// Check if nearby WriteFile has script content (shebang or @echo off)
+				lookRange := 15
+				startIdx := i - 5
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				hasScriptContent := false
+				for j := startIdx; j <= endIdx; j++ {
+					if strings.Contains(allLines[j], "WriteFile") {
+						// Look at content being written
+						for k := j - 5; k <= j+5 && k < len(allLines); k++ {
+							if k < 0 {
+								continue
+							}
+							if strings.Contains(allLines[k], "#!/") || 
+							   strings.Contains(allLines[k], "@echo off") ||
+							   strings.Contains(allLines[k], "exit 0") ||
+							   strings.Contains(allLines[k], "exit 1") {
+								hasScriptContent = true
+								break
+							}
+						}
+					}
+					if hasScriptContent {
+						break
+					}
+				}
+
+				if hasScriptContent {
+					issues = append(issues, fmt.Sprintf("%s:%d: .exe file created with script content (use .bat for text scripts)", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: No .exe files with script content found")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d .exe files with script content\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testBatFilesProperSyntax() {
+	fmt.Println("Test 23: .bat Files Should Have Proper Syntax")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Look for += ".bat" assignments
+			if strings.Contains(line, `+= ".bat"`) || strings.Contains(line, `.bat"`) {
+				// Check if nearby WriteFile has proper batch syntax
+				lookRange := 10
+				startIdx := i - 5
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				hasEchoOff := false
+				hasWriteFile := false
+				for j := startIdx; j <= endIdx; j++ {
+					if strings.Contains(allLines[j], "WriteFile") {
+						hasWriteFile = true
+						// Look at content being written
+						for k := j - 10; k <= j+5 && k < len(allLines); k++ {
+							if k < 0 {
+								continue
+							}
+							if strings.Contains(allLines[k], "@echo off") {
+								hasEchoOff = true
+								break
+							}
+						}
+					}
+				}
+
+				if hasWriteFile && !hasEchoOff {
+					issues = append(issues, fmt.Sprintf("%s:%d: .bat file may be missing '@echo off' at start", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: All .bat files have proper syntax")
+		passed++
+	} else {
+		fmt.Printf("⚠️  INFO: Found %d potential .bat syntax issues\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		// Informational only
+	}
+	fmt.Println()
+}
+
+func testBatchEchoQuotes() {
+	fmt.Println("Test 24: Batch Echo Should Not Use Quotes")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Look for echo " in content assigned to batch files
+			if strings.Contains(line, `echo "`) {
+				// Check if we're in a Windows batch context
+				isInBatchContext := false
+				lookRange := 10
+				startIdx := i - lookRange
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				for j := startIdx; j <= endIdx; j++ {
+					if strings.Contains(allLines[j], "@echo off") ||
+					   (strings.Contains(allLines[j], `".bat"`) && strings.Contains(allLines[j], "WriteFile")) {
+						isInBatchContext = true
+						break
+					}
+				}
+
+				if isInBatchContext && !strings.Contains(line, "//") {
+					issues = append(issues, fmt.Sprintf("%s:%d: Batch echo includes quotes in output (remove quotes)", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: No batch echo quote issues found")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d batch echo quote issues\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testContainsPathComparisons() {
+	fmt.Println("Test 25: Contains/HasPrefix/HasSuffix Path Comparisons")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+
+			// Check for path comparisons with forward slashes without ToSlash
+			if (strings.Contains(line, ".Contains(") || 
+			    strings.Contains(line, ".HasPrefix(") || 
+			    strings.Contains(line, ".HasSuffix(")) &&
+				(strings.Contains(line, `"/`) || strings.Contains(line, `"/`)) &&
+				!strings.Contains(line, "ToSlash") &&
+				!strings.Contains(line, "//") {
+				issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: All string path comparisons look good")
+		passed++
+	} else {
+		fmt.Printf("⚠️  INFO: Found %d path comparisons that may need ToSlash()\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		// Informational only
 	}
 	fmt.Println()
 }
