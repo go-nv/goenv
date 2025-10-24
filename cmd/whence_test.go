@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -127,7 +128,10 @@ func TestWhenceCommand(t *testing.T) {
 
 			for i, expected := range tt.expectedOutput {
 				if tt.checkContains {
-					if !strings.Contains(gotLines[i], expected) {
+					// Normalize paths for cross-platform comparison
+					normalizedGot := filepath.ToSlash(gotLines[i])
+					normalizedExpected := filepath.ToSlash(expected)
+					if !strings.Contains(normalizedGot, normalizedExpected) {
 						t.Errorf("Line %d: expected to contain '%s', got '%s'", i, expected, gotLines[i])
 					}
 				} else {

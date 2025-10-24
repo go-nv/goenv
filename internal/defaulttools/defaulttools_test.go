@@ -223,11 +223,9 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 
 	// Create mock go binary that succeeds
 	goBinary := filepath.Join(goBinDir, "go")
-	if runtime.GOOS == "windows" {
-		goBinary += ".exe"
-	}
 	mockScript := "#!/bin/sh\nexit 0"
 	if runtime.GOOS == "windows" {
+		goBinary += ".bat"
 		mockScript = "@echo off\nexit 0"
 	}
 	if err := os.WriteFile(goBinary, []byte(mockScript), 0755); err != nil {
@@ -267,11 +265,9 @@ func TestInstallTools_Failure(t *testing.T) {
 
 	// Create mock go binary that fails
 	goBinary := filepath.Join(goBinDir, "go")
-	if runtime.GOOS == "windows" {
-		goBinary += ".exe"
-	}
 	mockScript := "#!/bin/sh\nexit 1"
 	if runtime.GOOS == "windows" {
+		goBinary += ".bat"
 		mockScript = "@echo off\nexit 1"
 	}
 	if err := os.WriteFile(goBinary, []byte(mockScript), 0755); err != nil {

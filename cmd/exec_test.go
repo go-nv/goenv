@@ -119,6 +119,9 @@ func TestExecCommand(t *testing.T) {
 						content = strings.ReplaceAll(content, "#!/bin/sh\n", "@echo off\n")
 						// Convert Unix shell variable expansion to Windows batch
 						content = strings.ReplaceAll(content, "$@", "%*")
+						// Windows batch echo includes quotes in output, so strip them
+						content = strings.ReplaceAll(content, `echo "`, `echo `)
+						content = strings.ReplaceAll(content, `"`+"\n", "\n")
 					}
 					err := os.WriteFile(binPath, []byte(content), 0755)
 					if err != nil {

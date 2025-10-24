@@ -348,7 +348,8 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 		}
 
 		goBinary := filepath.Join(goBinDir, "go.bat")
-		if err := os.WriteFile(goBinary, []byte("mock go"), 0755); err != nil {
+		goBatchContent := "@echo off\necho mock go\n"
+		if err := os.WriteFile(goBinary, []byte(goBatchContent), 0755); err != nil {
 			t.Fatalf("Failed to create go.bat: %v", err)
 		}
 
@@ -360,7 +361,8 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 
 		if version == "1.21.0" {
 			toolPath := filepath.Join(gopathBin, "mockgopls.bat")
-			if err := os.WriteFile(toolPath, []byte("mock tool"), 0755); err != nil {
+			toolBatchContent := "@echo off\necho mock tool\n"
+			if err := os.WriteFile(toolPath, []byte(toolBatchContent), 0755); err != nil {
 				t.Fatalf("Failed to create tool: %v", err)
 			}
 		}

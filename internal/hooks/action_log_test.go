@@ -383,7 +383,7 @@ func TestExpandTilde(t *testing.T) {
 			name: "Path with tilde",
 			path: "~/test/file.log",
 			check: func(result string) bool {
-				return !strings.HasPrefix(result, "~") && strings.Contains(result, "test/file.log")
+				return !strings.HasPrefix(result, "~") && strings.Contains(filepath.ToSlash(result), "test/file.log")
 			},
 		},
 		{
