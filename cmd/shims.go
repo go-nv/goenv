@@ -215,8 +215,20 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	if err == nil && len(versions) > 0 {
 		for _, version := range versions {
 			if whenceFlags.path {
+				// Build the path without extension first
 				versionPath := filepath.Join(cfg.VersionsDir(), version, "bin", commandName)
-				fmt.Fprintln(cmd.OutOrStdout(), versionPath)
+				// On Windows, try to find the actual file with extension
+				if runtime.GOOS == "windows" {
+					if foundPath, err := findExecutable(versionPath); err == nil {
+						// Strip the extension for display (show logical command name)
+						displayPath := strings.TrimSuffix(strings.TrimSuffix(foundPath, ".exe"), ".bat")
+						fmt.Fprintln(cmd.OutOrStdout(), displayPath)
+					} else {
+						fmt.Fprintln(cmd.OutOrStdout(), versionPath)
+					}
+				} else {
+					fmt.Fprintln(cmd.OutOrStdout(), versionPath)
+				}
 			} else {
 				fmt.Fprintln(cmd.OutOrStdout(), version)
 			}
@@ -426,7 +438,12 @@ func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config)
 		if foundPath, err := findExecutable(commandPath); err == nil {
 			foundAny = true
 			if whenceFlags.path {
-				fmt.Fprintln(cmd.OutOrStdout(), foundPath)
+				// On Windows, strip extension for display (show logical command name)
+				displayPath := foundPath
+				if runtime.GOOS == "windows" {
+					displayPath = strings.TrimSuffix(strings.TrimSuffix(foundPath, ".exe"), ".bat")
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), displayPath)
 			} else {
 				fmt.Fprintln(cmd.OutOrStdout(), version)
 			}

@@ -48,6 +48,9 @@ func main() {
 	testPlatformSpecificErrorMessages()
 	testBinaryExtensionStripping()
 	testPermissionTestsSkipWindows()
+	testHardcodedShebangInTests()
+	testShimCreationPatterns()
+	testExtensionStrippingForDisplay()
 
 	// Summary
 	fmt.Println()
@@ -1243,6 +1246,277 @@ func testPermissionTestsSkipWindows() {
 			}
 		}
 		warnings += len(issues)
+	}
+	fmt.Println()
+}
+func testHardcodedShebangInTests() {
+	fmt.Println("Test 19: No Hardcoded Unix Shebangs Without Windows Checks")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Check for hardcoded shebangs without runtime checks
+			if (strings.Contains(line, `"#!/bin/bash`) ||
+				strings.Contains(line, `"#!/bin/sh`) ||
+				strings.Contains(line, `"#!/usr/bin/env bash`) ||
+				strings.Contains(line, `"#!/usr/bin/env sh`)) &&
+				!strings.Contains(line, "//") {
+
+				// Check if runtime.GOOS exists nearby
+				hasRuntimeCheck := false
+				lookRange := 10
+				startIdx := i - lookRange
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				for j := startIdx; j <= endIdx; j++ {
+					if strings.Contains(allLines[j], "runtime.GOOS") && strings.Contains(allLines[j], "windows") {
+						hasRuntimeCheck = true
+						break
+					}
+				}
+
+				if !hasRuntimeCheck {
+					issues = append(issues, fmt.Sprintf("%s:%d: Hardcoded Unix shebang without Windows check", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: No hardcoded Unix shebangs found")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d hardcoded Unix shebangs without Windows checks\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+
+func testShimCreationPatterns() {
+	fmt.Println("Test 20: Shim Creation Uses Platform-Specific Patterns")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Check for shim-related WriteFile without Windows handling
+			if strings.Contains(line, "WriteFile") &&
+				(strings.Contains(line, "shim") || strings.Contains(line, "Shim")) &&
+				!strings.Contains(line, "//") {
+
+				// Check if runtime.GOOS or .bat exists nearby
+				hasRuntimeCheck := false
+				lookRange := 10
+				startIdx := i - lookRange
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				for j := startIdx; j <= endIdx; j++ {
+					if (strings.Contains(allLines[j], "runtime.GOOS") && strings.Contains(allLines[j], "windows")) ||
+					   strings.Contains(allLines[j], ".bat") ||
+					   strings.Contains(allLines[j], "@echo off") {
+						hasRuntimeCheck = true
+						break
+					}
+				}
+
+				if !hasRuntimeCheck {
+					issues = append(issues, fmt.Sprintf("%s:%d: Shim creation without Windows handling", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: All shim creation uses platform-specific patterns")
+		passed++
+	} else {
+		fmt.Printf("⚠️  WARNING: Found %d shim creations without Windows handling\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		warnings += len(issues)
+	}
+	fmt.Println()
+}
+func testExtensionStrippingForDisplay() {
+	fmt.Println("Test 21: Extension Stripping For Display on Windows")
+	fmt.Println("--------------------------------------------------")
+
+	issues := []string{}
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if info.Name() == "vendor" || info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		allLines := []string{}
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		for i, line := range allLines {
+			lineNum := i + 1
+
+			// Check for functions that return shim/binary names without stripping extensions
+			if (strings.Contains(line, "return") && strings.Contains(line, "entry.Name()")) ||
+			   (strings.Contains(line, "append") && strings.Contains(line, "entry.Name()")) ||
+			   (strings.Contains(line, "Fprintln") && strings.Contains(line, "foundPath")) {
+
+				// Look for Windows extension stripping nearby
+				hasExtensionStripping := false
+				lookRange := 10
+				startIdx := i - lookRange
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				endIdx := i + lookRange
+				if endIdx >= len(allLines) {
+					endIdx = len(allLines) - 1
+				}
+
+				for j := startIdx; j <= endIdx; j++ {
+					if (strings.Contains(allLines[j], "TrimSuffix") && 
+					    (strings.Contains(allLines[j], ".exe") || strings.Contains(allLines[j], ".bat"))) ||
+					   (strings.Contains(allLines[j], "runtime.GOOS") && 
+					    strings.Contains(allLines[j], "windows") &&
+					    strings.Contains(allLines[j], "TrimSuffix")) {
+						hasExtensionStripping = true
+						break
+					}
+				}
+
+				// Check if this is in a function that returns binary/shim names
+				inRelevantFunction := false
+				for j := i; j >= 0 && j > i-50; j-- {
+					if strings.Contains(allLines[j], "func") && 
+					   (strings.Contains(allLines[j], "ListShims") ||
+					    strings.Contains(allLines[j], "Whence") ||
+					    strings.Contains(allLines[j], "Which") ||
+					    strings.Contains(allLines[j], "FindBinary")) {
+						inRelevantFunction = true
+						break
+					}
+				}
+
+				if inRelevantFunction && !hasExtensionStripping {
+					issues = append(issues, fmt.Sprintf("%s:%d: Binary/shim name may need extension stripping on Windows", path, lineNum))
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("⚠️  WARNING: Error scanning files: %v\n", err)
+		warnings++
+	} else if len(issues) == 0 {
+		fmt.Println("✓ PASS: All binary/shim names strip extensions appropriately")
+		passed++
+	} else {
+		fmt.Printf("⚠️  INFO: Found %d potential extension stripping issues\n", len(issues))
+		for i, issue := range issues {
+			if i < 3 {
+				fmt.Printf("  %s\n", issue)
+			}
+		}
+		// Don't count as warnings, just informational
 	}
 	fmt.Println()
 }

@@ -252,12 +252,12 @@ func TestRehashCommand(t *testing.T) {
 			if runtime.GOOS == "windows" {
 				t.Skip("skipping permission test on Windows")
 			}
-				os.MkdirAll(shimsDir, 0755)
-				if err := os.Chmod(shimsDir, os.FileMode(tt.shimsDirPerms)); err != nil {
-					t.Fatalf("Failed to change shims directory permissions: %v", err)
-				}
-				// Ensure cleanup restores permissions
-				defer os.Chmod(shimsDir, 0755)
+			os.MkdirAll(shimsDir, 0755)
+			if err := os.Chmod(shimsDir, os.FileMode(tt.shimsDirPerms)); err != nil {
+				t.Fatalf("Failed to change shims directory permissions: %v", err)
+			}
+			// Ensure cleanup restores permissions
+			defer os.Chmod(shimsDir, 0755)
 			}
 
 			// Create and execute command

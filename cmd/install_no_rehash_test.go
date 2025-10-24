@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -27,7 +28,14 @@ func TestInstallCommand_NoRehashFlag(t *testing.T) {
 
 	// Create mock go binary
 	goBinary := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/bash\necho go1.21.0\n"), 0755); err != nil {
+	var content string
+	if runtime.GOOS == "windows" {
+		goBinary += ".bat"
+		content = "@echo off\necho go1.21.0\n"
+	} else {
+		content = "#!/bin/bash\necho go1.21.0\n"
+	}
+	if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
 		t.Fatalf("Failed to create mock go binary: %v", err)
 	}
 
@@ -69,7 +77,14 @@ func TestInstallCommand_NoRehashEnv(t *testing.T) {
 
 	// Create mock go binary
 	goBinary := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/bash\necho go1.21.0\n"), 0755); err != nil {
+	var content string
+	if runtime.GOOS == "windows" {
+		goBinary += ".bat"
+		content = "@echo off\necho go1.21.0\n"
+	} else {
+		content = "#!/bin/bash\necho go1.21.0\n"
+	}
+	if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
 		t.Fatalf("Failed to create mock go binary: %v", err)
 	}
 

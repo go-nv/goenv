@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
@@ -118,7 +119,12 @@ func (s *ShimManager) ListShims() ([]string, error) {
 	var shims []string
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			shims = append(shims, entry.Name())
+			name := entry.Name()
+			// On Windows, strip .bat extension from shim names
+			if runtime.GOOS == "windows" && strings.HasSuffix(name, ".bat") {
+				name = strings.TrimSuffix(name, ".bat")
+			}
+			shims = append(shims, name)
 		}
 	}
 
