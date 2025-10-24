@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -52,10 +53,11 @@ func TestGoenvRootCommand(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			// Check output
-			got := strings.TrimSpace(output.String())
-			if got != tt.expectedOutput {
-				t.Errorf("Expected output %q, got %q", tt.expectedOutput, got)
+			// Check output (normalize paths for cross-platform comparison)
+			got := filepath.ToSlash(strings.TrimSpace(output.String()))
+			expected := filepath.ToSlash(tt.expectedOutput)
+			if got != expected {
+				t.Errorf("Expected output %q, got %q", expected, got)
 			}
 		})
 	}

@@ -83,8 +83,12 @@ func (s *ShimManager) Rehash() error {
 		}
 	}
 
-	// Create shims for all binaries
+	// Create shims for all binaries (except goenv itself to prevent recursion)
 	for binary := range binaries {
+		// Skip creating a shim for goenv itself to prevent infinite recursion
+		if binary == "goenv" {
+			continue
+		}
 		if err := s.createShim(binary); err != nil {
 			return fmt.Errorf("failed to create shim for %s: %w", binary, err)
 		}

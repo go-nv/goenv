@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -133,8 +134,8 @@ func (m *Manager) ListInstalledVersions() ([]string, error) {
 	for _, entry := range entries {
 		if entry.IsDir() {
 			// Verify this is a valid Go installation
-			goExe := filepath.Join(versionsDir, entry.Name(), "bin", "go")
-			if _, err := os.Stat(goExe); err == nil {
+			goExeBase := filepath.Join(versionsDir, entry.Name(), "bin", "go")
+			if _, err := pathutil.FindExecutable(goExeBase); err == nil {
 				versions = append(versions, entry.Name())
 			}
 		}
