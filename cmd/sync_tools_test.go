@@ -341,8 +341,8 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 	for _, version := range []string{"1.21.0", "1.22.0"} {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
-		// Create go.bat binary
-		goBinDir := filepath.Join(versionPath, "go", "bin")
+		// Create go.bat binary (version directory IS the GOROOT, no extra 'go' subdirectory)
+		goBinDir := filepath.Join(versionPath, "bin")
 		if err := os.MkdirAll(goBinDir, 0755); err != nil {
 			t.Fatalf("Failed to create go bin directory: %v", err)
 		}

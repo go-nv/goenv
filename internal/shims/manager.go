@@ -56,9 +56,12 @@ func (s *ShimManager) Rehash() error {
 		for _, entry := range entries {
 			if !entry.IsDir() && isExecutable(filepath.Join(versionBinDir, entry.Name())) {
 				binaryName := entry.Name()
-				// On Windows, strip .exe extension from shim name
-				if runtime.GOOS == "windows" && filepath.Ext(binaryName) == ".exe" {
-					binaryName = binaryName[:len(binaryName)-4]
+				// On Windows, strip .exe and .bat extensions from shim name
+				if runtime.GOOS == "windows" {
+					ext := filepath.Ext(binaryName)
+					if ext == ".exe" || ext == ".bat" {
+						binaryName = binaryName[:len(binaryName)-len(ext)]
+					}
 				}
 				binaries[binaryName] = true
 			}
@@ -72,9 +75,12 @@ func (s *ShimManager) Rehash() error {
 				for _, entry := range gopathEntries {
 					if !entry.IsDir() && isExecutable(filepath.Join(gopathBinDir, entry.Name())) {
 						binaryName := entry.Name()
-						// On Windows, strip .exe extension from shim name
-						if runtime.GOOS == "windows" && filepath.Ext(binaryName) == ".exe" {
-							binaryName = binaryName[:len(binaryName)-4]
+						// On Windows, strip .exe and .bat extensions from shim name
+						if runtime.GOOS == "windows" {
+							ext := filepath.Ext(binaryName)
+							if ext == ".exe" || ext == ".bat" {
+								binaryName = binaryName[:len(binaryName)-len(ext)]
+							}
 						}
 						binaries[binaryName] = true
 					}

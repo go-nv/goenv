@@ -62,7 +62,8 @@ func TestConfigDirectories(t *testing.T) {
 
 	globalFile := cfg.GlobalVersionFile()
 	expected = "/test/goenv/version"
-	if globalFile != expected {
+	// Normalize paths for cross-platform comparison
+	if filepath.ToSlash(globalFile) != expected {
 		t.Errorf("Expected %s, got %s", expected, globalFile)
 	}
 

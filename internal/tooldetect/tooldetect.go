@@ -59,13 +59,15 @@ func ListInstalledTools(goenvRoot, goVersion string) ([]Tool, error) {
 
 		name := entry.Name()
 
-		// Skip non-executables on Windows
-		if runtime.GOOS == "windows" && !strings.HasSuffix(name, ".exe") {
-			continue
+		// Skip non-executables on Windows (check for .exe and .bat for tests)
+		if runtime.GOOS == "windows" {
+			if !strings.HasSuffix(name, ".exe") && !strings.HasSuffix(name, ".bat") {
+				continue
+			}
 		}
 
-		// Remove .exe suffix for display name
-		displayName := strings.TrimSuffix(name, ".exe")
+		// Remove .exe or .bat suffix for display name
+		displayName := strings.TrimSuffix(strings.TrimSuffix(name, ".exe"), ".bat")
 
 		binaryPath := filepath.Join(gopathBin, name)
 
