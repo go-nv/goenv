@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -26,6 +27,10 @@ func createExecutable(t *testing.T, testRoot, version, execName string) {
 
 	execPath := filepath.Join(binDir, execName)
 	content := "#!/bin/sh\necho 'mock executable'\n"
+	if runtime.GOOS == "windows" {
+		execPath += ".bat"
+		content = "@echo off\necho mock executable\n"
+	}
 	if err := os.WriteFile(execPath, []byte(content), 0755); err != nil {
 		t.Fatalf("Failed to create executable: %v", err)
 	}

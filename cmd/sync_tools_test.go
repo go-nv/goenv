@@ -374,9 +374,13 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 
 	_ = runSyncTools(cmd, args)
 
-	// Should not error on Windows with proper .bat handling
+	// Should successfully discover tools on Windows with proper .bat handling
 	output := buf.String()
 	if !strings.Contains(output, "Discovering tools") {
 		t.Errorf("Expected tool discovery on Windows, got output:\n%s", output)
+	}
+	// Verify it found the tool
+	if !strings.Contains(output, "mockgopls") {
+		t.Errorf("Expected to find mockgopls tool, got output:\n%s", output)
 	}
 }

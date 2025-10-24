@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -226,7 +227,12 @@ func TestUninstallCompletion(t *testing.T) {
 
 		// Create go binary for version detection
 		goExe := filepath.Join(binPath, "go")
-		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho mock go"), 0755); err != nil {
+		content := []byte("#!/bin/sh\necho mock go")
+		if runtime.GOOS == "windows" {
+			goExe += ".bat"
+			content = []byte("@echo off\necho mock go")
+		}
+		if err := os.WriteFile(goExe, content, 0755); err != nil {
 			t.Fatalf("Failed to create go binary: %v", err)
 		}
 	}
