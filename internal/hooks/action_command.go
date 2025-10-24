@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -157,10 +158,13 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 		shellType = strings.ToLower(shell)
 	}
 
-	// Execute command
+	// Execute command with timeout context
+	cmdCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	cmdToRun, cmdArgs := prepareCommand(command, args, shellType)
 
-	execCmd := exec.Command(cmdToRun, cmdArgs...)
+	execCmd := exec.CommandContext(cmdCtx, cmdToRun, cmdArgs...)
 	if workDir != "" {
 		execCmd.Dir = workDir
 	}
@@ -172,88 +176,11 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 		execCmd.Stderr = &stderr
 	}
 
-	// Start the command
-	if err := execCmd.Start(); err != nil {
-		return fmt.Errorf("failed to start command: %v", err)
-	}
+	// Run the command (Start + Wait)
+	err := execCmd.Run()
 
-	// Wait for completion or timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- execCmd.Wait()
-	}()
-
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	// Track whether we timed out
-	timedOut := false
-
-	select {
-	case err := <-done:
-		// Check if timer expired while we were getting the error
-		select {
-		case <-timer.C:
-			timedOut = true
-		default:
-			// Timer hasn't expired, this is a normal completion
-		}
-
-		if timedOut {
-			// Process exited due to timeout
-			errMsg := fmt.Sprintf("command timed out after %s", timeout)
-			if logOutput {
-				logError(errMsg)
-			}
-
-			if failOnError {
-				return fmt.Errorf("%s", errMsg)
-			}
-			return nil
-		}
-
-		// Command completed normally
-		if err != nil {
-			errMsg := fmt.Sprintf("command failed: %v", err)
-			if stderr.Len() > 0 {
-				errMsg += fmt.Sprintf("\nStderr: %s", stderr.String())
-			}
-
-			if logOutput {
-				logError(errMsg)
-			}
-
-			if failOnError {
-				return fmt.Errorf("%s", errMsg)
-			}
-			// If not failing on error, just log and continue
-			return nil
-		}
-
-		// Success - log output if requested
-		if logOutput && stdout.Len() > 0 {
-			logError(fmt.Sprintf("Command output:\n%s", stdout.String()))
-		}
-
-		// Store output in context if captured
-		if captureOutput {
-			ctx.Variables["command_stdout"] = stdout.String()
-			ctx.Variables["command_stderr"] = stderr.String()
-			ctx.Variables["command_exit_code"] = "0"
-		}
-
-		return nil
-
-	case <-timer.C:
-		// Timeout - kill the process
-		timedOut = true
-		if execCmd.Process != nil {
-			execCmd.Process.Kill()
-		}
-
-		// Wait for the process to finish being killed
-		<-done
-
+	// Check if context deadline exceeded (timeout)
+	if cmdCtx.Err() == context.DeadlineExceeded {
 		errMsg := fmt.Sprintf("command timed out after %s", timeout)
 		if logOutput {
 			logError(errMsg)
@@ -264,6 +191,38 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 		}
 		return nil
 	}
+
+	// Check for other errors
+	if err != nil {
+		errMsg := fmt.Sprintf("command failed: %v", err)
+		if stderr.Len() > 0 {
+			errMsg += fmt.Sprintf("\nStderr: %s", stderr.String())
+		}
+
+		if logOutput {
+			logError(errMsg)
+		}
+
+		if failOnError {
+			return fmt.Errorf("%s", errMsg)
+		}
+		// If not failing on error, just log and continue
+		return nil
+	}
+
+	// Success - log output if requested
+	if logOutput && stdout.Len() > 0 {
+		logError(fmt.Sprintf("Command output:\n%s", stdout.String()))
+	}
+
+	// Store output in context if captured
+	if captureOutput {
+		ctx.Variables["command_stdout"] = stdout.String()
+		ctx.Variables["command_stderr"] = stderr.String()
+		ctx.Variables["command_exit_code"] = "0"
+	}
+
+	return nil
 }
 
 // prepareCommand prepares the command and arguments based on the shell type
