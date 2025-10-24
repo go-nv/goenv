@@ -186,8 +186,32 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
+	// Track whether we timed out
+	timedOut := false
+
 	select {
 	case err := <-done:
+		// Check if timer expired while we were getting the error
+		select {
+		case <-timer.C:
+			timedOut = true
+		default:
+			// Timer hasn't expired, this is a normal completion
+		}
+
+		if timedOut {
+			// Process exited due to timeout
+			errMsg := fmt.Sprintf("command timed out after %s", timeout)
+			if logOutput {
+				logError(errMsg)
+			}
+
+			if failOnError {
+				return fmt.Errorf("%s", errMsg)
+			}
+			return nil
+		}
+
 		// Command completed normally
 		if err != nil {
 			errMsg := fmt.Sprintf("command failed: %v", err)
@@ -222,6 +246,7 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 
 	case <-timer.C:
 		// Timeout - kill the process
+		timedOut = true
 		if execCmd.Process != nil {
 			execCmd.Process.Kill()
 		}
