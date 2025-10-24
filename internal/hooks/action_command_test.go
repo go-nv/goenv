@@ -438,10 +438,6 @@ func TestRunCommandAction_Execute_Timeout(t *testing.T) {
 		t.Skip("Skipping command execution test in short mode")
 	}
 
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping timeout test on Windows due to process termination timing issues")
-	}
-
 	action := &RunCommandAction{}
 
 	ctx := &HookContext{
@@ -453,10 +449,10 @@ func TestRunCommandAction_Execute_Timeout(t *testing.T) {
 	var params map[string]interface{}
 	if runtime.GOOS == "windows" {
 		params = map[string]interface{}{
-			"command":       "timeout /t 10",
+			"command":       "Start-Sleep -Seconds 10",
 			"timeout":       "1s",
 			"fail_on_error": true,
-			"shell":         "cmd",
+			"shell":         "powershell",
 		}
 	} else {
 		params = map[string]interface{}{
