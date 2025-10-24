@@ -159,6 +159,7 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 	}
 
 	// Execute command with timeout context
+	// CommandContext will automatically kill the process when the context deadline is exceeded
 	cmdCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -179,11 +180,9 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 	// Run the command (Start + Wait)
 	err := execCmd.Run()
 
-	// ALWAYS check context state first before examining the error
-	// This is critical because on Windows, the process might exit with an error code
-	// before we can see that the context deadline was exceeded
-	if cmdCtx.Err() != nil {
-		// Context was cancelled or timed out
+	// Check context state first to distinguish timeout from normal command failures
+	// This is important because a timed-out command may return a non-zero exit code
+	if cmdCtx.Err() == context.DeadlineExceeded {
 		errMsg := fmt.Sprintf("command timed out after %s", timeout)
 		if logOutput {
 			logError(errMsg)

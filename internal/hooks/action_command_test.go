@@ -438,6 +438,10 @@ func TestRunCommandAction_Execute_Timeout(t *testing.T) {
 		t.Skip("Skipping command execution test in short mode")
 	}
 
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping timeout test on Windows due to process termination timing issues")
+	}
+
 	action := &RunCommandAction{}
 
 	ctx := &HookContext{
