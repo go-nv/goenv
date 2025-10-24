@@ -27,7 +27,7 @@ func TestVersionFileReadCommand(t *testing.T) {
 			name:          "fails for file that does not exist",
 			filename:      "non-existent",
 			noFile:        true,
-			expectedError: "no such file or directory",
+			expectedError: "non-existent", // Both Unix ("no such file") and Windows ("cannot find file") errors contain the filename
 		},
 		{
 			name:          "fails for file that exists but is blank",

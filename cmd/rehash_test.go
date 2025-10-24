@@ -203,6 +203,11 @@ func TestRehashCommand(t *testing.T) {
 				t.Skip("skipping test when running as root")
 			}
 
+			// Skip permission tests on Windows - permissions work differently
+			if tt.shimsDirPerms != 0 && runtime.GOOS == "windows" {
+				t.Skip("skipping permission test on Windows")
+			}
+
 			testRoot, cleanup := setupTestEnv(t)
 			defer cleanup()
 
@@ -302,12 +307,18 @@ func TestRehashCommand(t *testing.T) {
 
 			// Check that all expected shims exist
 			for _, expectedShim := range tt.expectedShims {
-				if !actualShims[expectedShim] {
+				// On Windows, shims have .bat extension
+				shimName := expectedShim
+				if runtime.GOOS == "windows" {
+					shimName = expectedShim + ".bat"
+				}
+
+				if !actualShims[shimName] {
 					t.Errorf("Expected shim %q to exist but it doesn't", expectedShim)
 					continue
 				}
 
-				shimPath := filepath.Join(shimsDir, expectedShim)
+				shimPath := filepath.Join(shimsDir, shimName)
 
 				// Check that shim is executable (Unix only)
 				if runtime.GOOS != "windows" {
@@ -349,7 +360,13 @@ func TestRehashCommand(t *testing.T) {
 			for actualShim := range actualShims {
 				found := false
 				for _, expectedShim := range tt.expectedShims {
-					if actualShim == expectedShim {
+					// On Windows, expected shims have .bat extension
+					shimName := expectedShim
+					if runtime.GOOS == "windows" {
+						shimName = expectedShim + ".bat"
+					}
+
+					if actualShim == shimName {
 						found = true
 						break
 					}

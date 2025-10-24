@@ -184,7 +184,10 @@ func TestWhichCommand(t *testing.T) {
 			got := strings.TrimSpace(output.String())
 
 			if tt.checkContains {
-				if !strings.Contains(got, tt.expectedOutput) {
+				// Normalize paths for cross-platform comparison
+				normalizedGot := filepath.ToSlash(got)
+				normalizedExpected := filepath.ToSlash(tt.expectedOutput)
+				if !strings.Contains(normalizedGot, normalizedExpected) {
 					t.Errorf("Expected output to contain '%s', got '%s'", tt.expectedOutput, got)
 				}
 			} else {

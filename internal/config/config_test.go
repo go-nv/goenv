@@ -16,7 +16,8 @@ func TestDefaultRoot(t *testing.T) {
 	// Test with GOENV_ROOT set
 	utils.GoenvEnvVarRoot.Set("/custom/root")
 	root := DefaultRoot()
-	if root != "/custom/root" {
+	// Normalize paths for cross-platform comparison
+	if filepath.ToSlash(root) != "/custom/root" {
 		t.Errorf("Expected /custom/root, got %s", root)
 	}
 
@@ -47,13 +48,15 @@ func TestConfigDirectories(t *testing.T) {
 
 	versionsDir := cfg.VersionsDir()
 	expected := "/test/goenv/versions"
-	if versionsDir != expected {
+	// Normalize paths for cross-platform comparison
+	if filepath.ToSlash(versionsDir) != expected {
 		t.Errorf("Expected %s, got %s", expected, versionsDir)
 	}
 
 	shimsDir := cfg.ShimsDir()
 	expected = "/test/goenv/shims"
-	if shimsDir != expected {
+	// Normalize paths for cross-platform comparison
+	if filepath.ToSlash(shimsDir) != expected {
 		t.Errorf("Expected %s, got %s", expected, shimsDir)
 	}
 
