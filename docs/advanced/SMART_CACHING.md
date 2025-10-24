@@ -394,53 +394,58 @@ Debug: Using cached versions
 
 ### Problem: "exec format error" When Switching Versions
 
-When using multiple Go versions, you may encounter errors like:
+When using multiple Go versions or cross-compiling, you may encounter errors like:
 
 ```
 fork/exec /Users/username/Library/Caches/go-build/.../staticcheck: exec format error
 ```
 
-**Primary cause:** By default, Go uses a **shared build cache** (`GOCACHE`) across all Go versions. When you build tools with Go 1.23, then switch to Go 1.24, the cached binaries become incompatible because:
-- Tool binaries contain Go runtime code specific to the version they were built with
-- Cached intermediate build artifacts may have version-specific formats
-- Go 1.23's cache entries may not be compatible with Go 1.24's expectations
+**Root causes:**
 
-**Secondary causes (rare):**
+1. **Version conflicts:** By default, Go uses a shared `GOCACHE` across all Go versions. When you build with Go 1.23, then switch to Go 1.24, the cached binaries contain version-specific runtime code that becomes incompatible.
+
+2. **Architecture conflicts (most dangerous):** When cross-compiling (e.g., `GOOS=linux GOARCH=amd64`), host-run tool binaries like `staticcheck`, code generators, or `vet` analyzers may get built for the target architecture instead of the host:
+   - You cross-compile for `linux/amd64` on `darwin/arm64`
+   - `staticcheck` gets built and cached as `linux/amd64` binary
+   - Later, your build tries to execute that binary on `darwin/arm64`
+   - OS rejects it: `exec format error`
+
+**Other causes:**
 - Migration from Intel to Apple Silicon (cached x86_64 binaries on new arm64 machine)
 - Running Go under Rosetta vs natively on Apple Silicon
-- Manual `GOARCH` overrides during builds
 
-### Solution: Version-Specific Cache Isolation
+### Solution: Version AND Architecture-Specific Cache Isolation
 
-Starting in goenv v3, **build caches are automatically isolated per Go version** to prevent these conflicts.
+Starting in goenv v3, **build caches are automatically isolated per Go version AND target architecture** to prevent these conflicts.
 
 #### How It Works
 
 When you run `goenv exec go build` or any Go command through goenv:
 
 ```bash
-# Go 1.23.2
+# Native builds (no GOOS/GOARCH set)
 $ goenv exec go env GOCACHE
-/Users/username/.goenv/versions/1.23.2/go-build
+/Users/username/.goenv/versions/1.23.2/go-build-host-host
 
-# Go 1.24.4
-$ goenv exec go env GOCACHE
-/Users/username/.goenv/versions/1.24.4/go-build
+# Cross-compiling for Linux
+$ GOOS=linux GOARCH=amd64 goenv exec go env GOCACHE
+/Users/username/.goenv/versions/1.23.2/go-build-linux-amd64
 
-# Go 1.25.2
-$ goenv exec go env GOCACHE
-/Users/username/.goenv/versions/1.25.2/go-build
+# Cross-compiling for Windows
+$ GOOS=windows GOARCH=amd64 goenv exec go env GOCACHE
+/Users/username/.goenv/versions/1.23.2/go-build-windows-amd64
 ```
 
-Each Go version gets its own isolated cache directory, preventing architecture/version mismatches.
+Each combination of **Go version + target OS + target architecture** gets its own isolated cache directory, preventing all types of conflicts.
 
 #### Benefits
 
-- ✅ **No more "exec format error"** when switching Go versions
-- ✅ **Clean isolation** - Each Go version has its own build environment
-- ✅ **No manual cache cleaning** required between version switches
+- ✅ **No more "exec format error"** when switching Go versions or cross-compiling
+- ✅ **Safe cross-compilation** - Host-run tool binaries (staticcheck, generators, analyzers) stay isolated from cross-compile builds
+- ✅ **Clean isolation** - Each Go version + target architecture has its own build environment
+- ✅ **No manual cache cleaning** required between version switches or cross-compiles
 - ✅ **Automatic and transparent** - works out of the box
-- ✅ **Handles edge cases** - Migration scenarios and architecture changes also covered
+- ✅ **Handles edge cases** - Migration scenarios, architecture changes, and multi-platform builds all covered
 
 #### Module Cache Isolation
 

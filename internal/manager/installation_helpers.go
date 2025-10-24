@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/pathutil"
 )
 
 // IsVersionCorrupted checks if an installed version is missing its go binary
@@ -22,14 +23,9 @@ func (m *Manager) IsVersionCorrupted(version string) bool {
 		return false // Not installed, not corrupted
 	}
 
-	// Check for go binary
-	goBinaryName := "go"
-	if runtime.GOOS == "windows" {
-		goBinaryName = "go.exe"
-	}
-	goBinary := filepath.Join(versionDir, "bin", goBinaryName)
-
-	_, err := os.Stat(goBinary)
+	// Check for go binary (handles .exe and .bat on Windows)
+	goBinaryBase := filepath.Join(versionDir, "bin", "go")
+	_, err := pathutil.FindExecutable(goBinaryBase)
 	return err != nil // Corrupted if binary doesn't exist
 }
 

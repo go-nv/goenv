@@ -11,6 +11,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
 )
@@ -397,13 +398,10 @@ func checkInstalledVersions(cfg *config.Config) checkResult {
 	versionsDir := cfg.VersionsDir()
 
 	for _, ver := range versions {
-		goBinaryName := "go"
-		if runtime.GOOS == "windows" {
-			goBinaryName = "go.exe"
-		}
-		goBinary := filepath.Join(versionsDir, ver, "bin", goBinaryName)
+		goBinaryBase := filepath.Join(versionsDir, ver, "bin", "go")
 
-		if _, err := os.Stat(goBinary); err != nil {
+		// Check if go binary exists (handles .exe and .bat on Windows)
+		if _, err := pathutil.FindExecutable(goBinaryBase); err != nil {
 			corruptedVersions = append(corruptedVersions, ver)
 		} else {
 			validVersions = append(validVersions, ver)
@@ -458,14 +456,11 @@ func checkCurrentVersion(cfg *config.Config) checkResult {
 	}
 
 	// Check if the installation is corrupted (missing go binary)
-	goBinaryName := "go"
-	if runtime.GOOS == "windows" {
-		goBinaryName = "go.exe"
-	}
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
-	goBinary := filepath.Join(versionPath, "bin", goBinaryName)
+	goBinaryBase := filepath.Join(versionPath, "bin", "go")
 
-	if _, err := os.Stat(goBinary); err != nil {
+	// Check if go binary exists (handles .exe and .bat on Windows)
+	if _, err := pathutil.FindExecutable(goBinaryBase); err != nil {
 		return checkResult{
 			name:    "Current Go version",
 			status:  "error",

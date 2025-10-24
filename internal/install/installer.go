@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/version"
 	"github.com/schollz/progressbar/v3"
 )
@@ -135,14 +136,13 @@ func (i *Installer) Install(goVersion string, force bool) error {
 	}
 
 	// Verify installation by checking for go binary
-	goBinaryName := "go"
-	if strings.Contains(file.OS, "windows") {
-		goBinaryName = "go.exe"
-	}
-	goBinary := filepath.Join(versionDir, "bin", goBinaryName)
-	if _, err := os.Stat(goBinary); err != nil {
+	goBinaryBase := filepath.Join(versionDir, "bin", "go")
+
+	// Check if go binary exists (handles .exe on Windows)
+	goBinary, err := pathutil.FindExecutable(goBinaryBase)
+	if err != nil {
 		os.RemoveAll(versionDir) // Clean up corrupted installation
-		return fmt.Errorf("installation verification failed: go binary not found at %s (extraction may have failed)", goBinary)
+		return fmt.Errorf("installation verification failed: go binary not found (extraction may have failed)")
 	}
 
 	if i.Verbose {

@@ -126,17 +126,40 @@ func runExec(cmd *cobra.Command, args []string) error {
 			env = setEnvVar(env, "GOPATH", versionGopath)
 		}
 
-		// Set version-specific GOCACHE to prevent architecture/version conflicts
-		// This prevents "exec format error" when switching between Go versions or architectures
+		// Set version AND architecture-specific GOCACHE to prevent conflicts
+		//
+		// This prevents two types of "exec format error":
+		// 1. Version conflicts: Go 1.23 binaries incompatible with Go 1.24
+		// 2. Architecture conflicts: Cross-compile tool binaries (staticcheck, generators)
+		//    built for linux/amd64 accidentally executed on darwin/arm64
+		//
+		// By isolating caches per version+GOOS+GOARCH, we ensure:
+		// - Native builds use: go-build-host-host
+		// - Cross-compiles use: go-build-{GOOS}-{GOARCH}
+		// - Tool binaries stay architecture-appropriate
 		if !utils.GoenvEnvVarDisableGocache.IsTrue() {
 			customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
 			var versionGocache string
+
+			// Determine target GOOS/GOARCH for cache isolation
+			goos := getEnvValue(env, "GOOS")
+			goarch := getEnvValue(env, "GOARCH")
+			if goos == "" {
+				goos = "host" // Use "host" as marker when targeting host platform
+			}
+			if goarch == "" {
+				goarch = "host"
+			}
+
+			// Build cache path with architecture suffix to isolate cross-compile artifacts
+			cacheSuffix := fmt.Sprintf("go-build-%s-%s", goos, goarch)
+
 			if customGocacheDir != "" {
 				// Use custom GOCACHE directory if specified
-				versionGocache = filepath.Join(customGocacheDir, currentVersion)
+				versionGocache = filepath.Join(customGocacheDir, currentVersion, cacheSuffix)
 			} else {
-				// Use GOENV_ROOT/versions/{version}/go-build as default GOCACHE
-				versionGocache = filepath.Join(versionPath, "go-build")
+				// Use GOENV_ROOT/versions/{version}/go-build-{GOOS}-{GOARCH} as default GOCACHE
+				versionGocache = filepath.Join(versionPath, cacheSuffix)
 			}
 			env = setEnvVar(env, "GOCACHE", versionGocache)
 		}
@@ -284,6 +307,17 @@ func setEnvVar(env []string, key, value string) []string {
 		}
 	}
 	return append(env, prefix+value)
+}
+
+// getEnvValue retrieves an environment variable value from the env slice
+func getEnvValue(env []string, key string) string {
+	prefix := key + "="
+	for _, envVar := range env {
+		if strings.HasPrefix(envVar, prefix) {
+			return strings.TrimPrefix(envVar, prefix)
+		}
+	}
+	return ""
 }
 
 // prependToPath prepends a directory to the PATH environment variable
