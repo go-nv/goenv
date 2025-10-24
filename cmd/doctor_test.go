@@ -1046,13 +1046,28 @@ func TestPlatformSpecificChecksInDoctor(t *testing.T) {
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("GOENV_DIR", tmpDir)
 
+	// Clear GOENV_VERSION to avoid picking up .go-version from repo
+	t.Setenv("GOENV_VERSION", "system")
+
+	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+
 	// Create directory structure
+	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
 	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
 	if err := os.MkdirAll(filepath.Join(tmpDir, "versions"), 0755); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
+
+	// Override exit to prevent test termination
+	oldExit := doctorExit
+	doctorExit = func(code int) {}
+	defer func() { doctorExit = oldExit }()
 
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
