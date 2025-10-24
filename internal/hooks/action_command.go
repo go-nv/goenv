@@ -3,6 +3,7 @@ package hooks
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -179,8 +180,11 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 	// Run the command (Start + Wait)
 	err := execCmd.Run()
 
-	// Check if context deadline exceeded (timeout)
-	if cmdCtx.Err() == context.DeadlineExceeded {
+	// ALWAYS check context state first before examining the error
+	// This is critical because on Windows, the process might exit with an error code
+	// before we can see that the context deadline was exceeded
+	if cmdCtx.Err() != nil {
+		// Context was cancelled or timed out
 		errMsg := fmt.Sprintf("command timed out after %s", timeout)
 		if logOutput {
 			logError(errMsg)
