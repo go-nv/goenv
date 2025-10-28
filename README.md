@@ -139,6 +139,9 @@ goenv use 1.22.0 --global
 # Or install first, then set
 goenv install 1.22.0
 
+# 💡 Shorthand: goenv 1.22.0 is an alias for goenv use 1.22.0
+goenv 1.22.0  # Same as: goenv use 1.22.0
+
 # Verify
 go version
 
@@ -147,9 +150,14 @@ go install golang.org/x/tools/cmd/goimports@latest
 goenv rehash  # Makes tools available as shims
 ```
 
-**Tools per version:** Tools installed with `go install` are automatically isolated per Go version in version-specific GOPATH directories. After installation, run `goenv rehash` to create shims, making tools available in your PATH.
+**💡 Tools installed with `go install` are isolated per Go version:**
 
-See [Installation Guide](docs/user-guide/INSTALL.md) and [GOPATH Integration](docs/advanced/GOPATH_INTEGRATION.md) for more details.
+- Tools install to `$HOME/go/{version}/bin/` (e.g., `~/go/1.22.0/bin/goimports`)
+- Running `goenv rehash` creates shims that automatically use the right version
+- Switch Go versions → tools switch too (no conflicts between versions)
+- See [GOPATH Integration](docs/advanced/GOPATH_INTEGRATION.md) for complete details
+
+See [Installation Guide](docs/user-guide/INSTALL.md) for platform-specific setup.
 
 ---
 
@@ -216,13 +224,36 @@ goenv hooks test       # Dry-run hooks without executing
 
 ### Quick Links
 
-- **[Installation Guide](./docs/user-guide/INSTALL.md)** - Get started with goenv
+#### Getting Started
+- **[Installation Guide](./docs/user-guide/INSTALL.md)** - Get started with goenv ⭐ **NEW: Windows FAQ**
+- **[Quick Reference](./docs/QUICK_REFERENCE.md)** - One-page cheat sheet ⭐ **NEW**
+- **[FAQ](./docs/FAQ.md)** - Frequently asked questions ⭐ **NEW**
+- **[What's New in Docs](./docs/WHATS_NEW_DOCUMENTATION.md)** - Recent documentation improvements ⭐ **NEW**
 - **[How It Works](./docs/user-guide/HOW_IT_WORKS.md)** - Understanding goenv's internals
 - **[VS Code Integration](./docs/user-guide/VSCODE_INTEGRATION.md)** - Setting up VS Code with goenv
-- **[Command Reference](./docs/reference/COMMANDS.md)** - Complete CLI documentation
+
+#### Reference
+- **[Command Reference](./docs/reference/COMMANDS.md)** - Complete CLI documentation ⭐ **NEW: --force guidance, vscode setup**
 - **[Environment Variables](./docs/reference/ENVIRONMENT_VARIABLES.md)** - Configuration options
-- **[Hooks System](./docs/HOOKS.md)** - Automate actions with declarative hooks
-- **[Smart Caching](./docs/advanced/SMART_CACHING.md)** - Intelligent version caching
-- **[Contributing](./docs/CONTRIBUTING.md)** - How to contribute
+- **[Platform Support Matrix](./docs/PLATFORM_SUPPORT.md)** - OS and architecture compatibility ⭐ **NEW**
+- **[Modern Commands Guide](./docs/MODERN_COMMANDS.md)** - use/current/list vs legacy commands ⭐ **NEW**
+- **[JSON Output Guide](./docs/JSON_OUTPUT_GUIDE.md)** - Automation and CI/CD integration ⭐ **NEW**
+
+#### Advanced Topics
+- **[CI/CD Integration](./docs/CI_CD_GUIDE.md)** - Best practices for pipelines ⭐ **NEW: Offline mode, Windows examples**
+- **[Hooks System Quick Start](./docs/HOOKS_QUICKSTART.md)** - 5-minute hooks setup ⭐ **NEW**
+- **[Hooks System (Full)](./docs/HOOKS.md)** - Complete hooks documentation ⭐ **NEW: Security best practices**
+- **[Compliance Use Cases](./docs/COMPLIANCE_USE_CASES.md)** - SOC 2, ISO 27001, SBOM ⭐ **NEW**
+- **[Smart Caching](./docs/advanced/SMART_CACHING.md)** - Intelligent version caching ⭐ **NEW: Network reliability**
+- **[What NOT to Sync](./docs/advanced/WHAT_NOT_TO_SYNC.md)** - Sharing goenv across machines
+- **[Cache Troubleshooting](./docs/CACHE_TROUBLESHOOTING.md)** - Cache issues and migration ⭐ **NEW**
+- **[System Go Coexistence](./docs/SYSTEM_GO_COEXISTENCE.md)** - Using with system-installed Go ⭐ **NEW**
+
+#### For Contributors
+- **[Contributing](./docs/CONTRIBUTING.md)** - How to contribute (code & documentation)
+- **[Documentation Review Checklist](./docs/DOCUMENTATION_REVIEW_CHECKLIST.md)** - Doc quality checklist ⭐ **NEW**
+- **[Testing Roadmap](./docs/TESTING_ROADMAP.md)** - Test coverage gaps and priorities 🆕
+
+#### Other
 - **[Code of Conduct](./docs/CODE_OF_CONDUCT.md)** - Community guidelines
 - **[Changelog](./docs/CHANGELOG.md)** - Version history

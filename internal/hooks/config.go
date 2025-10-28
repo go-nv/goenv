@@ -19,7 +19,6 @@ type Config struct {
 	Aliases           map[string]string   `yaml:"aliases,omitempty"`
 	DefaultTools      []string            `yaml:"default_tools,omitempty"`
 	Hooks             map[string][]Action `yaml:"hooks"`
-	ConditionalHooks  []ConditionalHook   `yaml:"conditional_hooks,omitempty"`
 }
 
 // Settings contains global hook settings
@@ -38,18 +37,6 @@ type Action struct {
 	Action    string                 `yaml:"action"`
 	Condition string                 `yaml:"condition,omitempty"`
 	Params    map[string]interface{} `yaml:",inline"`
-}
-
-// ConditionalHook allows running hooks only when conditions are met
-type ConditionalHook struct {
-	Condition Condition           `yaml:"condition"`
-	Hooks     map[string][]Action `yaml:"hooks"`
-}
-
-// Condition represents a condition for conditional hooks
-type Condition struct {
-	EnvVar string `yaml:"env_var"`
-	Equals string `yaml:"equals"`
 }
 
 // HookContext provides runtime context to actions

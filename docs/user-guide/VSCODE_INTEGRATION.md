@@ -14,9 +14,173 @@ This guide shows how to use goenv seamlessly with Visual Studio Code and the off
 
 ## Quick Start
 
-### Option 1: Automatic Setup (Easiest - NEW! ⚡)
+## 🎯 Choosing Your Configuration Mode
 
-The fastest way to set up VS Code integration:
+**TL;DR: How do you launch VS Code?**
+
+| **You launch VS Code from...**    | **Use this mode**            | **Command**                    | **Why**                                                       |
+| --------------------------------- | ---------------------------- | ------------------------------ | ------------------------------------------------------------- |
+| 🖱️ **Dock / Finder / Start Menu** | **Absolute Paths** (default) | `goenv vscode init`            | Works even when VS Code doesn't inherit shell environment     |
+| 💻 **Terminal** (`code .`)        | **Environment Variables**    | `goenv vscode init --env-vars` | Automatically updates when you change Go versions             |
+| 🤷 **Not sure / Both**            | **Absolute Paths** (default) | `goenv vscode init`            | Most reliable; use `goenv vscode sync` when changing versions |
+
+### Understanding the Two Modes
+
+#### Absolute Paths Mode (Default - Recommended)
+
+```json
+{
+  "go.goroot": "${env:HOME}/.goenv/versions/1.23.2",
+  "go.gopath": "${env:HOME}/go/1.23.2"
+}
+```
+
+**✅ Pros:**
+
+- Works when VS Code is opened from GUI (Dock, Finder, Start Menu)
+- Reliable - doesn't depend on shell environment
+- Team-friendly - uses `${env:HOME}` for portability
+
+**❌ Cons:**
+
+- Must run `goenv vscode sync` after changing Go versions
+- Settings contain specific version number
+
+**When to use:** You open VS Code from the GUI, or you're not sure
+
+#### Environment Variables Mode
+
+```json
+{
+  "go.goroot": "${env:GOROOT}",
+  "go.gopath": "${env:GOPATH}"
+}
+```
+
+**✅ Pros:**
+
+- Automatically tracks current Go version
+- No need to sync after `goenv use` commands
+- Cleaner settings files
+
+**❌ Cons:**
+
+- **ONLY works if you launch VS Code from a terminal** with goenv initialized
+- **Reload Window does NOT refresh environment variables**
+- Must quit VS Code and restart from terminal to pick up changes
+
+**When to use:** You always launch VS Code from terminal (`code .`)
+
+### ⚠️ Critical: Reload Window vs Restart
+
+**Common mistake:** Using "Developer: Reload Window" after changing Go versions
+
+| **Action**                             | **Refreshes Environment?** | **When to Use**                   |
+| -------------------------------------- | -------------------------- | --------------------------------- |
+| ⌘+Shift+P → "Developer: Reload Window" | ❌ **NO**                  | Testing extensions, UI updates    |
+| Quit VS Code → `code .` from terminal  | ✅ **YES**                 | After `goenv use` (env vars mode) |
+| `goenv vscode sync` → Reload Window    | ✅ **YES**                 | After `goenv use` (absolute mode) |
+
+**Environment Variables Mode requires full restart:**
+
+```bash
+# Wrong - Reload Window does NOT work for env vars!
+goenv use 1.24.0
+# ⌘+Shift+P → "Developer: Reload Window"  ❌ Still uses old version
+
+# Correct - Must restart from terminal
+goenv use 1.24.0
+# Quit VS Code completely
+code .  ✅ Now uses new version
+```
+
+**Absolute Paths Mode uses sync command:**
+
+```bash
+# When using absolute paths
+goenv use 1.24.0
+goenv vscode sync  # Updates settings.json with new version
+# ⌘+Shift+P → "Developer: Reload Window"  ✅ Works!
+```
+
+### 📋 Quick Decision Flowchart
+
+```
+How do you typically open VS Code?
+│
+├─ From GUI (Dock/Finder/Start Menu)
+│  └─> Use ABSOLUTE PATHS mode (default)
+│      Command: goenv vscode init
+│      After version change: goenv vscode sync
+│
+├─ Always from terminal (code .)
+│  └─> Use ENVIRONMENT VARIABLES mode
+│      Command: goenv vscode init --env-vars
+│      After version change: Quit VS Code, reopen from terminal
+│
+└─ Sometimes GUI, sometimes terminal
+   └─> Use ABSOLUTE PATHS mode (default)
+       Command: goenv vscode init
+       Works in both scenarios with goenv vscode sync
+```
+
+## Quick Start
+
+### Option 1: Complete Setup - All-in-One Command (NEW! ⚡)
+
+The absolute fastest way for new users - does everything in one command:
+
+```bash
+# Navigate to your project
+cd ~/projects/myapp
+
+# Complete setup: init + sync + doctor
+goenv vscode setup
+```
+
+This single command automatically:
+
+- ✅ Creates `.vscode/settings.json` with goenv configuration
+- ✅ Generates `.vscode/extensions.json` (recommends Go extension)
+- ✅ Syncs settings with current Go version
+- ✅ Runs diagnostics to verify everything works
+- ✅ Shows clear error messages if anything needs fixing
+
+**Perfect for:**
+
+- 🆕 First-time goenv + VS Code users
+- 🚀 Quick project onboarding
+- 🔍 Troubleshooting when things aren't working
+- 📦 CI/CD workspace preparation
+
+**Advanced options:**
+
+```bash
+# Use advanced template with gopls settings
+goenv vscode setup --template advanced
+
+# Force overwrite existing settings
+goenv vscode setup --force
+
+# Use environment variables mode (for terminal-only users)
+goenv vscode setup --env-vars
+
+# Dry run (see what would be done)
+goenv vscode setup --dry-run
+```
+
+**What it does behind the scenes:**
+
+```bash
+# Equivalent to running these three commands:
+goenv vscode init      # Create configuration files
+goenv vscode sync      # Update with current Go version
+goenv doctor           # Verify installation
+```
+
+### Option 2: Automatic Setup with `goenv use` (Easiest - NEW! ⚡)
+
+Set project Go version AND configure VS Code in one command:
 
 ```bash
 # Navigate to your project
@@ -79,6 +243,83 @@ goenv vscode init --template monorepo
 goenv vscode init --force
 ```
 
+### 🎒 Portability Knobs (Advanced)
+
+For maximum portability across different machines or team collaboration, goenv provides two special flags:
+
+#### `--workspace-paths`: Workspace-Relative Paths
+
+```bash
+goenv vscode init --workspace-paths
+```
+
+**What it does:** Converts absolute paths to `${workspaceFolder}`-relative syntax where possible.
+
+**Example output:**
+
+```json
+{
+  "go.goroot": "${workspaceFolder}/../.goenv/versions/1.23.2",
+  "go.gopath": "${workspaceFolder}/../go/1.23.2"
+}
+```
+
+**When to use:**
+
+- ✅ Sharing projects where goenv is in a predictable relative location
+- ✅ Monorepos where `.goenv` is checked into the repository
+- ✅ Docker/container setups with mounted volumes at specific paths
+
+**When NOT to use:**
+
+- ❌ Standard goenv installation in `$HOME/.goenv` (absolute paths are clearer)
+- ❌ Team members have different directory structures
+- ❌ Using environment variables mode (this flag only affects absolute path mode)
+
+#### `--versioned-tools`: Per-Version Tools Directory
+
+```bash
+goenv vscode init --versioned-tools
+```
+
+**What it does:** Sets `go.toolsGopath` to use version-specific tools directory instead of shared tools.
+
+**Standard behavior (default):**
+
+```json
+{
+  "go.toolsGopath": "${env:HOME}/go/tools" // Shared across Go versions
+}
+```
+
+**With `--versioned-tools`:**
+
+```json
+{
+  "go.toolsGopath": "${env:HOME}/go/1.23.2/tools" // Isolated per version
+}
+```
+
+**When to use:**
+
+- ✅ Testing tool compatibility with different Go versions
+- ✅ Projects requiring specific tool versions tied to Go version
+- ✅ Avoiding tool conflicts between Go 1.x and 1.y
+
+**When NOT to use:**
+
+- ❌ Normal development (shared tools work fine and save disk space)
+- ❌ CI/CD (tools are typically installed fresh anyway)
+- ❌ You want faster tool updates across all projects
+
+**Combining both flags:**
+
+```bash
+goenv vscode init --workspace-paths --versioned-tools
+```
+
+This creates maximum isolation: workspace-relative paths AND version-specific tools.
+
 **Manual Configuration** (if you prefer):
 
 Add `.vscode/settings.json` to your project for consistent behavior:
@@ -123,6 +364,256 @@ The [Go extension](https://marketplace.visualstudio.com/items?itemName=golang.go
 - Opened via Finder/Spotlight/Dock on macOS
 - Launched via Windows Start Menu or desktop shortcut
 - Opened before shell initialization completes
+
+## Platform-Specific Behavior
+
+VS Code integration with goenv works across all major platforms, but there are important differences in how paths, environment variables, and shell integration work on each operating system.
+
+### Path Separators and Environment Variables
+
+| Aspect               | Linux/macOS                            | Windows                                              |
+| -------------------- | -------------------------------------- | ---------------------------------------------------- |
+| **Path separator**   | Forward slash (`/`)                    | Backslash (`\`) or forward slash (both work)         |
+| **Home variable**    | `${env:HOME}`                          | `${env:USERPROFILE}` (or `${env:HOME}` in Git Bash)  |
+| **Example goroot**   | `/home/user/.goenv/versions/1.23.2/go` | `C:\Users\user\.goenv\versions\1.23.2\go`            |
+| **Example gopath**   | `/home/user/go/1.23.2`                 | `C:\Users\user\go\1.23.2`                            |
+| **Workspace folder** | `${workspaceFolder}/bin`               | `${workspaceFolder}\bin` or `${workspaceFolder}/bin` |
+
+### Recommended Settings by Platform
+
+#### Linux/macOS Settings
+
+```json
+{
+  "go.goroot": "${env:GOROOT}",
+  "go.gopath": "${env:GOPATH}",
+  "go.toolsGopath": "${env:HOME}/go/tools"
+}
+```
+
+**Or with absolute paths:**
+
+```json
+{
+  "go.goroot": "${env:HOME}/.goenv/versions/1.23.2/go",
+  "go.gopath": "${env:HOME}/go/1.23.2",
+  "go.toolsGopath": "${env:HOME}/go/tools"
+}
+```
+
+#### Windows Settings (PowerShell)
+
+```json
+{
+  "go.goroot": "${env:GOROOT}",
+  "go.gopath": "${env:GOPATH}",
+  "go.toolsGopath": "${env:USERPROFILE}\\go\\tools"
+}
+```
+
+**Or with absolute paths:**
+
+```json
+{
+  "go.goroot": "${env:USERPROFILE}\\.goenv\\versions\\1.23.2\\go",
+  "go.gopath": "${env:USERPROFILE}\\go\\1.23.2",
+  "go.toolsGopath": "${env:USERPROFILE}\\go\\tools"
+}
+```
+
+**Windows with Git Bash:**
+
+```json
+{
+  "go.goroot": "${env:GOROOT}",
+  "go.gopath": "${env:GOPATH}",
+  "go.toolsGopath": "${env:HOME}/go/tools"
+}
+```
+
+### Shell Integration by Platform
+
+| Platform    | Default Shell | VS Code Terminal          | goenv init Location                                         |
+| ----------- | ------------- | ------------------------- | ----------------------------------------------------------- |
+| **Linux**   | bash          | bash, zsh, fish           | `~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`       |
+| **macOS**   | zsh (10.15+)  | zsh, bash, fish           | `~/.zshrc`, `~/.bash_profile`, `~/.config/fish/config.fish` |
+| **Windows** | PowerShell    | PowerShell, cmd, Git Bash | PowerShell profile, Git Bash `~/.bashrc`                    |
+
+**Linux Example (`~/.bashrc`):**
+
+```bash
+export GOENV_ROOT="$HOME/.goenv"
+export PATH="$GOENV_ROOT/bin:$PATH"
+eval "$(goenv init -)"
+```
+
+**macOS Example (`~/.zshrc`):**
+
+```bash
+export GOENV_ROOT="$HOME/.goenv"
+export PATH="$GOENV_ROOT/bin:$PATH"
+eval "$(goenv init -)"
+```
+
+**Windows PowerShell Example:**
+
+```powershell
+# PowerShell profile: $PROFILE
+$env:GOENV_ROOT = "$env:USERPROFILE\.goenv"
+$env:PATH = "$env:GOENV_ROOT\bin;$env:PATH"
+Invoke-Expression (goenv init - | Out-String)
+```
+
+**Windows Git Bash Example (`~/.bashrc`):**
+
+```bash
+export GOENV_ROOT="$HOME/.goenv"
+export PATH="$GOENV_ROOT/bin:$PATH"
+eval "$(goenv init -)"
+```
+
+### How VS Code Launches Differ by Platform
+
+| Platform    | GUI Launch                   | Terminal Launch              | Environment Inheritance                                                                  |
+| ----------- | ---------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------- |
+| **Linux**   | Desktop launcher, app menu   | `code .` from terminal       | GUI launch: Limited (systemd user environment)<br>Terminal: Full shell environment       |
+| **macOS**   | Dock, Finder, Spotlight      | `code .` from terminal       | GUI launch: `~/.MacOSX/environment.plist` or launchd<br>Terminal: Full shell environment |
+| **Windows** | Start Menu, desktop shortcut | `code .` from PowerShell/cmd | GUI launch: System environment variables only<br>Terminal: Full shell environment        |
+
+**Implications:**
+
+- **Linux/macOS GUI launches:** May not have `GOROOT`/`GOPATH` unless you configure system environment (not recommended)
+- **Windows GUI launches:** Only sees system environment variables, not PowerShell profile variables
+- **All platforms:** Terminal launch (`code .`) is most reliable for inheriting goenv environment
+
+### Platform-Specific Tips
+
+#### Linux
+
+**Desktop launchers:** If you launch VS Code from app menus/launchers, create a wrapper script:
+
+```bash
+# ~/.local/bin/code-goenv
+#!/bin/bash
+eval "$(goenv init -)"
+exec code "$@"
+```
+
+Then use the wrapper: `code-goenv .` or update your `.desktop` file to use it.
+
+**systemd user environment (advanced):**
+
+```bash
+# Add to ~/.config/environment.d/goenv.conf
+GOENV_ROOT=/home/user/.goenv
+PATH=/home/user/.goenv/shims:/home/user/.goenv/bin:/usr/local/bin:/usr/bin:/bin
+```
+
+#### macOS
+
+**Dock/Finder launches:** Use absolute path mode or configure launchd environment:
+
+```bash
+# Set environment for GUI apps
+launchctl setenv GOENV_ROOT "$HOME/.goenv"
+launchctl setenv PATH "$HOME/.goenv/shims:$PATH"
+```
+
+**Recommended:** Use `goenv vscode init` (absolute paths) and `goenv vscode sync` when changing versions.
+
+**Apple Silicon (ARM64) considerations:**
+
+- Go binaries may be Intel (x86_64) or ARM64 (arm64)
+- VS Code runs natively on ARM64
+- Both work, but ARM64 Go binaries are faster
+- goenv handles architecture automatically
+
+#### Windows
+
+**PowerShell vs Git Bash:**
+
+| Shell      | Path Style     | HOME Variable      | Best For                   |
+| ---------- | -------------- | ------------------ | -------------------------- |
+| PowerShell | `C:\Users\...` | `$env:USERPROFILE` | Native Windows development |
+| Git Bash   | `/c/Users/...` | `$HOME`            | Unix-like environment      |
+
+**Recommendation:** Choose one shell and stick with it. Don't mix PowerShell and Git Bash settings.
+
+**Windows-specific VS Code settings:**
+
+```json
+{
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "go.goroot": "${env:USERPROFILE}\\.goenv\\versions\\1.23.2\\go",
+  "go.gopath": "${env:USERPROFILE}\\go\\1.23.2"
+}
+```
+
+**WSL (Windows Subsystem for Linux):**
+
+If using WSL2, treat it as Linux:
+
+```bash
+# Inside WSL2
+export GOENV_ROOT="$HOME/.goenv"
+eval "$(goenv init -)"
+```
+
+VS Code's WSL extension handles the environment automatically when you use "Remote-WSL: New Window".
+
+### Cross-Platform Configuration (for Teams)
+
+If your team uses multiple platforms, use environment variable references for maximum portability:
+
+```json
+{
+  "go.goroot": "${env:GOROOT}",
+  "go.gopath": "${env:GOPATH}",
+  "go.toolsGopath": "${env:HOME}/go/tools"
+}
+```
+
+**Why this works:**
+
+- `${env:HOME}` resolves to correct value on all platforms
+- `${env:GOROOT}` and `${env:GOPATH}` are set by goenv on all platforms
+- Path separators are handled by Go tooling
+
+**What team members must do:**
+
+1. Install goenv on their platform
+2. Add goenv init to their shell profile
+3. Launch VS Code from terminal (`code .`)
+4. Reload when changing Go versions (quit VS Code, restart from terminal)
+
+**Alternative for teams:** Use absolute paths with `${env:HOME}` or `${env:USERPROFILE}`:
+
+```json
+{
+  "go.goroot": "${env:HOME}/.goenv/versions/1.23.2/go",
+  "go.gopath": "${env:HOME}/go/1.23.2",
+  "go.toolsGopath": "${env:HOME}/go/tools"
+}
+```
+
+Then document the `goenv vscode sync` command for when versions change.
+
+### Platform Support Matrix
+
+| Feature                  | Linux | macOS | Windows | Notes                                                 |
+| ------------------------ | ----- | ----- | ------- | ----------------------------------------------------- |
+| `goenv vscode init`      | ✅    | ✅    | ✅      | Creates settings.json with platform-appropriate paths |
+| `goenv vscode sync`      | ✅    | ✅    | ✅      | Updates settings when Go version changes              |
+| `goenv vscode doctor`    | ✅    | ✅    | ✅      | Checks platform-specific settings                     |
+| Environment variables    | ✅    | ✅    | ✅      | Requires shell initialization (terminal launch)       |
+| Absolute paths           | ✅    | ✅    | ✅      | Works with GUI launches                               |
+| Workspace-relative paths | ✅    | ✅    | ✅      | Useful for monorepos and containers                   |
+
+**For more platform details, see:**
+
+- **[Platform Support Matrix](../PLATFORM_SUPPORT.md)** - Comprehensive OS/architecture compatibility
+- **[Installation Guide](INSTALL.md)** - Platform-specific installation instructions
+- **[How It Works](HOW_IT_WORKS.md)** - Understanding goenv's cross-platform architecture
 
 ## Automated Setup (NEW!)
 
@@ -481,6 +972,67 @@ For large repositories with multiple Go versions:
 
 ## Troubleshooting
 
+### 🔍 Quick Troubleshooting Matrix
+
+Use this matrix to diagnose and fix common VS Code + goenv issues:
+
+| **Symptom**                                            | **Root Cause**                          | **Mode** | **Quick Fix**                                          | **Prevention**                                  |
+| ------------------------------------------------------ | --------------------------------------- | -------- | ------------------------------------------------------ | ----------------------------------------------- |
+| 🔴 **Wrong Go version in VS Code after `goenv use`**   | Used "Reload Window" instead of restart | Env Vars | Quit VS Code → relaunch from terminal (`code .`)       | Use absolute paths mode or always restart fully |
+| 🔴 **Terminal shows correct version, VS Code doesn't** | VS Code opened from GUI, not terminal   | Env Vars | Switch to absolute mode: `goenv vscode init` (default) | Launch VS Code from terminal only               |
+| 🔴 **`$GOROOT` empty in integrated terminal**          | `goenv init` not in shell profile       | Env Vars | Add `eval "$(goenv init -)"` to `~/.bashrc`/`~/.zshrc` | Check shell config with new terminal            |
+| 🔴 **gopls not found / Go tools fail**                 | Tools installed for wrong Go version    | Both     | Run `goenv tools update` or `goenv rehash`             | Update tools after version changes              |
+| 🟡 **Settings don't update when changing versions**    | Using absolute paths                    | Absolute | Run `goenv vscode sync` after `goenv use`              | Use env vars mode or remember to sync           |
+| 🟡 **Team members see different Go versions**          | Absolute paths in version control       | Absolute | Switch to env vars: `goenv vscode init --env-vars`     | Use env vars for shared projects                |
+| 🟡 **VS Code can't find Go at all**                    | No settings configured                  | None     | Run `goenv vscode init`                                | Configure on project setup                      |
+| 🟢 **Everything works from terminal but not GUI**      | Expected behavior with env vars         | Env Vars | This is normal! Use absolute mode for GUI launches     | Understand mode differences                     |
+
+### 🚦 Mode-Specific Workflows
+
+**If using Absolute Paths Mode (default):**
+
+```bash
+# After changing Go version:
+goenv use 1.24.0
+goenv vscode sync              # Updates paths in settings.json
+# ⌘+Shift+P → "Developer: Reload Window"  ✅ Works!
+```
+
+**If using Environment Variables Mode (`--env-vars`):**
+
+```bash
+# After changing Go version:
+goenv use 1.24.0
+# Quit VS Code completely (⌘+Q on macOS)
+code .                         # Restart from terminal  ✅ Works!
+# Note: "Reload Window" will NOT work  ❌
+```
+
+### 🎯 Decision: Which Mode Am I Using?
+
+**Check your `.vscode/settings.json`:**
+
+```json
+// Absolute Paths Mode:
+{
+  "go.goroot": "${env:HOME}/.goenv/versions/1.23.2",  // ← Contains version number
+  "go.gopath": "${env:HOME}/go/1.23.2"
+}
+
+// Environment Variables Mode:
+{
+  "go.goroot": "${env:GOROOT}",  // ← References env var
+  "go.gopath": "${env:GOPATH}"
+}
+```
+
+**Or run:**
+
+```bash
+goenv vscode status
+# Shows: "Mode: Absolute paths" or "Mode: Environment variables"
+```
+
 ### VS Code Shows Wrong Go Version After Changing Versions
 
 **Symptom:** After running `goenv use 1.23.2 --vscode`, VS Code still shows the old Go version (e.g., 1.24.4).
@@ -676,7 +1228,49 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 
 ## Best Practices
 
-### 1. Always Use .go-version Files
+### 1. Choose the Right Configuration Mode for Your Workflow
+
+**🎯 The Golden Rule:**
+
+> **If you launch VS Code from the Dock/Finder/Start Menu → Use Absolute Paths (default)**  
+> **If you always launch from terminal (`code .`) → Use Environment Variables**
+
+#### For Solo Projects (Use Absolute Paths - Default)
+
+```bash
+# Just run this - works from anywhere
+goenv vscode init
+```
+
+**Why:** Most reliable for solo developers who might launch VS Code from the GUI.
+
+#### For Team Projects (Use Environment Variables)
+
+```bash
+# Use env vars for team consistency
+goenv vscode init --env-vars
+```
+
+**Why:** Team members can have different GOENV_ROOT locations. Environment variables work across different setups.
+
+**Add to README.md:**
+
+```markdown
+## VS Code Setup
+
+This project uses goenv with environment variable mode.
+
+**Required:**
+
+1. Install goenv and initialize: `eval "$(goenv init -)"`
+2. Launch VS Code from terminal: `code .`
+3. After changing Go versions: Quit VS Code and relaunch from terminal
+
+**Important:** Do NOT use "Developer: Reload Window" - it won't refresh environment variables.
+Always quit and restart VS Code from your terminal.
+```
+
+### 2. Always Use .go-version Files
 
 Commit `.go-version` to your repository:
 
@@ -688,7 +1282,7 @@ git commit -m "Set Go version to 1.22.0"
 
 This ensures all team members use the same Go version.
 
-### 2. Include .vscode/settings.json
+### 3. Include .vscode/settings.json (With Important Notes)
 
 Make VS Code integration seamless for your team:
 
@@ -697,7 +1291,7 @@ git add .vscode/settings.json
 git commit -m "Add VS Code Go configuration"
 ```
 
-**Recommended settings.json:**
+**Recommended settings.json (Environment Variables Mode - for teams):**
 
 ```json
 {
@@ -715,23 +1309,128 @@ git commit -m "Add VS Code Go configuration"
 }
 ```
 
-### 3. Document Setup in README
+**⚠️ Important for Team Projects:**
 
-Add to your project's README:
+Add this comment to the top of your `.vscode/settings.json`:
 
-```markdown
+```json
+{
+  // This project uses goenv with environment variables.
+  // IMPORTANT: Launch VS Code from terminal (code .) to inherit environment.
+  // After changing Go versions, quit VS Code completely and restart from terminal.
+  // "Developer: Reload Window" will NOT work!
+
+  "go.goroot": "${env:GOROOT}",
+  "go.gopath": "${env:GOPATH}"
+}
+```
+
+**Alternative for Mixed Launch Methods (Absolute Paths):**
+
+If team members might launch from GUI or terminal:
+
+```json
+{
+  // Using absolute paths mode - works from GUI or terminal.
+  // After changing Go versions, run: goenv vscode sync
+
+  "go.goroot": "${env:HOME}/.goenv/versions/1.23.2",
+  "go.gopath": "${env:HOME}/go/1.23.2"
+}
+```
+
+**⚠️ Note:** With absolute paths, remember to add `.vscode/settings.json` to `.gitignore` if paths are user-specific, OR use `${env:HOME}` to make them portable.
+
+### 4. Document Setup in README
+
+Add comprehensive setup instructions to your project's README:
+
+**For Environment Variables Mode (recommended for teams):**
+
+````markdown
 ## Development Setup
 
 This project uses goenv to manage Go versions.
 
-1. Install goenv: https://github.com/yourusername/goenv
-2. Install Go version: `goenv install`
-3. Launch VS Code from terminal: `code .`
+### First Time Setup
 
-The Go version is specified in `.go-version`.
-```
+1. **Install goenv:**
 
-### 4. Use Shell Initialization
+   ```bash
+   # macOS/Linux
+   curl -fsSL https://github.com/go-nv/goenv/raw/master/install.sh | bash
+
+   # Or see: https://github.com/go-nv/goenv#installation
+   ```
+````
+
+2. **Initialize goenv in your shell:**
+
+   ```bash
+   # Add to ~/.bashrc, ~/.zshrc, or equivalent
+   eval "$(goenv init -)"
+
+   # Restart shell or run: exec $SHELL
+   ```
+
+3. **Install Go version:**
+
+   ```bash
+   cd /path/to/project
+   goenv install  # Reads .go-version file
+   ```
+
+4. **Launch VS Code from terminal:**
+   ```bash
+   code .
+   ```
+
+### Changing Go Versions
+
+After running `goenv use <version>`:
+
+**IMPORTANT:** You MUST restart VS Code properly:
+
+1. Quit VS Code completely (⌘+Q on macOS, not just close window)
+2. Relaunch from terminal: `code .`
+
+**Common Mistake:** Using "Developer: Reload Window" (⌘+Shift+P) does NOT refresh environment variables!
+
+### Troubleshooting
+
+- **VS Code shows wrong Go version:** Quit VS Code and restart from terminal
+- **`$GOROOT` is empty:** Ensure `eval "$(goenv init -)"` is in your shell config
+- **gopls not found:** Run `goenv tools update` after changing versions
+
+````
+
+**For Absolute Paths Mode (solo projects):**
+
+```markdown
+## Development Setup
+
+This project uses goenv with absolute path configuration.
+
+### First Time Setup
+
+1. Install goenv (see main docs)
+2. Install Go: `goenv install`
+3. Initialize VS Code: `goenv vscode init`
+4. Open VS Code any way you like (GUI or terminal)
+
+### Changing Go Versions
+
+After running `goenv use <version>`:
+
+```bash
+goenv vscode sync  # Updates paths in .vscode/settings.json
+````
+
+Then reload VS Code: ⌘+Shift+P → "Developer: Reload Window"
+
+````
+
+### 5. Use Shell Initialization
 
 Ensure goenv is initialized in your shell profile:
 
@@ -741,7 +1440,7 @@ Ensure goenv is initialized in your shell profile:
 export GOENV_ROOT="$HOME/.goenv"
 export PATH="$GOENV_ROOT/bin:$PATH"
 eval "$(goenv init -)"
-```
+````
 
 **Zsh** (`~/.zshrc`):
 

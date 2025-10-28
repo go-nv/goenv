@@ -8,6 +8,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -57,6 +58,11 @@ func runVersions(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(cmd.OutOrStdout(), "--skip-aliases")
 		return nil
 	}
+
+	// Deprecation warning
+	fmt.Fprintf(cmd.OutOrStderr(), "%sDeprecation warning: 'goenv versions' is a legacy command. Use 'goenv list' instead.\n", utils.Emoji("⚠️  "))
+	fmt.Fprintf(cmd.OutOrStderr(), "  Modern command: goenv list\n")
+	fmt.Fprintf(cmd.OutOrStderr(), "  See: goenv help list\n\n")
 
 	// Handle invalid arguments (BATS test expects usage error)
 	if len(args) > 0 {

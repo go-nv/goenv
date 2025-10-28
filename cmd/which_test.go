@@ -3,7 +3,6 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -11,30 +10,6 @@ import (
 )
 
 // Helper to create an executable in a version's bin directory
-func createExecutable(t *testing.T, testRoot, version, execName string) {
-	var binDir string
-	if strings.Contains(version, "/") {
-		// Absolute path like "${GOENV_TEST_DIR}/bin"
-		binDir = version
-	} else {
-		// Version name like "1.10.3"
-		binDir = filepath.Join(testRoot, "versions", version, "bin")
-	}
-
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-
-	execPath := filepath.Join(binDir, execName)
-	content := "#!/bin/sh\necho 'mock executable'\n"
-	if runtime.GOOS == "windows" {
-		execPath += ".bat"
-		content = "@echo off\necho mock executable\n"
-	}
-	if err := os.WriteFile(execPath, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create executable: %v", err)
-	}
-}
 
 func TestWhichCommand(t *testing.T) {
 	tests := []struct {

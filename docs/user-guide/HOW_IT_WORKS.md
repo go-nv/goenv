@@ -97,8 +97,7 @@ reading it from the following sources, in this order:
    Go. (In other words, whatever version would run if goenv isn't present in
    `PATH`.)
 
-**NOTE:** You can activate multiple versions at the same time, including multiple
-versions of Go simultaneously or per project.
+**NOTE:** The precedence system allows you to work on multiple projects with different Go versions simultaneously. Each shell session or directory can have its own active version (via `goenv shell` or `.go-version` files), but only **one Go version is active** in any given context. For example, you can have Go 1.22.0 active in one terminal and Go 1.23.2 active in another terminal or project directory—the versions don't conflict because each context resolves to a single version through the precedence chain above.
 
 ## Locating the Go Installation
 
@@ -134,6 +133,68 @@ versions/1.21.0/
 
 As far as goenv is concerned, version names are simply the directories in
 the versions directory.
+
+## GOPATH Integration: Where Tools Land
+
+When you install tools with `go install`, goenv automatically manages version-specific GOPATH directories:
+
+**Default structure:**
+
+```
+$HOME/go/
+├── 1.21.0/
+│   ├── bin/           # Tools installed with Go 1.21.0
+│   │   ├── gopls
+│   │   ├── goimports
+│   │   └── ...
+│   ├── pkg/
+│   └── src/
+├── 1.22.0/
+│   ├── bin/           # Tools installed with Go 1.22.0
+│   │   ├── gopls
+│   │   └── ...
+│   └── ...
+└── 1.23.2/
+    └── bin/           # Tools installed with Go 1.23.2
+        └── ...
+```
+
+**How it works:**
+
+1. **Installation:** When you run `go install`, the tool is placed in `$HOME/go/{version}/bin/`
+2. **Shim creation:** Running `goenv rehash` (or `goenv use`) creates shims in `~/.goenv/shims/`
+3. **Version routing:** Shims automatically route to the active Go version's GOPATH bin directory
+4. **Isolation:** Tools from different Go versions never conflict
+
+**Example workflow:**
+
+```bash
+# Using Go 1.22.0
+goenv use 1.22.0
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+# → Installs to: $HOME/go/1.22.0/bin/golangci-lint
+
+goenv rehash
+golangci-lint version  # ✅ Uses tool from Go 1.22.0's GOPATH
+
+# Switch to Go 1.21.0
+goenv use 1.21.0
+golangci-lint version  # ⚠️  command not found (not installed for this version)
+
+# Install for this version
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+# → Installs to: $HOME/go/1.21.0/bin/golangci-lint
+
+goenv rehash
+golangci-lint version  # ✅ Now uses tool from Go 1.21.0's GOPATH
+```
+
+**Configuration:**
+
+- `GOENV_GOPATH_PREFIX` - Change base directory (default: `$HOME/go`)
+- `GOENV_DISABLE_GOPATH` - Set to `1` to disable version-specific GOPATH
+
+See [GOPATH Integration Guide](../advanced/GOPATH_INTEGRATION.md) for complete details, configuration options, and advanced usage.
 
 ## Implementation
 

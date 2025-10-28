@@ -130,6 +130,31 @@ Provides actionable advice for fixing any issues found.`,
 	RunE: runVSCodeDoctor,
 }
 
+var vscodeSetupCmd = &cobra.Command{
+	Use:   "setup",
+	Short: "One-command VS Code setup (init + sync + doctor)",
+	Long: `Unified command for new users to set up VS Code integration.
+
+This command combines three operations:
+  1. Initialize .vscode/settings.json (vscode init)
+  2. Sync with current Go version (vscode sync)
+  3. Validate configuration (vscode doctor)
+
+Perfect for getting started quickly without running multiple commands.`,
+	Example: `  # Complete VS Code setup in one command
+  goenv vscode setup
+
+  # Setup with advanced template
+  goenv vscode setup --template advanced
+
+  # Preview what would be done
+  goenv vscode setup --dry-run
+
+  # Setup and exit with error if validation fails
+  goenv vscode setup --strict`,
+	RunE: runVSCodeSetup,
+}
+
 var vscodeInitFlags struct {
 	force          bool
 	template       string
@@ -157,8 +182,16 @@ var vscodeDoctorFlags struct {
 	json bool
 }
 
+var vscodeSetupFlags struct {
+	template string
+	dryRun   bool
+	strict   bool
+	json     bool
+}
+
 func init() {
 	rootCmd.AddCommand(vscodeCmd)
+	vscodeCmd.AddCommand(vscodeSetupCmd)
 	vscodeCmd.AddCommand(vscodeInitCmd)
 	vscodeCmd.AddCommand(vscodeSyncCmd)
 	vscodeCmd.AddCommand(vscodeStatusCmd)
@@ -188,12 +221,20 @@ func init() {
 	// Doctor flags
 	vscodeDoctorCmd.Flags().BoolVar(&vscodeDoctorFlags.json, "json", false, "Output diagnostics as JSON")
 
+	// Setup flags
+	vscodeSetupCmd.Flags().StringVarP(&vscodeSetupFlags.template, "template", "t", "basic", "Template to use (basic, advanced, monorepo)")
+	vscodeSetupCmd.Flags().BoolVar(&vscodeSetupFlags.dryRun, "dry-run", false, "Preview what would be done")
+	vscodeSetupCmd.Flags().BoolVar(&vscodeSetupFlags.strict, "strict", false, "Exit with error if doctor validation fails")
+	vscodeSetupCmd.Flags().BoolVar(&vscodeSetupFlags.json, "json", false, "Output doctor results in JSON")
+
+	vscodeSetupCmd.SilenceUsage = true
 	vscodeInitCmd.SilenceUsage = true
 	vscodeSyncCmd.SilenceUsage = true
 	vscodeStatusCmd.SilenceUsage = true
 	vscodeRevertCmd.SilenceUsage = true
 	vscodeDoctorCmd.SilenceUsage = true
 
+	helptext.SetCommandHelp(vscodeSetupCmd)
 	helptext.SetCommandHelp(vscodeInitCmd)
 	helptext.SetCommandHelp(vscodeSyncCmd)
 	helptext.SetCommandHelp(vscodeStatusCmd)
@@ -391,28 +432,45 @@ func initializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 
 	// Write settings.json
 	if existingSettings != nil && !force {
-		// File exists - update only the specific Go keys we care about
-		if useAbsolutePaths {
-			fmt.Fprintf(cmd.OutOrStdout(), "%sUpdating Go paths with absolute values\n", utils.Emoji("ℹ️  "))
+		// File exists - check if any values actually differ before updating
+		hasChanges := false
+		for key, newVal := range keysToUpdate {
+			oldVal := existingSettings[key]
+			if oldVal != newVal {
+				hasChanges = true
+				break
+			}
+		}
+
+		if !hasChanges {
+			// No changes needed - skip backup and update
+			fmt.Fprintf(cmd.OutOrStdout(), "✓ Settings are already up-to-date, no changes needed\n")
 		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "%sUpdating Go paths with environment variables\n", utils.Emoji("ℹ️  "))
-		}
+			// File exists - update only the specific Go keys we care about
+			if useAbsolutePaths {
+				fmt.Fprintf(cmd.OutOrStdout(), "%sUpdating Go paths with absolute values\n", utils.Emoji("ℹ️  "))
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "%sUpdating Go paths with environment variables\n", utils.Emoji("ℹ️  "))
+			}
 
-		// Backup before modifying
-		if err := vscode.BackupFile(settingsFile); err != nil {
-			return fmt.Errorf("failed to create backup: %w", err)
-		}
+			// Backup before modifying
+			if err := vscode.BackupFile(settingsFile); err != nil {
+				return fmt.Errorf("failed to create backup: %w", err)
+			}
 
-		if err := vscode.UpdateJSONKeys(settingsFile, keysToUpdate); err != nil {
-			return fmt.Errorf("failed to update settings.json: %w", err)
+			if err := vscode.UpdateJSONKeys(settingsFile, keysToUpdate); err != nil {
+				return fmt.Errorf("failed to update settings.json: %w", err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "✓ Updated %s\n", settingsFile)
 		}
 	} else {
 		// No existing file or force mode - create new file
 		if err := vscode.WriteJSONFile(settingsFile, settings); err != nil {
 			return fmt.Errorf("failed to write settings.json: %w", err)
 		}
+		fmt.Fprintf(cmd.OutOrStdout(), "✓ Created %s\n", settingsFile)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "✓ Created/updated %s\n", settingsFile)
 
 	// Generate and write extensions.json
 	// Read existing extensions if file exists
@@ -684,17 +742,38 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 	if vscodeSyncFlags.dryRun || vscodeSyncFlags.diff {
 		fmt.Fprintf(cmd.OutOrStdout(), "%sPreview of changes:\n", utils.Emoji("🔍 "))
 		fmt.Fprintln(cmd.OutOrStdout())
+		hasChanges := false
 		for key, newVal := range keysToUpdate {
 			oldVal := existingSettings[key]
 			if oldVal != newVal {
+				hasChanges = true
 				fmt.Fprintf(cmd.OutOrStdout(), "  %s:\n", key)
 				fmt.Fprintf(cmd.OutOrStdout(), "    - %v\n", oldVal)
 				fmt.Fprintf(cmd.OutOrStdout(), "    + %v\n", newVal)
 			}
 		}
+		if !hasChanges {
+			fmt.Fprintln(cmd.OutOrStdout(), "  (No changes needed - settings are already correct)")
+		}
 		if vscodeSyncFlags.dryRun || vscodeSyncFlags.diff {
 			return nil
 		}
+	}
+
+	// Check if any values actually differ before updating
+	hasChanges := false
+	for key, newVal := range keysToUpdate {
+		oldVal := existingSettings[key]
+		if oldVal != newVal {
+			hasChanges = true
+			break
+		}
+	}
+
+	if !hasChanges {
+		// No changes needed - skip backup and update
+		fmt.Fprintf(cmd.OutOrStdout(), "✓ Settings are already synced to Go %s\n", version)
+		return nil
 	}
 
 	// Backup before modifying
@@ -1100,6 +1179,89 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "%sAll checks passed! Your VS Code integration is healthy.\n", utils.Emoji("✅ "))
 	}
+
+	return nil
+}
+
+// runVSCodeSetup runs unified setup (init + sync + doctor)
+func runVSCodeSetup(cmd *cobra.Command, args []string) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "%sRunning unified VS Code setup...\n\n",
+		utils.Emoji("🚀 "))
+
+	// Step 1: Initialize
+	fmt.Fprintf(cmd.OutOrStdout(), "%sStep 1/3: Initializing VS Code workspace\n",
+		utils.Emoji("📝 "))
+
+	// Set init flags for this invocation
+	originalForce := vscodeInitFlags.force
+	originalTemplate := vscodeInitFlags.template
+	originalDryRun := vscodeInitFlags.dryRun
+
+	vscodeInitFlags.force = true // Always overwrite in setup
+	vscodeInitFlags.template = vscodeSetupFlags.template
+	vscodeInitFlags.dryRun = vscodeSetupFlags.dryRun
+
+	err := runVSCodeInit(cmd, args)
+
+	// Restore original flags
+	vscodeInitFlags.force = originalForce
+	vscodeInitFlags.template = originalTemplate
+	vscodeInitFlags.dryRun = originalDryRun
+
+	if err != nil {
+		return fmt.Errorf("init failed: %w", err)
+	}
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Step 2: Sync (only if not dry-run)
+	if !vscodeSetupFlags.dryRun {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 2/3: Syncing with current Go version\n",
+			utils.Emoji("🔄 "))
+
+		// Set sync flags
+		originalSyncDryRun := vscodeSyncFlags.dryRun
+		vscodeSyncFlags.dryRun = false
+
+		err = runVSCodeSync(cmd, args)
+
+		// Restore original flag
+		vscodeSyncFlags.dryRun = originalSyncDryRun
+
+		if err != nil {
+			// Sync might fail if using env vars (which is ok), or if no settings exist yet
+			// Don't fail the whole setup, just warn
+			fmt.Fprintf(cmd.OutOrStderr(), "%sSync step skipped: %v\n",
+				utils.Emoji("ℹ️  "), err)
+		}
+		fmt.Fprintln(cmd.OutOrStdout())
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 2/3: Skipping sync (dry-run mode)\n\n",
+			utils.Emoji("⏭️  "))
+	}
+
+	// Step 3: Doctor
+	fmt.Fprintf(cmd.OutOrStdout(), "%sStep 3/3: Validating configuration\n",
+		utils.Emoji("🔍 "))
+
+	// Set doctor flags
+	originalDoctorJSON := vscodeDoctorFlags.json
+	vscodeDoctorFlags.json = vscodeSetupFlags.json
+
+	err = runVSCodeDoctor(cmd, args)
+
+	// Restore original flag
+	vscodeDoctorFlags.json = originalDoctorJSON
+
+	if err != nil {
+		if vscodeSetupFlags.strict {
+			return fmt.Errorf("validation failed: %w", err)
+		}
+		fmt.Fprintf(cmd.OutOrStderr(), "%sWarning: Some checks failed (use --strict to fail on errors)\n",
+			utils.Emoji("⚠️  "))
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "\n%sSetup complete! VS Code is ready to use with goenv.\n",
+		utils.Emoji("✅ "))
 
 	return nil
 }

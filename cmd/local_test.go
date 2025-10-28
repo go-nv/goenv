@@ -270,7 +270,7 @@ func TestLocalCommand(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			output := strings.TrimSpace(stdout.String())
+			output := stripDeprecationWarning(stdout.String())
 			if tt.expectOutput != "" {
 				if output != tt.expectOutput {
 					t.Fatalf("expected output %q, got %q", tt.expectOutput, output)

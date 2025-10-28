@@ -1,7 +1,10 @@
 # Hooks System Documentation
 
 ## Table of Contents
+
 - [Overview](#overview)
+- [Security Model](#security-model)
+- [Operational Limits](#operational-limits)
 - [Getting Started](#getting-started)
 - [Hook Points](#hook-points)
 - [Available Actions](#available-actions)
@@ -23,6 +26,7 @@
 The goenv hooks system allows you to execute automated actions at specific points in the goenv lifecycle. Hooks are declarative, defined in a YAML configuration file, and provide a safe way to extend goenv's functionality without writing shell scripts.
 
 **Key Features:**
+
 - **Declarative:** Define what should happen, not how to do it
 - **Safe:** Limited to predefined actions with security controls
 - **Non-blocking:** Hook failures don't break goenv commands
@@ -30,13 +34,441 @@ The goenv hooks system allows you to execute automated actions at specific point
 - **Cross-platform:** Works on Linux, macOS, and Windows
 
 **Common Use Cases:**
+
 - Log Go version installations for audit trails
 - Send webhook notifications to team channels
 - Check disk space before installing large Go versions
 - Set environment variables after version changes
 - Display desktop notifications for long-running operations
 
+## Security Model
+
+The goenv hooks system is designed with security as a priority. All actions have built-in protections, and security controls are **enabled by default**.
+
+### Safe by Default
+
+**SSRF Protection (Server-Side Request Forgery):**
+
+The `http_webhook` action includes comprehensive SSRF protection that is **enabled by default**:
+
+```yaml
+settings:
+  allow_http: false # ✓ Default: HTTPS only, HTTP blocked
+  allow_internal_ips: false # ✓ Default: Internal IPs blocked
+  strict_dns: false # ✓ Default: Lenient DNS validation
+```
+
+**What's Protected by Default:**
+
+- ❌ HTTP URLs blocked (HTTPS required)
+- ❌ Private IP ranges blocked (RFC1918: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`)
+- ❌ Loopback addresses blocked (`127.0.0.0/8`, `::1`)
+- ❌ Link-local addresses blocked (`169.254.0.0/16`, `fe80::/10`)
+- ❌ Carrier-grade NAT blocked (`100.64.0.0/10`)
+- ❌ DNS resolution checks all IPs for private ranges
+- ❌ Pattern matching catches `.internal`, `.local`, `localhost` even if DNS fails
+
+**Example - Blocked by Default:**
+
+```yaml
+# ❌ These will be rejected with default settings
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: http://localhost:3000/api        # HTTP blocked
+        url: https://192.168.1.10/webhook     # Private IP blocked
+        url: https://internal.corp/api        # Internal domain blocked
+        url: http://100.64.1.1/webhook        # CGNAT blocked
+```
+
+**Example - Allowed by Default:**
+
+```yaml
+# ✅ These work with default settings (HTTPS + public IPs)
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+        body: '{"text": "Installed Go {version}"}'
+```
+
+### When to Override Defaults
+
+Only override security defaults when you have a specific, trusted use case:
+
+**Development/Testing - Allow HTTP and Internal IPs:**
+
+```yaml
+# ⚠️ Use only in development - NOT for production
+settings:
+  allow_http: true # Allow HTTP for local testing
+  allow_internal_ips: true # Allow internal network webhooks
+  strict_dns: false # Keep lenient for local DNS
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: http://localhost:8080/webhook
+        body: '{"version": "{version}"}'
+```
+
+**Production - Maximum Security with Strict DNS:**
+
+```yaml
+# 🔒 Maximum security for untrusted environments
+settings:
+  allow_http: false # HTTPS only (default)
+  allow_internal_ips: false # Block internal IPs (default)
+  strict_dns: true # Reject URLs when DNS fails (strict)
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: https://webhook.site/unique-url
+        body: '{"version": "{version}"}'
+```
+
+**Internal Network - Controlled Environment:**
+
+```yaml
+# ⚠️ Use only when targeting trusted internal services
+settings:
+  allow_http: false # Keep HTTPS only
+  allow_internal_ips: true # Allow internal IPs (REQUIRED for internal webhooks)
+  strict_dns: false # Lenient DNS
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: https://webhook.internal.company.com/api
+        body: '{"version": "{version}"}'
+```
+
+### Understanding strict_dns
+
+The `strict_dns` setting controls behavior when DNS resolution fails:
+
+**Lenient Mode (Default: `strict_dns: false`):**
+
+- If DNS fails, falls back to hostname pattern matching
+- Blocks obvious patterns (`localhost`, `.internal`, `.local`)
+- Allows legitimate URLs with temporary DNS issues
+- **Recommended for most users**
+
+**Strict Mode (`strict_dns: true`):**
+
+- If DNS fails and `allow_internal_ips: false`, the URL is rejected
+- Provides maximum SSRF protection
+- May block legitimate webhooks during DNS outages
+- **Recommended for:**
+  - Untrusted environments
+  - High-security deployments
+  - When you can't tolerate any DNS resolution failures
+
+**Example - When strict_dns Helps:**
+
+```yaml
+# Without strict_dns (default):
+# - If DNS is down, "https://api.example.com" might be allowed
+# - Pattern matching provides defense in depth
+
+# With strict_dns: true
+# - If DNS fails for "https://api.example.com", it's rejected
+# - Prevents potential DNS rebinding attacks
+# - Trade-off: legitimate URLs may be blocked during DNS issues
+
+settings:
+  strict_dns: true # Reject when DNS resolution fails
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+        body: '{"text": "Installed {version}"}'
+```
+
+### Security Audit Checklist
+
+Before enabling hooks in production, audit your configuration:
+
+**1. Check HTTPS Enforcement:**
+
+```bash
+# Search for HTTP URLs in your configuration
+grep -i "http://" ~/.goenv/hooks.yaml
+# Should return nothing (or only commented examples)
+```
+
+**2. Review allow_internal_ips Setting:**
+
+```yaml
+# Verify setting matches your intent
+settings:
+  allow_internal_ips: false # ✓ Should be false unless you need internal webhooks
+```
+
+**3. Consider Strict DNS for Production:**
+
+```yaml
+# For maximum security
+settings:
+  strict_dns: true # Consider enabling for untrusted environments
+```
+
+**4. Audit Webhook URLs:**
+
+```bash
+# List all webhook URLs
+grep -A 2 "http_webhook" ~/.goenv/hooks.yaml | grep "url:"
+# Verify all URLs are:
+# - HTTPS (not HTTP)
+# - Public services (not internal IPs)
+# - Trusted endpoints
+```
+
+**5. Test Configuration:**
+
+```bash
+# Validate hooks configuration
+goenv hooks validate
+
+# Test hooks without executing (shows what would run)
+goenv hooks test post_install
+```
+
+### Additional Security Controls
+
+**Command Execution Safety:**
+
+- `run_command` uses args array (not shell evaluation)
+- Control character validation on all string inputs
+- Timeout protection (default 5s, configurable)
+- No shell injection vulnerabilities
+
+**File Operations:**
+
+- Path traversal validation
+- Restricted to user-writable locations
+- Control character filtering in filenames
+
+**Environment Variables:**
+
+- Key/value validation
+- No control characters allowed
+- Scoped to hook execution context only
+
+### Security Resources
+
+- **SSRF Protection Details:** See [http_webhook Security Model](#security-model-1) section
+- **Command Safety:** See [run_command](#run_command) documentation
+- **Best Practices:** See [Best Practices - Security](#security-1) section
+
+## Operational Limits
+
+The hooks system has built-in limits and timeouts to prevent abuse, misconfiguration, and performance degradation.
+
+### Default Limits
+
+All limits are configurable but have sensible defaults:
+
+| **Setting**         | **Default** | **Valid Range** | **Purpose**                            | **Location**                  |
+| ------------------- | ----------- | --------------- | -------------------------------------- | ----------------------------- |
+| `timeout`           | `5s`        | Any duration    | Maximum execution time per action      | `internal/hooks/config.go:70` |
+| `max_actions`       | `10`        | `1` - `100`     | Maximum actions per hook point         | `internal/hooks/config.go:71` |
+| `continue_on_error` | `true`      | boolean         | Whether to continue on action failures | `internal/hooks/config.go:73` |
+
+**Implementation details:**
+
+- **Per-action timeout** (`internal/hooks/executor.go:76-91`): Each action gets its own timeout, not shared across the hook point
+- **Max actions validation** (`internal/hooks/config.go:187-190`): Enforced at config load time per hook point
+- **Continue on error** (`internal/hooks/executor.go:50-56`): Logs errors but continues execution when enabled
+
+### How Limits Work
+
+**Timeout Behavior:**
+
+```yaml
+settings:
+  timeout: "5s" # Each action gets 5 seconds max
+
+hooks:
+  post_install:
+    - action: http_webhook # Gets 5s timeout
+      params:
+        url: https://slow.webhook.com/api
+    - action: run_command # Gets separate 5s timeout
+      params:
+        command: sleep
+        args: ["10"] # ❌ Will timeout after 5s
+```
+
+When an action times out:
+
+- Error message: `action timed out after 5s`
+- If `continue_on_error: true` (default): Next action executes
+- If `continue_on_error: false`: Execution stops, goenv command fails
+
+**Max Actions Limit:**
+
+```yaml
+settings:
+  max_actions: 10 # Hard limit per hook point
+
+hooks:
+  post_install:
+    # ✅ OK: 3 actions (under limit)
+    - action: log_to_file
+      params: { path: "/tmp/install.log", message: "Start" }
+    - action: http_webhook
+      params: { url: "https://api.example.com/webhook" }
+    - action: notify_desktop
+      params: { title: "Done", message: "Go {version} installed" }
+
+  pre_install:
+    # ❌ ERROR: 11 actions (exceeds limit)
+    # Config validation will fail at load time
+```
+
+Validation error if exceeded:
+
+```
+Error: hook point post_install has 11 actions, max is 10
+```
+
+**Continue on Error:**
+
+```yaml
+settings:
+  continue_on_error: true # Default: don't break goenv
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params: { url: "https://flaky.service.com/webhook" }
+      # ⚠️ Fails with network error
+
+    - action: log_to_file
+      params: { path: "/tmp/install.log", message: "Installed" }
+      # ✅ Still executes (continue_on_error: true)
+```
+
+With `continue_on_error: false`:
+
+```yaml
+settings:
+  continue_on_error: false # Stop on first error
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params: { url: "https://broken.service.com/webhook" }
+      # ❌ Fails
+
+    - action: log_to_file
+      # ❌ Never executes (stopped after first failure)
+      # ❌ goenv install command fails
+```
+
+### Recommended Limits by Use Case
+
+**Development/Testing:**
+
+```yaml
+settings:
+  timeout: "10s" # Generous for debugging
+  max_actions: 20 # Allow experimentation
+  continue_on_error: true # Don't break workflow
+```
+
+**Production/CI:**
+
+```yaml
+settings:
+  timeout: "5s" # Fast fail for reliability
+  max_actions: 5 # Keep it simple
+  continue_on_error: true # Never break builds
+```
+
+**Air-gapped/Offline:**
+
+```yaml
+settings:
+  timeout: "30s" # Slow local systems
+  max_actions: 3 # Minimal hooks
+  continue_on_error: true # Resilience
+```
+
+### Preventing Abuse
+
+The limits prevent common misconfigurations:
+
+| **Problem**                | **Limit**                 | **Prevention**                            |
+| -------------------------- | ------------------------- | ----------------------------------------- |
+| Runaway webhook loops      | `timeout: 5s`             | Terminates slow/hanging webhooks          |
+| Excessive action chains    | `max_actions: 10`         | Prevents accidentally complex hook chains |
+| Hanging commands           | `timeout: 5s`             | Kills long-running commands               |
+| Breaking normal operations | `continue_on_error: true` | Logs errors but doesn't fail goenv        |
+
+**Example - Preventing runaway hooks:**
+
+```yaml
+# ❌ Bad: This would hang forever without timeout
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: tail
+        args: ["-f", "/var/log/system.log"]  # Infinite stream
+        # ✅ Timeout kills it after 5s
+
+# ❌ Bad: This creates excessive work
+hooks:
+  post_install:
+    # 50 webhook actions would be rejected
+    # max_actions: 10 limit prevents this at config load
+```
+
+### Configuration Example
+
+Complete example with all limits configured:
+
+```yaml
+version: 1
+enabled: true
+acknowledged_risks: true
+
+settings:
+  timeout: "10s" # Per-action timeout
+  max_actions: 15 # Per hook point limit
+  continue_on_error: true # Resilient execution
+  log_file: "~/.goenv/hooks.log"
+
+hooks:
+  post_install:
+    - action: log_to_file
+      params:
+        path: "~/.goenv/install-audit.log"
+        message: "{timestamp} - Installed Go {version}"
+
+    - action: http_webhook
+      params:
+        url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+        body: '{"text": "Installed Go {version}"}'
+        headers:
+          Content-Type: "application/json"
+```
+
+See [Configuration Options](#configuration-options) for complete settings documentation.
+
 ## Getting Started
+
+> **🔒 Security First:** The hooks system is designed with security by default. HTTPS is enforced, internal IPs are blocked, and all actions have built-in protections. See the [Security Model](#security-model) section for details.
 
 ### 1. Initialize Configuration
 
@@ -58,6 +490,14 @@ acknowledged_risks: true
 ```
 
 **Important:** You must set `acknowledged_risks: true` to acknowledge that hooks can execute actions on your system. Review the generated configuration carefully.
+
+**Security Note:** The default configuration uses safe settings:
+
+- `allow_http: false` - HTTPS only (recommended)
+- `allow_internal_ips: false` - Blocks internal IPs (recommended)
+- `strict_dns: false` - Lenient DNS validation (reasonable default)
+
+Only override these settings if you have a specific, trusted use case (see [Security Model](#security-model)).
 
 ### 3. Configure Your First Hook
 
@@ -94,6 +534,207 @@ See all available actions and hook points:
 goenv hooks list
 ```
 
+## Platform Requirements
+
+Some hook actions have platform-specific dependencies or behaviors. This section documents what's needed on each platform.
+
+### Desktop Notifications (`notify_desktop`)
+
+Desktop notifications work on all platforms but require different system components:
+
+| Platform    | Tool                      | Installation                                                                                                         | Notes                              |
+| ----------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| **Linux**   | libnotify (`notify-send`) | `apt install libnotify-bin` (Debian/Ubuntu)<br>`dnf install libnotify` (Fedora/RHEL)<br>`pacman -S libnotify` (Arch) | Required for desktop notifications |
+| **macOS**   | osascript                 | ✅ Built-in (no installation needed)                                                                                 | Uses AppleScript for notifications |
+| **Windows** | PowerShell                | ✅ Built-in (no installation needed)                                                                                 | Uses Windows Toast notifications   |
+
+**Verify Installation:**
+
+```bash
+# Linux
+which notify-send && echo "✅ notify-send available" || echo "❌ Install libnotify"
+
+# macOS
+which osascript && echo "✅ osascript available"
+
+# Windows (PowerShell)
+Get-Command New-BurntToastNotification -ErrorAction SilentlyContinue
+```
+
+**Example Configuration:**
+
+```yaml
+hooks:
+  post_install:
+    - action: notify_desktop
+      params:
+        title: "Go Installation Complete"
+        message: "Go {version} is now installed"
+        # Works on all platforms - goenv handles the differences
+```
+
+### Command Execution (`run_command`)
+
+The `run_command` action detects and uses the appropriate shell for each platform:
+
+| Platform    | Shells              | Default Shell      | Notes                                            |
+| ----------- | ------------------- | ------------------ | ------------------------------------------------ |
+| **Linux**   | bash, sh, zsh, fish | bash               | Auto-detected from `$SHELL` environment variable |
+| **macOS**   | bash, zsh, fish     | zsh (macOS 10.15+) | Auto-detected from `$SHELL` environment variable |
+| **Windows** | cmd, PowerShell     | PowerShell         | Auto-detected, PowerShell preferred              |
+
+**Cross-Platform Best Practice:**
+
+Use the `args` array instead of shell-specific syntax for maximum compatibility:
+
+```yaml
+# ✅ RECOMMENDED: Cross-platform using args array
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "echo"
+        args:
+          - "Go {version} installed successfully"
+
+# ⚠️ PLATFORM-SPECIFIC: Works but requires specific shell
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - "echo 'Go {version} installed' && go version"
+```
+
+**Platform-Specific Examples:**
+
+```yaml
+# Linux/macOS: Bash script
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - "echo $HOME/.goenv/versions/{version} >> ~/.goenv/version-history"
+
+# Windows: PowerShell script
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "powershell"
+        args:
+          - "-Command"
+          - "Add-Content -Path $env:USERPROFILE\\.goenv\\version-history -Value '{version}'"
+```
+
+### HTTP Webhooks (`http_webhook`)
+
+HTTP webhooks work identically on all platforms. No platform-specific dependencies.
+
+**Network Requirements:**
+
+- HTTPS support (built into Go standard library)
+- Outbound network access (if targeting external services)
+- DNS resolution (for domain names)
+
+**Platform Behavior:**
+
+| Platform    | HTTPS Support | DNS                                  | Proxy Support                                            |
+| ----------- | ------------- | ------------------------------------ | -------------------------------------------------------- |
+| **Linux**   | ✅ Native     | systemd-resolved or /etc/resolv.conf | Respects `HTTP_PROXY`, `HTTPS_PROXY` env vars            |
+| **macOS**   | ✅ Native     | macOS DNS resolver                   | Respects system proxy settings                           |
+| **Windows** | ✅ Native     | Windows DNS resolver                 | Respects system proxy settings and `HTTP_PROXY` env vars |
+
+**Example (works on all platforms):**
+
+```yaml
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+        body: '{"text": "Go {version} installed on {GOOS}/{GOARCH}"}'
+```
+
+### File Operations (`log_to_file`, `check_disk_space`)
+
+File operations work on all platforms with automatic path handling:
+
+**Path Separators:**
+
+| Platform    | Separator                        | Example Path                            | Tilde Expansion                          |
+| ----------- | -------------------------------- | --------------------------------------- | ---------------------------------------- |
+| **Linux**   | Forward slash (`/`)              | `/home/user/.goenv/logs/install.log`    | ✅ `~/.goenv/` → `/home/user/.goenv/`    |
+| **macOS**   | Forward slash (`/`)              | `/Users/user/.goenv/logs/install.log`   | ✅ `~/.goenv/` → `/Users/user/.goenv/`   |
+| **Windows** | Backslash (`\`) or forward slash | `C:\Users\user\.goenv\logs\install.log` | ✅ `~/.goenv/` → `C:\Users\user\.goenv\` |
+
+**Cross-Platform Path Examples:**
+
+```yaml
+# ✅ RECOMMENDED: Tilde expansion works everywhere
+hooks:
+  post_install:
+    - action: log_to_file
+      params:
+        path: ~/.goenv/logs/install.log
+        message: "{timestamp} - Go {version} installed"
+
+# ✅ ALSO WORKS: Absolute paths (but not portable)
+hooks:
+  post_install:
+    - action: log_to_file
+      params:
+        path: /var/log/goenv-install.log  # Linux/macOS
+        # path: C:\Logs\goenv-install.log  # Windows
+        message: "{timestamp} - Go {version} installed"
+```
+
+### Environment Variables (`set_env`)
+
+Environment variables work on all platforms but have different scoping:
+
+| Platform    | Scope               | Persistence    | Notes                                         |
+| ----------- | ------------------- | -------------- | --------------------------------------------- |
+| **Linux**   | Hook execution only | Not persistent | Child processes inherit during hook execution |
+| **macOS**   | Hook execution only | Not persistent | Child processes inherit during hook execution |
+| **Windows** | Hook execution only | Not persistent | Child processes inherit during hook execution |
+
+**Important:** Environment variables set via `set_env` only affect the hook execution context. They do NOT persist after the goenv command completes.
+
+**For persistent environment variables:**
+
+```bash
+# Linux/macOS: Add to shell profile
+echo 'export MY_VAR="value"' >> ~/.bashrc
+
+# Windows: Use PowerShell profile
+Add-Content $PROFILE "Set-Variable -Name MY_VAR -Value 'value'"
+```
+
+### Platform Support Summary
+
+| Action             | Linux | macOS | Windows | External Dependencies                       |
+| ------------------ | ----- | ----- | ------- | ------------------------------------------- |
+| `log_to_file`      | ✅    | ✅    | ✅      | None                                        |
+| `http_webhook`     | ✅    | ✅    | ✅      | Network access (outbound HTTPS)             |
+| `notify_desktop`   | ✅    | ✅    | ✅      | Linux: libnotify<br>macOS/Windows: Built-in |
+| `check_disk_space` | ✅    | ✅    | ✅      | None                                        |
+| `set_env`          | ✅    | ✅    | ✅      | None                                        |
+| `run_command`      | ✅    | ✅    | ✅      | Target command must be available            |
+
+**Platform-Specific Documentation:**
+
+For more details on platform support, cross-platform compatibility, and architecture-specific features, see:
+
+- **[Platform Support Matrix](PLATFORM_SUPPORT.md)** - Comprehensive OS/architecture compatibility
+- **[CI/CD Guide](CI_CD_GUIDE.md)** - Platform-specific CI/CD examples (GitHub Actions, GitLab CI)
+- **[Advanced Configuration](advanced/ADVANCED_CONFIGURATION.md)** - Platform-specific environment setup
+
 ## Hook Points
 
 Hooks can be triggered at 8 different points in the goenv lifecycle:
@@ -101,11 +742,13 @@ Hooks can be triggered at 8 different points in the goenv lifecycle:
 ### Installation Hooks
 
 **`pre_install`**
+
 - **When:** Before installing a Go version
 - **Use cases:** Check disk space, validate prerequisites, send notifications
 - **Variables:** `{version}`, `{hook}`, `{timestamp}`
 
 **`post_install`**
+
 - **When:** After successfully installing a Go version
 - **Use cases:** Log installation, notify team, set up environment
 - **Variables:** `{version}`, `{hook}`, `{timestamp}`
@@ -113,11 +756,13 @@ Hooks can be triggered at 8 different points in the goenv lifecycle:
 ### Uninstallation Hooks
 
 **`pre_uninstall`**
+
 - **When:** Before removing a Go version
 - **Use cases:** Create backups, log removal intent, confirm disk space
 - **Variables:** `{version}`, `{hook}`, `{timestamp}`
 
 **`post_uninstall`**
+
 - **When:** After successfully removing a Go version
 - **Use cases:** Log removal, clean up related files, notify team
 - **Variables:** `{version}`, `{hook}`, `{timestamp}`
@@ -125,11 +770,13 @@ Hooks can be triggered at 8 different points in the goenv lifecycle:
 ### Execution Hooks
 
 **`pre_exec`**
+
 - **When:** Before executing a Go command through goenv
 - **Use cases:** Log command usage, check environment, validate version
 - **Variables:** `{version}`, `{command}`, `{hook}`, `{timestamp}`
 
 **`post_exec`**
+
 - **When:** After executing a Go command through goenv
 - **Use cases:** Log execution time, track usage, send metrics
 - **Variables:** `{version}`, `{command}`, `{hook}`, `{timestamp}`
@@ -137,11 +784,13 @@ Hooks can be triggered at 8 different points in the goenv lifecycle:
 ### Rehash Hooks
 
 **`pre_rehash`**
+
 - **When:** Before regenerating shims
 - **Use cases:** Backup existing shims, log rehash events
 - **Variables:** `{hook}`, `{timestamp}`
 
 **`post_rehash`**
+
 - **When:** After regenerating shims
 - **Use cases:** Verify shims, update shell completions, notify tools
 - **Variables:** `{hook}`, `{timestamp}`
@@ -154,12 +803,13 @@ Write log messages to a file. Great for audit trails and debugging.
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `path` | string | Yes | Absolute or tilde-prefixed path to log file |
-| `message` | string | Yes | Message to write (supports templates) |
+| Parameter | Type   | Required | Description                                 |
+| --------- | ------ | -------- | ------------------------------------------- |
+| `path`    | string | Yes      | Absolute or tilde-prefixed path to log file |
+| `message` | string | Yes      | Message to write (supports templates)       |
 
 **Features:**
+
 - Creates parent directories automatically
 - Appends to existing files
 - Thread-safe writes
@@ -175,7 +825,7 @@ hooks:
       params:
         path: ~/.goenv/logs/install.log
         message: "[{timestamp}] Installed Go {version}"
-  
+
   pre_exec:
     - action: log_to_file
       params:
@@ -184,6 +834,7 @@ hooks:
 ```
 
 **Log Output:**
+
 ```
 [2025-10-16T10:30:45Z] Installed Go 1.21.3
 [2025-10-16T11:15:22Z] Executing 'go build' with Go 1.21.3
@@ -197,12 +848,13 @@ Send HTTP POST requests with JSON payloads. Perfect for team notifications and i
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `url` | string | Yes | HTTP(S) endpoint URL |
-| `body` | string | Yes | JSON payload (supports templates) |
+| Parameter | Type   | Required | Description                       |
+| --------- | ------ | -------- | --------------------------------- |
+| `url`     | string | Yes      | HTTP(S) endpoint URL              |
+| `body`    | string | Yes      | JSON payload (supports templates) |
 
 **Features:**
+
 - Automatic JSON content-type header
 - 5-second timeout (configurable in settings)
 - Template variable interpolation in URL and body
@@ -210,124 +862,189 @@ Send HTTP POST requests with JSON payloads. Perfect for team notifications and i
 - Non-blocking (errors logged but don't fail commands)
 
 **Security:**
+
 - Only HTTP and HTTPS protocols allowed
 - No authentication secrets in config (use environment variables in URL)
 - Timeout protection against hanging requests
 - SSRF protection (see Security Model below)
 
-#### Security Model
+#### http_webhook Security Model
 
 The `http_webhook` action includes comprehensive security controls to prevent Server-Side Request Forgery (SSRF) attacks and protect against malicious URLs.
 
-**Default Security Settings:**
+> **💡 Quick Reference:** For a comprehensive security guide, see the main [Security Model](#security-model) section. This section provides technical details specific to the HTTP webhook action.
+
+**Default Security Settings (Safe by Default):**
 
 All security features are **enabled by default** and configured via global settings:
 
 ```yaml
 settings:
-  allow_http: false         # Default: HTTPS only
-  allow_internal_ips: false # Default: block private IPs
-  strict_dns: false         # Default: lenient DNS validation
+  allow_http: false # ✓ Default: HTTPS only
+  allow_internal_ips: false # ✓ Default: block private IPs (SSRF protection)
+  strict_dns: false # ✓ Default: lenient DNS validation
 ```
 
 **Security Features:**
 
 1. **HTTPS Enforcement** (`allow_http`)
-   - Default: `false` (HTTPS required)
-   - When `false`: HTTP URLs are rejected
+
+   - **Default:** `false` (HTTPS required)
+   - When `false`: HTTP URLs are rejected with error message
    - When `true`: Both HTTP and HTTPS allowed
-   - Recommendation: Keep at `false` for production
+   - **Recommendation:** Keep at `false` for production
+   - **Override only for:** Local development (localhost)
 
 2. **SSRF Protection** (`allow_internal_ips`)
-   - Default: `false` (blocks internal/private IPs)
-   - Blocks access to:
+
+   - **Default:** `false` (blocks internal/private IPs)
+   - **Blocks access to:**
      - RFC1918 private ranges: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
      - Carrier-grade NAT (CGNAT): `100.64.0.0/10`
-     - Loopback: `127.0.0.0/8`
-     - Link-local: `169.254.0.0/16`
-     - IPv6 private ranges: `::1/128`, `fe80::/10`, `fc00::/7`
-   - DNS resolution: Resolves hostnames and checks all returned IPs
-   - Pattern matching: Catches `localhost`, `.internal`, `.lan` patterns even if DNS fails
+     - Loopback: `127.0.0.0/8` (IPv4), `::1/128` (IPv6)
+     - Link-local: `169.254.0.0/16` (IPv4), `fe80::/10` (IPv6)
+     - IPv6 unique local: `fc00::/7`
+   - **DNS resolution:** Resolves hostnames and checks all returned IPs
+   - **Pattern matching:** Catches `localhost`, `.internal`, `.lan`, `.local` patterns even if DNS fails
+   - **Recommendation:** Keep at `false` unless you need to webhook internal services
+   - **Override only when:** You need to send webhooks to trusted internal services
 
 3. **Strict DNS Mode** (`strict_dns`)
-   - Default: `false` (lenient mode)
-   - **Lenient mode** (`strict_dns: false`):
-     - If DNS resolution fails, falls back to hostname pattern checks
-     - Allows URLs with DNS failures if no suspicious patterns detected
-     - Recommended for most users
-   - **Strict mode** (`strict_dns: true`):
-     - Rejects URLs when DNS resolution fails (if `allow_internal_ips: false`)
-     - Provides maximum SSRF protection
-     - May block legitimate URLs with temporary DNS issues
+
+   - **Default:** `false` (lenient mode - recommended for most users)
+
+   **Lenient Mode** (`strict_dns: false`, default):
+
+   - If DNS resolution fails, falls back to hostname pattern checks
+   - Blocks obvious internal patterns: `localhost`, `.internal`, `.lan`, `.local`
+   - Allows URLs with DNS failures if no suspicious patterns detected
+   - **Use case:** Production with reliable DNS, handles temporary DNS failures gracefully
+
+   **Strict Mode** (`strict_dns: true`):
+
+   - Rejects URLs when DNS resolution fails (if `allow_internal_ips: false`)
+   - Provides maximum SSRF protection
+   - May block legitimate URLs with temporary DNS issues
+   - **Use case:** Untrusted environments, maximum security requirements, can tolerate DNS failure impacts
+
+   **When strict_dns Helps:**
+
+   - Prevents DNS rebinding attacks (attacker controls DNS, changes IP after validation)
+   - Ensures every webhook URL can be validated against private IP ranges
+   - Provides defense-in-depth when DNS infrastructure might be compromised
+
+   **Trade-offs:**
+
+   - `strict_dns: true` may fail legitimate webhooks during DNS outages
+   - `strict_dns: false` (default) provides reasonable security with better availability
 
 **Configuration Examples:**
 
 ```yaml
-# Maximum security (recommended for production)
+# ✅ Maximum security (recommended for production)
 settings:
-  allow_http: false         # HTTPS only
+  allow_http: false # HTTPS only
   allow_internal_ips: false # Block internal IPs
-  strict_dns: true          # Reject on DNS failure
+  strict_dns: true # Reject on DNS failure (strict)
 
 hooks:
   post_install:
     - action: http_webhook
-      url: https://webhooks.example.com/notify
-      body: '{"version": "{version}"}'
+      params:
+        url: https://webhooks.example.com/notify
+        body: '{"version": "{version}"}'
 ```
 
 ```yaml
-# Development/testing (allow internal webhooks)
+# ✅ Balanced security (default, recommended for most users)
 settings:
-  allow_http: true          # Allow HTTP for local testing
-  allow_internal_ips: true  # Allow internal IPs
-  strict_dns: false         # Lenient DNS
-
-hooks:
-  post_install:
-    - action: http_webhook
-      url: http://localhost:8080/webhook
-      body: '{"version": "{version}"}'
-```
-
-```yaml
-# Balanced (public HTTPS webhooks with lenient DNS)
-settings:
-  allow_http: false         # HTTPS only
+  allow_http: false # HTTPS only
   allow_internal_ips: false # Block internal IPs
-  strict_dns: false         # Allow DNS failures for legitimate services
+  strict_dns: false # Allow DNS failures for legitimate services (default)
 
 hooks:
   post_install:
     - action: http_webhook
-      url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-      body: '{"text": "Installed {version}"}'
+      params:
+        url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+        body: '{"text": "Installed {version}"}'
 ```
 
-**What Gets Blocked:**
+```yaml
+# ⚠️ Development/testing only (NOT for production)
+settings:
+  allow_http: true # Allow HTTP for local testing
+  allow_internal_ips: true # Allow internal IPs
+  strict_dns: false # Lenient DNS
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: http://localhost:8080/webhook
+        body: '{"version": "{version}"}'
+```
 
 ```yaml
-# ❌ Blocked by default (allow_internal_ips: false)
-- http://localhost:3000/webhook
-- https://192.168.1.10/api
-- http://internal.company.local/notify
-- https://10.0.0.5/webhook
-- http://100.64.1.1/api          # CGNAT range
-- https://api.internal/v1/hook
+# ⚠️ Internal network only (trusted environment)
+settings:
+  allow_http: false # Keep HTTPS
+  allow_internal_ips: true # REQUIRED: Allow internal IPs for corporate webhooks
+  strict_dns: false # Lenient: Internal DNS may be flaky
 
-# ✅ Allowed by default
-- https://hooks.slack.com/services/...
-- https://discord.com/api/webhooks/...
-- https://api.example.com/webhooks
-- https://webhook.site/unique-url
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: https://webhook.internal.company.com/api
+        body: '{"version": "{version}"}'
+```
+
+**What Gets Blocked by Default:**
+
+```yaml
+# ❌ All blocked by default (allow_internal_ips: false)
+- http://localhost:3000/webhook # Loopback
+- https://192.168.1.10/api # RFC1918 private
+- http://internal.company.local/notify # Internal domain pattern
+- https://10.0.0.5/webhook # RFC1918 private
+- http://100.64.1.1/api # CGNAT range
+- https://api.internal/v1/hook # Internal pattern
+- http://172.16.50.10/webhook # RFC1918 private
+- https://[::1]/api # IPv6 loopback
+- https://[fe80::1]/webhook # IPv6 link-local
+- https://[fc00::1]/api # IPv6 unique local
+
+# ✅ All allowed by default (public HTTPS)
+- https://hooks.slack.com/services/... # Public HTTPS
+- https://discord.com/api/webhooks/... # Public HTTPS
+- https://api.example.com/webhooks # Public HTTPS
+- https://webhook.site/unique-url # Public HTTPS
+```
+
+**Error Messages You Might See:**
+
+```
+# HTTPS enforcement (allow_http: false)
+❌ HTTP URLs are not allowed (use HTTPS or set allow_http: true)
+
+# SSRF protection (allow_internal_ips: false)
+❌ internal/private IP addresses are not allowed (set allow_internal_ips: true)
+❌ hostname resolves to internal/private IP 192.168.1.10 (set allow_internal_ips: true)
+❌ hostname appears to target internal resources (set allow_internal_ips: true)
+
+# Strict DNS mode (strict_dns: true)
+❌ DNS resolution failed and strict_dns is enabled: lookup failed
 ```
 
 **Security Notes:**
 
 - **CGNAT ranges** (`100.64.0.0/10`) are blocked by default to prevent attacks via carrier-grade NAT networks
-- DNS rebinding attacks are mitigated by resolving hostnames and checking all returned IPs
-- If you need to send webhooks to internal services, explicitly set `allow_internal_ips: true` and understand the risks
-- For maximum security in untrusted environments, enable `strict_dns: true`
+- **DNS rebinding attacks** are mitigated by resolving hostnames and checking all returned IPs
+- **Defense in depth:** Pattern matching provides protection even when DNS resolution fails
+- **Explicit opt-in:** To use internal webhooks, you must explicitly set `allow_internal_ips: true`
+- **Maximum security:** Enable `strict_dns: true` for environments where DNS cannot be trusted
+- **Audit regularly:** Use the [Security Audit Checklist](#security-audit-checklist) to verify your configuration
 
 **Slack Example:**
 
@@ -386,18 +1103,20 @@ Display native desktop notifications. Great for long-running operations.
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `title` | string | Yes | Notification title (supports templates) |
-| `message` | string | Yes | Notification body (supports templates) |
+| Parameter | Type   | Required | Description                             |
+| --------- | ------ | -------- | --------------------------------------- |
+| `title`   | string | Yes      | Notification title (supports templates) |
+| `message` | string | Yes      | Notification body (supports templates)  |
 
 **Features:**
+
 - Native system notifications (macOS, Windows, Linux)
 - Template variable interpolation
 - Non-intrusive (notifications timeout automatically)
 - Works even when terminal is in background
 
 **Platform Support:**
+
 - **macOS:** Uses `osascript` (always available)
 - **Linux:** Uses `notify-send` (requires libnotify)
 - **Windows:** Uses PowerShell notifications
@@ -411,7 +1130,7 @@ hooks:
       params:
         title: "goenv: Installation Complete"
         message: "Go {version} is ready to use"
-  
+
   pre_install:
     - action: notify_desktop
       params:
@@ -422,6 +1141,7 @@ hooks:
 **Notification Appearance:**
 
 On macOS, notifications appear in the Notification Center:
+
 ```
 ┌─────────────────────────────────────┐
 │ goenv: Installation Complete        │
@@ -437,12 +1157,13 @@ Verify sufficient disk space before operations. Prevents failed installations.
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `min_space_mb` | number | Yes | Minimum required space in megabytes |
-| `path` | string | No | Path to check (defaults to goenv root) |
+| Parameter      | Type   | Required | Description                            |
+| -------------- | ------ | -------- | -------------------------------------- |
+| `min_space_mb` | number | Yes      | Minimum required space in megabytes    |
+| `path`         | string | No       | Path to check (defaults to goenv root) |
 
 **Features:**
+
 - Checks available space on filesystem
 - Configurable threshold in MB
 - Cross-platform (Linux, macOS, Windows)
@@ -450,6 +1171,7 @@ Verify sufficient disk space before operations. Prevents failed installations.
 - Useful for `pre_install` and `pre_rehash` hooks
 
 **How It Works:**
+
 1. Checks available space on the filesystem containing `path`
 2. Compares to `min_space_mb` threshold
 3. Returns error if insufficient space (stops hook execution)
@@ -464,7 +1186,7 @@ hooks:
       params:
         min_space_mb: 500
         path: ~/.goenv/versions
-    
+
     - action: log_to_file
       params:
         path: ~/.goenv/install.log
@@ -472,12 +1194,14 @@ hooks:
 ```
 
 **Why Use This:**
+
 - Go SDK downloads can be 100-200 MB
 - Prevents partial installations from running out of space
 - Provides clear error message before wasting time downloading
 - Especially useful on systems with limited disk space
 
 **Error Message Example:**
+
 ```
 Error: Insufficient disk space at ~/.goenv/versions
 Required: 500 MB, Available: 245 MB
@@ -491,18 +1215,20 @@ Set environment variables dynamically. Useful for version-specific configuration
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | Yes | Environment variable name |
-| `value` | string | Yes | Variable value (supports templates) |
+| Parameter | Type   | Required | Description                         |
+| --------- | ------ | -------- | ----------------------------------- |
+| `name`    | string | Yes      | Environment variable name           |
+| `value`   | string | Yes      | Variable value (supports templates) |
 
 **Features:**
+
 - Sets environment variables in the current process
 - Template variable interpolation
 - Persists for the goenv command execution
 - Great for `pre_exec` hooks to configure Go behavior
 
 **Important Notes:**
+
 - Variables are set in goenv's process and child processes
 - Does NOT persist across shell sessions
 - Does NOT modify shell configuration files
@@ -517,7 +1243,7 @@ hooks:
       params:
         name: GO_VERSION_INFO
         value: "go{version}"
-    
+
     - action: set_env
       params:
         name: GOENV_COMMAND
@@ -525,6 +1251,7 @@ hooks:
 ```
 
 **Use Cases:**
+
 - Set `GOPROXY` based on Go version
 - Configure `GOPRIVATE` for specific projects
 - Set build tags dynamically
@@ -539,12 +1266,12 @@ hooks:
       params:
         name: GOPROXY
         value: "https://proxy.golang.org,direct"
-    
+
     - action: set_env
       params:
         name: GOENV_ACTIVE_VERSION
         value: "{version}"
-    
+
     - action: log_to_file
       params:
         path: ~/.goenv/exec.log
@@ -557,43 +1284,53 @@ hooks:
 
 Execute shell commands during hook execution. Enables custom validation, automation, and integration.
 
-**⚠️ SECURITY FIRST: Always Use Args Array**
+**🔒 SECURITY BEST PRACTICE: Always Use Args Array**
 
-The `args` array form is the **secure pattern** for running commands. It prevents shell injection by passing arguments directly without shell interpretation.
+The `args` array form is the **ONLY recommended pattern** for running commands. It prevents shell injection by passing arguments directly without shell interpretation.
+
+**Best practice (use this pattern):**
 
 ```yaml
-# ✅ SECURE: Args array (recommended)
+# ✅ ALWAYS USE: Args array (secure by design)
 - action: run_command
   params:
     command: "go"
     args: ["build", "-o", "/tmp/app"]
-
-# ⚠️ AVOID: Shell string (only for simple, trusted commands)
-- action: run_command
-  params:
-    command: "go build -o /tmp/app"  # Shell interprets spaces, quotes, etc.
 ```
 
-**Why args array matters:**
-- **No shell injection**: Arguments can't contain shell metacharacters (`;`, `|`, `$()`, etc.)
-- **Predictable behavior**: Spaces and quotes are treated as literals
-- **Template safety**: Even template variables with special chars are safe
-- **Cross-platform**: Works consistently on Windows, macOS, Linux
+**Why args array is mandatory for security:**
+
+- **No shell injection**: Arguments can't contain shell metacharacters (`;`, `|`, `$()`, backticks, etc.)
+- **Predictable behavior**: Spaces, quotes, and special chars are treated as literals
+- **Template safety**: Template variables with any content are safe (no escaping needed)
+- **Cross-platform**: Works consistently on Windows, macOS, and Linux
+
+**Avoid this pattern (shell string):**
+
+```yaml
+# ⚠️ AVOID: Shell string (only for static, fully trusted commands)
+- action: run_command
+  params:
+    command: "go build -o /tmp/app" # Shell interprets - use args array instead!
+```
+
+Use shell strings ONLY when the command is static, hardcoded, and has zero variables or user input. **In all other cases, use args array.**
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `command` | string | Yes | Command to execute (supports templates) |
-| `args` | array | No | Command arguments (each supports templates) |
-| `working_dir` | string | No | Working directory for command execution |
-| `timeout` | string | No | Command timeout (default: "2m") |
-| `capture_output` | boolean | No | Capture stdout/stderr (default: false) |
-| `log_output` | boolean | No | Log command output (default: false) |
-| `fail_on_error` | boolean | No | Fail hook if command fails (default: true) |
-| `shell` | string | No | Shell to use: auto, bash, sh, cmd, powershell (default: "auto") |
+| Parameter        | Type    | Required | Description                                                     |
+| ---------------- | ------- | -------- | --------------------------------------------------------------- |
+| `command`        | string  | Yes      | Command to execute (supports templates)                         |
+| `args`           | array   | No       | Command arguments (each supports templates)                     |
+| `working_dir`    | string  | No       | Working directory for command execution                         |
+| `timeout`        | string  | No       | Command timeout (default: "2m")                                 |
+| `capture_output` | boolean | No       | Capture stdout/stderr (default: false)                          |
+| `log_output`     | boolean | No       | Log command output (default: false)                             |
+| `fail_on_error`  | boolean | No       | Fail hook if command fails (default: true)                      |
+| `shell`          | string  | No       | Shell to use: auto, bash, sh, cmd, powershell (default: "auto") |
 
 **Features:**
+
 - Execute custom validation scripts
 - Run platform-specific commands
 - Capture and log output
@@ -603,6 +1340,7 @@ The `args` array form is the **secure pattern** for running commands. It prevent
 - Security: Protected against control characters, with timeout limits
 
 **How It Works:**
+
 1. Interpolates template variables in command and arguments
 2. Selects appropriate shell based on `shell` parameter (or auto-detects)
 3. Executes command with optional timeout
@@ -677,7 +1415,7 @@ hooks:
   post_install:
     - action: run_command
       params:
-        command: "go version"  # ⚠️ OK only if: no user input, no templates, fully trusted
+        command: "go version" # ⚠️ OK only if: no user input, no templates, fully trusted
         capture_output: true
 ```
 
@@ -687,18 +1425,18 @@ hooks:
 # ❌ INSECURE: Template in command string
 - action: run_command
   params:
-    command: "go install {package}@latest"  # {package} could contain shell metacharacters
+    command: "go install {package}@latest" # {package} could contain shell metacharacters
 
 # ❌ INSECURE: User input in command string
 - action: run_command
   params:
-    command: "git clone {repo_url}"  # {repo_url} could contain "; rm -rf /"
+    command: "git clone {repo_url}" # {repo_url} could contain "; rm -rf /"
 
 # ✅ SECURE: Use args array instead
 - action: run_command
   params:
     command: "git"
-    args: ["clone", "{repo_url}"]  # Safe: repo_url treated as literal string
+    args: ["clone", "{repo_url}"] # Safe: repo_url treated as literal string
 ```
 
 **Example: Test Compilation**
@@ -765,6 +1503,7 @@ hooks:
 **Captured Variables:**
 
 When `capture_output: true` is set, the following variables are added to the hook context:
+
 - `{command_stdout}` - Standard output from the command
 - `{command_stderr}` - Standard error from the command
 - `{command_exit_code}` - Exit code (currently "0" on success)
@@ -786,6 +1525,7 @@ hooks:
 ```
 
 **Security Considerations:**
+
 - ⚠️ **Command execution is powerful** - Only use commands you trust
 - ✅ Commands are validated for control characters
 - ✅ Timeout prevents hanging processes (default 2 minutes)
@@ -797,20 +1537,22 @@ hooks:
 - 💡 Consider setting `fail_on_error: false` for non-critical validations
 
 **Shell Injection Prevention:**
+
 ```yaml
 # ❌ AVOID: Shell interpretation (command as string)
 - action: run_command
   params:
-    command: "go build -o output-{version}"  # Shell interprets {version}
+    command: "go build -o output-{version}" # Shell interprets {version}
 
 # ✅ PREFER: Direct execution (command + args)
 - action: run_command
   params:
     command: "go"
-    args: ["build", "-o", "output-{version}"]  # No shell, safer
+    args: ["build", "-o", "output-{version}"] # No shell, safer
 ```
 
 **Use Cases:**
+
 - Verify Go binary works after installation
 - Run custom validation or compliance scripts
 - Test compilation capabilities
@@ -819,6 +1561,7 @@ hooks:
 - Trigger CI/CD pipelines or deployments
 
 **Platform Notes:**
+
 - **Auto shell detection:** Uses `sh` on Unix, `cmd` on Windows
 - **Bash/sh:** Commands are executed as `bash -c "command"` or `sh -c "command"`
 - **Windows cmd:** Commands are executed as `cmd /C "command"`
@@ -829,6 +1572,8 @@ hooks:
 
 ## Configuration Options
 
+> **📊 For detailed information about operational limits, timeouts, and max_actions, see the [Operational Limits](#operational-limits) section.**
+
 ### Global Settings
 
 ```yaml
@@ -837,6 +1582,7 @@ acknowledged_risks: true
 
 settings:
   timeout: "5s"
+  max_actions: 10
   continue_on_error: true
   allow_http: false
   allow_internal_ips: false
@@ -844,73 +1590,49 @@ settings:
 ```
 
 **`enabled`** (boolean, required)
+
 - Controls whether hooks are executed
 - Set to `false` to disable all hooks without removing configuration
 - Default: `false`
 
 **`acknowledged_risks`** (boolean, required)
+
 - Safety flag to confirm you've reviewed the configuration
 - Both `enabled` and `acknowledged_risks` must be `true` for hooks to run
 - Default: `false`
 
-### Operational Limits
-
-The hooks system includes built-in limits to prevent abuse and ensure reliable operation:
-
-| Limit | Default | Maximum | Description |
-|-------|---------|---------|-------------|
-| **Action Timeout** | `5s` | `10m` | Maximum time for each action to complete |
-| **Actions per Hook** | Unlimited | ~1000 | Number of actions per hook point (soft limit) |
-| **Total Hooks** | Unlimited | ~50 | Number of configured hooks across all hook points |
-| **Webhook Body Size** | 64KB | 1MB | Maximum size for HTTP webhook payloads |
-| **Log File Size** | Unlimited | N/A | No size limit for log_to_file actions |
-
-**Notes:**
-- Timeouts are enforced per-action, not per-hook-point
-- Multiple actions on the same hook point run sequentially
-- Failed actions don't count against limits when `continue_on_error: true`
-- Limits are designed to prevent misconfiguration, not malicious use
-
-**Example configuration with custom limits:**
-
-```yaml
-settings:
-  timeout: "10s"  # Increase for slow webhooks or commands
-  continue_on_error: true  # Don't break goenv on hook failures
-
-hooks:
-  post_install:
-    # Keep action lists reasonable (< 10 actions per hook is a good rule)
-    - action: log_to_file
-      params:
-        path: ~/.goenv/install.log
-        message: "Installed Go {version}"
-
-    - action: http_webhook
-      params:
-        url: https://webhooks.example.com/notify
-        body: '{"version": "{version}", "timestamp": "{timestamp}"}'
-```
-
 **`settings.timeout`** (string, default: "5s")
+
 - Maximum time for each action to complete
 - Valid units: `s` (seconds), `m` (minutes), `h` (hours)
 - Examples: `"5s"`, `"30s"`, `"1m"`, `"2m30s"`
 - Actions exceeding timeout are terminated
-- Recommended: `5s` for webhooks, `10s` for commands, `30s` for disk checks
+- See [Operational Limits](#operational-limits) for detailed timeout behavior
+
+**`settings.max_actions`** (integer, default: 10, range: 1-100)
+
+- Maximum number of actions allowed per hook point
+- Enforced at config load time
+- Prevents accidentally complex hook chains
+- Validation error if exceeded: `hook point X has Y actions, max is Z`
+- See [Operational Limits](#operational-limits) for examples
 
 **`settings.continue_on_error`** (boolean, default: true)
+
 - If `true`: Log errors but continue executing remaining hooks
 - If `false`: Stop executing hooks on first error
 - Recommended: `true` (hooks shouldn't break normal operations)
+- See [Operational Limits](#operational-limits) for detailed behavior
 
 **`settings.allow_http`** (boolean, default: false)
+
 - Controls whether HTTP URLs are allowed in `http_webhook` actions
 - When `false`: Only HTTPS URLs accepted (recommended for production)
 - When `true`: Both HTTP and HTTPS URLs allowed
 - See [http_webhook Security Model](#security-model) for details
 
 **`settings.allow_internal_ips`** (boolean, default: false)
+
 - Controls SSRF protection for `http_webhook` actions
 - When `false`: Blocks requests to private/internal IP ranges (RFC1918, CGNAT, loopback, link-local)
 - When `true`: Allows requests to any IP address
@@ -918,30 +1640,11 @@ hooks:
 - See [http_webhook Security Model](#security-model) for complete list of blocked ranges
 
 **`settings.strict_dns`** (boolean, default: false)
--- Enhanced DNS validation for `http_webhook` actions
--- When `true`: More strict DNS checking to prevent DNS rebinding attacks
--- When `false`: Standard DNS resolution
--- Recommended for high-security environments
 
-### Operational Limits
-
-To prevent abuse and ensure system stability, the following limits are enforced:
-
-| Limit | Default | Description |
-|-------|---------|-------------|
-| **Max Actions per Hook** | 10 | Maximum number of actions that can be defined for a single hook point |
-| **Default Timeout** | 5s | Default timeout for each action if not specified |
-| **Max Timeout** | 10m | Maximum timeout value allowed for any action |
-| **Command Timeout** | 2m | Default timeout for `run_command` actions |
-| **Webhook Timeout** | 10s | Maximum timeout for `http_webhook` requests |
-| **Max Retries** | 3 | Maximum retry attempts for failed actions (if retry is enabled) |
-
-**Notes:**
-- Timeouts are enforced per-action, not per-hook
-- Actions exceeding timeout are terminated gracefully
-- `continue_on_error: true` (default) ensures one failing action doesn't block others
-- Limits prevent runaway hooks from degrading system performance
-- See [http_webhook Security Model](#security-model) for detailed behavior
+- Enhanced DNS validation for `http_webhook` actions
+- When `true`: More strict DNS checking to prevent DNS rebinding attacks
+- When `false`: Standard DNS resolution
+- Recommended for high-security environments
 
 ### Hook Configuration
 
@@ -954,7 +1657,7 @@ hooks:
       params:
         path: ~/.goenv/install.log
         message: "Installed {version}"
-    
+
     - action: notify_desktop
       params:
         title: "Installation Complete"
@@ -962,6 +1665,7 @@ hooks:
 ```
 
 **Execution Order:**
+
 - Actions execute in the order defined
 - If `continue_on_error: false`, execution stops on first error
 - If `continue_on_error: true`, all actions attempt to execute
@@ -973,17 +1677,22 @@ All action parameters support template variable interpolation using `{variable}`
 ### Available Variables
 
 **Always Available:**
+
 - `{hook}` - Current hook point name (e.g., "post_install")
 - `{timestamp}` - ISO 8601 timestamp (e.g., "2025-10-16T10:30:45Z")
 
 **Installation/Uninstallation Hooks:**
+
 - `{version}` - Go version being installed/uninstalled (e.g., "1.21.3")
 
 **Execution Hooks:**
+
 - `{version}` - Active Go version (e.g., "1.21.3")
 - `{command}` - Command being executed (e.g., "go build")
+- `{file_arg}` - File argument passed to command, if any (e.g., "main.go")
 
 **Rehash Hooks:**
+
 - (No additional variables beyond hook and timestamp)
 
 ### Template Examples
@@ -1031,7 +1740,7 @@ hooks:
       params:
         path: ~/.goenv/audit/installations.log
         message: "[{timestamp}] INSTALL: Go {version}"
-    
+
     - action: notify_desktop
       params:
         title: "goenv: Installation Complete"
@@ -1073,12 +1782,12 @@ hooks:
       params:
         min_space_mb: 500
         path: ~/.goenv/versions
-    
+
     - action: notify_desktop
       params:
         title: "goenv: Starting Installation"
         message: "Installing Go {version}... Please wait."
-    
+
     - action: log_to_file
       params:
         path: ~/.goenv/install.log
@@ -1087,7 +1796,7 @@ hooks:
 
 ### 4. Command Usage Tracking
 
-Log all Go commands for analytics:
+Log all Go commands for analytics, including file arguments:
 
 ```yaml
 hooks:
@@ -1095,8 +1804,8 @@ hooks:
     - action: log_to_file
       params:
         path: ~/.goenv/logs/usage.log
-        message: "[{timestamp}] v{version}: {command}"
-  
+        message: "[{timestamp}] v{version}: {command} {file_arg}"
+
   post_exec:
     - action: http_webhook
       params:
@@ -1106,8 +1815,17 @@ hooks:
             "event": "go_command_executed",
             "version": "{version}",
             "command": "{command}",
+            "file_arg": "{file_arg}",
             "timestamp": "{timestamp}"
           }
+```
+
+**Example log output:**
+
+```
+[2025-10-28T14:30:00Z] v1.23.2: go build main.go
+[2025-10-28T14:30:15Z] v1.23.2: go run
+[2025-10-28T14:31:00Z] v1.22.0: go test ./...
 ```
 
 ### 5. Environment Configuration
@@ -1121,7 +1839,7 @@ hooks:
       params:
         name: GOENV_ACTIVE_VERSION
         value: "{version}"
-    
+
     - action: set_env
       params:
         name: GOPROXY
@@ -1209,7 +1927,7 @@ hooks:
         args: ["run", "-"]
         working_dir: "/tmp"
         timeout: "30s"
-        fail_on_error: false  # Don't fail install if test fails
+        fail_on_error: false # Don't fail install if test fails
         shell: "bash"
 
     # Log validation results
@@ -1250,7 +1968,13 @@ hooks:
     - action: run_command
       params:
         command: "mkdir"
-        args: ["-p", "~/go/{version}/bin", "~/go/{version}/src", "~/go/{version}/pkg"]
+        args:
+          [
+            "-p",
+            "~/go/{version}/bin",
+            "~/go/{version}/src",
+            "~/go/{version}/pkg",
+          ]
         fail_on_error: false
 ```
 
@@ -1331,7 +2055,7 @@ hooks:
           - "-c"
           - "echo 'package main\nfunc main() {}' | go build -o /tmp/goenv-test-{version} -x -"
         timeout: "1m"
-        fail_on_error: false  # Non-critical
+        fail_on_error: false # Non-critical
 
     # Log comprehensive validation success
     - action: log_to_file
@@ -1414,23 +2138,452 @@ hooks:
 
 ## Advanced Patterns
 
-### Conditional Execution Based on Go Version
+### Conditional Execution Patterns
 
-Execute actions only for specific Go versions:
+While goenv hooks don't have built-in conditional logic, you can use shell commands to implement flexible conditional execution based on Go version, environment, OS, or any custom condition.
+
+> **💡 Design Note:** goenv deliberately uses shell-based conditionals instead of a custom expression language. This provides maximum flexibility while keeping the hooks system simple and avoiding the need to maintain a complex condition evaluator.
+
+#### Pattern 1: Version-Specific Actions
+
+Execute actions only for specific Go versions or version ranges:
+
+**Example: Go 1.21+ Only (New Features)**
 
 ```yaml
 hooks:
   post_install:
-    # For Go 1.21+ only: Enable new features
     - action: run_command
       params:
-        command: "sh"
+        command: "bash"
         args:
           - "-c"
-          - "if [ \"$(go version | grep -oE '[0-9]+\\.[0-9]+' | head -1)\" \\> \"1.20\" ]; then echo 'Go 1.21+ detected'; fi"
-        capture_output: true
-        fail_on_error: false
+          - |
+            # Only run for Go 1.21+
+            VERSION=$(go version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            if [[ "$VERSION" > "1.20" ]]; then
+              echo "Go 1.21+ detected - enabling new toolchain features"
+              # Your commands here
+              go env -w GOTOOLCHAIN=local
+            else
+              echo "Go 1.20 or earlier - using legacy behavior"
+            fi
 ```
+
+**Example: Exact Version Match**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            if [ "{version}" = "1.23.2" ]; then
+              echo "Exact version match - running special setup"
+              # Install version-specific tools
+              go install golang.org/x/tools/gopls@v0.14.0
+            fi
+```
+
+**Example: Version Range**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            MAJOR=$(echo {version} | cut -d. -f1)
+            MINOR=$(echo {version} | cut -d. -f2)
+
+            # For Go 1.20.x to 1.22.x
+            if [ "$MAJOR" -eq 1 ] && [ "$MINOR" -ge 20 ] && [ "$MINOR" -le 22 ]; then
+              echo "Go 1.20-1.22 detected - applying compatibility patches"
+              # Version-specific setup
+            fi
+```
+
+**Example: Legacy Version Handling**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            VERSION=$(go version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            if [[ "$VERSION" < "1.18" ]]; then
+              echo "Legacy Go version detected - installing compatibility tools"
+              # Old Go versions need different gopls
+              go get golang.org/x/tools/gopls@v0.7.5
+            else
+              echo "Modern Go version - using latest gopls"
+              go install golang.org/x/tools/gopls@latest
+            fi
+```
+
+#### Pattern 2: Environment-Based Conditionals
+
+Execute different actions based on environment (CI, dev, prod):
+
+**Example: CI vs Local Development**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            if [ "$CI" = "true" ]; then
+              echo "CI environment detected"
+              # Minimal CI setup
+              go install golang.org/x/tools/cmd/goimports@latest
+              # Log to CI-friendly location
+              echo "{version}" >> /var/log/goenv-ci.log
+            else
+              echo "Local development environment"
+              # Full development tools
+              go install golang.org/x/tools/gopls@latest
+              go install github.com/go-delve/delve/cmd/dlv@latest
+              # Desktop notification
+              notify-send "Go {version} installed" "Development environment ready"
+            fi
+```
+
+**Example: Multi-Environment Setup**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            ENV=${DEPLOYMENT_ENV:-dev}
+
+            case "$ENV" in
+              production)
+                echo "Production environment - minimal tooling"
+                go install golang.org/x/tools/cmd/goimports@latest
+                ;;
+              staging)
+                echo "Staging environment - testing tools"
+                go install golang.org/x/tools/cmd/goimports@latest
+                go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+                ;;
+              dev)
+                echo "Development environment - full toolset"
+                go install golang.org/x/tools/gopls@latest
+                go install github.com/go-delve/delve/cmd/dlv@latest
+                go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+                ;;
+              *)
+                echo "Unknown environment: $ENV"
+                ;;
+            esac
+```
+
+**Example: GitHub Actions Detection**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            if [ "$GITHUB_ACTIONS" = "true" ]; then
+              echo "GitHub Actions detected"
+              echo "::notice::Go {version} installed successfully"
+              # GitHub Actions-specific logging
+              echo "{version}" >> $GITHUB_STEP_SUMMARY
+            fi
+```
+
+#### Pattern 3: OS-Specific Actions
+
+Execute different commands based on operating system:
+
+**Example: Cross-Platform Notifications**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            case "$OSTYPE" in
+              linux*)
+                # Linux: use notify-send
+                if command -v notify-send &> /dev/null; then
+                  notify-send "goenv" "Go {version} installed"
+                fi
+                ;;
+              darwin*)
+                # macOS: use osascript
+                osascript -e 'display notification "Go {version} installed" with title "goenv"'
+                ;;
+              msys*|cygwin*)
+                # Windows: use PowerShell
+                powershell -Command "New-BurntToastNotification -Text 'goenv', 'Go {version} installed'"
+                ;;
+            esac
+```
+
+**Example: Platform-Specific Tool Installation**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            case "$OSTYPE" in
+              linux*)
+                echo "Linux: Installing development tools"
+                # Linux-specific tools
+                go install github.com/go-delve/delve/cmd/dlv@latest
+                ;;
+              darwin*)
+                echo "macOS: Installing development tools"
+                # macOS-specific setup
+                go install github.com/go-delve/delve/cmd/dlv@latest
+                # macOS-specific: code signing might be needed
+                ;;
+              msys*|cygwin*)
+                echo "Windows: Installing development tools"
+                # Windows may need different approach for some tools
+                go install golang.org/x/tools/gopls@latest
+                ;;
+            esac
+```
+
+**Example: Architecture-Specific Setup**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            ARCH=$(uname -m)
+
+            case "$ARCH" in
+              x86_64|amd64)
+                echo "AMD64 architecture - standard setup"
+                # Standard tools
+                ;;
+              arm64|aarch64)
+                echo "ARM64 architecture - optimized binaries"
+                # May need ARM-specific builds
+                export GOARCH=arm64
+                ;;
+              *)
+                echo "Unsupported architecture: $ARCH"
+                exit 1
+                ;;
+            esac
+```
+
+#### Pattern 4: File/Directory Existence Checks
+
+Execute actions based on file or directory presence:
+
+**Example: Project Type Detection**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            if [ -f "go.work" ]; then
+              echo "Go workspace detected - multi-module project"
+              # Install workspace-specific tools
+              go install golang.org/x/tools/gopls@latest
+            elif [ -f "go.mod" ]; then
+              echo "Go module detected - standard project"
+              # Install standard tools
+              go install golang.org/x/tools/cmd/goimports@latest
+            else
+              echo "No Go project detected - basic setup only"
+            fi
+```
+
+**Example: Configuration File Detection**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            if [ -f "$HOME/.goenv/team-config.sh" ]; then
+              echo "Team configuration found - applying team settings"
+              source "$HOME/.goenv/team-config.sh"
+              # Team-specific setup based on sourced config
+            else
+              echo "No team config - using defaults"
+            fi
+```
+
+#### Pattern 5: Complex Multi-Condition Logic
+
+Combine multiple conditions with AND/OR logic:
+
+**Example: Version AND Environment**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            VERSION=$(go version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+
+            # Go 1.21+ in CI environment
+            if [[ "$VERSION" > "1.20" ]] && [ "$CI" = "true" ]; then
+              echo "Go 1.21+ in CI - enabling new toolchain and minimal tools"
+              go env -w GOTOOLCHAIN=local
+              go install golang.org/x/tools/cmd/goimports@latest
+            # Go 1.21+ in local development
+            elif [[ "$VERSION" > "1.20" ]] && [ "$CI" != "true" ]; then
+              echo "Go 1.21+ in dev - full feature set"
+              go env -w GOTOOLCHAIN=local
+              go install golang.org/x/tools/gopls@latest
+              go install github.com/go-delve/delve/cmd/dlv@latest
+            # Legacy version
+            else
+              echo "Legacy Go version - compatibility mode"
+              # Old tools for old Go
+            fi
+```
+
+**Example: Platform OR CI**
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            # Skip slow operations on Windows OR in CI
+            if [[ "$OSTYPE" == "msys" ]] || [ "$CI" = "true" ]; then
+              echo "Fast mode - skipping slow operations"
+              # Quick setup only
+            else
+              echo "Full mode - running complete setup"
+              # Full development environment
+              go install golang.org/x/tools/gopls@latest
+              go install github.com/go-delve/delve/cmd/dlv@latest
+              go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+            fi
+```
+
+#### Pattern 6: Custom Condition Functions
+
+Create reusable condition checks:
+
+```yaml
+hooks:
+  post_install:
+    - action: run_command
+      params:
+        command: "bash"
+        args:
+          - "-c"
+          - |
+            # Define helper functions
+            is_go_21_plus() {
+              VERSION=$(go version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+              [[ "$VERSION" > "1.20" ]]
+            }
+
+            is_ci() {
+              [ "$CI" = "true" ] || [ "$GITHUB_ACTIONS" = "true" ] || [ "$GITLAB_CI" = "true" ]
+            }
+
+            is_linux() {
+              [[ "$OSTYPE" == "linux"* ]]
+            }
+
+            # Use the functions
+            if is_go_21_plus && is_ci && is_linux; then
+              echo "Go 1.21+ in Linux CI - optimized setup"
+              # Specific configuration
+            fi
+```
+
+#### When to Use Conditional Patterns
+
+**✅ Use shell-based conditionals for:**
+
+- Complex version comparisons
+- Environment detection (CI, dev, prod)
+- OS-specific logic
+- File existence checks
+- Any custom condition you can express in shell
+
+**✅ Benefits:**
+
+- Extremely flexible - any condition possible
+- Platform-aware (shell auto-detection)
+- Leverages existing shell knowledge
+- No additional goenv code to maintain
+
+**⚠️ Trade-offs:**
+
+- Requires shell knowledge
+- Platform-specific syntax (use bash for consistency)
+- More verbose than hypothetical native conditionals
+- Harder to validate than structured conditionals
+
+**💡 Best Practices:**
+
+1. **Use bash for consistency:** Specify `command: "bash"` to ensure consistent behavior across platforms
+2. **Test your conditions:** Use `goenv hooks test post_install` to verify logic
+3. **Fail gracefully:** Set `fail_on_error: false` for non-critical conditionals
+4. **Document your logic:** Add comments explaining complex conditions
+5. **Extract to scripts:** For very complex logic, use external scripts and call them via `run_command`
+
+**🚀 Future:** If native conditional hooks become common user requests, goenv may add built-in condition support. For now, shell-based patterns provide all necessary flexibility.
 
 ### Integration with Version Control
 
@@ -1466,6 +2619,7 @@ hooks:
 ```
 
 Example `~/.goenv/scripts/health-check.sh`:
+
 ```bash
 #!/bin/bash
 VERSION=$1
@@ -1501,11 +2655,147 @@ exit 0
 
 ### Security
 
-1. **Review Generated Configuration:** Always review `hooks.yaml` before enabling
-2. **Use HTTPS:** For webhooks, always use HTTPS URLs
-3. **Protect Webhook URLs:** Treat webhook URLs as secrets (don't commit to public repos)
-4. **Limit Actions:** Only use actions you need
-5. **Test First:** Use `goenv hooks test` before enabling hooks
+**Essential Security Practices:**
+
+1. **Use Default SSRF Protection:** Keep `allow_http: false` and `allow_internal_ips: false` unless you have a specific need
+
+   - See [Security Model](#security-model) for comprehensive SSRF protection details
+   - Default settings block HTTP URLs and internal/private IP addresses
+
+2. **Enable Strict DNS for Production/CI:** **Strongly recommended** for CI/CD pipelines and untrusted environments
+
+   - Rejects URLs when DNS resolution fails (prevents DNS rebinding attacks)
+   - Provides maximum protection against SSRF via DNS manipulation
+   - **Especially important in CI/CD:** Prevents malicious PRs from exploiting DNS to reach internal services
+   - Trade-off: may block legitimate URLs during DNS outages (acceptable in CI)
+
+   **CI/CD recommendation:**
+
+   ```yaml
+   # ~/.goenv/hooks.yaml - Production/CI configuration
+   settings:
+     allow_http: false # HTTPS only
+     allow_internal_ips: false # Block internal IPs
+     strict_dns: true # ✅ RECOMMENDED for CI - reject on DNS failure
+   ```
+
+   **Why strict_dns matters in CI:**
+
+   - CI environments may have access to internal networks
+   - Malicious PRs could attempt DNS rebinding to probe infrastructure
+   - `strict_dns: true` adds defense-in-depth against these attacks
+   - Future goenv versions may default to `strict_dns: true` for enhanced security
+
+3. **Audit Your Configuration:** Before enabling hooks, verify security settings
+
+   ```bash
+   # Check for HTTP URLs (should find none in production)
+   grep -i "http://" ~/.goenv/hooks.yaml
+
+   # Verify SSRF settings
+   grep -A 2 "^settings:" ~/.goenv/hooks.yaml
+
+   # Validate configuration
+   goenv hooks validate
+   ```
+
+4. **Review Generated Configuration:** Always review `hooks.yaml` before enabling
+
+   - Check that `allow_internal_ips: false` (unless you need internal webhooks)
+   - Verify all webhook URLs use HTTPS
+   - Ensure `acknowledged_risks: true` only after reviewing all actions
+
+5. **Protect Webhook URLs:** Treat webhook URLs as secrets
+
+   - Don't commit webhook URLs to public repositories
+   - Use environment variables or secret management for sensitive URLs
+   - Rotate webhook URLs if accidentally exposed
+
+6. **Limit Actions:** Only enable actions you actually use
+
+   - Remove unused hooks from configuration
+   - Start with simple actions (log_to_file) before adding webhooks
+   - Test with `goenv hooks test` before enabling
+
+7. **Use HTTPS Exclusively:** For webhooks, always use HTTPS URLs
+
+   - Default `allow_http: false` enforces this
+   - Never override to allow HTTP in production
+   - HTTP acceptable only for local development (localhost)
+
+8. **Understand Override Risks:**
+
+   ```yaml
+   # ⚠️ Only override defaults when necessary
+   settings:
+     allow_http: true # Risk: Unencrypted traffic, MITM attacks
+     allow_internal_ips: true # Risk: SSRF, access to internal services
+     strict_dns: false # Risk: DNS rebinding (but default is reasonable)
+   ```
+
+9. **Test First:** Use `goenv hooks test` before enabling hooks
+
+   ```bash
+   goenv hooks test post_install --verbose
+   ```
+
+10. **Monitor Hook Execution:** Check logs for unexpected behavior
+    - Look for rejected URLs in goenv output
+    - Verify webhooks are reaching intended destinations
+    - Watch for timeout errors (may indicate DNS issues)
+
+**Security Configuration Examples:**
+
+```yaml
+# ✅ RECOMMENDED: Production with maximum security
+settings:
+  allow_http: false # HTTPS only
+  allow_internal_ips: false # Block internal IPs
+  strict_dns: true # Reject on DNS failure
+  timeout: "5s"
+  continue_on_error: true # Don't break goenv on hook failures
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+        body: '{"text": "Go {version} installed"}'
+```
+
+```yaml
+# ⚠️ DEVELOPMENT ONLY: Local testing with internal webhooks
+settings:
+  allow_http: true # Allow HTTP for localhost
+  allow_internal_ips: true # Allow internal IPs for local services
+  strict_dns: false # Lenient DNS
+  timeout: "5s"
+  continue_on_error: true
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: http://localhost:8080/webhook
+        body: '{"version": "{version}"}'
+```
+
+```yaml
+# ⚠️ INTERNAL NETWORK: Trusted internal services only
+settings:
+  allow_http: false # Keep HTTPS
+  allow_internal_ips: true # REQUIRED for internal webhooks
+  strict_dns: false # Lenient DNS (internal DNS may be flaky)
+  timeout: "10s" # Longer timeout for internal networks
+  continue_on_error: true
+
+hooks:
+  post_install:
+    - action: http_webhook
+      params:
+        url: https://webhook.internal.company.com/api/v1/notify
+        body: '{"version": "{version}", "host": "{hostname}"}'
+```
 
 ### Performance
 
@@ -1551,13 +2841,13 @@ hooks:
       params:
         path: ~/.goenv/audit/install.log
         message: "[{timestamp}] Installed Go {version}"
-    
+
     # Notify team in Slack #dev-notifications
     - action: http_webhook
       params:
         url: https://hooks.slack.com/services/YOUR/WEBHOOK
         body: '{"text": "Go {version} installed on dev server"}'
-  
+
   # Ensure we don't run out of disk space
   pre_install:
     - action: check_disk_space
@@ -1572,6 +2862,7 @@ hooks:
 **Problem:** Hooks aren't running when expected.
 
 **Solutions:**
+
 1. Check `enabled: true` in `hooks.yaml`
 2. Check `acknowledged_risks: true` in `hooks.yaml`
 3. Verify `hooks.yaml` is in the correct location (`~/.goenv/hooks.yaml`)
@@ -1583,6 +2874,7 @@ hooks:
 **Problem:** `goenv hooks validate` reports errors.
 
 **Solutions:**
+
 1. Check YAML syntax (indentation, quotes, colons)
 2. Verify all required parameters are present
 3. Check parameter types (strings vs numbers)
@@ -1596,27 +2888,32 @@ hooks:
 **Solutions:**
 
 **log_to_file:**
+
 - Ensure parent directory exists or can be created
 - Check file permissions
 - Verify path is valid for your OS
 
 **http_webhook:**
+
 - Test URL in a browser or with `curl`
 - Verify JSON syntax in body
 - Check network connectivity
 - Ensure URL uses HTTP or HTTPS
 
 **notify_desktop:**
+
 - **Linux:** Install `libnotify` (`sudo apt install libnotify-bin`)
 - **macOS:** Should work out of the box
 - **Windows:** PowerShell must be available
 
 **check_disk_space:**
+
 - Verify `path` exists
 - Check `min_space_mb` is a number, not a string
 - Ensure sufficient permissions to check disk space
 
 **set_env:**
+
 - Verify `name` is a valid environment variable name
 - Check for typos in variable names
 
@@ -1625,6 +2922,7 @@ hooks:
 **Problem:** Actions timing out.
 
 **Solutions:**
+
 1. Increase `settings.timeout` value
 2. Check network latency for webhooks
 3. Verify external services are responsive
@@ -1635,6 +2933,7 @@ hooks:
 **Problem:** Variables show as literal `{variable}` instead of values.
 
 **Solutions:**
+
 1. Verify variable names are correct (case-sensitive)
 2. Ensure variable is available for that hook point
 3. Check for typos in variable names
@@ -1645,12 +2944,14 @@ hooks:
 If you're still having issues:
 
 1. **Check Configuration:**
+
    ```bash
    goenv hooks validate
    goenv hooks list
    ```
 
 2. **Test Hooks:**
+
    ```bash
    goenv hooks test post_install
    ```
@@ -1689,12 +2990,12 @@ hooks:
       params:
         min_space_mb: 500
         path: ~/.goenv/versions
-    
+
     - action: notify_desktop
       params:
         title: "goenv"
         message: "Installing Go {version}..."
-    
+
     - action: log_to_file
       params:
         path: ~/.goenv/logs/install.log
@@ -1706,12 +3007,12 @@ hooks:
       params:
         path: ~/.goenv/logs/install.log
         message: "[{timestamp}] POST_INSTALL: Go {version} - SUCCESS"
-    
+
     - action: notify_desktop
       params:
         title: "goenv: Installation Complete"
         message: "Go {version} is ready to use"
-    
+
     - action: http_webhook
       params:
         url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
@@ -1735,7 +3036,7 @@ hooks:
       params:
         path: ~/.goenv/logs/install.log
         message: "[{timestamp}] POST_UNINSTALL: Go {version} - REMOVED"
-    
+
     - action: notify_desktop
       params:
         title: "goenv: Uninstallation Complete"
@@ -1747,7 +3048,7 @@ hooks:
       params:
         name: GOENV_VERSION
         value: "{version}"
-    
+
     - action: log_to_file
       params:
         path: ~/.goenv/logs/commands.log
@@ -1779,7 +3080,7 @@ hooks:
       params:
         path: ~/.goenv/logs/rehash.log
         message: "[{timestamp}] POST_REHASH - Shims updated"
-    
+
     - action: notify_desktop
       params:
         title: "goenv"
@@ -1791,21 +3092,25 @@ hooks:
 ## Next Steps
 
 1. **Generate Configuration:**
+
    ```bash
    goenv hooks init
    ```
 
 2. **Review and Edit:**
+
    ```bash
    nano ~/.goenv/hooks.yaml
    ```
 
 3. **Validate:**
+
    ```bash
    goenv hooks validate
    ```
 
 4. **Test:**
+
    ```bash
    goenv hooks test post_install
    ```

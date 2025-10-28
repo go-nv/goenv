@@ -271,8 +271,13 @@ func TestExec_MinimalNoopPath(t *testing.T) {
 	// Create a minimal Go program
 	tempDir := t.TempDir()
 	toolSource := `package main
+
 import "fmt"
-func main() { fmt.Println("goenv-exec-test-ok") }`
+
+func main() {
+	fmt.Println("goenv-exec-test-ok")
+}
+`
 
 	toolSourcePath := filepath.Join(tempDir, "testtool.go")
 	if err := os.WriteFile(toolSourcePath, []byte(toolSource), 0644); err != nil {

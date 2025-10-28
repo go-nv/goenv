@@ -336,22 +336,13 @@ func main() {
 
 The Go implementation maintains full backward compatibility. However, be aware of:
 
-### 1. Hooks System Changes (YAML-Based Configuration)
+### 1. New Feature: YAML-Based Hooks System
 
-**What Changed:**
+**What's New:**
 
-The bash version had a hook system that was listed but non-functional. The Go version introduces a **completely new YAML-based declarative hooks system** with predefined safe actions.
+The Go version 3.0 introduces a **brand new YAML-based declarative hooks system** - this feature did NOT exist in bash goenv.
 
-**This is NOT about shell script hooks** - it's a configuration-based system with limited, predefined actions to prevent arbitrary code execution.
-
-**Key Differences:**
-
-| Bash Version                        | Go Version                                 |
-| ----------------------------------- | ------------------------------------------ |
-| Shell script hooks (non-functional) | YAML configuration with predefined actions |
-| Listed but never executed           | Fully functional declarative system        |
-| Arbitrary code execution            | Safe, limited actions only                 |
-| Hook scripts in directories         | Single `hooks.yaml` config file            |
+**This is NOT a migration** - it's an entirely new opt-in feature with predefined safe actions to prevent arbitrary code execution.
 
 **Available Predefined Actions:**
 
@@ -362,34 +353,13 @@ The bash version had a hook system that was listed but non-functional. The Go ve
 5. `set_env` - Set environment variables
 6. `run_command` - Execute commands (with safety controls)
 
-**Migration Impact:** NONE for most users
+**Impact:** NONE for existing users
 
-- Old bash hook scripts are **not compatible** (different system entirely)
-- New system is opt-in - configure `~/.goenv/hooks.yaml` to use
-- If you had bash hooks, you'll need to rewrite them as YAML config
+- This is an opt-in feature - nothing changes if you don't use it
+- No configuration needed unless you want to enable hooks
+- Bash goenv never had hooks, so there's nothing to migrate
 
-**Example Migration:**
-
-```bash
-# OLD (bash - non-functional anyway):
-# ~/.goenv/hooks/post_install/log.bash
-#!/usr/bin/env bash
-echo "Installed Go $1" >> ~/.goenv/install.log
-
-# NEW (Go - YAML config):
-# ~/.goenv/hooks.yaml
-version: 1
-enabled: true
-acknowledged_risks: true
-
-hooks:
-  post_install:
-    - action: log_to_file
-      path: ~/.goenv/install.log
-      message: "Installed Go {version} at {timestamp}"
-```
-
-**To Start Using Hooks:**
+**Getting Started with Hooks:**
 
 ```bash
 # Initialize configuration file
@@ -398,6 +368,18 @@ goenv hooks init
 # Edit ~/.goenv/hooks.yaml and set:
 # enabled: true
 # acknowledged_risks: true
+
+# Example configuration:
+version: 1
+enabled: true
+acknowledged_risks: true
+
+hooks:
+  post_install:
+    - action: log_to_file
+      params:
+        path: ~/.goenv/install.log
+        message: "Installed Go {version} at {timestamp}"
 
 # Validate configuration
 goenv hooks validate
@@ -581,7 +563,7 @@ go env GOCACHE
 | Diagnostics            | ❌                        | ✅ `goenv doctor`          | Comprehensive checks             |
 | Architecture isolation | ❌                        | ✅ Automatic               | Prevents exec format error       |
 | Cache management       | ❌                        | ✅ `goenv cache`           | Status, clean, migrate           |
-| Hooks                  | ⚠️ Shell scripts (unused) | ✅ YAML declarative (safe) | Predefined actions, no arb. code |
+| Hooks                  | ❌ Not available          | ✅ YAML declarative (NEW)  | Predefined actions, opt-in       |
 | GOPATH integration     | ❌                        | ✅ Optional                | Per-version isolation            |
 | Version shorthand      | ❌                        | ✅                         | `goenv 1.22.5`                   |
 | File arg detection     | ❌                        | ✅                         | `GOENV_FILE_ARG`                 |

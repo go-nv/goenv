@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"time"
 
 	"github.com/go-nv/goenv/internal/hooks"
@@ -31,6 +32,11 @@ func executeHooks(hookPoint hooks.HookPoint, vars map[string]string) {
 	}
 	vars["hook"] = hookPoint.String()
 	vars["timestamp"] = time.Now().Format(time.RFC3339)
+
+	// Add file_arg if available (useful for exec hooks to know which file is being processed)
+	if fileArg := os.Getenv("GOENV_FILE_ARG"); fileArg != "" {
+		vars["file_arg"] = fileArg
+	}
 
 	// Execute hooks (errors are logged but don't fail the command)
 	_ = executor.Execute(hookPoint, vars)

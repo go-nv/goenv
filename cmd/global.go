@@ -45,6 +45,11 @@ func runGlobal(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Deprecation warning
+	fmt.Fprintf(cmd.OutOrStderr(), "%sDeprecation warning: 'goenv global' is a legacy command. Use 'goenv use <version> --global' instead.\n", utils.Emoji("⚠️  "))
+	fmt.Fprintf(cmd.OutOrStderr(), "  Modern command: goenv use <version> --global\n")
+	fmt.Fprintf(cmd.OutOrStderr(), "  See: goenv help use\n\n")
+
 	// Validate: global command takes 0 or 1 argument
 	if len(args) > 1 {
 		return fmt.Errorf("Usage: goenv global [version]")

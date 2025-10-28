@@ -228,6 +228,388 @@ go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
+### Testing Priorities
+
+**📊 See [TESTING_ROADMAP.md](TESTING_ROADMAP.md) for current testing gaps and priorities.**
+
+We especially welcome contributions in:
+
+1. **High Priority:**
+   - Integration tests for hooks system (lifecycle verification)
+   - Cache migration tests (protect user data)
+   - Error handling edge cases (file permissions, corrupted files)
+   - CI interaction tests (prevent hangs in non-interactive mode)
+
+2. **Medium Priority:**
+   - VS Code integration E2E tests (setup/sync/revert flows)
+   - Doctor command environment simulation (NFS, WSL, containers)
+   - SBOM output verification tests
+
+3. **Low Priority:**
+   - Completions script validation
+   - Custom command discovery tests
+
+**Getting Started:**
+
+1. Check the [Testing Roadmap](TESTING_ROADMAP.md) for specific test examples
+2. Pick a high-priority gap that interests you
+3. Open an issue to discuss your approach
+4. Submit a PR with tests and any necessary refactoring
+
+**Test Guidelines:**
+
+- Follow the existing test structure in `*_test.go` files
+- Include both positive and negative test cases
+- Test edge cases and error conditions
+- Add comments explaining complex test scenarios
+- Ensure tests are deterministic (no flaky tests)
+- Run `go test ./...` before submitting
+
+## Documentation Contributions
+
+Good documentation is just as important as good code! We welcome contributions to improve our documentation.
+
+### Documentation Standards
+
+All documentation should follow these quality standards:
+
+✅ **Structure:**
+- Include a table of contents for documents > 100 lines
+- Use clear, hierarchical headings (H1 → H2 → H3)
+- Group related content logically
+- Add "See Also" cross-references at the end
+
+✅ **Content:**
+- Start with a brief purpose statement
+- Include copy-paste working examples
+- Cover common use cases first, advanced topics later
+- Explain the "why" not just the "what"
+- Include troubleshooting sections
+
+✅ **Examples:**
+- All code examples must be tested and work
+- Show both success and failure cases
+- Include platform-specific examples when relevant
+- Use realistic, practical examples (not "foo/bar")
+
+✅ **Cross-Platform:**
+- Note platform differences (Linux, macOS, Windows)
+- Include examples for all major platforms
+- Mention any platform limitations
+
+✅ **Security:**
+- Highlight security considerations
+- Show secure patterns first
+- Warn about insecure alternatives
+- Explain the security implications
+
+### Documentation Types
+
+We have several documentation patterns you can follow:
+
+#### Quick Start Guides
+
+**Example:** [HOOKS_QUICKSTART.md](./HOOKS_QUICKSTART.md)
+
+**Purpose:** Get users productive in 5 minutes
+
+**Template:**
+```markdown
+# Feature Quick Start
+
+Get started with [feature] in 5 minutes.
+
+## What Is [Feature]?
+
+Brief explanation (2-3 sentences).
+
+## 5-Minute Setup
+
+### 1. Step One
+### 2. Step Two
+### 3. Test It
+
+## Common Use Cases
+
+### Use Case 1
+### Use Case 2
+
+## Troubleshooting
+
+## Next Steps
+```
+
+#### Reference Guides
+
+**Example:** [COMMANDS.md](./reference/COMMANDS.md), [PLATFORM_SUPPORT.md](./PLATFORM_SUPPORT.md)
+
+**Purpose:** Complete, authoritative reference
+
+**Template:**
+```markdown
+# Feature Reference
+
+Complete reference for [feature].
+
+## Table of Contents
+
+## Overview
+
+## Reference Tables
+
+| Item | Description | Notes |
+|------|-------------|-------|
+
+## Detailed Sections
+
+## See Also
+```
+
+#### How-To Guides
+
+**Example:** [COMPLIANCE_USE_CASES.md](./COMPLIANCE_USE_CASES.md), [CACHE_TROUBLESHOOTING.md](./CACHE_TROUBLESHOOTING.md)
+
+**Purpose:** Solve specific problems
+
+**Template:**
+```markdown
+# How to [Task]
+
+Complete guide to [task].
+
+## Problem Statement
+
+## Prerequisites
+
+## Step-by-Step Solution
+
+## Common Issues
+
+## Best Practices
+
+## See Also
+```
+
+#### Concept Guides
+
+**Example:** [MODERN_COMMANDS.md](./MODERN_COMMANDS.md), [SMART_CACHING.md](./advanced/SMART_CACHING.md)
+
+**Purpose:** Explain concepts and design decisions
+
+**Template:**
+```markdown
+# Understanding [Concept]
+
+## Overview
+
+## Why This Matters
+
+## How It Works
+
+## Trade-offs and Alternatives
+
+## Best Practices
+```
+
+### Documentation Checklist
+
+Use this checklist before submitting documentation PRs:
+
+**📋 See [DOCUMENTATION_REVIEW_CHECKLIST.md](./DOCUMENTATION_REVIEW_CHECKLIST.md) for the complete checklist.**
+
+Quick checklist:
+- [ ] Table of contents included (for docs > 100 lines)
+- [ ] All code examples tested and work
+- [ ] Cross-references added to related docs
+- [ ] Platform-specific notes where needed
+- [ ] Security considerations highlighted
+- [ ] Troubleshooting section included
+- [ ] "See Also" section at end
+- [ ] Markdown linter passes
+- [ ] No broken links
+
+### Where to Add Documentation
+
+**Reference Documentation:**
+- Commands: `docs/reference/COMMANDS.md`
+- Environment variables: `docs/reference/ENVIRONMENT_VARIABLES.md`
+- Platform support: `docs/PLATFORM_SUPPORT.md`
+
+**User Guides:**
+- Getting started: `docs/user-guide/`
+- Installation: `docs/user-guide/INSTALL.md`
+- VS Code: `docs/user-guide/VSCODE_INTEGRATION.md`
+
+**Advanced Topics:**
+- Configuration: `docs/advanced/`
+- Caching: `docs/advanced/SMART_CACHING.md`
+- Cross-building: `docs/advanced/CROSS_BUILDING.md`
+
+**Troubleshooting:**
+- Cache issues: `docs/CACHE_TROUBLESHOOTING.md`
+- Platform issues: `docs/PLATFORM_SUPPORT.md`
+- FAQ: `docs/FAQ.md`
+
+**Compliance & Operations:**
+- Hooks: `docs/HOOKS_QUICKSTART.md` (quick) or `docs/HOOKS.md` (complete)
+- Compliance: `docs/COMPLIANCE_USE_CASES.md`
+- CI/CD: `docs/CI_CD_GUIDE.md`
+
+### Updating the Documentation Index
+
+When adding new documentation:
+
+1. **Add to main README.md:**
+   ```markdown
+   #### Advanced Topics
+   - **[Your New Guide](./docs/YOUR_GUIDE.md)** - Brief description ⭐ **NEW**
+   ```
+
+2. **Add to docs/README.md:**
+   ```markdown
+   ### Your Category
+   - **[Your New Guide](YOUR_GUIDE.md)** - Brief description
+   ```
+
+3. **Add cross-references:**
+   - Link from related documents
+   - Add to "See Also" sections
+
+### Documentation Examples
+
+Learn from our best documentation:
+
+**Complete Guides:**
+- [Hooks Quick Start](./HOOKS_QUICKSTART.md) - Perfect quick start example
+- [Compliance Use Cases](./COMPLIANCE_USE_CASES.md) - Comprehensive how-to
+- [Platform Support Matrix](./PLATFORM_SUPPORT.md) - Complete reference
+
+**Well-Structured Commands:**
+- [goenv vscode setup](./reference/COMMANDS.md#goenv-vscode-setup) - Clear, complete command documentation
+- [goenv cache clean](./reference/COMMANDS.md#goenv-cache-clean) - Good examples and options
+
+**Security Documentation:**
+- [run_command action](./HOOKS.md#run_command) - Security-first approach
+- [Hooks Security Model](./HOOKS.md#security-model) - Complete threat model
+
+### Common Documentation Patterns
+
+**Platform-specific examples:**
+```markdown
+### macOS / Linux
+
+\```bash
+export GOENV_ROOT="$HOME/.goenv"
+\```
+
+### Windows (PowerShell)
+
+\```powershell
+$env:GOENV_ROOT = "$HOME\.goenv"
+\```
+```
+
+**Troubleshooting format:**
+```markdown
+### Issue: Brief Description
+
+**Symptom:**
+\```
+Error message or behavior
+\```
+
+**Cause:** Explanation
+
+**Solution:**
+\```bash
+command to fix
+\```
+```
+
+**Example with explanation:**
+```markdown
+### Use Case: Descriptive Title
+
+\```bash
+# Step 1: Do this
+command --flag
+
+# Step 2: Do that
+another command
+\```
+
+**What this does:**
+1. First command explanation
+2. Second command explanation
+
+**Why this works:** Brief explanation
+```
+
+### Testing Documentation
+
+Before submitting:
+
+1. **Test all commands:**
+   ```bash
+   # Copy each command from your doc
+   # Run it in a clean environment
+   # Verify the output matches your documentation
+   ```
+
+2. **Check links:**
+   ```bash
+   # Use a markdown link checker
+   markdown-link-check docs/YOUR_GUIDE.md
+   ```
+
+3. **Verify cross-references:**
+   ```bash
+   # Ensure all "See Also" links work
+   # Check that related docs link back
+   ```
+
+4. **Spelling and grammar:**
+   ```bash
+   # Run through a spell checker
+   # Use proper technical terminology
+   ```
+
+### Documentation Style Guide
+
+**Voice and tone:**
+- Use active voice: "Run this command" not "This command should be run"
+- Be direct: "Do X" not "You should probably do X"
+- Be helpful: Explain why, not just what
+
+**Formatting:**
+- Use **bold** for emphasis and important notes
+- Use `code` for commands, files, and variables
+- Use > blockquotes for tips and warnings
+- Use ✅ ❌ ⚠️ for visual cues (sparingly)
+
+**Terminology:**
+- "Go version" not "golang version"
+- "goenv" (lowercase) in text, `goenv` in code
+- "macOS" not "Mac OS" or "OSX"
+- "Windows" not "win" or "windows"
+- Use proper product names: "VS Code" not "vscode"
+
+**Code blocks:**
+```markdown
+\```bash
+# Always include shebang or language
+# Add comments to explain non-obvious parts
+goenv install 1.25.2
+\```
+```
+
+### Getting Help with Documentation
+
+- **Ask questions:** Open a discussion on GitHub
+- **Request review:** Tag maintainers in your PR
+- **Use examples:** Reference existing good docs
+- **Iterate:** Documentation improves through feedback
+
 ## Workflows
 
 ### Submitting an issue

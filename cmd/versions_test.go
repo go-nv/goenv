@@ -187,7 +187,8 @@ func TestVersionsCommand(t *testing.T) {
 			}
 
 			if len(tt.expectedOutput) > 0 {
-				got := strings.TrimRight(output.String(), "\n")
+				got := stripDeprecationWarning(output.String())
+				got = strings.TrimRight(got, "\n")
 				gotLines := strings.Split(got, "\n")
 
 				// Adjust expected output if system Go is present (but not expected in test setup)
@@ -282,7 +283,8 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 		t.Errorf("Versions command failed: %v", err)
 	}
 
-	got := strings.TrimRight(output.String(), "\n")
+	got := stripDeprecationWarning(output.String())
+	got = strings.TrimRight(got, "\n")
 	gotLines := strings.Split(got, "\n")
 
 	// Should show local version (1.22.2) as current with source, not global (1.21.5)
@@ -427,7 +429,7 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	got := strings.TrimSpace(output.String())
+	got := stripDeprecationWarning(output.String())
 	expected := "* system"
 
 	if got != expected {

@@ -20,6 +20,182 @@ When you install tools using `go install`, they are placed in your GOPATH bin di
 3. **Makes version switching seamless** - tools switch with Go versions
 4. **Prevents version conflicts** - no mixing of Go modules from different versions
 
+## Do You Need GOPATH Integration?
+
+**⚠️ IMPORTANT: Most modern Go developers using modules (Go 1.16+) do NOT need GOPATH for their projects.**
+
+### Quick Decision Guide
+
+**❌ You DON'T need GOPATH integration if:**
+
+- ✅ You only use Go modules (`go.mod` files) for your projects
+- ✅ You only install development tools (`gopls`, `golangci-lint`, etc.)
+- ✅ You use Go 1.16+ (modules are default)
+- ✅ You never use `go get` for downloading packages to GOPATH/src
+
+**In this case:** goenv still manages tool isolation automatically. Tools installed with `go install` work correctly without thinking about GOPATH.
+
+**✅ You DO need GOPATH integration if:**
+
+- You maintain legacy code that depends on GOPATH structure
+- You use `go get` to download packages to `$GOPATH/src` (pre-module workflow)
+- You have build scripts that expect specific GOPATH layouts
+- You work with Go 1.10 or earlier regularly
+
+### How to Disable GOPATH Integration
+
+If you're certain you don't need GOPATH integration (modules-only, Go 1.16+), you can disable it:
+
+```bash
+# Add to ~/.bashrc, ~/.zshrc, or your shell config
+export GOENV_DISABLE_GOPATH=1
+```
+
+**When to disable:**
+
+- ✅ You only use Go modules (never `go get` for packages)
+- ✅ You manually install tools system-wide or per-project
+- ✅ You want to manage GOPATH yourself
+- ✅ You have custom GOPATH requirements
+
+**Trade-offs of disabling:**
+
+- ❌ Per-version tool isolation is disabled
+- ❌ Need to manually install tools for each Go version
+- ❌ Tools like `gopls` won't automatically switch with Go versions
+- ❌ May mix tool binaries built with different Go versions
+
+**Recommendation:** Most users should **leave GOPATH integration enabled** (the default). It provides version isolation benefits even for modules-only workflows, and you don't need to think about it.
+
+### What About Development Tools?
+
+**Tools like `gopls`, `golangci-lint`, `goimports` are managed automatically:**
+
+```bash
+# Install a tool (uses GOPATH under the hood, but you don't need to think about it)
+$ goenv use 1.23.2
+$ go install golang.org/x/tools/gopls@latest
+
+# Tool is isolated to Go 1.23.2
+$ gopls version
+golang.org/x/tools/gopls v0.14.2
+
+# Switch Go version
+$ goenv use 1.22.0
+
+# Tool from 1.23.2 is not available (different GOPATH)
+$ gopls version
+goenv: gopls: command not found
+
+# Install for this version too
+$ go install golang.org/x/tools/gopls@latest
+$ gopls version
+golang.org/x/tools/gopls v0.14.2
+```
+
+**This isolation happens automatically - you don't need to configure anything.**
+
+### Module-First Workflow (Recommended for New Projects)
+
+If you're using Go modules (Go 1.16+), this is the recommended workflow:
+
+```bash
+# 1. Create a new project
+$ mkdir myproject && cd myproject
+$ go mod init github.com/user/myproject
+
+# 2. Add dependencies (no GOPATH needed)
+$ go get github.com/gin-gonic/gin@latest
+
+# 3. Dependencies are in $HOME/go/pkg/mod (managed by Go, not GOPATH)
+$ go mod tidy
+
+# 4. Build your project
+$ go build
+```
+
+**GOPATH is not involved in this workflow.** Dependencies are in the module cache (`$GOPATH/pkg/mod`), not `$GOPATH/src`.
+
+### When GOPATH Integration Matters
+
+**Scenario 1: Per-Version Tool Isolation**
+
+```bash
+# Go 1.22.0 has gopls v0.13.0
+$ goenv use 1.22.0
+$ gopls version
+v0.13.0
+
+# Go 1.23.2 has gopls v0.14.2
+$ goenv use 1.23.2
+$ gopls version
+v0.14.2
+```
+
+**Without GOPATH integration:** Both versions would use the same `gopls`, potentially causing compatibility issues.
+
+**With GOPATH integration (default):** Each Go version has its own set of tools, preventing conflicts.
+
+**Scenario 2: Legacy GOPATH Projects**
+
+```bash
+# Old project structure (pre-modules)
+$GOPATH/src/
+  └── github.com/
+      └── mycompany/
+          └── legacy-project/
+
+# This still works with goenv's GOPATH integration
+$ go build github.com/mycompany/legacy-project
+```
+
+### Disabling GOPATH Integration
+
+**If you only use modules and don't need tool isolation:**
+
+```bash
+# Disable GOPATH integration entirely
+export GOENV_DISABLE_GOPATH=1
+
+# Now all Go versions share the same tool directory
+# Tools installed with any version are available with all versions
+```
+
+**Benefits of Disabling:**
+
+- Simpler mental model (one tool installation location)
+- Faster rehash (fewer directories to scan)
+- Tools work across all Go versions
+
+**Trade-off:**
+
+- Tools are shared across Go versions (may cause compatibility issues)
+- Tools installed with Go 1.22.0 are also used with Go 1.23.2
+- Some tools may not work correctly with different Go versions
+
+**Recommendation:**
+
+**For most modern Go 1.16+ users:** Consider disabling GOPATH integration for simplicity:
+
+```bash
+export GOENV_DISABLE_GOPATH=1
+```
+
+**Keep GOPATH integration enabled (default) if:**
+
+- You need per-version tool isolation (e.g., different gopls versions for different Go versions)
+- You maintain legacy GOPATH projects (pre-Go 1.16)
+- You frequently switch between Go versions with incompatible tools
+
+### Configuration Summary
+
+| Use Case                                             | Recommendation          | GOENV_DISABLE_GOPATH            |
+| ---------------------------------------------------- | ----------------------- | ------------------------------- |
+| **Simple setup (Go 1.16+, modules only)**            | Disable for simplicity  | `1` (recommended for new users) |
+| **Per-version tool isolation needed**                | Keep enabled            | `0` (default)                   |
+| **Legacy GOPATH projects (pre-1.16)**                | Keep enabled (required) | `0` (default)                   |
+| **Advanced: different tool versions per Go version** | Keep enabled            | `0` (default)                   |
+
 ## How It Works
 
 ### Default Behavior

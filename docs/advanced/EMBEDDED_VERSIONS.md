@@ -341,6 +341,11 @@ goenv install --list  # Will fetch fresh from API
 ### Potential Improvements
 
 1. **Compression**: gzip embedded data (817 KB → ~150 KB)
+   - Would reduce binary size by ~670 KB
+   - Adds decompression overhead (~5-10ms on first access)
+   - Trade-off: Smaller binary vs. slightly slower cold start
+   - Current: Prioritizing instant access and simplicity
+
 2. **Incremental**: Embed only versions since last release
 3. **Lazy Loading**: Decompress on first use only
 4. **Version Ranges**: Embed only supported version ranges (e.g., Go 1.20+)

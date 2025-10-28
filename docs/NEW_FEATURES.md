@@ -8,9 +8,9 @@ This document summarizes all the new features and improvements in the Go impleme
 | ---------------------------- | ---------------------- | --------------------- | -------- | ------------------------------------------------------------- |
 | SBOM Generation & Inventory  | Not Available          | ✅ Fully Functional   | High     | [Commands Reference](reference/COMMANDS.md#goenv-sbom)        |
 | Smart Caching & Offline Mode | Not Available          | ✅ Fully Functional   | High     | [Smart Caching Guide](advanced/SMART_CACHING.md)              |
-| Configuration Hooks          | Shell scripts (broken) | ✅ YAML config (safe) | High     | [Hooks Guide](HOOKS.md)                                       |
+| Configuration Hooks          | Not Available          | ✅ YAML config (NEW)  | High     | [Hooks Guide](HOOKS.md)                                       |
 | GOPATH Integration           | Not Available          | ✅ Fully Functional   | High     | [GOPATH Integration](advanced/GOPATH_INTEGRATION.md)          |
-| Auto-Rehash Control          | Always On              | ✅ Configurable       | High     | [Commands Reference](reference/COMMANDS.md#install)           |
+| Auto-Rehash Control          | Not Available          | ✅ Automatic (NEW)    | High     | [Commands Reference](reference/COMMANDS.md#install)           |
 | Version Shorthand            | Not Available          | ✅ Fully Functional   | Medium   | [Commands Reference](reference/COMMANDS.md#version-shorthand) |
 | File Arg Detection           | Not Available          | ✅ Fully Functional   | Low      | [Hooks Guide](HOOKS.md#environment-variables)                 |
 | Shell Completion             | Partial                | ✅ Complete           | Medium   | [Commands Reference](reference/COMMANDS.md)                   |

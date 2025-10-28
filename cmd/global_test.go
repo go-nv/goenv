@@ -3,112 +3,11 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
-
-func setupTestEnv(t *testing.T) (string, func()) {
-	// Create temporary test directory
-	testDir, err := os.MkdirTemp("", "goenv_test_")
-	if err != nil {
-		t.Fatalf("Failed to create test directory: %v", err)
-	}
-
-	// Set test environment variables
-	oldGoenvRoot := utils.GoenvEnvVarRoot.UnsafeValue()
-	oldHome := os.Getenv("HOME")
-	oldPath := os.Getenv("PATH")
-	oldGoenvVersion := utils.GoenvEnvVarVersion.UnsafeValue()
-
-	testRoot := filepath.Join(testDir, "root")
-	testHome := filepath.Join(testDir, "home")
-
-	utils.GoenvEnvVarRoot.Set(testRoot)
-	os.Setenv("HOME", testHome)
-	// Clear PATH to ensure no system go is found unless explicitly added by test
-	if runtime.GOOS == "windows" {
-		os.Setenv("PATH", "C:\\Windows\\System32")
-	} else {
-		os.Setenv("PATH", "/usr/bin:/bin")
-	}
-	// Clear GOENV_VERSION to ensure clean test environment
-	os.Unsetenv("GOENV_VERSION")
-
-	// Create necessary directories
-	os.MkdirAll(testRoot, 0755)
-	os.MkdirAll(testHome, 0755)
-	os.MkdirAll(filepath.Join(testRoot, "versions"), 0755)
-
-	// Change to testHome to avoid picking up any .go-version files from the repository
-	oldDir, _ := os.Getwd()
-	os.Chdir(testHome)
-
-	// Also set GOENV_DIR to testHome to prevent any directory traversal finding repo .go-version
-	oldGoenvDir := utils.GoenvEnvVarDir.UnsafeValue()
-	utils.GoenvEnvVarDir.Set(testHome)
-
-	// Cleanup function
-	cleanup := func() {
-		os.Chdir(oldDir)
-		utils.GoenvEnvVarRoot.Set(oldGoenvRoot)
-		os.Setenv("HOME", oldHome)
-		os.Setenv("PATH", oldPath)
-		utils.GoenvEnvVarDir.Set(oldGoenvDir)
-		if oldGoenvVersion != "" {
-			utils.GoenvEnvVarVersion.Set(oldGoenvVersion)
-		}
-		os.RemoveAll(testDir)
-	}
-
-	return testRoot, cleanup
-}
-
-func createTestVersion(t *testing.T, root, version string) {
-	versionDir := filepath.Join(root, "versions", version)
-	if err := os.MkdirAll(versionDir, 0755); err != nil {
-		t.Fatalf("Failed to create test version directory: %v", err)
-	}
-
-	binDir := filepath.Join(versionDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		t.Fatalf("Failed to create test bin directory: %v", err)
-	}
-
-	// Create mock go binary
-	goBin := filepath.Join(binDir, "go")
-	var content string
-	if runtime.GOOS == "windows" {
-		goBin += ".bat"
-		content = "@echo off\necho go version go" + version + " windows/amd64\n"
-	} else {
-		content = "#!/bin/sh\necho go version go" + version + " linux/amd64\n"
-	}
-
-	if err := os.WriteFile(goBin, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create test go binary: %v", err)
-	}
-}
-
-func createTestAlias(t *testing.T, root, name, target string) {
-	aliasesFile := filepath.Join(root, "aliases")
-
-	// Read existing aliases if file exists
-	var content string
-	if data, err := os.ReadFile(aliasesFile); err == nil {
-		content = string(data)
-	}
-
-	// Append new alias
-	content += name + "=" + target + "\n"
-
-	if err := os.WriteFile(aliasesFile, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create alias: %v", err)
-	}
-}
 
 func TestGlobalCommand(t *testing.T) {
 	tests := []struct {
@@ -203,7 +102,7 @@ func TestGlobalCommand(t *testing.T) {
 			}
 
 			if tt.expectedOutput != "" {
-				got := strings.TrimSpace(stdout.String())
+				got := stripDeprecationWarning(stdout.String())
 				if got != tt.expectedOutput {
 					t.Errorf("Expected output '%s', got '%s'", tt.expectedOutput, got)
 				}
@@ -308,7 +207,7 @@ func TestGlobalWithLocalOverride(t *testing.T) {
 		t.Errorf("Global command failed: %v", err)
 	}
 
-	got := strings.TrimSpace(output.String())
+	got := stripDeprecationWarning(output.String())
 	if got != "1.21.5" {
 		t.Errorf("Global command should show global version '1.21.5', got '%s'", got)
 	}

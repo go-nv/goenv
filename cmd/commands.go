@@ -75,6 +75,9 @@ func runCommands(cmd *cobra.Command, args []string) error {
 	}
 	commands = append(commands, standardCommands...)
 
+	// Track discovered commands and their paths for duplicate detection
+	commandPaths := make(map[string][]string)
+
 	// Check PATH for additional goenv commands
 	pathEnv := os.Getenv("PATH")
 	for _, dir := range filepath.SplitList(pathEnv) {
@@ -90,11 +93,27 @@ func runCommands(cmd *cobra.Command, args []string) error {
 							// On Windows, all files are "executable"; on Unix, check the executable bit
 							if runtime.GOOS == "windows" || info.Mode()&0111 != 0 {
 								commands = append(commands, cmdName)
+								commandPaths[cmdName] = append(commandPaths[cmdName], fullPath)
 							}
 						}
 					}
 				}
 			}
+		}
+	}
+
+	// Check for duplicates and warn (to stderr, doesn't affect output)
+	for cmdName, paths := range commandPaths {
+		if len(paths) > 1 {
+			fmt.Fprintf(os.Stderr, "⚠️  Warning: Multiple 'goenv-%s' commands found in PATH:\n", cmdName)
+			for i, path := range paths {
+				marker := "  "
+				if i == 0 {
+					marker = "→ " // First one wins (appears first in PATH)
+				}
+				fmt.Fprintf(os.Stderr, "  %s%s\n", marker, path)
+			}
+			fmt.Fprintln(os.Stderr)
 		}
 	}
 

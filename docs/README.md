@@ -7,8 +7,11 @@ Welcome to the goenv documentation! This directory contains comprehensive docume
 ### Getting Started
 
 - **[Installation Guide](user-guide/INSTALL.md)** - Complete installation instructions for all platforms
+- **[Quick Reference](QUICK_REFERENCE.md)** - One-page cheat sheet ⭐ **NEW**
+- **[FAQ](FAQ.md)** - Frequently asked questions ⭐ **NEW**
 - **[How It Works](user-guide/HOW_IT_WORKS.md)** - Understanding goenv's architecture and workflow
 - **[VS Code Integration](user-guide/VSCODE_INTEGRATION.md)** - Setting up VS Code with goenv
+- **[What's New in Documentation](WHATS_NEW_DOCUMENTATION.md)** - Recent documentation improvements ⭐ **NEW**
 - **[New Features](NEW_FEATURES.md)** - Summary of new features in Go implementation
 - **[Migration Guide](MIGRATION_GUIDE.md)** - Migrating from bash to Go implementation
 
@@ -16,6 +19,9 @@ Welcome to the goenv documentation! This directory contains comprehensive docume
 
 - **[Commands Reference](reference/COMMANDS.md)** - Complete command-line interface documentation
 - **[Environment Variables](reference/ENVIRONMENT_VARIABLES.md)** - All configuration options via environment variables
+- **[Platform Support Matrix](PLATFORM_SUPPORT.md)** - OS and architecture compatibility guide
+- **[Modern vs Legacy Commands](MODERN_COMMANDS.md)** - Command modernization guide
+- **[JSON Output Guide](JSON_OUTPUT_GUIDE.md)** - JSON output for automation and CI/CD
 
 ### Advanced Topics
 
@@ -25,17 +31,22 @@ Welcome to the goenv documentation! This directory contains comprehensive docume
 - **[GOPATH Integration](advanced/GOPATH_INTEGRATION.md)** - Managing GOPATH binaries per version
 - **[Cross-Building](advanced/CROSS_BUILDING.md)** - Cross-compilation and architecture-specific builds
 - **[What NOT to Sync](advanced/WHAT_NOT_TO_SYNC.md)** - Sharing goenv across machines and containers
-- **[Hooks System](HOOKS.md)** - Extending goenv with custom hooks
+- **[Hooks System Quick Start](HOOKS_QUICKSTART.md)** - 5-minute hooks setup guide
+- **[Hooks System (Full)](HOOKS.md)** - Complete hooks documentation
+- **[Compliance Use Cases](COMPLIANCE_USE_CASES.md)** - SOC 2, ISO 27001, SBOM generation
 
 ### Troubleshooting & Diagnostics
 
+- **[Cache Troubleshooting](CACHE_TROUBLESHOOTING.md)** - Cache issues, migration, and optimization
+- **[System Go Coexistence](SYSTEM_GO_COEXISTENCE.md)** - Using goenv with system-installed Go ⭐ **NEW**
 - **[Environment Detection](../ENVIRONMENT_DETECTION.md)** - Container, WSL, and filesystem detection
 - **[Environment Detection Quick Reference](ENVIRONMENT_DETECTION_QUICKREF.md)** - Quick reference for environment issues
 - **[Platform-Specific Enhancements](../PLATFORM_SPECIFIC_ENHANCEMENTS.md)** - macOS, Windows, and Linux platform checks
 
 ### Contributing
 
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to goenv
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to goenv (includes documentation guidelines)
+- **[Documentation Review Checklist](DOCUMENTATION_REVIEW_CHECKLIST.md)** - Quality checklist for docs ⭐ **NEW**
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community guidelines
 - **[Release Process](RELEASE_PROCESS.md)** - Release workflow for maintainers
 
@@ -76,13 +87,80 @@ gopls version
 goenv 1.25.2  # Same as: goenv use 1.25.2
 ```
 
-**💡 Pro tips:**
+**💡 How `go install` works with goenv:**
 
-- 🌐 **Offline/air-gapped?** Set `export GOENV_OFFLINE=1` to use embedded versions (no network required)
-- 🚀 **CI/CD?** Use `GOENV_OFFLINE=1` for maximum speed and reproducibility
-- 📶 **Slow connection?** Cache is automatically used when available (see [Smart Caching](advanced/SMART_CACHING.md))
+Tools installed via `go install` are automatically isolated per Go version:
+
+```bash
+# Example: Installing gopls with Go 1.25.2
+goenv use 1.25.2
+go install golang.org/x/tools/gopls@latest
+# → Installs to: $HOME/go/1.25.2/bin/gopls
+
+goenv rehash  # Creates shim at ~/.goenv/shims/gopls
+
+# Now gopls is available and uses Go 1.25.2
+gopls version
+
+# Switch to a different Go version
+goenv use 1.24.0
+# → gopls shim now points to $HOME/go/1.24.0/bin/gopls (if installed)
+# → Or shows "command not found" if not installed for this version
+```
+
+**Key points:**
+
+- 🔒 **Isolation:** Each Go version has its own `$HOME/go/{version}/` directory
+- 🔄 **Auto-switching:** Tools switch automatically when you change Go versions
+- 🛡️ **No conflicts:** Different tool versions for different Go versions coexist
+- 🔧 **Shims:** `goenv rehash` (or `goenv use`) creates shims that route to the active version's tools
+
+See [GOPATH Integration](advanced/GOPATH_INTEGRATION.md) for configuration options and advanced usage.
+
+---
 
 **Note:** Tools installed with `go install` are isolated per Go version. Running `goenv rehash` (or `goenv use`) automatically creates shims for all installed tools.
+
+### 🌐 Network Reliability & Offline Mode
+
+goenv works reliably in all network conditions:
+
+> **💡 Offline/Air-Gapped Environments**
+>
+> ```bash
+> export GOENV_OFFLINE=1
+> ```
+>
+> This disables all network calls and uses embedded versions (331 versions built-in at last update). Perfect for:
+>
+> - 🔒 **Air-gapped systems** - No internet access required
+> - 🚀 **CI/CD pipelines** - Maximum speed (~8ms vs ~500ms) and guaranteed reproducibility
+> - 📶 **Bandwidth constraints** - Mobile hotspots, metered connections
+> - 🔐 **Security requirements** - No outbound network calls
+>
+> All version listing and installation commands work offline with embedded data.
+
+**Other network features:**
+
+- ✅ **Automatic caching** - Reduces API calls by 85% for active users ([Smart Caching](advanced/SMART_CACHING.md))
+- ✅ **Graceful fallback** - Network failures use cached data instead of failing
+- ✅ **30-second timeout** - Prevents hanging on slow connections
+- ✅ **ETag support** - 99.97% bandwidth savings when cache is current (2MB → 500 bytes)
+
+**Quick network troubleshooting:**
+
+```bash
+# Test connectivity and cache status
+goenv doctor
+
+# Force refresh after network issues
+goenv refresh
+
+# Debug network/cache behavior
+GOENV_DEBUG=1 goenv install --list
+```
+
+See [Network Reliability Defaults](advanced/SMART_CACHING.md#network-reliability-defaults) for complete details on timeouts, fallback behavior, and environment variables.
 
 ## 🎯 Modern Unified Commands
 
@@ -254,17 +332,20 @@ goenv install 1.24.8     # Installs from embedded data
 When using goenv across multiple machines, containers, or in dotfiles repositories, it's important to know what to sync and what to keep local:
 
 **✅ Safe to sync (commit to git, share in containers):**
+
 - `.go-version` files (per-project version markers)
 - `goenv.yaml` hooks configuration
 - Shell initialization scripts (`.bashrc`, `.zshrc` snippets)
 
 **❌ Do NOT sync (keep local to each machine):**
+
 - `$GOENV_ROOT/versions/` - Installed Go binaries (platform-specific)
 - `$GOENV_ROOT/cache/` - Version lists and download caches
 - `$GOENV_ROOT/shims/` - Generated executable wrappers
 - Architecture-specific build caches
 
 **Best practices:**
+
 - Use `.go-version` files for consistent versions across teams
 - Let each machine/container install its own Go binaries
 - Share hooks configuration (`goenv.yaml`) for team workflows

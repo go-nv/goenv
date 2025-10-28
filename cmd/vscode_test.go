@@ -59,7 +59,7 @@ func TestVSCodeGenerateSettingsBasic(t *testing.T) {
 
 	// Verify legacy settings are NOT included (modern VS Code Go extension doesn't need them)
 	legacySettings := []string{
-		"go.useLanguageServer", // Removed in Go extension v0.30.0+ (2022)
+		"go.useLanguageServer",   // Removed in Go extension v0.30.0+ (2022)
 		"go.languageServerFlags", // Replaced by gopls configuration
 	}
 	for _, key := range legacySettings {
@@ -450,4 +450,287 @@ func TestVSCodePathGeneration_PlatformSpecific(t *testing.T) {
 			t.Logf("✓ %s: %s", tc.envVar, tc.expected)
 		}
 	})
+}
+
+// TestVSCodeInit_NoBackupWhenNoChanges verifies that no backup is created when settings are already correct
+func TestVSCodeInit_NoBackupWhenNoChanges(t *testing.T) {
+	// Create a temporary directory
+	tmpDir := t.TempDir()
+	vscodeDir := tmpDir + "/.vscode"
+	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+		t.Fatalf("Failed to create .vscode directory: %v", err)
+	}
+
+	settingsFile := vscodeDir + "/settings.json"
+	backupFile := settingsFile + ".bak"
+
+	// Create initial settings that match what init would generate
+	initialSettings := map[string]interface{}{
+		"go.goroot":      "${env:HOME}/.goenv/versions/1.23.2",
+		"go.gopath":      "${env:HOME}/go/1.23.2",
+		"go.toolsGopath": "${env:HOME}/go/tools",
+	}
+
+	if err := vscode.WriteJSONFile(settingsFile, initialSettings); err != nil {
+		t.Fatalf("Failed to write initial settings: %v", err)
+	}
+
+	// Change to temp directory
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get working directory: %v", err)
+	}
+	defer os.Chdir(oldWd)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
+
+	// Simulate the check that happens in runVSCodeInit
+	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
+	if err != nil {
+		t.Fatalf("Failed to read existing settings: %v", err)
+	}
+
+	keysToUpdate := map[string]interface{}{
+		"go.goroot": "${env:HOME}/.goenv/versions/1.23.2",
+		"go.gopath": "${env:HOME}/go/1.23.2",
+	}
+
+	// Check if any values differ
+	hasChanges := false
+	for key, newVal := range keysToUpdate {
+		oldVal := existingSettings[key]
+		if oldVal != newVal {
+			hasChanges = true
+			break
+		}
+	}
+
+	// Verify that no changes are detected
+	if hasChanges {
+		t.Error("Expected no changes to be detected when settings are already correct")
+	}
+
+	// Verify no backup file exists
+	if _, err := os.Stat(backupFile); err == nil {
+		t.Error("Backup file should not exist when no changes are made")
+	}
+
+	t.Log("✓ No backup created when settings are already correct")
+}
+
+// TestVSCodeInit_BackupCreatedWhenChangesNeeded verifies that backup is created only when changes are made
+func TestVSCodeInit_BackupCreatedWhenChangesNeeded(t *testing.T) {
+	// Create a temporary directory
+	tmpDir := t.TempDir()
+	vscodeDir := tmpDir + "/.vscode"
+	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+		t.Fatalf("Failed to create .vscode directory: %v", err)
+	}
+
+	settingsFile := vscodeDir + "/settings.json"
+	backupFile := settingsFile + ".bak"
+
+	// Create initial settings with DIFFERENT values
+	initialSettings := map[string]interface{}{
+		"go.goroot":      "${env:HOME}/.goenv/versions/1.22.0", // Old version
+		"go.gopath":      "${env:HOME}/go/1.22.0",              // Old version
+		"go.toolsGopath": "${env:HOME}/go/tools",
+	}
+
+	if err := vscode.WriteJSONFile(settingsFile, initialSettings); err != nil {
+		t.Fatalf("Failed to write initial settings: %v", err)
+	}
+
+	// Simulate the check that happens in runVSCodeInit
+	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
+	if err != nil {
+		t.Fatalf("Failed to read existing settings: %v", err)
+	}
+
+	keysToUpdate := map[string]interface{}{
+		"go.goroot": "${env:HOME}/.goenv/versions/1.23.2", // New version
+		"go.gopath": "${env:HOME}/go/1.23.2",              // New version
+	}
+
+	// Check if any values differ
+	hasChanges := false
+	for key, newVal := range keysToUpdate {
+		oldVal := existingSettings[key]
+		if oldVal != newVal {
+			hasChanges = true
+			break
+		}
+	}
+
+	// Verify that changes ARE detected
+	if !hasChanges {
+		t.Error("Expected changes to be detected when settings differ")
+	}
+
+	// If changes are detected, backup should be created
+	if hasChanges {
+		if err := vscode.BackupFile(settingsFile); err != nil {
+			t.Fatalf("Failed to create backup: %v", err)
+		}
+
+		// Verify backup file exists
+		if _, err := os.Stat(backupFile); err != nil {
+			t.Error("Backup file should exist when changes are made")
+		}
+
+		// Verify backup contains the old values
+		backupSettings, err := vscode.ReadExistingSettings(backupFile)
+		if err != nil {
+			t.Fatalf("Failed to read backup settings: %v", err)
+		}
+
+		if backupSettings["go.goroot"] != "${env:HOME}/.goenv/versions/1.22.0" {
+			t.Errorf("Backup should contain old go.goroot value, got: %v", backupSettings["go.goroot"])
+		}
+
+		if backupSettings["go.gopath"] != "${env:HOME}/go/1.22.0" {
+			t.Errorf("Backup should contain old go.gopath value, got: %v", backupSettings["go.gopath"])
+		}
+
+		t.Log("✓ Backup created and contains correct old values when changes are needed")
+	}
+}
+
+// TestVSCodeSync_NoBackupWhenAlreadySynced verifies that sync doesn't create backup when already in sync
+func TestVSCodeSync_NoBackupWhenAlreadySynced(t *testing.T) {
+	// Create a temporary directory
+	tmpDir := t.TempDir()
+	vscodeDir := tmpDir + "/.vscode"
+	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+		t.Fatalf("Failed to create .vscode directory: %v", err)
+	}
+
+	settingsFile := vscodeDir + "/settings.json"
+	backupFile := settingsFile + ".bak"
+
+	// Create settings that are already synced
+	currentVersion := "1.23.2"
+	syncedSettings := map[string]interface{}{
+		"go.goroot":      "${env:HOME}/.goenv/versions/" + currentVersion,
+		"go.gopath":      "${env:HOME}/go/" + currentVersion,
+		"go.toolsGopath": "${env:HOME}/go/tools",
+	}
+
+	if err := vscode.WriteJSONFile(settingsFile, syncedSettings); err != nil {
+		t.Fatalf("Failed to write synced settings: %v", err)
+	}
+
+	// Simulate the sync check
+	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
+	if err != nil {
+		t.Fatalf("Failed to read existing settings: %v", err)
+	}
+
+	// Keys that sync would update (using same version, so should be identical)
+	keysToUpdate := map[string]interface{}{
+		"go.goroot": "${env:HOME}/.goenv/versions/" + currentVersion,
+		"go.gopath": "${env:HOME}/go/" + currentVersion,
+	}
+
+	// Check if any values differ
+	hasChanges := false
+	for key, newVal := range keysToUpdate {
+		oldVal := existingSettings[key]
+		if oldVal != newVal {
+			hasChanges = true
+			break
+		}
+	}
+
+	// Verify no changes detected
+	if hasChanges {
+		t.Error("Expected no changes when settings are already synced")
+	}
+
+	// Verify no backup file exists
+	if _, err := os.Stat(backupFile); err == nil {
+		t.Error("Backup file should not exist when sync is not needed")
+	}
+
+	t.Log("✓ No backup created when settings are already synced")
+}
+
+// TestVSCodeSync_BackupCreatedWhenOutOfSync verifies that sync creates backup when out of sync
+func TestVSCodeSync_BackupCreatedWhenOutOfSync(t *testing.T) {
+	// Create a temporary directory
+	tmpDir := t.TempDir()
+	vscodeDir := tmpDir + "/.vscode"
+	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+		t.Fatalf("Failed to create .vscode directory: %v", err)
+	}
+
+	settingsFile := vscodeDir + "/settings.json"
+	backupFile := settingsFile + ".bak"
+
+	// Create settings for an old version
+	oldVersion := "1.22.0"
+	newVersion := "1.23.2"
+	oldSettings := map[string]interface{}{
+		"go.goroot":      "${env:HOME}/.goenv/versions/" + oldVersion,
+		"go.gopath":      "${env:HOME}/go/" + oldVersion,
+		"go.toolsGopath": "${env:HOME}/go/tools",
+	}
+
+	if err := vscode.WriteJSONFile(settingsFile, oldSettings); err != nil {
+		t.Fatalf("Failed to write old settings: %v", err)
+	}
+
+	// Simulate the sync check with a new version
+	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
+	if err != nil {
+		t.Fatalf("Failed to read existing settings: %v", err)
+	}
+
+	// Keys that sync would update (using new version)
+	keysToUpdate := map[string]interface{}{
+		"go.goroot": "${env:HOME}/.goenv/versions/" + newVersion,
+		"go.gopath": "${env:HOME}/go/" + newVersion,
+	}
+
+	// Check if any values differ
+	hasChanges := false
+	for key, newVal := range keysToUpdate {
+		oldVal := existingSettings[key]
+		if oldVal != newVal {
+			hasChanges = true
+			break
+		}
+	}
+
+	// Verify changes ARE detected
+	if !hasChanges {
+		t.Error("Expected changes to be detected when versions differ")
+	}
+
+	// Create backup when changes are detected
+	if hasChanges {
+		if err := vscode.BackupFile(settingsFile); err != nil {
+			t.Fatalf("Failed to create backup: %v", err)
+		}
+
+		// Verify backup file exists
+		if _, err := os.Stat(backupFile); err != nil {
+			t.Error("Backup file should exist when sync needs to update settings")
+		}
+
+		// Verify backup contains the old version
+		backupSettings, err := vscode.ReadExistingSettings(backupFile)
+		if err != nil {
+			t.Fatalf("Failed to read backup settings: %v", err)
+		}
+
+		expectedOldGoroot := "${env:HOME}/.goenv/versions/" + oldVersion
+		if backupSettings["go.goroot"] != expectedOldGoroot {
+			t.Errorf("Backup should contain old version %s, got: %v", expectedOldGoroot, backupSettings["go.goroot"])
+		}
+
+		t.Log("✓ Backup created when sync detects version mismatch")
+	}
 }

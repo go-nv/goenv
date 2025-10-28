@@ -394,26 +394,28 @@ var (
 
 func getInstallRoot() string {
 	installRootOnce.Do(func() {
+		// Check environment variable override first
 		if envRoot := utils.GoenvEnvVarInstallRoot.UnsafeValue(); envRoot != "" {
 			installRoot = envRoot
 			return
 		}
 
+		// Use executable location to find install root
+		// This works correctly for distributed binaries
 		if exe, err := os.Executable(); err == nil {
+			// Binary is typically in <root>/bin/goenv
+			// So install root is one level up from the binary directory
 			dir := filepath.Dir(exe)
 			candidate := filepath.Clean(filepath.Join(dir, ".."))
+
+			// Verify this looks like a goenv installation by checking for completions
 			if _, err := os.Stat(filepath.Join(candidate, "completions")); err == nil {
 				installRoot = candidate
 				return
 			}
 		}
 
-		if _, file, _, ok := runtime.Caller(0); ok {
-			candidate := filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
-			installRoot = candidate
-			return
-		}
-
+		// No install root found - completions won't be available
 		installRoot = ""
 	})
 

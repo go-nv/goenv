@@ -6,6 +6,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -24,6 +25,11 @@ func init() {
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
+	// Deprecation warning
+	fmt.Fprintf(cmd.OutOrStderr(), "%sDeprecation warning: 'goenv version' is a legacy command. Use 'goenv current' instead.\n", utils.Emoji("⚠️  "))
+	fmt.Fprintf(cmd.OutOrStderr(), "  Modern command: goenv current\n")
+	fmt.Fprintf(cmd.OutOrStderr(), "  See: goenv help current\n\n")
+
 	// Validate: version command takes no arguments
 	if len(args) > 0 {
 		return fmt.Errorf("Usage: goenv version")

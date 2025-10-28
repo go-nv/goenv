@@ -122,7 +122,7 @@ func TestVersionCommand(t *testing.T) {
 				return
 			}
 
-			got := strings.TrimSpace(output.String())
+			got := stripDeprecationWarning(output.String())
 
 			if tt.checkOutputMatch {
 				// Check if output starts with expected prefix
@@ -171,7 +171,7 @@ func TestVersionWithMultipleVersions(t *testing.T) {
 		return
 	}
 
-	got := strings.TrimSpace(output.String())
+	got := stripDeprecationWarning(output.String())
 	gotLines := strings.Split(got, "\n")
 
 	// Should show both versions

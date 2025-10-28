@@ -1,5 +1,98 @@
 # Smart Caching Strategy
 
+## Network Reliability Defaults
+
+goenv is designed for reliability in diverse network conditions, from high-speed connections to air-gapped environments.
+
+### HTTP Timeouts
+
+All network requests have sensible timeout defaults to prevent hanging:
+
+| **Operation**          | **Timeout** | **Location**                    | **Purpose**                         |
+| ---------------------- | ----------- | ------------------------------- | ----------------------------------- |
+| Version fetching       | 30 seconds  | `internal/version/fetcher.go:61` | Fetching from go.dev API            |
+| Doctor health check    | 3 seconds   | `cmd/doctor.go:859`             | Quick connectivity test to go.dev   |
+| Hook HTTP actions      | 30 seconds  | `internal/hooks/action_http.go` | Custom HTTP hook requests           |
+
+**Why these defaults:**
+- **30 seconds** for version fetching: Generous enough for slow connections (2MB download on 500 kbps = ~32s) but prevents infinite hangs
+- **3 seconds** for doctor checks: Uses lightweight HEAD request, only verifying connectivity (not downloading data)
+- **Automatic fallback**: Network failures during cache validation fall back to using cached data
+
+### Connection Failure Handling
+
+goenv gracefully handles network failures:
+
+**During version fetching (Tier 2 quick check):**
+```
+Quick check fails (timeout, DNS error, etc.)
+  → Don't fail the command
+  → Use cached data anyway (better than failing)
+  → Next run will try again
+```
+
+**During doctor health check:**
+```bash
+$ goenv doctor
+...
+⚠ Network connectivity: Cannot reach go.dev
+  You may not be able to fetch new Go versions. Check your internet connection and firewall settings.
+```
+
+- Returns **warning** (not error) - goenv still functions with cached/embedded data
+- Uses HTTPS HEAD request (not ping) - works in CI/containers where ICMP is blocked
+- Tests `go.dev` (actual endpoint) - verifies real connectivity
+
+### Environment Variables for Network Control
+
+| **Variable**          | **Default** | **Purpose**                                  | **Example**           |
+| --------------------- | ----------- | -------------------------------------------- | --------------------- |
+| `GOENV_OFFLINE`       | `0` (off)   | Disable all network calls, use embedded data | `export GOENV_OFFLINE=1` |
+| `GOENV_CACHE_DISABLE` | `0` (off)   | Disable cache, always fetch fresh data      | `export GOENV_CACHE_DISABLE=1` |
+| `GOENV_DEBUG`         | `0` (off)   | Show detailed network/cache debug output     | `export GOENV_DEBUG=1` |
+
+**Network reliability scenarios:**
+
+```bash
+# Offline/air-gapped environment
+export GOENV_OFFLINE=1
+goenv install --list  # Uses embedded versions, ~8ms, no network
+
+# Slow/unreliable network with caching
+# (default behavior - no config needed)
+goenv install --list  # Uses cache when available, falls back on errors
+
+# Force fresh data despite slow connection
+export GOENV_CACHE_DISABLE=1
+goenv install --list  # Always fetches, may be slow
+
+# Debug network issues
+export GOENV_DEBUG=1
+goenv install --list
+# Debug: Cache is 48h0m0s old, doing quick freshness check...
+# Debug: Quick check failed (timeout), using cache anyway
+```
+
+### ETag Support for Bandwidth Efficiency
+
+goenv uses HTTP ETags to minimize bandwidth on slow or metered connections:
+
+```
+First fetch:
+  → Request: GET /dl/?mode=json&include=all
+  → Response: 200 OK, ETag: "abc123", Body: 2MB
+  → Cache: Save releases + ETag
+
+Subsequent fetches:
+  → Request: GET /dl/?mode=json&include=all
+              If-None-Match: "abc123"
+  → Response: 304 Not Modified (no body!)
+  → Cache: Use existing data
+  → Bandwidth saved: 99.97% (2MB → 500 bytes)
+```
+
+See [ETag Support](#etag-support-http-conditional-requests) section below for complete details.
+
 ## Cache Management
 
 ### Clear Cache
@@ -76,6 +169,56 @@ $ GOENV_OFFLINE=1 GOENV_DEBUG=1 goenv install --list
 Debug: Fetching available Go versions...
 Debug: GOENV_OFFLINE=1, skipping online fetch and using embedded versions
 ```
+
+### Build Cache Migration
+
+If you're upgrading from an older version of goenv (pre-v3.0) or switching between architectures (e.g., Intel to Apple Silicon), you may have old-format build caches that need migration to the new architecture-aware format.
+
+**When to run `goenv cache migrate`:**
+
+- **After upgrading goenv** - From bash-based version to Go-based v3.0+
+- **After architecture changes** - Switching from Intel Mac to Apple Silicon (or vice versa)
+- **Cross-platform development** - Working with both native and Rosetta environments
+- **Cache conflicts** - Encountering "version mismatch" errors after version switches
+- **First-time setup** - Running goenv for the first time on a machine with existing Go installations
+
+**What it does:**
+
+The migrate command detects old-format caches (non-architecture-specific `go-build` directories) and moves them to the new format (`go-build-{GOOS}-{GOARCH}`):
+
+```bash
+# Check for old format caches
+$ goenv cache migrate --dry-run
+Found 3 old format caches that need migration:
+  ~/.goenv/versions/1.24.0/cache/go-build → go-build-darwin-arm64
+  ~/.goenv/versions/1.24.8/cache/go-build → go-build-darwin-arm64
+  ~/.goenv/versions/1.25.2/cache/go-build → go-build-darwin-arm64
+
+# Perform migration
+$ goenv cache migrate
+✓ Migrated ~/.goenv/versions/1.24.0/cache/go-build
+✓ Migrated ~/.goenv/versions/1.24.8/cache/go-build
+✓ Migrated ~/.goenv/versions/1.25.2/cache/go-build
+
+# Or skip confirmation prompt
+$ goenv cache migrate --force
+```
+
+**Benefits:**
+
+- **Prevents cache conflicts** - Separate caches per architecture prevent "version mismatch" errors
+- **Supports Rosetta** - Intel and Apple Silicon caches coexist without interference
+- **Safe migration** - Preserves existing caches while creating architecture-specific versions
+- **Idempotent** - Can be run multiple times safely
+
+**After migration:**
+
+Build caches are now isolated by architecture, preventing conflicts when switching between:
+- Native arm64 and Rosetta x86_64 (macOS Apple Silicon)
+- Different platforms (Linux amd64 vs arm64)
+- WSL and native Windows environments
+
+See [`goenv cache migrate`](../reference/COMMANDS.md#goenv-cache-migrate) for complete command documentation.
 
 ## How It Works
 

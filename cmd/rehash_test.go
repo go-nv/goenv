@@ -558,18 +558,3 @@ func TestRehashIdempotency(t *testing.T) {
 }
 
 // Helper to create a test binary in a version's bin directory
-func createTestBinary(t *testing.T, root, version, binaryName string) {
-	binDir := filepath.Join(root, "versions", version, "bin")
-	binaryPath := filepath.Join(binDir, binaryName)
-	var content string
-	if runtime.GOOS == "windows" {
-		binaryPath += ".bat"
-		content = fmt.Sprintf("@echo off\necho Mock %s from version %s\n", binaryName, version)
-	} else {
-		content = fmt.Sprintf("#!/bin/bash\necho 'Mock %s from version %s'\n", binaryName, version)
-	}
-
-	if err := os.WriteFile(binaryPath, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create test binary %s: %v", binaryName, err)
-	}
-}

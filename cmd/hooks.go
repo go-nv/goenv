@@ -388,12 +388,33 @@ func formatStatus(config *hooks.Config) string {
 
 // generateTemplateConfig generates a template hooks.yaml
 func generateTemplateConfig() string {
-	return `# goenv Hooks Configuration
-# 
-# This file defines declarative hooks that extend goenv functionality.
-# Hooks are executed at specific points during goenv operations.
+	return `# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ⚠️  SECURITY WARNING ⚠️
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# This file executes automated actions on your system.
+# Treat it as executable code with the same caution as shell scripts.
+#
+# BEFORE ENABLING HOOKS:
+#   - Review all hook configurations below carefully
+#   - Understand what each action does
+#   - Verify URLs, file paths, and commands are trusted
+#   - Use restrictive file permissions: chmod 600 ~/.goenv/hooks.yaml
+#   - Never commit secrets or credentials to version control
+#
+# SECURITY BEST PRACTICES:
+#   - Keep allow_http: false (HTTPS only, recommended)
+#   - Keep allow_internal_ips: false (prevents SSRF attacks)
+#   - Only use run_command with trusted commands
+#   - Review changes before enabling hooks (set both flags below to true)
 #
 # Documentation: https://github.com/go-nv/goenv/blob/master/docs/HOOKS.md
+#
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# goenv Hooks Configuration
+# This file defines declarative hooks that extend goenv functionality.
+# Hooks are executed at specific points during goenv operations.
 
 version: 1
 
@@ -401,7 +422,7 @@ version: 1
 # To enable:
 #   1. Review this configuration carefully
 #   2. Set enabled: true
-#   3. Set acknowledged_risks: true
+#   3. Set acknowledged_risks: true (confirms you understand security implications)
 enabled: false
 acknowledged_risks: false
 

@@ -58,6 +58,11 @@ func runLocal(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Deprecation warning
+	fmt.Fprintf(cmd.OutOrStderr(), "%sDeprecation warning: 'goenv local' is a legacy command. Use 'goenv use <version>' instead.\n", utils.Emoji("⚠️  "))
+	fmt.Fprintf(cmd.OutOrStderr(), "  Modern command: goenv use <version>\n")
+	fmt.Fprintf(cmd.OutOrStderr(), "  See: goenv help use\n\n")
+
 	// Validate: local command takes 0 or 1 argument (not including flags)
 	// Exception: with --from-gomod, takes 0 arguments
 	if !localFlags.fromGoMod && len(args) > 1 {

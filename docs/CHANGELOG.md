@@ -93,6 +93,20 @@ Change line format:
 - **🔧 Doctor Network Check** - Replaced ICMP ping (blocked in CI/containers) with HTTPS HEAD request to go.dev for reliable network connectivity testing
 - **🔧 Windows PATH Filtering** - Fixed shim PATH detection to use normalized absolute path comparison instead of substring matching, preventing false exclusions of directories like `goenv_shims_backup`
 
+### Documentation
+
+- **📚 Windows FAQ** - Comprehensive Windows-specific documentation covering hook logs, toast notifications, tool paths, VS Code integration, and path handling (`docs/user-guide/INSTALL.md`)
+- **🔐 Security Documentation** - Added SHA256 checksum verification documentation showing how all Go downloads are automatically verified (`docs/reference/COMMANDS.md`)
+- **🔧 Hook Operational Limits** - Documented timeout defaults (5s), max_actions (10), and continue_on_error behavior with practical examples (`docs/HOOKS.md`)
+- **🌐 Network Reliability** - Documented HTTP timeout defaults (30s for fetching, 3s for doctor), connection failure handling, and graceful fallback behavior (`docs/advanced/SMART_CACHING.md`)
+- **🚀 CI/CD Best Practices** - Enhanced CI/CD guide with offline mode (`GOENV_OFFLINE=1`) recommendations, cache strategy table, and Windows GitHub Actions examples (`docs/CI_CD_GUIDE.md`)
+- **🔒 Security Recommendations** - Added strong recommendation for `strict_dns: true` in CI/CD environments to prevent DNS rebinding attacks (`docs/HOOKS.md`)
+- **📊 Testing Roadmap** - Created comprehensive testing roadmap identifying 9 major test gaps with priorities and specific test examples (`docs/TESTING_ROADMAP.md`)
+- **📋 Documentation Review Summary** - Added summary document tracking all documentation improvements, metrics, and quick reference links (`docs/DOCUMENTATION_REVIEW_SUMMARY.md`)
+- **⚠️  Deprecation Timeline** - Documented clear deprecation path for legacy commands (`local`, `global`, `version`, `versions`) with migration checklist (`docs/reference/COMMANDS.md`)
+- **💡 PowerShell Quoting** - Documented Windows PowerShell PATH and quoting gotchas with implementation references (`docs/CI_CD_GUIDE.md`)
+- **📦 Cache Strategy** - Added detailed cache size/speed comparison table recommending what to cache in CI (`docs/CI_CD_GUIDE.md`)
+
 ### Removed
 
 - `GOENV_GOMOD_VERSION_ENABLE` environment variable (obsolete - go.mod support is now built-in)

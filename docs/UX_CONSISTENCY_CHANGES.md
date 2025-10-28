@@ -15,6 +15,13 @@ Some commands have `--json` flags while others don't, creating inconsistent auto
 - ✅ `tools list --json` - exists
 - ✅ `versions --json` - **IMPLEMENTED**
 - ✅ `list --json` - **IMPLEMENTED** (modern unified command, replaces `versions`)
+- ✅ `list --remote --json` - **IMPLEMENTED** (query available versions)
+
+**JSON Parity Status:** ✅ **COMPLETE**
+- Both `versions --json` and `list --json` produce identical output for installed versions
+- `list` additionally supports `--remote --json` for available versions
+- Schema versioning ensures API stability
+- Documented in COMMANDS.md and CI_CD_GUIDE.md
 
 ---
 

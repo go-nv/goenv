@@ -10,6 +10,7 @@ first argument.
 For automation, CI/CD, or when stdout is not a TTY, goenv automatically suppresses emojis and colors. You can also explicitly control output formatting:
 
 **Environment Variables:**
+
 ```bash
 # Suppress all colors (https://no-color.org/ standard)
 NO_COLOR=1 goenv doctor
@@ -19,6 +20,7 @@ goenv --plain version
 ```
 
 **Global Flags:**
+
 ```bash
 --plain         # Plain output (no emojis, no colors)
 --no-color      # Disable colored output only
@@ -26,11 +28,13 @@ goenv --plain version
 ```
 
 **Automatic Detection:**
+
 - When output is piped (`goenv list | grep 1.25`), emojis are automatically suppressed
 - When `NO_COLOR` environment variable is set, colors and emojis are disabled
 - JSON output is always machine-readable (use `--json` where supported)
 
 **Examples:**
+
 ```bash
 # CI/CD usage
 NO_COLOR=1 goenv doctor --json > report.json
@@ -58,11 +62,10 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
 ## 📋 All Subcommands
 
 - [Command Reference](#command-reference)
+  - [Global Flags \& Output Options](#global-flags--output-options)
+    - [Machine-Readable Output](#machine-readable-output)
   - [🚀 Modern Unified Commands (Recommended)](#-modern-unified-commands-recommended)
   - [📋 All Subcommands](#-all-subcommands)
-  - [`goenv use`](#goenv-use)
-  - [`goenv current`](#goenv-current)
-  - [`goenv list`](#goenv-list)
   - [`goenv alias`](#goenv-alias)
   - [`goenv cache`](#goenv-cache)
     - [`goenv cache status`](#goenv-cache-status)
@@ -75,12 +78,25 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv tools`](#goenv-tools)
   - [`goenv tools default`](#goenv-tools-default)
   - [`goenv doctor`](#goenv-doctor)
+    - [Quick Usage](#quick-usage)
+    - [Exit Codes (for CI/automation)](#exit-codes-for-ciautomation)
+    - [Flags](#flags)
+    - [Example Output](#example-output)
+    - [Comprehensive Checks](#comprehensive-checks)
+    - [Comprehensive Checks](#comprehensive-checks-1)
+    - [JSON Output (Recommended for CI/CD)](#json-output-recommended-for-cicd)
+    - [CI/CD Integration Examples](#cicd-integration-examples)
+    - [Advanced: Parse Specific Checks](#advanced-parse-specific-checks)
+  - [`goenv use`](#goenv-use)
+  - [`goenv current`](#goenv-current)
+  - [`goenv list`](#goenv-list)
   - [`goenv exec`](#goenv-exec)
   - [`goenv global`](#goenv-global)
   - [`goenv help`](#goenv-help)
   - [`goenv init`](#goenv-init)
   - [`goenv install`](#goenv-install)
     - [Options](#options)
+    - [Using a Custom Mirror](#using-a-custom-mirror)
     - [Auto-Rehash](#auto-rehash)
   - [`goenv installed`](#goenv-installed)
   - [`goenv inventory`](#goenv-inventory)
@@ -93,13 +109,30 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv rehash`](#goenv-rehash)
   - [`goenv root`](#goenv-root)
   - [`goenv sbom`](#goenv-sbom)
+    - [Prerequisites](#prerequisites)
+    - [Usage: `goenv sbom project`](#usage-goenv-sbom-project)
+    - [Secured CI/CD Usage](#secured-cicd-usage)
   - [`goenv shell`](#goenv-shell)
   - [`goenv shims`](#goenv-shims)
   - [`goenv unalias`](#goenv-unalias)
   - [`goenv uninstall`](#goenv-uninstall)
   - [`goenv update`](#goenv-update)
     - [Options](#options-2)
+    - [Installation Type Detection](#installation-type-detection)
     - [Installation Methods](#installation-methods)
+      - [Git-based installations (recommended)](#git-based-installations-recommended)
+      - [Binary installations](#binary-installations)
+    - [GitHub API Implementation](#github-api-implementation)
+      - [ETag Caching](#etag-caching)
+      - [Rate Limits \& Authentication](#rate-limits--authentication)
+      - [Retry Logic \& Backoff](#retry-logic--backoff)
+      - [Security Features](#security-features)
+    - [Error Recovery](#error-recovery)
+      - [Git not found (git-based installations)](#git-not-found-git-based-installations)
+      - [Permission denied (binary installations)](#permission-denied-binary-installations)
+      - [Uncommitted changes (git-based installations)](#uncommitted-changes-git-based-installations)
+    - [Examples](#examples)
+    - [Troubleshooting](#troubleshooting)
   - [`goenv tools update`](#goenv-tools-update)
     - [Options](#options-3)
   - [`goenv vscode`](#goenv-vscode)
@@ -114,12 +147,18 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv versions`](#goenv-versions)
     - [Options](#options-4)
   - [`goenv whence`](#goenv-whence)
-  - [Version Discovery & Precedence](#version-discovery--precedence)
+  - [`goenv which`](#goenv-which)
+  - [Version Discovery \& Precedence](#version-discovery--precedence)
     - [Version Sources](#version-sources)
     - [Smart Precedence Rules](#smart-precedence-rules)
-    - [Examples](#examples)
+      - [Interactive Mode](#interactive-mode)
+    - [Examples](#examples-1)
     - [Best Practices](#best-practices)
-  - [`goenv which`](#goenv-which)
+      - [For Go Module Projects](#for-go-module-projects)
+      - [For Scripts/Non-Module Projects](#for-scriptsnon-module-projects)
+      - [For CI/CD](#for-cicd)
+    - [Troubleshooting](#troubleshooting-1)
+  - [🔄 Legacy Commands (Backward Compatibility)](#-legacy-commands-backward-compatibility)
 
 ## `goenv alias`
 
@@ -288,7 +327,29 @@ goenv cache clean all --force
 - `--old-format` - Clean old format caches only (non-architecture-aware)
 - `--older-than <duration>` - Delete caches older than duration (e.g., 30d, 1w, 24h)
 - `--max-bytes <size>` - Keep only this much cache, delete oldest (e.g., 1GB, 500MB)
-- `--force, -f` - Skip confirmation prompt
+- `--force, -f` - Skip confirmation prompt (required for non-interactive environments)
+
+**Non-Interactive Environments:**
+
+When running in CI/CD, scripts, or non-interactive shells, use `--force` to bypass the confirmation prompt:
+
+```bash
+# CI/CD pipeline
+goenv cache clean all --force
+
+# Automated cleanup script
+goenv cache clean build --older-than 30d --force
+
+# Docker container cleanup
+RUN goenv cache clean all --force
+```
+
+Without `--force`, the command will fail in non-interactive mode with:
+
+```
+Error: cannot prompt for confirmation in non-interactive mode
+Use --force to skip confirmation
+```
 
 **Examples:**
 
@@ -381,19 +442,37 @@ Migrating...
 ✓ Done! Migrated 1 cache(s)
 ```
 
+**⚠️ IMPORTANT CLARIFICATION:**
+
+This command is **only for migrating Go's internal build cache format**, not for migrating from bash goenv to Go goenv.
+
+- ✅ **Migrates:** Go build caches (`go-build` → `go-build-{GOOS}-{GOARCH}`)
+- ❌ **Does NOT migrate:** Installed Go versions, config files, environment variables, or GOPATH
+
+**If you're upgrading from bash goenv:** Your installed versions and configuration already work - no migration needed!
+
 **When to run migrate:**
 
-- **After upgrading from bash goenv** - Convert old caches to new format
+- **After upgrading to goenv v3.x from v2.x (Go goenv only)** - New architecture-aware caching system
 - **When seeing "exec format error"** - Often caused by architecture mismatch in old caches
 - **Before cross-compiling** - Ensures each architecture has isolated cache
-- **When doctor reports old cache format** - `goenv doctor` will detect and recommend migration
+- **When `goenv doctor` reports old cache format** - Doctor will detect and recommend migration
+- **When switching between architectures** - Prevents cache corruption (e.g., M1 Mac vs Intel Mac)
+
+**When NOT to run migrate:**
+
+- ❌ **Upgrading from bash goenv to Go goenv** - Not applicable (versions already work)
+- ❌ **Fresh goenv installation** - No old caches to migrate
+- ❌ **Haven't built anything yet** - Nothing to migrate
 
 **Safe to run anytime:**
+
 - Idempotent (safe to run multiple times)
 - Non-destructive (keeps your cache data)
 - Interactive confirmation (unless `--force`)
 
 **After migration:**
+
 - Old `go-build` directories are renamed to `go-build-{GOOS}-{GOARCH}`
 - Existing data is preserved
 - Future builds use architecture-aware caching automatically
@@ -626,9 +705,144 @@ tools:
   - github.com/go-delve/delve/cmd/dlv@latest
 ```
 
+## `goenv tools list`
+
+List all Go tools installed for the currently active Go version. Tools are isolated per version in `$HOME/go/{version}/bin/`.
+
+**Usage:**
+
+```shell
+# List tools for current version (human-readable)
+> goenv tools list
+golang.org/x/tools/cmd/goimports
+golang.org/x/tools/gopls
+github.com/golangci/golangci-lint/cmd/golangci-lint
+
+# JSON output for automation
+> goenv tools list --json
+```
+
+**Options:**
+
+- `--json` - Output in JSON format for CI/automation (machine-readable)
+
+**Output Format:**
+
+Human-readable output shows one tool per line with the full import path.
+
+JSON output provides structured data with a stable schema:
+
+```json
+{
+  "schema_version": "1",
+  "go_version": "1.25.2",
+  "tools": [
+    {
+      "path": "golang.org/x/tools/cmd/goimports",
+      "binary": "goimports"
+    },
+    {
+      "path": "golang.org/x/tools/gopls",
+      "binary": "gopls"
+    },
+    {
+      "path": "github.com/golangci/golangci-lint/cmd/golangci-lint",
+      "binary": "golangci-lint"
+    }
+  ]
+}
+```
+
+**CI/CD Examples:**
+
+```bash
+# Check if a specific tool is installed
+goenv tools list --json | jq -e '.tools[] | select(.binary=="gopls")'
+
+# Count installed tools
+TOOL_COUNT=$(goenv tools list --json | jq '.tools | length')
+echo "Tools installed for Go $(goenv current --bare): $TOOL_COUNT"
+
+# Verify required tools exist
+REQUIRED_TOOLS=("gopls" "golangci-lint" "staticcheck")
+INSTALLED=$(goenv tools list --json | jq -r '.tools[].binary')
+
+for tool in "${REQUIRED_TOOLS[@]}"; do
+  if ! echo "$INSTALLED" | grep -q "^${tool}$"; then
+    echo "ERROR: Required tool '$tool' not installed"
+    exit 1
+  fi
+done
+
+# GitHub Actions - Verify tool installation
+- name: Verify Go tools
+  run: |
+    goenv use 1.25.2
+    goenv tools list --json | jq -e '.tools[] | select(.binary=="gopls")'
+    goenv tools list --json | jq -e '.tools[] | select(.binary=="golangci-lint")'
+```
+
+**Per-Version Isolation:**
+
+Tools are isolated per Go version to prevent conflicts:
+
+```shell
+# Install gopls for Go 1.25.2
+> goenv use 1.25.2
+> go install golang.org/x/tools/gopls@latest
+> goenv tools list
+golang.org/x/tools/gopls
+
+# Switch to Go 1.24.0
+> goenv use 1.24.0
+> goenv tools list
+# (empty - gopls not installed for this version)
+
+# Install gopls for Go 1.24.0
+> go install golang.org/x/tools/gopls@latest
+> goenv tools list
+golang.org/x/tools/gopls
+```
+
+Each version maintains its own `$HOME/go/{version}/bin/` directory, ensuring tools are version-specific and don't interfere with each other.
+
+See [GOPATH Integration](../advanced/GOPATH_INTEGRATION.md) for complete details on tool isolation.
+
 ## `goenv doctor`
 
-Diagnose goenv installation and configuration issues.
+**First-class CI/CD feature** for validating goenv installation and configuration.
+
+### Quick Usage
+
+```shell
+# Human-readable output (default)
+goenv doctor
+
+# CI/CD with JSON output (recommended)
+goenv doctor --json --fail-on=error
+
+# Strict validation (fail on warnings)
+goenv doctor --json --fail-on=warning
+```
+
+### Exit Codes (for CI/automation)
+
+The `doctor` command uses distinct exit codes for precise pipeline control:
+
+| Exit Code | Meaning  | Description                                                     |
+| --------- | -------- | --------------------------------------------------------------- |
+| `0`       | Success  | No issues found, or only warnings when `--fail-on=error`        |
+| `1`       | Errors   | Critical issues found that prevent goenv from working correctly |
+| `2`       | Warnings | Non-critical issues found when `--fail-on=warning` is set       |
+
+### Flags
+
+- `--json` - Output results in JSON format for CI/automation (machine-readable)
+- `--fail-on <level>` - Exit with non-zero status on `error` (default) or `warning`
+
+### Example Output
+
+Human-readable format:
 
 ```shell
 > goenv doctor
@@ -654,6 +868,10 @@ Diagnose goenv installation and configuration issues.
 ✓ Configuration complete
 ```
 
+### Comprehensive Checks
+
+### Comprehensive Checks
+
 This command verifies:
 
 - **Runtime environment**: Detects containers (Docker, Kubernetes), WSL, and native systems
@@ -670,55 +888,9 @@ This command verifies:
 - **Tool migration**: Recommends syncing tools between versions
 - **Common configuration problems**: GOTOOLCHAIN conflicts, PATH order issues
 
-### Flags
+### JSON Output (Recommended for CI/CD)
 
-- `--json` - Output results in JSON format for CI/automation
-- `--fail-on <level>` - Exit with non-zero status on `error` (default) or `warning`
-
-### Exit Codes (for CI/automation)
-
-The `doctor` command uses distinct exit codes to help CI systems differentiate between errors and warnings:
-
-| Exit Code | Meaning  | Description                                                     |
-| --------- | -------- | --------------------------------------------------------------- |
-| `0`       | Success  | No issues found, or only warnings when `--fail-on=error`        |
-| `1`       | Errors   | Critical issues found that prevent goenv from working correctly |
-| `2`       | Warnings | Non-critical issues found when `--fail-on=warning` is set       |
-
-**CI/CD Examples:**
-
-```yaml
-# GitHub Actions - Fail on errors only (default)
-- name: Check goenv health
-  run: goenv doctor --json
-
-# GitHub Actions - Fail on warnings (strict mode)
-- name: Check goenv health (strict)
-  run: goenv doctor --json --fail-on=warning
-
-# GitLab CI - Allow warnings
-- name: Check goenv health
-  run: goenv doctor
-  # Exit code 2 (warnings) won't fail the pipeline
-  allow_failure:
-    exit_codes: [2]
-
-# Shell script - Handle exit codes
-if ! goenv doctor --json; then
-  EXIT_CODE=$?
-  if [ $EXIT_CODE -eq 1 ]; then
-    echo "Errors found"
-    exit 1
-  elif [ $EXIT_CODE -eq 2 ]; then
-    echo "Warnings found"
-    # Continue anyway
-  fi
-fi
-```
-
-### JSON Output
-
-The `--json` flag outputs machine-readable JSON with check IDs for automation:
+The `--json` flag outputs machine-readable JSON with stable check IDs:
 
 ```json
 {
@@ -736,18 +908,98 @@ The `--json` flag outputs machine-readable JSON with check IDs for automation:
       "status": "warning",
       "message": "No shell init found",
       "advice": "Add 'eval \"$(goenv init -)\"' to your ~/.zshrc"
+    },
+    {
+      "id": "path-configuration",
+      "name": "PATH configuration",
+      "status": "error",
+      "message": "Shims directory not in PATH",
+      "advice": "Add goenv shims to PATH: export PATH=\"$GOENV_ROOT/shims:$PATH\""
     }
   ],
   "summary": {
-    "total": 15,
-    "ok": 13,
+    "total": 24,
+    "ok": 21,
     "warnings": 2,
-    "errors": 0
+    "errors": 1
   }
 }
 ```
 
-**Check IDs** are stable and can be used in CI scripts to filter or assert specific checks.
+**Check IDs** are stable and can be used in CI scripts to filter or assert specific checks. The JSON schema version ensures backward compatibility.
+
+### CI/CD Integration Examples
+
+**GitHub Actions - Basic:**
+
+```yaml
+- name: Validate goenv setup
+  run: goenv doctor --json --fail-on=error
+```
+
+**GitHub Actions - With annotations:**
+
+```yaml
+- name: Health check
+  run: |
+    goenv doctor --json > report.json || true
+    jq -r '.checks[] | select(.status=="error") | "::error ::\(.name): \(.message)"' report.json
+    jq -r '.checks[] | select(.status=="warning") | "::warning ::\(.name): \(.message)"' report.json
+    if jq -e '.summary.errors > 0' report.json; then exit 1; fi
+```
+
+**GitLab CI - Allow warnings:**
+
+```yaml
+check-goenv:
+  script:
+    - goenv doctor --json --fail-on=warning
+  allow_failure:
+    exit_codes: [2] # Allow warnings (exit code 2) to pass
+```
+
+**CircleCI:**
+
+```yaml
+- run:
+    name: Validate goenv
+    command: goenv doctor --json --fail-on=error
+```
+
+**Shell script - Handle all exit codes:**
+
+```bash
+goenv doctor --json --fail-on=warning || EXIT_CODE=$?
+
+if [ "${EXIT_CODE:-0}" -eq 1 ]; then
+  echo "ERROR: Critical errors found"
+  exit 1
+elif [ "${EXIT_CODE:-0}" -eq 2 ]; then
+  echo "WARNING: Non-critical warnings found"
+  # Continue anyway
+  exit 0
+fi
+
+echo "SUCCESS: No issues found"
+```
+
+### Advanced: Parse Specific Checks
+
+Use `jq` to filter specific check IDs for custom validation:
+
+```bash
+# Check if PATH is configured correctly
+goenv doctor --json | jq -e '.checks[] | select(.id=="path-configuration" and .status=="ok")'
+
+# Get all errors
+goenv doctor --json | jq '.checks[] | select(.status=="error")'
+
+# Count warnings
+goenv doctor --json | jq '.summary.warnings'
+
+# Check specific subsystem
+goenv doctor --json | jq '.checks[] | select(.id | startswith("cache-"))'
+```
 
 ## `goenv use`
 
@@ -924,9 +1176,15 @@ echo "Building with Go $VERSION"
 - `--skip-aliases` - Don't show version aliases
 - `--json` - Output in JSON format (for installed versions only)
 
-**Output Ordering:**
+**Output Format:**
 
-When using `--remote`, versions are displayed in **oldest-first order** (matching traditional shell behavior). The "go" prefix is automatically stripped from version strings. Pre-release versions (beta, rc) are included by default unless `--stable` is specified.
+When using `--remote`, the output follows the bash `goenv install --list` format for compatibility:
+
+- **Header**: "Available versions:"
+- **Indentation**: Two-space indentation for each version
+- **Prefix stripping**: The "go" prefix is automatically stripped from version strings
+- **Order**: Versions are displayed in **oldest-first order** (matching traditional bash behavior)
+- **Pre-releases**: Beta, rc, and other pre-release versions are included by default unless `--stable` is specified
 
 **Examples:**
 
@@ -1007,6 +1265,10 @@ selected by e.g `goenv use 1.11.1 --global`,
 ```
 
 ## `goenv global`
+
+> **Note:** This is a legacy command. Use [`goenv use <version> --global`](#goenv-use) instead for a more consistent interface.
+>
+> **For backward compatibility:** This command still works as expected, but `goenv use --global` is recommended as it provides a unified interface for both local and global version management.
 
 Sets the global version of Go to be used in all shells by writing
 the version name to the `~/.goenv/version` file. This version can be
@@ -1109,6 +1371,49 @@ Common use cases:
 - **Air-gapped networks**: Point to internal package repository
 - **Testing**: Use custom build servers
 
+### Security: Checksum Verification
+
+**All Go downloads are automatically verified** using SHA256 checksums from go.dev's official API.
+
+**How it works:**
+
+1. goenv fetches official SHA256 checksums from `go.dev/dl/?mode=json&include=all`
+2. During download, computes SHA256 hash in real-time
+3. After download completes, compares computed hash against expected hash
+4. Installation **fails immediately** if checksums don't match
+
+**Implementation:** `internal/install/installer.go:156-221`
+
+```shell
+# Example output with verbose mode
+> goenv install 1.24.3 --verbose
+Downloading Go 1.24.3 for darwin-arm64...
+Downloading from: https://go.dev/dl/go1.24.3.darwin-arm64.tar.gz
+Download completed and verified  # ✅ Checksum verified
+Installing to /Users/user/.goenv/versions/1.24.3...
+Successfully installed Go 1.24.3
+```
+
+**What happens on checksum mismatch:**
+
+```shell
+> goenv install 1.24.3
+Downloading Go 1.24.3...
+Error: checksum verification failed: expected abc123..., got def456...
+# Installation aborted, temp file removed
+```
+
+**Security guarantees:**
+
+- ✅ Protects against corrupted downloads
+- ✅ Protects against man-in-the-middle attacks (when using HTTPS)
+- ✅ Protects against compromised mirrors (mirror downloads fallback to official if checksums fail)
+- ✅ Automatic - no configuration needed
+
+**Custom mirrors:** Checksum verification still applies even when using `GO_BUILD_MIRROR_URL`. If mirror serves corrupted files, installation fails and falls back to official go.dev source.
+
+See [Using a Custom Mirror](#using-a-custom-mirror) for mirror configuration.
+
 ### Auto-Rehash
 
 By default, goenv automatically rehashes shims after installation so that installed binaries are immediately available. For batch installations or CI/CD pipelines, you can disable this:
@@ -1191,6 +1496,42 @@ LATEST_125=$(goenv list --bare | grep "^1\.25\." | tail -1)
 if goenv installed "$LATEST_125" &>/dev/null; then
   goenv use "$LATEST_125"
 fi
+
+# Conditional installation in Makefile
+.PHONY: setup
+setup:
+	@if ! goenv installed $(GO_VERSION) &>/dev/null; then \
+		echo "Installing Go $(GO_VERSION)..."; \
+		goenv install $(GO_VERSION); \
+	fi
+	@goenv use $(GO_VERSION)
+
+# CI: Install only if missing (cache-friendly)
+#!/bin/bash
+VERSION_FILE=".go-version"
+if [ -f "$VERSION_FILE" ]; then
+  REQUIRED_VERSION=$(cat "$VERSION_FILE")
+  if ! goenv installed "$REQUIRED_VERSION" &>/dev/null; then
+    echo "::group::Installing Go $REQUIRED_VERSION"
+    goenv install "$REQUIRED_VERSION"
+    echo "::endgroup::"
+  else
+    echo "✓ Go $REQUIRED_VERSION already installed"
+  fi
+  goenv use "$REQUIRED_VERSION"
+fi
+
+# Get installed count for reporting
+INSTALLED_COUNT=$(goenv list --bare | wc -l)
+echo "Installed Go versions: $INSTALLED_COUNT"
+
+# Check system Go availability
+if goenv installed system &>/dev/null; then
+  SYSTEM_GO=$(goenv installed system)
+  echo "System Go available at: $SYSTEM_GO"
+else
+  echo "No system Go installation found"
+fi
 ```
 
 **Exit Codes:**
@@ -1253,11 +1594,20 @@ Total: 1 Go version(s) installed
 
 **Use cases:**
 
-- Compliance audits
+- Compliance audits (SOC 2, ISO 27001, etc.)
 - System inventory reports
 - Tracking installed versions across environments
+- License compliance verification
+- Vulnerability management
+- Change management documentation
+
+**For detailed compliance examples, see:** [Compliance Use Cases Guide](../COMPLIANCE_USE_CASES.md)
 
 ## `goenv local`
+
+> **Note:** This is a legacy command. Use [`goenv use <version>`](#goenv-use) instead for a more consistent interface.
+>
+> **For backward compatibility:** This command still works as expected, but `goenv use` is recommended as it provides a unified interface for both local and global version management.
 
 Sets a local application-specific Go version by writing the version
 name to a `.go-version` file in the current directory. This version
@@ -1544,58 +1894,245 @@ Generate an SBOM for a Go project:
 
 **Options:**
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `--tool` | string | SBOM tool to use: `cyclonedx-gomod` (Go modules), `syft` (multi-language/containers) |
-| `--format` | string | Output format: `cyclonedx-json`, `spdx-json`, `cyclonedx-xml`, `spdx-json`, `table`, `text` |
-| `-o, --output` | string | Output file path (default: `sbom.json`, or stdout if `-`) |
-| `--dir` | string | Project directory to scan (default: `.`) |
-| `--image` | string | Container image to scan (syft only), e.g., `ghcr.io/myapp:v1.0.0` |
-| `--modules-only` | bool | Only scan Go modules, exclude stdlib/main (cyclonedx-gomod only) |
-| `--offline` | bool | Offline mode - avoid network access for module metadata |
-| `--tool-args` | string | Additional arguments to pass directly to the underlying tool |
+| Option           | Type   | Description                                                                                   | Example                                    |
+| ---------------- | ------ | --------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `--tool`         | string | SBOM tool to use                                                                              | `cyclonedx-gomod`, `syft`                  |
+| `--format`       | string | Output format                                                                                 | `cyclonedx-json`, `spdx-json`, `table`     |
+| `-o, --output`   | string | Output file path (default: `sbom.json`, or stdout if `-`)                                     | `sbom.cdx.json`, `-` (stdout)              |
+| `--dir`          | string | Project directory to scan (default: `.`)                                                      | `/path/to/project`                         |
+| `--image`        | string | Container image to scan (**syft only**)                                                       | `ghcr.io/myapp:v1.0.0`                     |
+| `--modules-only` | bool   | Only scan Go modules, exclude stdlib/main (**cyclonedx-gomod only**)                          | `--modules-only`                           |
+| `--offline`      | bool   | Offline mode - avoid network access for module metadata (**recommended for reproducibility**) | `--offline`                                |
+| `--tool-args`    | string | Additional arguments to pass directly to the underlying tool                                  | `--tool-args="--quiet --exclude-dev-deps"` |
+
+**Supported Tools:**
+
+| Tool              | Best For                           | Image Support | Offline Mode | Formats Supported                      |
+| ----------------- | ---------------------------------- | ------------- | ------------ | -------------------------------------- |
+| `cyclonedx-gomod` | Go modules (fast, lightweight)     | ❌ No         | ✅ Yes       | `cyclonedx-json`, `cyclonedx-xml`      |
+| `syft`            | Multi-language, containers, images | ✅ Yes        | ⚠️ Partial   | `spdx-json`, `cyclonedx-json`, `table` |
 
 **Benefits:**
 
-- Reproducible SBOMs with pinned Go and tool versions
-- Correct cache isolation per Go version
-- CI-friendly output (provenance to stderr, SBOM to stdout/file)
-- Exit code preservation for pipeline integration
+- ✅ **Reproducible SBOMs** - Pinned Go and tool versions ensure consistent output
+- ✅ **Correct cache isolation** - Each Go version has isolated module/build caches
+- ✅ **CI-friendly output** - Provenance to stderr, SBOM to stdout/file
+- ✅ **Exit code preservation** - Pipeline integration with proper error handling
 
-### Secured CI/CD Usage
+### 🔒 Secured CI/CD Example (Recommended)
 
-For reproducible, auditable SBOMs in CI/CD pipelines, use fixed tool versions and offline mode:
+For reproducible, auditable SBOMs in production CI/CD pipelines:
 
-**1. CycloneDX with Fixed Versions (Recommended for Go projects)**
+**Characteristics of secured SBOM generation:**
+
+- 🔒 **Fixed versions** - Pinned Go and tool versions (no `@latest`)
+- 📴 **Offline mode** - No network calls during generation (reproducibility)
+- 🔐 **Verification** - Validate SBOM format and content
+- 📦 **Attestation-ready** - Upload as signed artifact
+
+**GitHub Actions Example:**
 
 ```yaml
-# GitHub Actions - Reproducible SBOM generation
-- name: Setup Go version
-  run: goenv use 1.25.2 --yes  # Pin Go version
+# .github/workflows/sbom.yml
+name: Generate SBOM
 
-- name: Install SBOM tool (pinned version)
-  run: goenv tools install cyclonedx-gomod@v1.6.0  # Pin tool version
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
 
-- name: Generate SBOM (offline, reproducible)
-  run: |
-    goenv sbom project \
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # For uploading SBOM artifacts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup goenv
+        run: |
+          curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
+          echo "$HOME/.goenv/bin" >> $GITHUB_PATH
+          eval "$(goenv init -)"
+
+      - name: Setup Go version (PINNED)
+        run: goenv use 1.25.2 --yes # ✅ Fixed version
+
+      - name: Install SBOM tool (PINNED VERSION)
+        run: goenv tools install cyclonedx-gomod@v1.6.0 # ✅ Fixed tool version
+
+      - name: Generate SBOM (OFFLINE, REPRODUCIBLE)
+        run: |
+          goenv sbom project \
+            --tool=cyclonedx-gomod \
+            --format=cyclonedx-json \
+            --output=sbom.cdx.json \
+            --offline  # ✅ No network calls during generation
+
+      - name: Verify SBOM integrity
+        run: |
+          # Validate CycloneDX format
+          jq -e '.bomFormat == "CycloneDX"' sbom.cdx.json
+          jq -e '.specVersion' sbom.cdx.json
+
+          # Verify components exist
+          COMPONENT_COUNT=$(jq '.components | length' sbom.cdx.json)
+          echo "SBOM contains $COMPONENT_COUNT components"
+          test $COMPONENT_COUNT -gt 0
+
+          # Check for required metadata
+          jq -e '.metadata.component.name' sbom.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          retention-days: 90
+
+      # Optional: Sign and attest SBOM
+      - name: Sign SBOM with cosign
+        if: github.event_name == 'release'
+        run: |
+          # Requires cosign setup
+          cosign sign-blob --key cosign.key sbom.cdx.json > sbom.cdx.json.sig
+```
+
+**GitLab CI Example:**
+
+```yaml
+# .gitlab-ci.yml
+generate-sbom:
+  stage: security
+  image: ubuntu:latest
+
+  variables:
+    GO_VERSION: "1.25.2" # ✅ Fixed Go version
+    SBOM_TOOL_VERSION: "v1.6.0" # ✅ Fixed tool version
+
+  before_script:
+    - curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
+    - export PATH="$HOME/.goenv/bin:$PATH"
+    - eval "$(goenv init -)"
+
+  script:
+    - goenv use $GO_VERSION --yes
+    - goenv tools install cyclonedx-gomod@$SBOM_TOOL_VERSION
+    - goenv sbom project \
       --tool=cyclonedx-gomod \
       --format=cyclonedx-json \
       --output=sbom.cdx.json \
-      --offline  # No network calls during generation
+      --offline # ✅ Offline mode
 
-- name: Verify SBOM
-  run: |
-    # Validate CycloneDX format
-    jq '.bomFormat == "CycloneDX"' sbom.cdx.json
-    jq '.components | length' sbom.cdx.json
+    # Verification
+    - jq -e '.bomFormat == "CycloneDX"' sbom.cdx.json
+    - jq '.components | length' sbom.cdx.json
 
-- name: Upload SBOM artifact
-  uses: actions/upload-artifact@v4
-  with:
-    name: sbom-cyclonedx
-    path: sbom.cdx.json
+  artifacts:
+    paths:
+      - sbom.cdx.json
+    expire_in: 90 days
+    reports:
+      cyclonedx: sbom.cdx.json # GitLab SBOM integration
 ```
+
+**Why this approach is secured:**
+
+1. **Reproducibility** - Same versions → same SBOM → verifiable builds
+2. **No surprises** - Offline mode prevents unexpected network dependencies
+3. **Auditability** - Fixed versions allow audit trail verification
+4. **Supply chain security** - Pinned tools reduce attack surface
+5. **Compliance-ready** - Meets SLSA, SSDF, and SBOM requirements
+
+### CycloneDX vs SPDX Format
+
+**When to use CycloneDX (cyclonedx-gomod):**
+
+- ✅ Fast, lightweight Go module scanning
+- ✅ Offline mode supported
+- ✅ Excellent for pure Go projects
+- ✅ Standard in many compliance frameworks
+
+**When to use SPDX/Syft:**
+
+- ✅ Multi-language projects (Go + Python + Node.js)
+- ✅ Container image scanning required
+- ✅ Broader tool ecosystem integration
+- ✅ SPDX specifically required by policy
+
+### Advanced: Container Image Scanning (Syft)
+
+Scan container images for vulnerabilities and dependencies:
+
+```bash
+# Build and scan your container
+docker build -t myapp:latest .
+
+goenv sbom project \
+  --tool=syft \
+  --image=myapp:latest \
+  --format=spdx-json \
+  --output=sbom.spdx.json
+```
+
+**Note:** Image scanning requires Docker and the image to be available locally or in a registry.
+
+### Troubleshooting
+
+**"Tool not found" error:**
+
+```bash
+# Install the required tool first
+goenv tools install cyclonedx-gomod@latest
+goenv tools install syft@latest
+```
+
+**"Module not found" in offline mode:**
+
+```bash
+# Download dependencies first
+go mod download
+go mod verify
+
+# Then generate SBOM offline
+goenv sbom project --tool=cyclonedx-gomod --offline
+```
+
+**Empty or minimal SBOM:**
+
+```bash
+# Ensure go.mod exists and dependencies are vendored/downloaded
+go mod tidy
+go mod download
+
+# Try without --modules-only flag
+goenv sbom project --tool=cyclonedx-gomod
+```
+
+**CI/CD specific issues:**
+
+```bash
+# Ensure goenv is initialized in CI environment
+eval "$(goenv init -)"
+
+# Use --yes flag to avoid prompts
+goenv use 1.25.2 --yes
+
+# Verify tool installation
+goenv tools list
+```
+
+### 🔐 Security Best Practices
+
+with:
+name: sbom-cyclonedx
+path: sbom.cdx.json
+
+````
 
 **2. Syft with Fixed Versions (Multi-language projects)**
 
@@ -1605,26 +2142,26 @@ sbom:
   stage: security
   script:
     - goenv use 1.25.2 --yes
-    - goenv tools install syft@v1.0.0  # Pin syft version
+    - goenv tools install syft@v1.0.0 # Pin syft version
 
     # Generate SPDX SBOM
     - goenv sbom project \
-        --tool=syft \
-        --format=spdx-json \
-        --output=sbom.spdx.json \
-        --offline
+      --tool=syft \
+      --format=spdx-json \
+      --output=sbom.spdx.json \
+      --offline
 
     # Also generate human-readable table
     - goenv sbom project \
-        --tool=syft \
-        --format=table \
-        --output=sbom.txt
+      --tool=syft \
+      --format=table \
+      --output=sbom.txt
   artifacts:
     paths:
       - sbom.spdx.json
       - sbom.txt
     expire_in: 90 days
-```
+````
 
 **3. Container Image Scanning**
 
@@ -1754,8 +2291,47 @@ This command removes the specified alias from the `~/.goenv/aliases` file. The t
 
 Uninstalls the specified version if it exists, otherwise - error.
 
+**Usage:**
+
 ```shell
+# Interactive mode (prompts for confirmation)
 > goenv uninstall 1.6.3
+Remove Go 1.6.3? [y/N]: y
+Uninstalling Go 1.6.3...
+✓ Go 1.6.3 uninstalled
+
+# Non-interactive mode (requires --force)
+> goenv uninstall 1.6.3 --force
+Uninstalling Go 1.6.3...
+✓ Go 1.6.3 uninstalled
+```
+
+**Options:**
+
+- `--force, -f` - Skip confirmation prompt (required for non-interactive environments)
+
+**Non-Interactive Environments:**
+
+When running in CI/CD, scripts, or automated workflows, use `--force` to bypass the confirmation prompt:
+
+```bash
+# CI/CD pipeline
+goenv uninstall 1.23.0 --force
+
+# Automated cleanup script
+for version in $(goenv list --bare | grep -v "$(goenv current --bare)"); do
+  goenv uninstall "$version" --force
+done
+
+# Docker multi-stage build cleanup
+RUN goenv uninstall 1.22.0 --force
+```
+
+Without `--force`, the command will fail in non-interactive mode:
+
+```
+Error: cannot prompt for confirmation in non-interactive mode
+Use --force to bypass confirmation: goenv uninstall <version> --force
 ```
 
 ## `goenv update`
@@ -1783,83 +2359,453 @@ Update available!
 
 ### Options
 
-- `--check` - Check for updates without installing
-- `--force` - Force update even if already up-to-date
+- `--check`, `-c` - Check for updates without installing
+- `--force`, `-f` - Force update even if already up-to-date
+
+### Installation Type Detection
+
+The `update` command automatically detects how goenv was installed and uses the appropriate update method. The detection follows this priority order:
+
+1. **Check if binary is in a git repository**
+
+   - Resolves symlinks to find actual binary location
+   - Checks for `.git` directory in binary's parent directory
+   - Validates it's a real git repo with `git rev-parse --git-dir`
+
+2. **Check if GOENV_ROOT is a git repository**
+
+   - Standard installation via git clone
+   - Most common for development setups
+   - Checks `$GOENV_ROOT/.git` directory
+
+3. **Fall back to binary installation**
+   - No git repository found
+   - Assumes standalone binary installation
+   - Uses GitHub releases API for updates
+
+**Example detection output (debug mode):**
+
+```shell
+> GOENV_DEBUG=1 goenv update
+Debug: Installation type: git
+Debug: Installation path: /Users/user/.goenv
+```
 
 ### Installation Methods
 
-**Git-based installations (recommended):**
+#### Git-based installations (recommended)
 
-- Automatically detected when `.git` directory exists in `$GOENV_ROOT`
-- Runs `git pull` in GOENV_ROOT directory
-- Shows changes and new version
-- Requires `git` command in PATH
+**Advantages:**
 
-**Binary installations:**
+- Instant updates via `git pull`
+- See exact changes being applied
+- Easy to rollback with `git reset`
+- No binary replacement needed
 
-- Automatically detected when no `.git` directory exists
-- Downloads latest release from GitHub using API
-- Replaces current binary with platform-specific download
-- Requires write permission to binary location
-- Uses HTTP ETag caching for efficient update checks
+**How it works:**
 
-### Update Detection & Caching
+1. Fetches latest changes from `origin`
+2. Shows commit log of changes
+3. Checks for uncommitted local changes
+4. Runs `git pull` to update
+5. Displays before/after commit hashes
 
-The update command automatically detects your installation type and uses the appropriate method.
+**Requirements:**
 
-**GitHub API with ETag Caching:**
+- Git must be installed and in PATH
+- GOENV_ROOT must be a git clone of the repository
+- Network access to GitHub
 
-For binary installations, goenv uses GitHub's releases API with conditional requests to minimize bandwidth and API rate limits:
-
-- **ETag Cache Location:** `$GOENV_ROOT/cache/update-etag`
-- **How it works:**
-  1. First request: Downloads release info and saves ETag
-  2. Subsequent requests: Sends `If-None-Match` header with cached ETag
-  3. GitHub responds with `304 Not Modified` if no new release
-  4. Only downloads release assets when a new version is available
-
-**GitHub API Rate Limits:**
-
-- Unauthenticated requests: 60 per hour per IP
-- Authenticated requests: 5,000 per hour (recommended for CI/CD)
-
-**Using GITHUB_TOKEN for higher rate limits:**
+**Example output:**
 
 ```shell
-# Export token for authenticated API requests
-export GITHUB_TOKEN=ghp_your_personal_access_token
+> goenv update
+🔄 Checking for goenv updates...
+📡 Fetching latest changes...
+📝 Changes:
+   • abc1234 Fix vscode init backup creation
+   • def5678 Add comprehensive test coverage
+   • ghi9012 Update documentation
 
-# Now update commands use authenticated requests
-goenv update --check
+⬇️  Updating goenv...
+✅ goenv updated successfully!
+   Updated from a1b2c3d to x7y8z9a
+
+💡 Restart your shell to use the new version:
+   exec $SHELL
 ```
 
-**Token requirements:**
-- Fine-grained PAT: Read-only access to public repositories
-- Classic PAT: No scopes needed (read public data)
+#### Binary installations
 
-**Best practices:**
-- Store token in `.bashrc`, `.zshrc`, or CI environment variables
+**Advantages:**
+
+- No git dependency required
+- Works in restricted environments
+- Simple standalone deployment
+- SHA256 checksum verification
+
+**How it works:**
+
+1. Queries GitHub releases API for latest version
+2. Uses ETag caching to avoid redundant downloads
+3. Downloads platform-specific binary (goenv_VERSION_OS_ARCH)
+4. Verifies SHA256 checksum from SHA256SUMS file
+5. Creates backup of current binary
+6. Replaces binary atomically
+7. Removes backup on success
+
+**Requirements:**
+
+- Write permission to binary location
+- Network access to GitHub releases
+- HTTPS support (uses strict TLS)
+
+**Example output:**
+
+```shell
+> goenv update
+🔄 Checking for goenv updates...
+📦 Detected binary installation
+   Binary location: /usr/local/bin/goenv
+
+🔍 Checking GitHub releases...
+⬇️  Downloading goenv v3.0.0...
+🔐 Verifying checksum...
+✅ Checksum verified
+💾 Creating backup...
+🔄 Replacing binary...
+
+✅ goenv updated successfully!
+   Updated from v2.9.0 to v3.0.0
+```
+
+### GitHub API Implementation
+
+#### ETag Caching
+
+To minimize bandwidth and respect GitHub API rate limits, binary updates use HTTP conditional requests:
+
+**Cache file location:** `$GOENV_ROOT/cache/update-etag`
+
+**How it works:**
+
+1. **First request:** GET to GitHub releases API, saves ETag header
+2. **Subsequent requests:** Sends `If-None-Match: <etag>` header
+3. **No update:** GitHub returns `304 Not Modified` (no body, minimal bandwidth)
+4. **New release:** GitHub returns `200 OK` with full release data
+
+**Benefits:**
+
+- Reduces bandwidth usage (304 responses are ~200 bytes)
+- Faster update checks (no JSON parsing needed)
+- Lower API rate limit consumption
+- Cache persists across goenv invocations
+
+**Cache file structure:**
+
+```shell
+# File: ~/.goenv/cache/update-etag
+# Contents: Raw ETag value from GitHub
+W/"a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+```
+
+**Cache permissions:**
+
+- Directory: `0700` (user read/write/execute only)
+- File: `0600` (user read/write only)
+- Prevents unauthorized access to cache data
+
+#### Rate Limits & Authentication
+
+**Unauthenticated requests:**
+
+- **Limit:** 60 requests per hour per IP address
+- **Resets:** Every hour on the hour
+- **Sufficient for:** Manual updates, occasional checks
+
+**Authenticated requests (recommended for CI/CD):**
+
+- **Limit:** 5,000 requests per hour
+- **Requires:** `GITHUB_TOKEN` environment variable
+- **Use case:** Automated update checks, CI pipelines, frequent updates
+
+**Setting up authentication:**
+
+```shell
+# 1. Create a GitHub Personal Access Token (PAT)
+#    - Go to: https://github.com/settings/tokens
+#    - Fine-grained PAT: No permissions needed (public repo read)
+#    - Classic PAT: No scopes needed (public data only)
+
+# 2. Export token in your shell profile (~/.bashrc, ~/.zshrc)
+export GITHUB_TOKEN=ghp_your_personal_access_token_here
+
+# 3. Verify it's working (check debug output)
+GOENV_DEBUG=1 goenv update --check
+# Should show: "Using GitHub token for higher rate limits"
+```
+
+**Token best practices:**
+
 - Use fine-grained tokens with minimal permissions
+- Set expiration dates (e.g., 90 days)
+- Rotate tokens regularly
+- Store in secure password manager
 - Never commit tokens to version control
+- Use CI-specific tokens for pipelines
+
+**Rate limit headers returned:**
+
+- `X-RateLimit-Limit` - Maximum requests per hour
+- `X-RateLimit-Remaining` - Requests remaining in current window
+- `X-RateLimit-Reset` - Unix timestamp when limit resets
+
+**Handling rate limit exceeded:**
+
+```shell
+> goenv update
+Error: GitHub API rate limit exceeded. Resets at 2025-10-28T15:00:00Z (in 42m30s)
+
+# Solution 1: Wait for reset
+# Solution 2: Set GITHUB_TOKEN
+export GITHUB_TOKEN=ghp_your_token
+goenv update
+
+# Solution 3: Download manually
+https://github.com/go-nv/goenv/releases
+```
+
+#### Retry Logic & Backoff
+
+**Rate limiting (403/429 responses):**
+
+- Attempts up to 3 retries with exponential backoff
+- Backoff delays: 1s, 2s, 4s
+- Honors `Retry-After` header if present (max 60s)
+- Displays helpful error with reset time
+
+**Network errors:**
+
+- Single attempt (no retries for connection failures)
+- Timeout: 10 seconds for API requests
+- Timeout: 60 seconds for binary downloads
+
+#### Security Features
+
+**HTTPS enforcement:**
+
+- All API requests use HTTPS only
+- No fallback to insecure HTTP
+- TLS certificate verification enabled
+
+**SHA256 checksum verification:**
+
+- Downloads `SHA256SUMS` file from release
+- Verifies binary matches published checksum
+- Format: `<hash>  <filename>` (standard sha256sum format)
+- Fails update if checksums mismatch
+- Warns if checksums unavailable (older releases)
+
+**Atomic binary replacement:**
+
+1. Download to temporary file
+2. Verify checksum
+3. Create backup of current binary
+4. Replace binary atomically with `os.Rename`
+5. Remove backup on success
+6. Restore backup on failure
 
 ### Error Recovery
 
-**Git not found (git-based installations):**
+#### Git not found (git-based installations)
 
-If `git` is not in PATH, the command provides platform-specific installation guidance:
+**Error message:**
 
-- **macOS:** Install Xcode Command Line Tools or Homebrew
-- **Windows:** Install Git for Windows or use winget
-- **Linux:** Install via package manager (apt, yum, pacman)
-- **Alternative:** Download binary from GitHub releases
+```
+Error: git not found in PATH - cannot update git-based installation
+```
 
-**Permission denied (binary installations):**
+**Platform-specific solutions:**
 
-If binary update fails due to permissions:
+**macOS:**
 
-- **macOS/Linux:** Run with `sudo goenv update` or install to user-writeable path
-- **Windows:** Run PowerShell as Administrator or install to `%LOCALAPPDATA%\goenv`
-- **Alternative:** Download and install manually from GitHub releases
+```shell
+# Option 1: Install Xcode Command Line Tools
+xcode-select --install
+
+# Option 2: Install via Homebrew
+brew install git
+```
+
+**Windows:**
+
+```powershell
+# Option 1: Install Git for Windows
+# Download from: https://git-scm.com/download/win
+
+# Option 2: Install via winget
+winget install Git.Git
+```
+
+**Linux:**
+
+```shell
+# Debian/Ubuntu
+sudo apt-get install git
+
+# RHEL/CentOS/Fedora
+sudo yum install git
+
+# Arch Linux
+sudo pacman -S git
+```
+
+**Alternative:** Switch to binary installation by downloading from [GitHub releases](https://github.com/go-nv/goenv/releases)
+
+#### Permission denied (binary installations)
+
+**Error message:**
+
+```
+Error: cannot update binary: permission denied
+
+To fix this:
+  • Run with elevated permissions: sudo goenv update
+  • Or install goenv to a user-writeable path (e.g., ~/.local/bin/)
+```
+
+**Solutions by platform:**
+
+**macOS/Linux:**
+
+```shell
+# Option 1: Run with sudo
+sudo goenv update
+
+# Option 2: Move to user-owned directory
+mkdir -p ~/.local/bin
+sudo mv /usr/local/bin/goenv ~/.local/bin/
+# Add ~/.local/bin to PATH in ~/.bashrc or ~/.zshrc
+
+# Option 3: Change binary ownership
+sudo chown $USER /usr/local/bin/goenv
+goenv update
+```
+
+**Windows:**
+
+```powershell
+# Option 1: Run as Administrator
+# Right-click PowerShell → "Run as Administrator"
+goenv update
+
+# Option 2: Install to user directory
+# Move goenv.exe to: %LOCALAPPDATA%\goenv\bin\
+# e.g., C:\Users\YourName\AppData\Local\goenv\bin\
+# Add to PATH in System Environment Variables
+```
+
+**Manual installation alternative:**
+
+1. Download latest release: https://github.com/go-nv/goenv/releases
+2. Extract platform-specific binary
+3. Replace existing binary manually
+
+#### Uncommitted changes (git-based installations)
+
+**Warning message:**
+
+```
+⚠️  Warning: You have uncommitted changes in goenv directory
+   The update may fail or overwrite your changes.
+
+Use --force to update anyway, or commit/stash your changes first.
+```
+
+**Solutions:**
+
+```shell
+# Option 1: Commit your changes
+cd $GOENV_ROOT
+git add .
+git commit -m "Local customizations"
+goenv update
+
+# Option 2: Stash your changes
+cd $GOENV_ROOT
+git stash
+goenv update
+git stash pop
+
+# Option 3: Force update (may lose changes)
+goenv update --force
+```
+
+### Examples
+
+**Check for updates without installing:**
+
+```shell
+> goenv update --check
+🔄 Checking for goenv updates...
+🆕 Update available!
+   Current:  v2.9.0
+   Latest:   v3.0.0
+
+Run 'goenv update' to install the update.
+```
+
+**Update with debug output:**
+
+```shell
+> GOENV_DEBUG=1 goenv update
+Debug: Installation type: binary
+Debug: Installation path: /usr/local/bin/goenv
+Debug: Latest version: v3.0.0
+Debug: Download URL: https://github.com/go-nv/goenv/releases/download/v3.0.0/goenv_3.0.0_darwin_arm64
+🔄 Checking for goenv updates...
+Using GitHub token for higher rate limits
+...
+```
+
+**Force update when already current:**
+
+```shell
+> goenv update --force
+🔄 Checking for goenv updates...
+📝 Changes:
+   (No new commits)
+
+⬇️  Updating goenv...
+✅ goenv updated successfully!
+```
+
+### Troubleshooting
+
+**"GitHub API rate limit exceeded"**
+
+- Wait for rate limit to reset (check error message for time)
+- Set `GITHUB_TOKEN` environment variable for 5,000/hour limit
+- Use `--check` to verify status without triggering download
+
+**"Checksum verification failed"**
+
+- Possible causes: corrupted download, network proxy, or security issue
+- Run with `GOENV_DEBUG=1` to see checksum details
+- Try download again: network hiccup may have corrupted file
+- If persistent, report as security issue
+
+**"304 Not Modified" in debug output**
+
+- This is normal and good! ETag cache is working
+- Means no update available since last check
+- No bandwidth wasted, no rate limit consumed
+
+**Update succeeds but version unchanged**
+
+- Git installations: Run `exec $SHELL` to reload shell
+- Binary installations: Restart terminal or re-run command
+- Check installation: `which goenv` and `goenv version`
 
 ## `goenv tools update`
 
@@ -1902,8 +2848,122 @@ Manage Visual Studio Code integration with goenv.
 Commands to configure and manage Visual Studio Code integration with goenv
 
 Available Commands:
+  setup       Complete VS Code setup (init + sync + doctor) - NEW!
   init        Initialize VS Code workspace for goenv
+  sync        Update VS Code settings with current Go version
 ```
+
+### `goenv vscode setup`
+
+**NEW!** Complete VS Code setup in one command - perfect for new users!
+
+This unified command combines `init`, `sync`, and `doctor` to set up VS Code integration in a single step. It's the fastest way to get started.
+
+**Usage:**
+
+```shell
+# Navigate to your project
+cd ~/projects/myapp
+
+# Complete setup (does everything)
+> goenv vscode setup
+✓ Initializing VS Code workspace...
+✓ Created/updated .vscode/settings.json
+✓ Created/updated .vscode/extensions.json
+✓ Syncing with current Go version (1.25.2)...
+✓ Updated settings for Go 1.25.2
+✓ Running diagnostics...
+✓ All checks passed!
+
+✨ VS Code is ready to use with goenv!
+```
+
+**What it does:**
+
+1. **Initialize** - Creates `.vscode/settings.json` and `.vscode/extensions.json`
+2. **Sync** - Updates settings with current Go version
+3. **Doctor** - Verifies installation and shows any issues
+
+**This is equivalent to running:**
+
+```bash
+goenv vscode init    # Create configuration
+goenv vscode sync    # Update with current version
+goenv doctor         # Verify everything works
+```
+
+**Flags:**
+
+- `--template <name>` - Use specific template (basic, advanced, monorepo)
+- `--force` - Overwrite existing settings instead of merging
+- `--env-vars` - Use environment variables mode (for terminal-only users)
+- `--workspace-paths` - Use workspace-relative paths for portability
+- `--versioned-tools` - Use per-version tools directory
+- `--dry-run` - Show what would be done without actually doing it
+- `--strict` - Exit with error if any diagnostics fail
+
+**Examples:**
+
+```bash
+# Basic setup (most common)
+goenv vscode setup
+
+# Advanced template with gopls settings
+goenv vscode setup --template advanced
+
+# Environment variables mode (terminal-only users)
+goenv vscode setup --env-vars
+
+# Force overwrite existing settings
+goenv vscode setup --force
+
+# Portable setup for teams
+goenv vscode setup --workspace-paths --versioned-tools
+
+# Check what would be done (dry run)
+goenv vscode setup --dry-run
+
+# Strict mode for CI/CD (fail on warnings)
+goenv vscode setup --strict
+```
+
+**Perfect for:**
+
+- 🆕 **First-time users** - Get started quickly without learning multiple commands
+- 🚀 **Quick onboarding** - Set up new projects in seconds
+- 🔍 **Troubleshooting** - Diagnoses issues and shows clear error messages
+- 📦 **CI/CD** - Prepare VS Code workspaces in automated pipelines
+- 👥 **Team onboarding** - Single command for new team members
+
+**Output example with issues detected:**
+
+```shell
+> goenv vscode setup
+✓ Initializing VS Code workspace...
+✓ Created .vscode/settings.json
+⚠ Warning: Go 1.25.2 is not installed
+
+💡 To fix:
+   goenv install 1.25.2
+
+✨ Setup partially complete. Install Go 1.25.2 to finish.
+```
+
+**Non-interactive mode (CI/CD):**
+
+```bash
+# Use with --force in automated scripts
+goenv vscode setup --force --strict
+
+# Or disable interactivity
+GOENV_NONINTERACTIVE=1 goenv vscode setup --force
+```
+
+**See also:**
+- [VS Code Integration Guide](../user-guide/VSCODE_INTEGRATION.md) - Complete setup walkthrough
+- [`goenv vscode init`](#goenv-vscode-init) - Initialize only (without sync/doctor)
+- [`goenv vscode sync`](#goenv-vscode-sync) - Sync only (after version changes)
+- [`goenv doctor`](#goenv-doctor) - Full diagnostics
 
 ### `goenv vscode init`
 
@@ -1941,24 +3001,29 @@ This command creates or updates `.vscode/settings.json` and `.vscode/extensions.
 For teams working across different machines or sharing VS Code settings in version control:
 
 **`--workspace-paths`** - Makes paths relative to workspace folder
+
 ```shell
 goenv vscode init --workspace-paths
 ```
+
 - **Without flag**: Uses absolute paths like `/Users/you/.goenv/versions/1.25.2`
 - **With flag**: Uses `${workspaceFolder}/.goenv/versions/1.25.2`
 - **Use when**: Sharing .vscode settings in git, team has different home directories
 - **Benefit**: Works across different machines without path modifications
 
 **`--versioned-tools`** - Isolates tools per Go version
+
 ```shell
 goenv vscode init --versioned-tools
 ```
+
 - **Without flag**: Uses shared tools directory `~/.goenv/tools`
 - **With flag**: Uses version-specific `~/.goenv/versions/1.25.2/tools`
 - **Use when**: Testing gopls versions, strict version isolation needed
 - **Benefit**: Each Go version has its own tool installations
 
 **Combined for maximum portability:**
+
 ```shell
 goenv vscode init --workspace-paths --versioned-tools
 ```
@@ -2022,6 +3087,10 @@ See the [VS Code Integration Guide](../user-guide/VSCODE_INTEGRATION.md) for det
 
 ## `goenv version`
 
+> **Note:** This is a legacy command. Use [`goenv current`](#goenv-current) instead for a more consistent interface.
+>
+> **For backward compatibility:** This command still works as expected, but `goenv current` is recommended as it provides clearer semantics (showing the "current" version rather than "version").
+
 Displays the currently active Go version, along with information on
 how it was set.
 
@@ -2081,6 +3150,8 @@ Explain how the current Go version is set.
 ## `goenv versions`
 
 > **Note:** This is a legacy command. Use [`goenv list`](#goenv-list) instead for a more consistent interface.
+>
+> **For automation:** Both `goenv versions --json` and `goenv list --json` produce identical output. The `list` command is recommended as it unifies installed and remote version queries.
 
 Lists all Go versions known to goenv, and shows an asterisk next to
 the currently active version.
@@ -2396,3 +3467,125 @@ If you're still seeing this error:
    ```
 
 See the [Smart Caching Guide](../advanced/SMART_CACHING.md#build-cache-isolation) for more details about cache isolation.
+
+## 🔄 Legacy Commands (Backward Compatibility)
+
+The following commands are maintained for backward compatibility with the bash implementation of goenv and other version managers. While they continue to work as expected, **we recommend using the [modern unified commands](#-modern-unified-commands-recommended)** for new scripts and workflows.
+
+### Command Migration Guide
+
+| Legacy Command           | Modern Equivalent                            | Why Migrate?                           |
+| ------------------------ | -------------------------------------------- | -------------------------------------- |
+| `goenv local <version>`  | [`goenv use <version>`](#goenv-use)          | Unified interface for local/global     |
+| `goenv global <version>` | [`goenv use <version> --global`](#goenv-use) | Single command with flag               |
+| `goenv version`          | [`goenv current`](#goenv-current)            | Clearer semantics                      |
+| `goenv versions`         | [`goenv list`](#goenv-list)                  | Consistent with other version managers |
+
+### Why Use Modern Commands?
+
+1. **Consistency**: One command (`use`) for both local and global, vs two commands (`local`/`global`)
+2. **Clarity**: `current` is clearer than `version` (which could mean "goenv's version")
+3. **Functionality**: `list` supports `--remote` to query available versions, `versions` doesn't
+4. **Convention**: Follows patterns from other modern version managers (nvm, rbenv, pyenv)
+
+### Examples
+
+**Before (legacy commands):**
+
+```bash
+goenv local 1.25.2
+goenv global 1.24.8
+goenv version
+goenv versions
+```
+
+**After (modern commands):**
+
+```bash
+goenv use 1.25.2
+goenv use 1.24.8 --global
+goenv current
+goenv list
+```
+
+### Backward Compatibility Promise
+
+All legacy commands will continue to work indefinitely. This ensures:
+
+- ✅ Existing scripts don't break
+- ✅ CI/CD pipelines keep working
+- ✅ Team members can migrate at their own pace
+- ✅ Documentation from bash goenv era remains valid
+
+However, new features and functionality will primarily be added to modern commands.
+
+### Deprecation Timeline
+
+**Current Status (v3.x):**
+
+- ✅ Legacy commands work without warnings
+- ✅ Hidden from `goenv help` output
+- ✅ Documented in dedicated "Legacy Commands" section
+
+**Future Plans:**
+
+**v3.x (Current):**
+
+- Legacy commands continue to work silently
+- No breaking changes to existing scripts
+
+**v4.0 (Future - TBD):**
+
+- May add deprecation warnings to stderr:
+  ```bash
+  $ goenv local 1.23.2
+  Warning: 'goenv local' is deprecated. Use 'goenv use 1.23.2' instead.
+  Setting local version to 1.23.2...
+  ```
+- Commands still functional, just with warnings
+- Warnings can be suppressed with `GOENV_SILENCE_DEPRECATION_WARNINGS=1`
+
+**v5.0 (Far Future - TBD):**
+
+- Consider removing legacy commands entirely
+- Or keep as thin wrappers with strong warnings
+- Decision based on community feedback and usage metrics
+
+### Recommendation for New Projects
+
+**✅ Use modern commands:**
+
+```bash
+# Modern - Recommended
+goenv use 1.25.2
+goenv use 1.24.8 --global
+goenv current
+goenv list
+```
+
+**⚠️ Avoid legacy commands in new code:**
+
+```bash
+# Legacy - Not recommended for new projects
+goenv local 1.25.2
+goenv global 1.24.8
+goenv version
+goenv versions
+```
+
+**📋 Migration checklist for existing projects:**
+
+1. Search codebase for legacy command usage: `grep -r "goenv local\|goenv global\|goenv version\|goenv versions" .`
+2. Update scripts to use modern equivalents
+3. Update CI/CD pipeline configuration
+4. Update team documentation
+5. Test thoroughly before deploying
+
+### Legacy Command Documentation
+
+For detailed documentation on legacy commands, see their individual sections:
+
+- [`goenv local`](#goenv-local) - Use [`goenv use`](#goenv-use) instead
+- [`goenv global`](#goenv-global) - Use [`goenv use --global`](#goenv-use) instead
+- [`goenv version`](#goenv-version) - Use [`goenv current`](#goenv-current) instead
+- [`goenv versions`](#goenv-versions) - Use [`goenv list`](#goenv-list) instead
