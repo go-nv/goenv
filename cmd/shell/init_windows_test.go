@@ -3,8 +3,6 @@
 package shell
 
 import (
-	cmdpkg "github.com/go-nv/goenv/cmd"
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"strings"
 	"testing"
 
