@@ -191,10 +191,14 @@ func TestFindInSystemPath(t *testing.T) {
 	// Create test executables in different directories
 	createTestExecutable := func(dir, name string) {
 		path := filepath.Join(dir, name)
+		var content string
 		if runtime.GOOS == "windows" {
 			path += ".exe"
+			content = "@echo off\necho test\n"
+		} else {
+			content = "#!/bin/bash\necho test\n"
 		}
-		if err := os.WriteFile(path, []byte("#!/bin/bash\necho test\n"), 0755); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0755); err != nil {
 			t.Fatal(err)
 		}
 	}

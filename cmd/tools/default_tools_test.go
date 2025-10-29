@@ -444,7 +444,14 @@ func TestDefaultToolsVerify_WithTools(t *testing.T) {
 
 	// Create one mock tool binary (gopls)
 	toolBinary := filepath.Join(binDir, "gopls")
-	if err := os.WriteFile(toolBinary, []byte("#!/bin/bash\necho gopls\n"), 0755); err != nil {
+	var content string
+	if runtime.GOOS == "windows" {
+		toolBinary += ".exe"
+		content = "@echo off\necho gopls\n"
+	} else {
+		content = "#!/bin/bash\necho gopls\n"
+	}
+	if err := os.WriteFile(toolBinary, []byte(content), 0755); err != nil {
 		t.Fatalf("Failed to create mock tool binary: %v", err)
 	}
 

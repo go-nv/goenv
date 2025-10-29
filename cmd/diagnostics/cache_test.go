@@ -1020,10 +1020,14 @@ func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
 
 	// Create fake go executable
 	goExe := filepath.Join(binPath, "go")
+	var content string
 	if runtime.GOOS == "windows" {
 		goExe += ".exe"
+		content = "@echo off\necho fake go\n"
+	} else {
+		content = "#!/bin/sh\necho fake go\n"
 	}
-	if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
+	if err := os.WriteFile(goExe, []byte(content), 0755); err != nil {
 		t.Fatalf("Failed to create fake go executable: %v", err)
 	}
 

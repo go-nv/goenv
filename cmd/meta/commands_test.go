@@ -4,6 +4,7 @@ import (
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -88,7 +89,14 @@ func TestCommandsCommand(t *testing.T) {
 				os.MkdirAll(libexecDir, 0755)
 				for _, cmdName := range tt.setupCommands {
 					cmdPath := filepath.Join(libexecDir, "goenv-"+cmdName)
-					os.WriteFile(cmdPath, []byte("#!/bin/sh\n"), 0755)
+					var content string
+					if runtime.GOOS == "windows" {
+						cmdPath += ".bat"
+						content = "@echo off\n"
+					} else {
+						content = "#!/bin/sh\n"
+					}
+					os.WriteFile(cmdPath, []byte(content), 0755)
 				}
 			}
 

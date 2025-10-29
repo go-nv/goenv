@@ -99,11 +99,15 @@ func TestResolveSBOMTool(t *testing.T) {
 	// Create mock tool
 	toolName := "cyclonedx-gomod"
 	toolPath := filepath.Join(hostBinDir, toolName)
+	var content string
 	if runtime.GOOS == "windows" {
 		toolPath += ".exe"
+		content = "@echo off\necho mock"
+	} else {
+		content = "#!/bin/sh\necho mock"
 	}
 
-	if err := os.WriteFile(toolPath, []byte("#!/bin/sh\necho mock"), 0755); err != nil {
+	if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
 		t.Fatalf("Failed to create mock tool: %v", err)
 	}
 
