@@ -16,8 +16,8 @@ var tempFileCounter uint64
 // AtomicWriter provides atomic file write operations with advisory locking.
 // It ensures that cache writes are safe even on networked filesystems.
 type AtomicWriter struct {
-	lockFile *os.File
-	tmpDir   string
+	lockFile  *os.File
+	tmpDir    string
 	cacheRoot string
 }
 
@@ -51,8 +51,8 @@ func NewAtomicWriter(cacheRoot string) (*AtomicWriter, error) {
 	}
 
 	return &AtomicWriter{
-		lockFile: lockFile,
-		tmpDir:   tmpDir,
+		lockFile:  lockFile,
+		tmpDir:    tmpDir,
 		cacheRoot: cacheRoot,
 	}, nil
 }
@@ -74,20 +74,28 @@ func (w *AtomicWriter) WriteFile(targetPath string, data []byte, perm os.FileMod
 		w.tmpDir,
 		fmt.Sprintf("%s.%d.%d.%d.tmp", filepath.Base(targetPath), os.Getpid(), time.Now().UnixNano(), counter),
 	)
-	if err := os.WriteFile(tmpPath, data, perm); err != nil {
+
+	// Write and sync the file in one operation
+	// Open with O_RDWR on Windows to allow Sync() to work
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	if _, err := f.Write(data); err != nil {
+		f.Close()
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 
-	// Fsync the file
-	f, err := os.Open(tmpPath)
-	if err != nil {
-		return fmt.Errorf("failed to open temp file for sync: %w", err)
-	}
+	// Fsync the file before closing
 	if err := f.Sync(); err != nil {
 		f.Close()
 		return fmt.Errorf("failed to sync temp file: %w", err)
 	}
-	f.Close()
+
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
 
 	// Atomic rename
 	if err := os.Rename(tmpPath, targetPath); err != nil {
@@ -147,7 +155,7 @@ func isLockError(err error) bool {
 
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr ||
-	       len(s) > len(substr) && findSubstring(s, substr)
+		len(s) > len(substr) && findSubstring(s, substr)
 }
 
 func findSubstring(s, substr string) bool {
