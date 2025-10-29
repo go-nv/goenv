@@ -1,13 +1,14 @@
 package shims
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
 
 	"github.com/spf13/cobra"
 )
