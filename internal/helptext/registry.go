@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -83,7 +84,7 @@ func getLatestInstalledVersion() string {
 	// Get latest version
 	latest := ""
 	for _, v := range installed {
-		if latest == "" || compareVersions(v, latest) > 0 {
+		if latest == "" || utils.CompareGoVersions(v, latest) > 0 {
 			latest = v
 		}
 	}
@@ -120,34 +121,6 @@ func addVersionExamples(description, latestVersion string) string {
 		result = strings.ReplaceAll(result, old, new)
 	}
 	return result
-}
-
-// compareVersions compares two version strings (returns >0 if v1 > v2)
-func compareVersions(v1, v2 string) int {
-	// Strip "go" prefix if present
-	v1 = strings.TrimPrefix(v1, "go")
-	v2 = strings.TrimPrefix(v2, "go")
-
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
-
-	for i := 0; i < len(parts1) && i < len(parts2); i++ {
-		// Simple string comparison works for numbers
-		if parts1[i] != parts2[i] {
-			if parts1[i] > parts2[i] {
-				return 1
-			}
-			return -1
-		}
-	}
-
-	// Longer version is greater
-	if len(parts1) > len(parts2) {
-		return 1
-	} else if len(parts1) < len(parts2) {
-		return -1
-	}
-	return 0
 }
 
 // Registry holds all command help text

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
+var RootCmd = &cobra.Command{
 	Use:   "goenv",
 	Short: "Simple Go version management",
 	Long: `goenv is a simple Go version management tool that allows you to:
@@ -51,7 +51,7 @@ var rootCmd = &cobra.Command{
 					WorkingDir:      cwd,
 					AdditionalFlags: additionalFlags,
 					VSCodeUpdate: func(version string) error {
-						return initializeVSCodeWorkspaceWithVersion(cmd, version)
+						return nil // TODO: Wire up VSCode integration without import cycle
 					},
 					InstallCallback: func(version string) error {
 						// Find install command
@@ -102,7 +102,7 @@ var rootCmd = &cobra.Command{
 				Stdin:      os.Stdin,
 				WorkingDir: cwd,
 				VSCodeUpdate: func(version string) error {
-					return initializeVSCodeWorkspaceWithVersion(cmd, version)
+					return nil // TODO: Wire up VSCode integration without import cycle
 				},
 			}
 
@@ -155,7 +155,7 @@ func Execute() {
 		}
 	}
 
-	if err := rootCmd.Execute(); err != nil {
+	if err := RootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -193,7 +193,7 @@ func isVersionLike(s string) bool {
 
 func init() {
 	// Add command groups to organize help output
-	rootCmd.AddGroup(
+	RootCmd.AddGroup(
 		&cobra.Group{
 			ID:    "common",
 			Title: "Common Commands:",
@@ -213,22 +213,22 @@ func init() {
 	)
 
 	// Add global flags here if needed
-	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug mode")
-	rootCmd.PersistentFlags().BoolVar(&NoColor, "no-color", false, "Disable colored output")
-	rootCmd.PersistentFlags().BoolVar(&Plain, "plain", false, "Plain output (no colors, no emojis)")
+	RootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug mode")
+	RootCmd.PersistentFlags().BoolVar(&NoColor, "no-color", false, "Disable colored output")
+	RootCmd.PersistentFlags().BoolVar(&Plain, "plain", false, "Plain output (no colors, no emojis)")
 
 	// Add version flag
 	var showVersion bool
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
+	RootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show version information")
 
 	// Override the default version behavior
-	rootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+	RootCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
 		// Propagate output options to utils package
 		utils.SetOutputOptions(NoColor, Plain)
 
 		if showVersion {
 			// Simple format for --version flag (matches bash version)
-			fmt.Printf("goenv %s\n", appVersion)
+			fmt.Printf("goenv %s\n", AppVersion)
 			os.Exit(0)
 		}
 		return nil
@@ -241,16 +241,16 @@ var Plain bool
 
 // Version information
 var (
-	appVersion   = "dev"
-	appCommit    = "unknown"
-	appBuildTime = "unknown"
+	AppVersion   = "dev"
+	AppCommit    = "unknown"
+	AppBuildTime = "unknown"
 )
 
 // SetVersionInfo sets version information from main
 func SetVersionInfo(v, c, bt string) {
-	appVersion = v
-	appCommit = c
-	appBuildTime = bt
+	AppVersion = v
+	AppCommit = c
+	AppBuildTime = bt
 }
 
 // splitArgs splits a string into arguments, respecting quoted strings

@@ -676,69 +676,11 @@ func maxVersion(versions []string) string {
 
 	max := versions[0]
 	for _, v := range versions[1:] {
-		if compareGoVersions(v, max) > 0 {
+		if utils.CompareGoVersions(v, max) > 0 {
 			max = v
 		}
 	}
 	return max
-}
-
-func compareGoVersions(v1, v2 string) int {
-	v1 = strings.TrimPrefix(v1, "go")
-	v2 = strings.TrimPrefix(v2, "go")
-
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
-
-	maxLen := len(parts1)
-	if len(parts2) > maxLen {
-		maxLen = len(parts2)
-	}
-
-	for i := 0; i < maxLen; i++ {
-		p1 := "0"
-		if i < len(parts1) {
-			p1 = parts1[i]
-		}
-
-		p2 := "0"
-		if i < len(parts2) {
-			p2 = parts2[i]
-		}
-
-		p1HasPre := strings.Contains(p1, "beta") || strings.Contains(p1, "rc")
-		p2HasPre := strings.Contains(p2, "beta") || strings.Contains(p2, "rc")
-
-		if p1HasPre && !p2HasPre {
-			return -1
-		}
-		if !p1HasPre && p2HasPre {
-			return 1
-		}
-		if p1HasPre && p2HasPre {
-			p1IsRC := strings.Contains(p1, "rc")
-			p2IsRC := strings.Contains(p2, "rc")
-			if p1IsRC && !p2IsRC {
-				return 1
-			}
-			if !p1IsRC && p2IsRC {
-				return -1
-			}
-		}
-
-		var n1, n2 int
-		fmt.Sscanf(p1, "%d", &n1)
-		fmt.Sscanf(p2, "%d", &n2)
-
-		if n1 > n2 {
-			return 1
-		}
-		if n1 < n2 {
-			return -1
-		}
-	}
-
-	return 0
 }
 
 // HasSystemGo checks if system Go is available in PATH

@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestCompareVersions(t *testing.T) {
@@ -27,9 +29,9 @@ func TestCompareVersions(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := compareVersions(test.v1, test.v2)
+		result := utils.CompareGoVersions(test.v1, test.v2)
 		if result != test.expected {
-			t.Errorf("compareVersions(%s, %s) = %d, expected %d",
+			t.Errorf("utils.CompareGoVersions(%s, %s) = %d, expected %d",
 				test.v1, test.v2, result, test.expected)
 		}
 	}

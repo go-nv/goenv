@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -40,10 +39,10 @@ type GoFile struct {
 type VersionCache struct {
 	Versions     []string  `json:"versions"`
 	UpdatedAt    time.Time `json:"updated_at"`
-	FullFetchAt  time.Time `json:"full_fetch_at"`     // Last time we fetched with include=all
-	QuickCheckAt time.Time `json:"quick_check_at"`    // Last time we checked latest versions only
-	ETag         string    `json:"etag,omitempty"`    // HTTP ETag for conditional requests
-	SHA256       string    `json:"sha256,omitempty"`  // SHA256 hash of versions data
+	FullFetchAt  time.Time `json:"full_fetch_at"`    // Last time we fetched with include=all
+	QuickCheckAt time.Time `json:"quick_check_at"`   // Last time we checked latest versions only
+	ETag         string    `json:"etag,omitempty"`   // HTTP ETag for conditional requests
+	SHA256       string    `json:"sha256,omitempty"` // SHA256 hash of versions data
 }
 
 // Fetcher handles fetching Go version information
@@ -238,72 +237,8 @@ func (f *Fetcher) GetVersionsForPlatform(goos, goarch string) ([]GoRelease, erro
 // SortVersions sorts Go versions in descending order (newest first)
 func SortVersions(versions []GoRelease) {
 	sort.Slice(versions, func(i, j int) bool {
-		return compareVersions(versions[i].Version, versions[j].Version) > 0
+		return utils.CompareGoVersions(versions[i].Version, versions[j].Version) > 0
 	})
-}
-
-// compareVersions compares two version strings
-// Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
-func compareVersions(v1, v2 string) int {
-	// Remove "go" prefix if present
-	v1 = strings.TrimPrefix(v1, "go")
-	v2 = strings.TrimPrefix(v2, "go")
-
-	// Split versions into parts
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
-
-	// Compare each part
-	maxLen := len(parts1)
-	if len(parts2) > maxLen {
-		maxLen = len(parts2)
-	}
-
-	for i := 0; i < maxLen; i++ {
-		var p1, p2 string
-		if i < len(parts1) {
-			p1 = parts1[i]
-		} else {
-			p1 = "0"
-		}
-		if i < len(parts2) {
-			p2 = parts2[i]
-		} else {
-			p2 = "0"
-		}
-
-		// Handle special suffixes like "beta", "rc"
-		p1HasPre := strings.Contains(p1, "beta") || strings.Contains(p1, "rc")
-		p2HasPre := strings.Contains(p2, "beta") || strings.Contains(p2, "rc")
-
-		if p1HasPre && !p2HasPre {
-			return -1 // stable version is greater than beta/rc
-		} else if !p1HasPre && p2HasPre {
-			return 1 // stable version is greater than beta/rc
-		} else if p1HasPre && p2HasPre {
-			// Both have pre-release, rc > beta
-			p1IsRC := strings.Contains(p1, "rc")
-			p2IsRC := strings.Contains(p2, "rc")
-			if p1IsRC && !p2IsRC {
-				return 1 // rc > beta
-			} else if !p1IsRC && p2IsRC {
-				return -1 // rc > beta
-			}
-		}
-
-		// Convert to integers for numeric comparison
-		var n1, n2 int
-		fmt.Sscanf(p1, "%d", &n1)
-		fmt.Sscanf(p2, "%d", &n2)
-
-		if n1 > n2 {
-			return 1
-		} else if n1 < n2 {
-			return -1
-		}
-	}
-
-	return 0
 }
 
 // GetFileForPlatform returns the download file for a specific platform
@@ -522,77 +457,6 @@ func computeSHA256(data []byte) string {
 // sortVersionStrings sorts version strings in descending order (newest first)
 func sortVersionStrings(versions []string) {
 	sort.Slice(versions, func(i, j int) bool {
-		return compareVersionStrings(versions[i], versions[j]) > 0
+		return utils.CompareGoVersions(versions[i], versions[j]) > 0
 	})
-}
-
-// compareVersionStrings compares two version strings
-func compareVersionStrings(v1, v2 string) int {
-	// Remove "go" prefix if present
-	v1 = strings.TrimPrefix(v1, "go")
-	v2 = strings.TrimPrefix(v2, "go")
-
-	// Split versions into parts
-	parts1 := strings.Split(v1, ".")
-	parts2 := strings.Split(v2, ".")
-
-	// Compare each part
-	maxLen := len(parts1)
-	if len(parts2) > maxLen {
-		maxLen = len(parts2)
-	}
-
-	for i := 0; i < maxLen; i++ {
-		var p1, p2 string
-		if i < len(parts1) {
-			p1 = parts1[i]
-		} else {
-			p1 = "0"
-		}
-		if i < len(parts2) {
-			p2 = parts2[i]
-		} else {
-			p2 = "0"
-		}
-
-		// Handle special suffixes like "beta", "rc"
-		p1HasPre := strings.Contains(p1, "beta") || strings.Contains(p1, "rc")
-		p2HasPre := strings.Contains(p2, "beta") || strings.Contains(p2, "rc")
-
-		if p1HasPre && !p2HasPre {
-			return -1 // stable version is greater than beta/rc
-		} else if !p1HasPre && p2HasPre {
-			return 1 // stable version is greater than beta/rc
-		} else if p1HasPre && p2HasPre {
-			// Both have pre-release, rc > beta
-			p1IsRC := strings.Contains(p1, "rc")
-			p2IsRC := strings.Contains(p2, "rc")
-			if p1IsRC && !p2IsRC {
-				return 1 // rc > beta
-			} else if !p1IsRC && p2IsRC {
-				return -1 // rc > beta
-			}
-		}
-
-		// Extract numeric part from string
-		re := regexp.MustCompile(`\d+`)
-		matches1 := re.FindString(p1)
-		matches2 := re.FindString(p2)
-
-		var n1, n2 int
-		if matches1 != "" {
-			fmt.Sscanf(matches1, "%d", &n1)
-		}
-		if matches2 != "" {
-			fmt.Sscanf(matches2, "%d", &n2)
-		}
-
-		if n1 > n2 {
-			return 1
-		} else if n1 < n2 {
-			return -1
-		}
-	}
-
-	return 0
 }
