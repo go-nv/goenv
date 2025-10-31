@@ -1285,6 +1285,8 @@ func TestCheckShellEnvironment(t *testing.T) {
 			} else {
 				// Explicitly set to empty string to ensure it's not inherited from parent process
 				t.Setenv("GOENV_SHELL", "")
+				// Also unset any shell function that might be inherited
+				t.Setenv("BASH_FUNC_goenv%%", "")
 			}
 			if tt.goenvRoot != "" {
 				t.Setenv("GOENV_ROOT", tt.goenvRoot)
