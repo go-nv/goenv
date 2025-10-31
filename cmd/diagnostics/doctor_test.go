@@ -1281,6 +1281,9 @@ func TestCheckShellEnvironment(t *testing.T) {
 				// This tells checkGoenvShellFunction that the function exists
 				if tt.goenvShell == "bash" || tt.goenvShell == "zsh" {
 					t.Setenv("BASH_FUNC_goenv%%", "() { echo fake; }")
+				} else {
+					// For non-bash/zsh shells, unset any inherited shell function
+					t.Setenv("BASH_FUNC_goenv%%", "")
 				}
 			} else {
 				// Explicitly set to empty string to ensure it's not inherited from parent process
