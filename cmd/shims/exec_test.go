@@ -1,12 +1,13 @@
 package shims
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -53,7 +54,7 @@ func TestExecCommand(t *testing.T) {
 		{
 			name:          "error with no command specified",
 			args:          []string{},
-			expectedError: "Usage: goenv exec <command> [arg1 arg2...]",
+			expectedError: "usage: goenv exec <command> [arg1 arg2...]",
 		},
 		{
 			name:          "error with version not installed (env)",
@@ -114,7 +115,7 @@ func TestExecCommand(t *testing.T) {
 				// Create custom binaries if specified
 				if content, exists := tt.createBinaries[version]; exists {
 					binPath := filepath.Join(testRoot, "versions", version, "bin", "go")
-					if runtime.GOOS == "windows" {
+					if utils.IsWindows() {
 						binPath += ".bat"
 						// Convert Unix shell script to Windows batch file
 						content = strings.ReplaceAll(content, "#!/bin/sh\n", "@echo off\n")
@@ -175,7 +176,7 @@ func TestExecCommand(t *testing.T) {
 				os.MkdirAll(systemBinDir, 0755)
 				systemGo := filepath.Join(systemBinDir, "go")
 				var content string
-				if runtime.GOOS == "windows" {
+				if utils.IsWindows() {
 					systemGo += ".bat"
 					content = "@echo off\necho system go version\n"
 				} else {
@@ -274,7 +275,7 @@ func TestExecEnvironmentVariables(t *testing.T) {
 	// Create a binary that prints specific environment variables
 	binPath := filepath.Join(testRoot, "versions", version, "bin", "env-test")
 	var content string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		binPath += ".bat"
 		content = "@echo off\necho GOROOT=%GOROOT%\necho GOPATH=%GOPATH%\n"
 	} else {
@@ -343,7 +344,7 @@ func TestExecWithShims(t *testing.T) {
 
 	shimPath := filepath.Join(shimsDir, "go")
 	var shimContent string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		shimPath += ".bat"
 		shimContent = "@echo off\ngoenv exec go %*\n"
 	} else {

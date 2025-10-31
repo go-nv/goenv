@@ -525,3 +525,267 @@ func BenchmarkShouldUseEmojis(b *testing.B) {
 		_ = ShouldUseEmojis()
 	}
 }
+
+func TestColorFunctions(t *testing.T) {
+	// Save original state
+	origOptions := globalOptions
+	defer func() {
+		globalOptions = origOptions
+		os.Unsetenv("NO_COLOR")
+	}()
+
+	tests := []struct {
+		name      string
+		colorFn   func(string) string
+		input     string
+		noColor   bool
+		plain     bool
+		envColor  string
+		wantPlain string
+		wantCode  string
+	}{
+		{
+			name:      "Red with color enabled",
+			colorFn:   Red,
+			input:     "error",
+			noColor:   false,
+			plain:     false,
+			envColor:  "",
+			wantPlain: "error",
+			wantCode:  "\x1b[31m",
+		},
+		{
+			name:      "Green with color enabled",
+			colorFn:   Green,
+			input:     "success",
+			noColor:   false,
+			plain:     false,
+			envColor:  "",
+			wantPlain: "success",
+			wantCode:  "\x1b[32m",
+		},
+		{
+			name:      "Yellow with color enabled",
+			colorFn:   Yellow,
+			input:     "warning",
+			noColor:   false,
+			plain:     false,
+			envColor:  "",
+			wantPlain: "warning",
+			wantCode:  "\x1b[33m",
+		},
+		{
+			name:      "Blue with color enabled",
+			colorFn:   Blue,
+			input:     "info",
+			noColor:   false,
+			plain:     false,
+			envColor:  "",
+			wantPlain: "info",
+			wantCode:  "\x1b[34m",
+		},
+		{
+			name:      "BoldRed with color enabled",
+			colorFn:   BoldRed,
+			input:     "critical",
+			noColor:   false,
+			plain:     false,
+			envColor:  "",
+			wantPlain: "critical",
+			wantCode:  "\x1b[1;31m",
+		},
+		{
+			name:      "Red with NO_COLOR env",
+			colorFn:   Red,
+			input:     "error",
+			noColor:   false,
+			plain:     false,
+			envColor:  "1",
+			wantPlain: "error",
+			wantCode:  "",
+		},
+		{
+			name:      "Green with --no-color flag",
+			colorFn:   Green,
+			input:     "success",
+			noColor:   true,
+			plain:     false,
+			envColor:  "",
+			wantPlain: "success",
+			wantCode:  "",
+		},
+		{
+			name:      "Yellow with --plain flag",
+			colorFn:   Yellow,
+			input:     "warning",
+			noColor:   false,
+			plain:     true,
+			envColor:  "",
+			wantPlain: "warning",
+			wantCode:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset state
+			globalOptions = OutputOptions{}
+			os.Unsetenv("NO_COLOR")
+
+			// Set test conditions
+			SetOutputOptions(tt.noColor, tt.plain)
+			if tt.envColor != "" {
+				os.Setenv("NO_COLOR", tt.envColor)
+			}
+
+			result := tt.colorFn(tt.input)
+
+			// When colors are disabled, should return plain text
+			if tt.noColor || tt.plain || tt.envColor != "" {
+				if result != tt.wantPlain {
+					t.Errorf("Expected plain text %q, got %q", tt.wantPlain, result)
+				}
+				return
+			}
+
+			// When colors might be enabled (depends on TTY)
+			// We can't guarantee colors will be on in test environment,
+			// but we can verify the structure if they are
+			if result == tt.wantPlain {
+				// Colors are off (non-TTY), which is correct
+				t.Logf("Colors disabled (non-TTY): %q", result)
+			} else {
+				// Colors are on, verify format
+				expectedColored := tt.wantCode + tt.wantPlain + "\x1b[0m"
+				if result != expectedColored {
+					t.Errorf("Expected colored %q, got %q", expectedColored, result)
+				} else {
+					t.Logf("Colors enabled (TTY): %q", result)
+				}
+			}
+		})
+	}
+}
+
+func TestGrayAndCyan(t *testing.T) {
+	// Save original state
+	origOptions := globalOptions
+	defer func() {
+		globalOptions = origOptions
+		os.Unsetenv("NO_COLOR")
+	}()
+
+	// Reset state and disable colors for consistent testing
+	globalOptions = OutputOptions{}
+	os.Setenv("NO_COLOR", "1")
+
+	tests := []struct {
+		name    string
+		colorFn func(string) string
+		input   string
+		want    string
+	}{
+		{
+			name:    "Gray with NO_COLOR",
+			colorFn: Gray,
+			input:   "comment",
+			want:    "comment",
+		},
+		{
+			name:    "Cyan with NO_COLOR",
+			colorFn: Cyan,
+			input:   "link",
+			want:    "link",
+		},
+		{
+			name:    "BoldGreen with NO_COLOR",
+			colorFn: BoldGreen,
+			input:   "confirmed",
+			want:    "confirmed",
+		},
+		{
+			name:    "BoldYellow with NO_COLOR",
+			colorFn: BoldYellow,
+			input:   "attention",
+			want:    "attention",
+		},
+		{
+			name:    "BoldBlue with NO_COLOR",
+			colorFn: BoldBlue,
+			input:   "heading",
+			want:    "heading",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.colorFn(tt.input)
+			if result != tt.want {
+				t.Errorf("%s = %q, want %q", tt.name, result, tt.want)
+			}
+		})
+	}
+}
+
+// TestColorSuppression_Integration tests color suppression in practice
+func TestColorSuppression_Integration(t *testing.T) {
+	// Save original state
+	origOptions := globalOptions
+	defer func() {
+		globalOptions = origOptions
+		os.Unsetenv("NO_COLOR")
+	}()
+
+	// Reset state
+	globalOptions = OutputOptions{}
+	os.Unsetenv("NO_COLOR")
+
+	// Test NO_COLOR=1
+	os.Setenv("NO_COLOR", "1")
+	if result := Red("error"); result != "error" {
+		t.Errorf("NO_COLOR=1 should disable colors, got %q", result)
+	} else {
+		t.Log("✓ NO_COLOR=1 correctly suppresses colors")
+	}
+
+	// Test plain flag
+	os.Unsetenv("NO_COLOR")
+	SetOutputOptions(false, true)
+	if result := Green("success"); result != "success" {
+		t.Errorf("--plain flag should disable colors, got %q", result)
+	} else {
+		t.Log("✓ --plain flag correctly suppresses colors")
+	}
+
+	// Test no-color flag
+	SetOutputOptions(true, false)
+	if result := Yellow("warning"); result != "warning" {
+		t.Errorf("--no-color flag should disable colors, got %q", result)
+	} else {
+		t.Log("✓ --no-color flag correctly suppresses colors")
+	}
+}
+
+// BenchmarkColorFunctions benchmarks the color functions
+func BenchmarkColorFunctions(b *testing.B) {
+	os.Setenv("NO_COLOR", "1") // Ensure consistent behavior
+	defer os.Unsetenv("NO_COLOR")
+
+	b.Run("Red", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = Red("error")
+		}
+	})
+
+	b.Run("Green", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = Green("success")
+		}
+	})
+
+	b.Run("BoldRed", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = BoldRed("critical")
+		}
+	})
+}

@@ -6,9 +6,20 @@ import (
 	"runtime"
 )
 
+// IsWindows returns true if the current OS is Windows
+func IsWindows() bool {
+	return runtime.GOOS == "windows"
+}
+
 // WindowsExecutableExtensions returns the list of valid executable extensions on Windows
 func WindowsExecutableExtensions() []string {
 	return []string{".exe", ".bat", ".cmd", ".com"}
+}
+
+// HasExecutableBit returns true if the file has the executable bit set (Unix permission 0111).
+// This is only meaningful on Unix-like systems. On Windows, this always returns true.
+func HasExecutableBit(info os.FileInfo) bool {
+	return info.Mode()&0111 != 0
 }
 
 // FindExecutable looks for an executable file in the given directory.
@@ -17,7 +28,7 @@ func WindowsExecutableExtensions() []string {
 //
 // Returns the full path to the executable if found, or an error if not found.
 func FindExecutable(dir, name string) (string, error) {
-	if runtime.GOOS == "windows" {
+	if IsWindows() {
 		// On Windows, try all executable extensions in order of preference
 		for _, ext := range WindowsExecutableExtensions() {
 			path := filepath.Join(dir, name+ext)
@@ -34,7 +45,7 @@ func FindExecutable(dir, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if info.Mode()&0111 == 0 {
+	if !HasExecutableBit(info) {
 		return "", os.ErrPermission
 	}
 	return path, nil
@@ -49,7 +60,7 @@ func IsExecutable(path string) bool {
 		return false
 	}
 
-	if runtime.GOOS == "windows" {
+	if IsWindows() {
 		// On Windows, check file extension
 		ext := filepath.Ext(path)
 		for _, validExt := range WindowsExecutableExtensions() {
@@ -61,14 +72,14 @@ func IsExecutable(path string) bool {
 	}
 
 	// On Unix, check execute bit
-	return info.Mode()&0111 != 0
+	return HasExecutableBit(info)
 }
 
 // HasExecutableExtension checks if a filename has a valid executable extension.
 // On Windows, checks for .exe, .bat, .cmd, or .com.
 // On Unix, returns true (Unix doesn't require extensions).
 func HasExecutableExtension(filename string) bool {
-	if runtime.GOOS == "windows" {
+	if IsWindows() {
 		ext := filepath.Ext(filename)
 		for _, validExt := range WindowsExecutableExtensions() {
 			if ext == validExt {

@@ -309,7 +309,7 @@ We have several documentation patterns you can follow:
 
 #### Quick Start Guides
 
-**Example:** [HOOKS_QUICKSTART.md](./HOOKS_QUICKSTART.md)
+**Example:** [HOOKS_QUICKSTART.md](./reference/HOOKS_QUICKSTART.md)
 
 **Purpose:** Get users productive in 5 minutes
 
@@ -341,7 +341,7 @@ Brief explanation (2-3 sentences).
 
 #### Reference Guides
 
-**Example:** [COMMANDS.md](./reference/COMMANDS.md), [PLATFORM_SUPPORT.md](./PLATFORM_SUPPORT.md)
+**Example:** [COMMANDS.md](./reference/COMMANDS.md), [PLATFORM_SUPPORT.md](./reference/PLATFORM_SUPPORT.md)
 
 **Purpose:** Complete, authoritative reference
 
@@ -367,7 +367,7 @@ Complete reference for [feature].
 
 #### How-To Guides
 
-**Example:** [COMPLIANCE_USE_CASES.md](./COMPLIANCE_USE_CASES.md), [CACHE_TROUBLESHOOTING.md](./CACHE_TROUBLESHOOTING.md)
+**Example:** [COMPLIANCE_USE_CASES.md](./advanced/COMPLIANCE_USE_CASES.md), [CACHE_TROUBLESHOOTING.md](./advanced/CACHE_TROUBLESHOOTING.md)
 
 **Purpose:** Solve specific problems
 
@@ -392,7 +392,7 @@ Complete guide to [task].
 
 #### Concept Guides
 
-**Example:** [MODERN_COMMANDS.md](./MODERN_COMMANDS.md), [SMART_CACHING.md](./advanced/SMART_CACHING.md)
+**Example:** [MODERN_COMMANDS.md](./user-guide/MODERN_COMMANDS.md), [SMART_CACHING.md](./advanced/SMART_CACHING.md)
 
 **Purpose:** Explain concepts and design decisions
 
@@ -415,7 +415,7 @@ Complete guide to [task].
 
 Use this checklist before submitting documentation PRs:
 
-**📋 See [DOCUMENTATION_REVIEW_CHECKLIST.md](./DOCUMENTATION_REVIEW_CHECKLIST.md) for the complete checklist.**
+**📋 Use the checklist above to ensure high-quality documentation.**
 
 Quick checklist:
 - [ ] Table of contents included (for docs > 100 lines)
@@ -433,7 +433,7 @@ Quick checklist:
 **Reference Documentation:**
 - Commands: `docs/reference/COMMANDS.md`
 - Environment variables: `docs/reference/ENVIRONMENT_VARIABLES.md`
-- Platform support: `docs/PLATFORM_SUPPORT.md`
+- Platform support: `docs/reference/PLATFORM_SUPPORT.md`
 
 **User Guides:**
 - Getting started: `docs/user-guide/`
@@ -446,14 +446,14 @@ Quick checklist:
 - Cross-building: `docs/advanced/CROSS_BUILDING.md`
 
 **Troubleshooting:**
-- Cache issues: `docs/CACHE_TROUBLESHOOTING.md`
-- Platform issues: `docs/PLATFORM_SUPPORT.md`
+- Cache issues: `docs/advanced/CACHE_TROUBLESHOOTING.md`
+- Platform issues: `docs/reference/PLATFORM_SUPPORT.md`
 - FAQ: `docs/FAQ.md`
 
 **Compliance & Operations:**
-- Hooks: `docs/HOOKS_QUICKSTART.md` (quick) or `docs/HOOKS.md` (complete)
-- Compliance: `docs/COMPLIANCE_USE_CASES.md`
-- CI/CD: `docs/CI_CD_GUIDE.md`
+- Hooks: `docs/reference/HOOKS_QUICKSTART.md` (quick) or `docs/reference/HOOKS.md` (complete)
+- Compliance: `docs/advanced/COMPLIANCE_USE_CASES.md`
+- CI/CD: `docs/advanced/CI_CD_GUIDE.md`
 
 ### Updating the Documentation Index
 
@@ -480,9 +480,9 @@ When adding new documentation:
 Learn from our best documentation:
 
 **Complete Guides:**
-- [Hooks Quick Start](./HOOKS_QUICKSTART.md) - Perfect quick start example
-- [Compliance Use Cases](./COMPLIANCE_USE_CASES.md) - Comprehensive how-to
-- [Platform Support Matrix](./PLATFORM_SUPPORT.md) - Complete reference
+- [Hooks Quick Start](./reference/HOOKS_QUICKSTART.md) - Perfect quick start example
+- [Compliance Use Cases](./advanced/COMPLIANCE_USE_CASES.md) - Comprehensive how-to
+- [Platform Support Matrix](./reference/PLATFORM_SUPPORT.md) - Complete reference
 
 **Well-Structured Commands:**
 - [goenv vscode setup](./reference/COMMANDS.md#goenv-vscode-setup) - Clear, complete command documentation

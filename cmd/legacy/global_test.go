@@ -243,7 +243,7 @@ func TestGlobalCommandRejectsExtraArguments(t *testing.T) {
 		return
 	}
 
-	if !strings.Contains(err.Error(), "Usage: goenv global [version]") {
+	if !strings.Contains(err.Error(), "usage: goenv global [version]") {
 		t.Errorf("Expected usage error, got: %v", err)
 	}
 }

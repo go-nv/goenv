@@ -15,13 +15,14 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var inventoryCmd = &cobra.Command{
 	Use:     "inventory",
 	Short:   "List installed Go versions and tools",
-	GroupID: "system",
+	GroupID: string(cmdpkg.GroupMeta),
 	Long: `List Go versions and tools installed by goenv for audit and compliance purposes.
 
 This is NOT an SBOM generator - it's a simple inventory of what goenv has installed.
@@ -103,7 +104,7 @@ type goInstallation struct {
 func collectGoInstallation(cfg *config.Config, version string, includeChecksum bool) goInstallation {
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
 	goBinary := filepath.Join(versionPath, "bin", "go")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".exe"
 	}
 

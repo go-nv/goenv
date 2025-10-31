@@ -264,9 +264,10 @@ hooks:
 	}
 	if defaultCfg == nil {
 		t.Error("LoadConfig() returned nil for non-existent file, expected default config")
-	}
-	if defaultCfg.Enabled {
-		t.Error("LoadConfig() default config should have Enabled=false")
+	} else {
+		if defaultCfg.Enabled {
+			t.Error("LoadConfig() default config should have Enabled=false")
+		}
 	}
 
 	// Test loading invalid YAML

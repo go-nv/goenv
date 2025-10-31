@@ -1,10 +1,11 @@
 package core
 
 import (
-	cmdhooks "github.com/go-nv/goenv/cmd/hooks"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	cmdhooks "github.com/go-nv/goenv/cmd/hooks"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
@@ -22,9 +23,23 @@ import (
 var installCmd = &cobra.Command{
 	Use:     "install [version]",
 	Short:   "Install a Go version",
-	GroupID: "common",
+	GroupID: string(cmdpkg.GroupVersions),
 	Long:    "Install a specific Go version. If no version is specified, installs the latest stable version.",
-	RunE:    runInstall,
+	Example: `  # Install latest stable Go version
+  goenv install
+
+  # Install specific version
+  goenv install 1.21.5
+
+  # Install latest patch version
+  goenv install 1.21
+
+  # Force reinstall
+  goenv install -f 1.21.5
+
+  # List available versions
+  goenv install -l`,
+	RunE: runInstall,
 }
 
 var installFlags struct {

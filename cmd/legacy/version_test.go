@@ -280,7 +280,7 @@ func TestVersionCommandRejectsExtraArguments(t *testing.T) {
 		return
 	}
 
-	if !strings.Contains(err.Error(), "Usage: goenv version") {
+	if !strings.Contains(err.Error(), "usage: goenv version") {
 		t.Errorf("Expected usage error, got: %v", err)
 	}
 }

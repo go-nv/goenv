@@ -3,6 +3,7 @@ package meta
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,7 +25,7 @@ import (
 var updateCmd = &cobra.Command{
 	Use:     "update",
 	Short:   "Update goenv to the latest version",
-	GroupID: "system",
+	GroupID: string(cmdpkg.GroupMeta),
 	Long: `Updates goenv to the latest version.
 
 For git-based installations (recommended):
@@ -126,7 +127,7 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 	if _, err := exec.LookPath("git"); err != nil {
 		errMsg := "git not found in PATH - cannot update git-based installation\n\n"
 		errMsg += "To fix this:\n"
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			errMsg += "  • Install Git for Windows: https://git-scm.com/download/win\n"
 			errMsg += "  • Or install via winget: winget install Git.Git\n"
 		} else if runtime.GOOS == "darwin" {
@@ -137,7 +138,7 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 		}
 		errMsg += "\nAlternatively, if you don't have write permissions to update:\n"
 		errMsg += "  • Download the latest binary from: https://github.com/go-nv/goenv/releases"
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	// Get current commit
@@ -270,7 +271,7 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	if err := checkWritePermission(binaryPath); err != nil {
 		errMsg := fmt.Sprintf("cannot update binary: %v\n\n", err)
 		errMsg += "To fix this:\n"
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			errMsg += "  • Run PowerShell as Administrator, or\n"
 			errMsg += "  • Install goenv to a user-writeable path like %LOCALAPPDATA%\\goenv\n"
 			errMsg += "    (e.g., C:\\Users\\YourName\\AppData\\Local\\goenv)\n"
@@ -280,7 +281,7 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 		}
 		errMsg += "\nAlternatively, download and install manually:\n"
 		errMsg += "  • https://github.com/go-nv/goenv/releases"
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	// Download new binary
@@ -308,14 +309,18 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	// Backup current binary
 	backupPath := binaryPath + ".backup"
 	fmt.Fprintf(cmd.OutOrStdout(), "%sCreating backup...\n", utils.Emoji("💾 "))
-	if err := copyFile(binaryPath, backupPath); err != nil {
+	if err := utils.CopyFile(binaryPath, backupPath); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
 	// Replace binary
 	fmt.Fprintf(cmd.OutOrStdout(), "%sReplacing binary...\n", utils.Emoji("🔄 "))
-	if err := os.Chmod(tmpFile, 0755); err != nil {
-		return fmt.Errorf("failed to set permissions: %w", err)
+
+	// Make executable on Unix (Windows uses file extension for executability)
+	if !utils.IsWindows() {
+		if err := os.Chmod(tmpFile, 0755); err != nil {
+			return fmt.Errorf("failed to set permissions: %w", err)
+		}
 	}
 
 	if err := os.Rename(tmpFile, binaryPath); err != nil {
@@ -420,7 +425,7 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 	}
 
 	// Check for GitHub token for higher rate limits
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+	if token := os.Getenv(utils.EnvVarGitHubToken); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 		if cfg.Debug {
 			fmt.Fprintf(os.Stderr, "Using GitHub token for higher rate limits\n")
@@ -593,31 +598,6 @@ func downloadBinary(url string) (string, error) {
 	}
 
 	return tmpFile.Name(), nil
-}
-
-func copyFile(src, dst string) error {
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destination.Close()
-
-	if _, err := io.Copy(destination, source); err != nil {
-		return err
-	}
-
-	// Copy permissions
-	srcInfo, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-	return os.Chmod(dst, srcInfo.Mode())
 }
 
 // verifyChecksum downloads SHA256SUMS and verifies the binary matches

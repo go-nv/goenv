@@ -26,7 +26,7 @@ func TestWhichCommand(t *testing.T) {
 		{
 			name:          "fails when no command argument given",
 			args:          []string{},
-			expectedError: "Usage: goenv which <command>",
+			expectedError: "usage: goenv which <command>",
 		},
 		{
 			name:          "prints path when GOENV_VERSION set and executable exists",

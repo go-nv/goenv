@@ -1,8 +1,8 @@
 package core
 
 import (
-	cmdhooks "github.com/go-nv/goenv/cmd/hooks"
 	"fmt"
+	cmdhooks "github.com/go-nv/goenv/cmd/hooks"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
@@ -16,7 +16,7 @@ import (
 var uninstallCmd = &cobra.Command{
 	Use:     "uninstall <version>",
 	Short:   "Uninstall a Go version",
-	GroupID: "common",
+	GroupID: string(cmdpkg.GroupVersions),
 	Long:    "Remove an installed Go version from the system",
 	Args:    cobra.MaximumNArgs(1),
 	RunE:    runUninstall,
@@ -48,7 +48,7 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 
 	// Validate: uninstall requires a version argument
 	if len(args) != 1 {
-		return fmt.Errorf("Usage: goenv uninstall <version>")
+		return fmt.Errorf("usage: goenv uninstall <version>")
 	}
 
 	cfg := config.Load()

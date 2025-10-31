@@ -1,15 +1,16 @@
 package shims
 
 import (
-	"github.com/go-nv/goenv/cmd/shell"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
+	"github.com/go-nv/goenv/cmd/shell"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -37,7 +38,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	mgr := manager.NewManager(cfg)
 
 	// Determine shell type
-	shell := shell.ResolveShell("", true)
+	shellType := shell.ResolveShell("", true)
 
 	// Call rehash unless --only-manage-paths is specified
 	onlyManagePaths := false
@@ -70,14 +71,14 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
 	appendGopath := utils.GoenvEnvVarAppendGopath.UnsafeValue() == "1"
 	prependGopath := utils.GoenvEnvVarPrependGopath.UnsafeValue() == "1"
-	existingGopath := os.Getenv("GOPATH")
+	existingGopath := os.Getenv(utils.EnvVarGopath)
 
 	// Build GOPATH value
 	var gopathValue string
 	if gopathPrefix == "" {
 		home, err := os.UserHomeDir()
 		if err != nil || home == "" {
-			home = os.Getenv("HOME") // Fallback
+			home = os.Getenv(utils.EnvVarHome) // Fallback
 		}
 		gopathValue = filepath.Join(home, "go", currentVersion)
 	} else {
@@ -95,7 +96,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	gorootValue := filepath.Join(cfg.Root, "versions", currentVersion)
 
 	// Generate shell-specific output
-	if shell == "fish" {
+	if shellType == shellutil.ShellTypeFish {
 		// Fish shell
 		if !disableGoroot {
 			fmt.Fprintf(cmd.OutOrStdout(), "set -gx GOROOT \"%s\"\n", gorootValue)
@@ -106,7 +107,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 		}
 
 		// Fish doesn't support hash -r
-	} else if shell == "powershell" {
+	} else if shellType == shellutil.ShellTypePowerShell {
 		// PowerShell
 		if !disableGoroot {
 			fmt.Fprintf(cmd.OutOrStdout(), "$env:GOROOT = \"%s\"\n", gorootValue)
@@ -117,7 +118,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 		}
 
 		// PowerShell doesn't need hash -r equivalent
-	} else if shell == "cmd" {
+	} else if shellType == shellutil.ShellTypeCmd {
 		// CMD
 		if !disableGoroot {
 			fmt.Fprintf(cmd.OutOrStdout(), "set GOROOT=%s\n", gorootValue)

@@ -1,15 +1,15 @@
 package integrations
 
 import (
-	cmdpkg "github.com/go-nv/goenv/cmd"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
+
+	cmdpkg "github.com/go-nv/goenv/cmd"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
@@ -22,7 +22,7 @@ import (
 var vscodeCmd = &cobra.Command{
 	Use:     "vscode",
 	Short:   "Manage VS Code integration",
-	GroupID: "config",
+	GroupID: string(cmdpkg.GroupIntegrations),
 	Long:    "Commands to configure and manage Visual Studio Code integration with goenv",
 }
 
@@ -321,7 +321,7 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 		// Use platform-specific environment variables for portability
 		// Windows: ${env:USERPROFILE}  Unix/macOS: ${env:HOME}
 		var homeEnvVar string
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			homeEnvVar = "${env:USERPROFILE}"
 		} else {
 			homeEnvVar = "${env:HOME}"
@@ -544,7 +544,7 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 func generateSettings(template string) (VSCodeSettings, error) {
 	// Determine platform-specific home environment variable
 	homeEnvVar := "${env:HOME}"
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		homeEnvVar = "${env:USERPROFILE}"
 	}
 
@@ -705,7 +705,7 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 	}
 
 	var homeEnvVar string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		homeEnvVar = "${env:USERPROFILE}"
 	} else {
 		homeEnvVar = "${env:HOME}"

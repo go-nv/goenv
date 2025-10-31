@@ -1,18 +1,19 @@
 package shell
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 
 	"github.com/spf13/cobra"
 )
 
 func TestShShellCommand(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		t.Skip("Skipping Unix shell test on Windows")
 	}
 

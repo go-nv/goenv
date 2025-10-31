@@ -134,16 +134,53 @@ easy to fork and contribute any changes back upstream.
     - `goenv use <TAB>` - See installed versions
 
 7.  **Install Go versions into `$GOENV_ROOT/versions`.**
-    For example, to download and install Go 1.12.0, run:
+    For example, to download and install Go 1.25.2, run:
 
-        goenv install 1.12.0
+        goenv install 1.25.2
 
     **NOTE:** It downloads and places the prebuilt Go binaries provided by Google.
 
 8.  **Set global Go version.**
-    For example, to set the version to Go 1.12.0, run:
+    For example, to set the version to Go 1.25.2, run:
 
-        goenv use 1.12.0 --global
+        goenv use 1.25.2 --global
+
+---
+
+## First-Time Setup (Recommended)
+
+After installing goenv (via any method above), the easiest way to get started is using the interactive setup wizard:
+
+```bash
+goenv setup
+```
+
+This command will:
+- Detect your shell (bash/zsh/fish/powershell)
+- Add goenv initialization to your shell profile
+- Configure tab completion
+- Verify the installation
+- Guide you through installing your first Go version
+
+The setup command is **safe to run multiple times** - it won't duplicate configuration.
+
+**Additional helpful commands for new users:**
+
+```bash
+# Interactive beginner guide
+goenv get-started
+
+# Quick installation health check
+goenv status
+
+# Comprehensive diagnostics
+goenv doctor
+
+# Fix any issues interactively
+goenv doctor --fix
+```
+
+**If you prefer manual setup**, continue with the Shell Setup section below.
 
 ---
 

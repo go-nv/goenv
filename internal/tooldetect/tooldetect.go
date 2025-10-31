@@ -6,8 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // Tool represents a detected Go tool
@@ -59,15 +60,25 @@ func ListInstalledTools(goenvRoot, goVersion string) ([]Tool, error) {
 
 		name := entry.Name()
 
-		// Skip non-executables on Windows (check for .exe and .bat for tests)
-		if runtime.GOOS == "windows" {
-			if !strings.HasSuffix(name, ".exe") && !strings.HasSuffix(name, ".bat") {
+		// Skip non-executables on Windows (check for valid executable extensions)
+		if utils.IsWindows() {
+			hasValidExt := false
+			for _, ext := range utils.WindowsExecutableExtensions() {
+				if strings.HasSuffix(name, ext) {
+					hasValidExt = true
+					break
+				}
+			}
+			if !hasValidExt {
 				continue
 			}
 		}
 
-		// Remove .exe or .bat suffix for display name
-		displayName := strings.TrimSuffix(strings.TrimSuffix(name, ".exe"), ".bat")
+		// Remove executable extension suffix for display name
+		displayName := name
+		for _, ext := range utils.WindowsExecutableExtensions() {
+			displayName = strings.TrimSuffix(displayName, ext)
+		}
 
 		binaryPath := filepath.Join(gopathBin, name)
 

@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,8 +16,36 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/version"
 	"github.com/schollz/progressbar/v3"
+)
+
+// InstallPhase represents the current phase of installation
+type InstallPhase string
+
+const (
+	PhaseFetching    InstallPhase = "fetching"
+	PhaseValidating  InstallPhase = "validating"
+	PhaseDownloading InstallPhase = "downloading"
+	PhaseExtracting  InstallPhase = "extracting"
+	PhaseVerifying   InstallPhase = "verifying"
+	PhaseComplete    InstallPhase = "complete"
+)
+
+// InstallErrorType categorizes installation errors
+type InstallErrorType string
+
+const (
+	ErrorTypeFetch            InstallErrorType = "fetch"
+	ErrorTypeNotFound         InstallErrorType = "not_found"
+	ErrorTypeAlreadyInstalled InstallErrorType = "already_installed"
+	ErrorTypeDownload         InstallErrorType = "download"
+	ErrorTypeExtract          InstallErrorType = "extract"
+	ErrorTypeVerification     InstallErrorType = "verification"
+	ErrorTypeChecksum         InstallErrorType = "checksum"
+	ErrorTypeNotInstalled     InstallErrorType = "not_installed"
+	ErrorTypePlatform         InstallErrorType = "platform"
 )
 
 // Installer handles Go installation
@@ -27,6 +56,27 @@ type Installer struct {
 	Quiet         bool
 	KeepBuildPath bool
 	MirrorURL     string
+}
+
+// InstallError represents a structured installation error
+type InstallError struct {
+	Type    InstallErrorType
+	Phase   InstallPhase
+	Message string
+	Err     error
+}
+
+// Error implements the error interface
+func (e *InstallError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("%s: %s: %v", e.Phase, e.Message, e.Err)
+	}
+	return fmt.Sprintf("%s: %s", e.Phase, e.Message)
+}
+
+// Unwrap implements error unwrapping
+func (e *InstallError) Unwrap() error {
+	return e.Err
 }
 
 // NewInstaller creates a new installer
@@ -58,7 +108,7 @@ func (i *Installer) Install(goVersion string, force bool) error {
 	}
 
 	if targetRelease == nil {
-		return fmt.Errorf("version %s not found", goVersion)
+		return i.createVersionNotFoundError(goVersion, releases)
 	}
 
 	// Get download file for current platform
@@ -372,4 +422,165 @@ func (i *Installer) Uninstall(goVersion string) error {
 
 	fmt.Printf("Successfully uninstalled Go %s\n", goVersion)
 	return nil
+}
+
+// createVersionNotFoundError creates a helpful error message with version suggestions
+func (i *Installer) createVersionNotFoundError(requestedVersion string, availableReleases []version.GoRelease) error {
+	// Basic error message
+	errMsg := fmt.Sprintf("version %s not found", requestedVersion)
+
+	// Find similar versions using fuzzy matching
+	suggestions := i.findSimilarVersions(requestedVersion, availableReleases, 5)
+
+	if len(suggestions) > 0 {
+		errMsg += "\n\nDid you mean one of these?"
+		for _, sug := range suggestions {
+			marker := ""
+			if sug.IsLatestInMinor {
+				marker = " (latest)"
+			}
+			errMsg += fmt.Sprintf("\n  • %s%s", sug.Version, marker)
+		}
+		errMsg += "\n\nUse 'goenv install-list' to see all available versions"
+	} else {
+		errMsg += "\n\nUse 'goenv install-list' to see all available versions"
+	}
+
+	return errors.New(errMsg)
+}
+
+// versionSuggestion represents a suggested version with metadata
+type versionSuggestion struct {
+	Version         string
+	IsLatestInMinor bool
+}
+
+// findSimilarVersions finds versions that are similar to the requested version
+func (i *Installer) findSimilarVersions(requested string, releases []version.GoRelease, maxResults int) []versionSuggestion {
+	var suggestions []versionSuggestion
+
+	// Normalize requested version (remove "go" prefix if present)
+	normalized := strings.TrimPrefix(requested, "go")
+
+	// Strategy 1: Prefix matching (e.g., "1.21" matches "1.21.0", "1.21.1", etc.)
+	if strings.Count(normalized, ".") < 2 {
+		// Looking for major.minor - find all patches
+		latestPerMinor := make(map[string]string) // track latest per minor version
+
+		for _, release := range releases {
+			ver := strings.TrimPrefix(release.Version, "go")
+
+			// Check if this matches the prefix
+			if strings.HasPrefix(ver, normalized+".") || ver == normalized {
+				suggestions = append(suggestions, versionSuggestion{
+					Version:         ver,
+					IsLatestInMinor: false,
+				})
+
+				// Track latest for this minor version
+				minorKey := utils.ExtractMajorMinor(ver)
+				if latestPerMinor[minorKey] == "" || utils.CompareGoVersions(ver, latestPerMinor[minorKey]) > 0 {
+					latestPerMinor[minorKey] = ver
+				}
+
+				if len(suggestions) >= maxResults {
+					break
+				}
+			}
+		}
+
+		// Mark latest versions
+		for idx := range suggestions {
+			minorKey := utils.ExtractMajorMinor(suggestions[idx].Version)
+			if suggestions[idx].Version == latestPerMinor[minorKey] {
+				suggestions[idx].IsLatestInMinor = true
+			}
+		}
+
+		if len(suggestions) > 0 {
+			return suggestions
+		}
+	}
+
+	// Strategy 2: Close version number matching (e.g., "1.20" suggests "1.21", "1.19")
+	parts := strings.Split(normalized, ".")
+	if len(parts) >= 2 {
+		major := parts[0]
+		minor := parts[1]
+
+		// Try adjacent minor versions
+		for _, release := range releases {
+			ver := strings.TrimPrefix(release.Version, "go")
+			verParts := strings.Split(ver, ".")
+
+			if len(verParts) >= 2 && verParts[0] == major {
+				// Check if minor version is close (±2)
+				if absInt(parseInt(verParts[1])-parseInt(minor)) <= 2 {
+					// Only add if it's the latest patch for that minor version
+					if i.isLatestPatchVersion(ver, releases) {
+						suggestions = append(suggestions, versionSuggestion{
+							Version:         ver,
+							IsLatestInMinor: true,
+						})
+
+						if len(suggestions) >= maxResults {
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if len(suggestions) > 0 {
+			return suggestions
+		}
+	}
+
+	// Strategy 3: Show latest stable versions as fallback
+	for _, release := range releases {
+		if release.Stable && !strings.Contains(release.Version, "beta") && !strings.Contains(release.Version, "rc") {
+			ver := strings.TrimPrefix(release.Version, "go")
+			suggestions = append(suggestions, versionSuggestion{
+				Version:         ver,
+				IsLatestInMinor: true,
+			})
+
+			if len(suggestions) >= maxResults {
+				break
+			}
+		}
+	}
+
+	return suggestions
+}
+
+// isLatestPatchVersion checks if a version is the latest patch for its minor version
+func (i *Installer) isLatestPatchVersion(ver string, releases []version.GoRelease) bool {
+	minorKey := utils.ExtractMajorMinor(ver)
+
+	for _, release := range releases {
+		releaseVer := strings.TrimPrefix(release.Version, "go")
+		if utils.ExtractMajorMinor(releaseVer) == minorKey {
+			if utils.CompareGoVersions(releaseVer, ver) > 0 {
+				return false // Found a newer patch version
+			}
+		}
+	}
+
+	return true
+}
+
+// parseInt parses an integer from string, returns 0 on error
+func parseInt(s string) int {
+	var result int
+	fmt.Sscanf(s, "%d", &result)
+	return result
+}
+
+// absInt returns absolute value of an integer
+func absInt(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }

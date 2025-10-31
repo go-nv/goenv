@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -286,7 +285,7 @@ func main() {
 
 	// Compile the test tool using system Go
 	toolBinaryName := "testtool"
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		toolBinaryName = "testtool.exe"
 	}
 	toolBinaryPath := filepath.Join(tempDir, toolBinaryName)

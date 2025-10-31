@@ -167,7 +167,7 @@ func logError(message string) {
 	fmt.Fprintf(stderr(), "goenv hooks: %s\n", message)
 
 	// Optionally write to log file if GOENV_HOOKS_LOG is set
-	if logPath := os.Getenv("GOENV_HOOKS_LOG"); logPath != "" {
+	if logPath := utils.GoenvEnvVarHooksLog.UnsafeValue(); logPath != "" {
 		// Open or create log file with append mode
 		f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -265,7 +265,7 @@ func ValidateURLWithStrictDNS(urlStr string, allowHTTP, allowInternalIPs, strict
 				// Strict mode: reject when DNS fails and internal IPs are not allowed
 				return fmt.Errorf("DNS resolution failed and strict_dns is enabled: %w", err)
 			}
-			
+
 			// Non-strict mode (default): fall back to substring checks as defense in depth
 			// This catches some obvious cases even if DNS is unavailable
 			lowerHost := strings.ToLower(hostname)
@@ -307,22 +307,22 @@ func isPrivateIP(ip net.IP) bool {
 
 		// IPv4 loopback (RFC1122)
 		"127.0.0.0/8",
-		
+
 		// IPv4 link-local (RFC3927)
 		"169.254.0.0/16",
-		
+
 		// IPv4 broadcast
 		"255.255.255.255/32",
-		
+
 		// IPv6 loopback (RFC4291)
 		"::1/128",
-		
+
 		// IPv6 link-local (RFC4291)
 		"fe80::/10",
-		
+
 		// IPv6 unique local (RFC4193)
 		"fc00::/7",
-		
+
 		// IPv6 documentation (RFC3849)
 		"2001:db8::/32",
 	}

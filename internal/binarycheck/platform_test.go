@@ -5,6 +5,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestGetPlatformInfo(t *testing.T) {
@@ -62,7 +64,7 @@ func TestCheckMacOSDeploymentTarget(t *testing.T) {
 }
 
 func TestCheckWindowsCompiler(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Windows compiler check only works on Windows")
 	}
 
@@ -90,7 +92,7 @@ func TestCheckWindowsCompiler(t *testing.T) {
 }
 
 func TestCheckWindowsARM64(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Windows ARM64 check only works on Windows")
 	}
 
@@ -159,7 +161,7 @@ func TestCheckWindowsScriptShims(t *testing.T) {
 	issues := CheckWindowsScriptShims(tmpFile)
 
 	// On Windows, should suggest creating wrapper
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		if len(issues) == 0 {
 			t.Error("Expected issues for script without .cmd/.ps1 extension on Windows")
 		}
@@ -192,10 +194,10 @@ func TestSuggestGlibcCompatibility(t *testing.T) {
 		expectSeverity string
 	}{
 		{
-			name:         "compatible versions",
+			name:          "compatible versions",
 			requiredGlibc: "2.27",
-			currentGlibc: "2.31",
-			expectIssues: false,
+			currentGlibc:  "2.31",
+			expectIssues:  false,
 		},
 		{
 			name:           "incompatible versions",
@@ -205,10 +207,10 @@ func TestSuggestGlibcCompatibility(t *testing.T) {
 			expectSeverity: "error",
 		},
 		{
-			name:         "same versions",
+			name:          "same versions",
 			requiredGlibc: "2.31",
-			currentGlibc: "2.31",
-			expectIssues: false,
+			currentGlibc:  "2.31",
+			expectIssues:  false,
 		},
 		{
 			name:           "major version mismatch",
@@ -313,7 +315,7 @@ func TestParseVersion(t *testing.T) {
 func findGoBinary() (string, error) {
 	// Try to find go binary
 	goBinary := "/usr/local/go/bin/go"
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary = "C:\\Go\\bin\\go.exe"
 	}
 
@@ -326,7 +328,7 @@ func findGoBinary() (string, error) {
 	goroot := runtime.GOROOT()
 	if goroot != "" {
 		goBinary = goroot + "/bin/go"
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			goBinary += ".exe"
 		}
 		if _, err := fileExists(goBinary); err == nil {

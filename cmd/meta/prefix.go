@@ -33,7 +33,7 @@ func init() {
 func RunPrefix(cmd *cobra.Command, args []string) error {
 	// Validate: prefix command takes 0 or 1 argument
 	if len(args) > 1 {
-		return fmt.Errorf("Usage: goenv prefix [version]")
+		return fmt.Errorf("usage: goenv prefix [version]")
 	}
 
 	cfg := config.Load()

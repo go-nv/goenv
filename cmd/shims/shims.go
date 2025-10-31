@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	cmdhooks "github.com/go-nv/goenv/cmd/hooks"
@@ -17,37 +16,41 @@ import (
 	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var rehashCmd = &cobra.Command{
-	Use:   "rehash",
-	Short: "Rehash goenv shims (run this after installing executables)",
-	Long:  "Scans all installed Go versions and creates shim files for their executables",
-	RunE:  RunRehash,
+	Use:     "rehash",
+	Short:   "Rehash goenv shims (run this after installing executables)",
+	GroupID: string(cmdpkg.GroupShell),
+	Long:    "Scans all installed Go versions and creates shim files for their executables",
+	RunE:    RunRehash,
 }
 
 var shimsCmd = &cobra.Command{
-	Use:   "shims",
-	Short: "List existing goenv shims",
-	Long:  "Display all available shim files in the goenv shims directory",
-	RunE:  runShims,
+	Use:     "shims",
+	Short:   "List existing goenv shims",
+	GroupID: string(cmdpkg.GroupAdvanced),
+	Long:    "Display all available shim files in the goenv shims directory",
+	RunE:    runShims,
 }
 
 var whichCmd = &cobra.Command{
-	Use:   "which <command>",
-	Short: "Display the full path to an executable",
-	Long:  "Shows the full path to the executable that goenv will invoke for the given command",
+	Use:     "which <command>",
+	Short:   "Display the full path to an executable",
+	GroupID: string(cmdpkg.GroupAdvanced),
+	Long:    "Shows the full path to the executable that goenv will invoke for the given command",
 	Args: func(cmd *cobra.Command, args []string) error {
 		// Handle completion mode
 		if whichFlags.complete {
 			return nil
 		}
 		if len(args) == 0 {
-			return fmt.Errorf("Usage: goenv which <command>")
+			return fmt.Errorf("usage: goenv which <command>")
 		}
 		if len(args) > 1 {
-			return fmt.Errorf("Usage: goenv which <command>")
+			return fmt.Errorf("usage: goenv which <command>")
 		}
 		return nil
 	},
@@ -59,19 +62,20 @@ var whichFlags struct {
 }
 
 var whenceCmd = &cobra.Command{
-	Use:   "whence <command>",
-	Short: "List all Go versions that contain the given executable",
-	Long:  "Display which installed Go versions have the specified command available",
+	Use:     "whence <command>",
+	Short:   "List all Go versions that contain the given executable",
+	GroupID: string(cmdpkg.GroupAdvanced),
+	Long:    "Display which installed Go versions have the specified command available",
 	Args: func(cmd *cobra.Command, args []string) error {
 		// Handle completion mode
 		if whenceFlags.complete {
 			return nil
 		}
 		if len(args) == 0 {
-			return fmt.Errorf("Usage: goenv whence [--path] <command>")
+			return fmt.Errorf("usage: goenv whence [--path] <command>")
 		}
 		if len(args) > 1 {
-			return fmt.Errorf("Usage: goenv whence [--path] <command>")
+			return fmt.Errorf("usage: goenv whence [--path] <command>")
 		}
 		return nil
 	},
@@ -113,7 +117,7 @@ func init() {
 func RunRehash(cmd *cobra.Command, args []string) error {
 	// Validate: rehash command takes no arguments
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv rehash")
+		return fmt.Errorf("usage: goenv rehash")
 	}
 
 	cfg := config.Load()
@@ -153,7 +157,7 @@ func runShims(cmd *cobra.Command, args []string) error {
 
 	// Validate: shims command takes no positional arguments (only --short flag)
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv shims [--short]")
+		return fmt.Errorf("usage: goenv shims [--short]")
 	}
 
 	cfg := config.Load()
@@ -182,7 +186,7 @@ func runWhich(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("Usage: goenv which <command>")
+		return fmt.Errorf("usage: goenv which <command>")
 	}
 
 	commandName := args[0]
@@ -208,7 +212,7 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(args) == 0 {
-		return fmt.Errorf("Usage: goenv whence [--path] <command>")
+		return fmt.Errorf("usage: goenv whence [--path] <command>")
 	}
 
 	commandName := args[0]
@@ -223,10 +227,13 @@ func runWhence(cmd *cobra.Command, args []string) error {
 				// Build the path without extension first
 				versionPath := filepath.Join(cfg.VersionsDir(), version, "bin", commandName)
 				// On Windows, try to find the actual file with extension
-				if runtime.GOOS == "windows" {
+				if utils.IsWindows() {
 					if foundPath, err := findExecutable(versionPath); err == nil {
 						// Strip the extension for display (show logical command name)
-						displayPath := strings.TrimSuffix(strings.TrimSuffix(foundPath, ".exe"), ".bat")
+						displayPath := foundPath
+						for _, ext := range utils.WindowsExecutableExtensions() {
+							displayPath = strings.TrimSuffix(displayPath, ext)
+						}
 						fmt.Fprintln(cmd.OutOrStdout(), displayPath)
 					} else {
 						fmt.Fprintln(cmd.OutOrStdout(), versionPath)
@@ -248,9 +255,8 @@ func runWhence(cmd *cobra.Command, args []string) error {
 // findExecutable looks for an executable file, handling Windows extensions
 func findExecutable(basePath string) (string, error) {
 	// On Windows, try common executable extensions
-	if runtime.GOOS == "windows" {
-		extensions := []string{".bat", ".cmd", ".exe"}
-		for _, ext := range extensions {
+	if utils.IsWindows() {
+		for _, ext := range utils.WindowsExecutableExtensions() {
 			path := basePath + ext
 			if info, err := os.Stat(path); err == nil && !info.IsDir() {
 				return path, nil
@@ -272,7 +278,7 @@ func findExecutable(basePath string) (string, error) {
 		return "", fmt.Errorf("is a directory")
 	}
 	// Check executable bit
-	if info.Mode()&0111 == 0 {
+	if !utils.HasExecutableBit(info) {
 		return "", fmt.Errorf("not executable")
 	}
 	return basePath, nil
@@ -285,11 +291,16 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 	// Get current version(s)
 	versionSpec, source, err := mgr.GetCurrentVersion()
 	if err != nil {
-		return fmt.Errorf("no version set")
+		// Check if any versions are installed
+		installedVersions, _ := mgr.ListInstalledVersions()
+		if len(installedVersions) == 0 {
+			return fmt.Errorf("no Go version set (none installed)\n\nInstall a version first:\n  goenv install         # Install latest Go\n  goenv install 1.21.5  # Install specific version")
+		}
+		return fmt.Errorf("no Go version set\n\nSet a version with:\n  goenv global <version>  # Set globally\n  goenv local <version>   # Set for this directory\n\nInstalled versions:\n  %s", formatVersionList(installedVersions))
 	}
 
 	// Split multiple versions
-	versions := splitVersionsWhich(versionSpec)
+	versions := utils.SplitVersions(versionSpec)
 
 	// Track errors for missing versions
 	var missingVersions []string
@@ -364,36 +375,9 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 	return fmt.Errorf("%s", errMsg)
 }
 
-// splitVersionsWhich splits a version string by ':' delimiter
-func splitVersionsWhich(version string) []string {
-	if version == "" {
-		return []string{}
-	}
-
-	result := []string{}
-	current := ""
-
-	for _, ch := range version {
-		if ch == ':' {
-			if current != "" {
-				result = append(result, current)
-				current = ""
-			}
-		} else {
-			current += string(ch)
-		}
-	}
-
-	if current != "" {
-		result = append(result, current)
-	}
-
-	return result
-}
-
 // findInSystemPath searches for a command in PATH, excluding goenv shims
 func findInSystemPath(commandName string, goenvRoot string) (string, error) {
-	pathEnv := os.Getenv("PATH")
+	pathEnv := os.Getenv(utils.EnvVarPath)
 	if pathEnv == "" {
 		return "", fmt.Errorf("command not found")
 	}
@@ -464,8 +448,10 @@ func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config)
 			if whenceFlags.path {
 				// On Windows, strip extension for display (show logical command name)
 				displayPath := foundPath
-				if runtime.GOOS == "windows" {
-					displayPath = strings.TrimSuffix(strings.TrimSuffix(foundPath, ".exe"), ".bat")
+				if utils.IsWindows() {
+					for _, ext := range utils.WindowsExecutableExtensions() {
+						displayPath = strings.TrimSuffix(displayPath, ext)
+					}
 				}
 				fmt.Fprintln(cmd.OutOrStdout(), displayPath)
 			} else {
@@ -480,4 +466,16 @@ func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config)
 	}
 
 	return nil
+}
+
+// formatVersionList formats a list of versions for display in error messages
+func formatVersionList(versions []string) string {
+	if len(versions) == 0 {
+		return "(none)"
+	}
+	if len(versions) <= 3 {
+		return strings.Join(versions, ", ")
+	}
+	// Show first 3 versions + count of remaining
+	return fmt.Sprintf("%s (and %d more)", strings.Join(versions[:3], ", "), len(versions)-3)
 }

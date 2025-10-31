@@ -21,9 +21,9 @@ type Cache struct {
 type CachedData struct {
 	LastUpdated time.Time   `json:"last_updated"`
 	Releases    []GoRelease `json:"releases"`
-	ETag        string      `json:"etag,omitempty"`        // HTTP ETag for conditional requests
-	SHA256      string      `json:"sha256,omitempty"`      // SHA256 hash of the releases data
-	Checksum    string      `json:"checksum,omitempty"`    // Legacy field, kept for compatibility
+	ETag        string      `json:"etag,omitempty"`     // HTTP ETag for conditional requests
+	SHA256      string      `json:"sha256,omitempty"`   // SHA256 hash of the releases data
+	Checksum    string      `json:"checksum,omitempty"` // Legacy field, kept for compatibility
 }
 
 // NewCache creates a new cache instance

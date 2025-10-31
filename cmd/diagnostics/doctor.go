@@ -1,8 +1,10 @@
 package diagnostics
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -22,6 +24,8 @@ import (
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/shellutil"
+	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
@@ -30,14 +34,15 @@ import (
 var doctorCmd = &cobra.Command{
 	Use:     "doctor",
 	Short:   "Diagnose goenv installation and configuration issues",
-	GroupID: "common",
+	GroupID: string(cmdpkg.GroupGettingStarted),
 	Long: `Checks your goenv installation and configuration for common issues.
 
 This command verifies:
   - Runtime environment (containers, WSL, native)
   - Filesystem type (NFS, SMB, FUSE, local)
   - goenv binary and paths
-  - Shell configuration
+  - Shell configuration files
+  - Shell environment variables (GOENV_SHELL, GOENV_ROOT)
   - PATH setup and order
   - Shims directory
   - Installed Go versions
@@ -53,23 +58,76 @@ This command verifies:
 
 Use this command to troubleshoot issues with goenv.
 
+Interactive Fix Mode:
+  Use --fix to interactively fix detected issues:
+    - Missing shell configuration (goenv init not sourced)
+    - Duplicate goenv installations
+    - Duplicate shell profile entries
+    - Stale cache files
+
+  Example: goenv doctor --fix
+
 Exit codes (for CI/automation):
   0 = No issues found (or only warnings when --fail-on=error)
   1 = Errors found
   2 = Warnings found (when --fail-on=warning)
 
 Flags:
-  --json       Output results in JSON format for CI/automation
-  --fail-on    Exit with non-zero status on 'error' (default) or 'warning'`,
+  --json              Output results in JSON format for CI/automation
+  --fail-on           Exit with non-zero status on 'error' (default) or 'warning'
+  --fix               Interactively fix detected issues (shell config, duplicates, stale cache)
+  --non-interactive   Disable all interactive prompts (for CI/automation)`,
 	RunE: runDoctor,
 }
 
+// Status type for check results
+type Status string
+
+const (
+	StatusOK      Status = "ok"
+	StatusWarning Status = "warning"
+	StatusError   Status = "error"
+)
+
+// FailOn represents the severity level at which doctor should exit with non-zero status
+type FailOn string
+
+const (
+	FailOnError   FailOn = "error"
+	FailOnWarning FailOn = "warning"
+)
+
+// Issue type constants for structured fix detection
+type IssueType string
+
+const (
+	IssueTypeNone                IssueType = ""
+	IssueTypeShimsMissing        IssueType = "shims-missing"
+	IssueTypeShimsEmpty          IssueType = "shims-empty"
+	IssueTypeCacheStale          IssueType = "cache-stale"
+	IssueTypeCacheArchMismatch   IssueType = "cache-arch-mismatch"
+	IssueTypeVersionNotSet       IssueType = "version-not-set"
+	IssueTypeVersionNotInstalled IssueType = "version-not-installed"
+	IssueTypeVersionCorrupted    IssueType = "version-corrupted"
+	IssueTypeVersionMismatch     IssueType = "version-mismatch"
+	IssueTypeNoVersionsInstalled IssueType = "no-versions-installed"
+	IssueTypeGoModMismatch       IssueType = "gomod-mismatch"
+	IssueTypeVSCodeMissing       IssueType = "vscode-missing"
+	IssueTypeVSCodeMismatch      IssueType = "vscode-mismatch"
+	IssueTypeToolsMissing        IssueType = "tools-missing"
+	IssueTypeMultipleInstalls    IssueType = "multiple-installs"
+	IssueTypeShellNotConfigured  IssueType = "shell-not-configured"
+	IssueTypeProfileDuplicates   IssueType = "profile-duplicates"
+)
+
 type checkResult struct {
-	id      string // Machine-readable identifier for CI/automation
-	name    string
-	status  string // "ok", "warning", "error"
-	message string
-	advice  string
+	id        string // Machine-readable identifier for CI/automation
+	name      string
+	status    Status // OK, Warning, or Error
+	message   string
+	advice    string
+	issueType IssueType   // Structured issue type for fix detection
+	fixData   interface{} // Additional data needed for fixing (version, path, etc)
 }
 
 // JSON-serializable version of checkResult
@@ -83,23 +141,30 @@ func (c checkResult) MarshalJSON() ([]byte, error) {
 	}{
 		ID:      c.id,
 		Name:    c.name,
-		Status:  c.status,
+		Status:  string(c.status),
 		Message: c.message,
 		Advice:  c.advice,
 	})
 }
 
 var (
-	doctorJSON   bool
-	doctorFailOn string
+	doctorJSON           bool
+	doctorFailOnStr      string // Raw string from flag
+	doctorFailOn         FailOn // Parsed enum value
+	doctorFix            bool
+	doctorNonInteractive bool
 	// doctorExit is a function variable that can be overridden in tests
 	doctorExit = os.Exit
+	// doctorStdin can be overridden in tests
+	doctorStdin io.Reader = os.Stdin
 )
 
 func init() {
 	cmdpkg.RootCmd.AddCommand(doctorCmd)
 	doctorCmd.Flags().BoolVar(&doctorJSON, "json", false, "Output results in JSON format")
-	doctorCmd.Flags().StringVar(&doctorFailOn, "fail-on", "error", "Exit with non-zero status on 'error' or 'warning' (for CI strictness)")
+	doctorCmd.Flags().StringVar(&doctorFailOnStr, "fail-on", "error", "Exit with non-zero status on 'error' or 'warning' (for CI strictness)")
+	doctorCmd.Flags().BoolVar(&doctorFix, "fix", false, "Interactively fix detected issues (shell config, duplicates, stale cache)")
+	doctorCmd.Flags().BoolVar(&doctorNonInteractive, "non-interactive", false, "Disable all interactive prompts")
 	helptext.SetCommandHelp(doctorCmd)
 }
 
@@ -107,9 +172,14 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	cfg := config.Load()
 	results := []checkResult{}
 
-	// Validate --fail-on flag
-	if doctorFailOn != "error" && doctorFailOn != "warning" {
-		return fmt.Errorf("invalid --fail-on value: %s (must be 'error' or 'warning')", doctorFailOn)
+	// Validate and parse --fail-on flag
+	switch doctorFailOnStr {
+	case string(FailOnError):
+		doctorFailOn = FailOnError
+	case string(FailOnWarning):
+		doctorFailOn = FailOnWarning
+	default:
+		return fmt.Errorf("invalid --fail-on value: %s (must be 'error' or 'warning')", doctorFailOnStr)
 	}
 
 	// Only show progress message in human-readable mode
@@ -132,6 +202,12 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 3: Shell configuration
 	results = append(results, checkShellConfig(cfg))
+
+	// Check 3a: Shell environment (runtime)
+	results = append(results, checkShellEnvironment(cfg))
+
+	// Check 3b: Profile sourcing issues (unsourced profiles, conflicting sources)
+	results = append(results, checkProfileSourcingIssues(cfg))
 
 	// Check 4: PATH configuration
 	results = append(results, checkPath(cfg))
@@ -198,12 +274,12 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 23: Windows compiler availability (Windows only)
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		results = append(results, checkWindowsCompiler(cfg))
 	}
 
 	// Check 24: Windows ARM64/ARM64EC (Windows only)
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		results = append(results, checkWindowsARM64(cfg))
 	}
 
@@ -212,19 +288,27 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		results = append(results, checkLinuxKernelVersion(cfg))
 	}
 
+	// Check 26: Multiple goenv installations
+	results = append(results, checkMultipleInstallations())
+
 	// Count results
 	okCount := 0
 	warningCount := 0
 	errorCount := 0
 	for _, result := range results {
 		switch result.status {
-		case "ok":
+		case StatusOK:
 			okCount++
-		case "warning":
+		case StatusWarning:
 			warningCount++
-		case "error":
+		case StatusError:
 			errorCount++
 		}
+	}
+
+	// Handle --fix flag: unified interactive fix mode
+	if doctorFix && !doctorJSON && !doctorNonInteractive {
+		return runFixMode(cmd, results, cfg)
 	}
 
 	// Output results (JSON or human-readable)
@@ -262,56 +346,67 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		//   2 = warnings found (when --fail-on=warning)
 		if errorCount > 0 {
 			doctorExit(1) // Errors always exit with code 1
-		} else if doctorFailOn == "warning" && warningCount > 0 {
+		} else if doctorFailOn == FailOnWarning && warningCount > 0 {
 			doctorExit(2) // Warnings exit with code 2 when --fail-on=warning
 		}
 		return nil
 	}
 
 	// Human-readable output
-	fmt.Fprintf(cmd.OutOrStdout(), "%sDiagnostic Results:\n", utils.Emoji("📋 "))
+	fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", utils.Emoji("📋 "), utils.BoldBlue("Diagnostic Results:"))
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	for _, result := range results {
-		var icon string
+		var icon, colorName string
 		switch result.status {
-		case "ok":
+		case StatusOK:
 			icon = utils.Emoji("✅ ")
-		case "warning":
+			colorName = utils.Green(result.name)
+		case StatusWarning:
 			icon = utils.Emoji("⚠️  ")
-		case "error":
+			colorName = utils.Yellow(result.name)
+		case StatusError:
 			icon = utils.Emoji("❌ ")
+			colorName = utils.Red(result.name)
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", icon, result.name)
+		fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", icon, colorName)
 		if result.message != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", result.message)
+			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.Gray(result.message))
 		}
 		if result.advice != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "   %s%s\n", utils.Emoji("💡 "), result.advice)
+			fmt.Fprintf(cmd.OutOrStdout(), "   %s%s\n", utils.Emoji("💡 "), utils.Cyan(result.advice))
 		}
 		fmt.Fprintln(cmd.OutOrStdout())
 	}
 
 	// Summary
-	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Fprintf(cmd.OutOrStdout(), "Summary: %d OK, %d warnings, %d errors\n", okCount, warningCount, errorCount)
+	fmt.Fprintln(cmd.OutOrStdout(), utils.Gray("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"))
+	fmt.Fprintf(cmd.OutOrStdout(), "Summary: %s OK, %s warnings, %s errors\n",
+		utils.Green(fmt.Sprintf("%d", okCount)),
+		utils.Yellow(fmt.Sprintf("%d", warningCount)),
+		utils.Red(fmt.Sprintf("%d", errorCount)))
+
+	// Offer interactive shell environment fix (only in interactive mode, not CI)
+	if !doctorNonInteractive && isInteractive() {
+		offerShellEnvironmentFix(cmd, results, cfg)
+	}
 
 	// Exit codes for CI clarity:
 	//   0 = success (no issues or only warnings when --fail-on=error)
 	//   1 = errors found
 	//   2 = warnings found (when --fail-on=warning)
 	if errorCount > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "\n%sIssues found. Please review the errors above.\n", utils.Emoji("❌ "))
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%s%s\n", utils.Emoji("❌ "), utils.Red("Issues found. Please review the errors above."))
 		doctorExit(1) // Errors always exit with code 1
 	} else if warningCount > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "\n%sEverything works, but some warnings should be reviewed.\n", utils.Emoji("⚠️  "))
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%s%s\n", utils.Emoji("⚠️  "), utils.Yellow("Everything works, but some warnings should be reviewed."))
 		// Check if we should fail on warnings based on --fail-on flag
-		if doctorFailOn == "warning" {
+		if doctorFailOn == FailOnWarning {
 			doctorExit(2) // Warnings exit with code 2 when --fail-on=warning
 		}
 	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "\n%sEverything looks good!\n", utils.Emoji("✅ "))
+		fmt.Fprintf(cmd.OutOrStdout(), "\n%s%s\n", utils.Emoji("✅ "), utils.Green("Everything looks good!"))
 	}
 
 	return nil
@@ -325,13 +420,13 @@ func checkEnvironment(cfg *config.Config) checkResult {
 	message := fmt.Sprintf("Running on %s", envInfo.String())
 
 	// Determine status based on warnings
-	status := "ok"
+	status := StatusOK
 	advice := ""
 
 	if envInfo.IsProblematicEnvironment() {
 		warnings := envInfo.GetWarnings()
 		if len(warnings) > 0 {
-			status = "warning"
+			status = StatusWarning
 			// Show first warning in message, rest in advice
 			message = fmt.Sprintf("%s - %s", message, warnings[0])
 			if len(warnings) > 1 {
@@ -356,24 +451,24 @@ func checkGoenvRootFilesystem(cfg *config.Config) checkResult {
 	message := fmt.Sprintf("Filesystem type: %s", envInfo.FilesystemType)
 
 	// Determine status
-	status := "ok"
+	status := StatusOK
 	advice := ""
 
 	switch envInfo.FilesystemType {
 	case envdetect.FSTypeNFS:
-		status = "warning"
+		status = StatusWarning
 		advice = "NFS filesystems can cause file locking issues and slow I/O. Consider using a local filesystem for GOENV_ROOT."
 	case envdetect.FSTypeSMB:
-		status = "warning"
+		status = StatusWarning
 		advice = "SMB/CIFS filesystems may have issues with symbolic links and permissions. Consider using a local filesystem for GOENV_ROOT."
 	case envdetect.FSTypeBind:
-		status = "warning"
+		status = StatusWarning
 		advice = "Bind mounts in containers should be persistent and have correct permissions."
 	case envdetect.FSTypeFUSE:
-		status = "warning"
+		status = StatusWarning
 		advice = "FUSE filesystems may have performance issues. Consider using a local filesystem for better performance."
 	case envdetect.FSTypeUnknown:
-		status = "warning"
+		status = StatusWarning
 		message = "Filesystem type: unknown"
 		advice = "Could not determine filesystem type. This may indicate an unusual configuration."
 	}
@@ -394,7 +489,7 @@ func checkGoenvBinary(_ *config.Config) checkResult {
 		return checkResult{
 			id:      "goenv-binary",
 			name:    "goenv binary",
-			status:  "error",
+			status:  StatusError,
 			message: fmt.Sprintf("Cannot determine goenv binary location: %v", err),
 			advice:  "Ensure goenv is properly installed",
 		}
@@ -403,7 +498,7 @@ func checkGoenvBinary(_ *config.Config) checkResult {
 	return checkResult{
 		id:      "goenv-binary",
 		name:    "goenv binary",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("Found at: %s", goenvPath),
 	}
 }
@@ -414,7 +509,7 @@ func checkGoenvRoot(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "goenvroot-directory",
 			name:    "GOENV_ROOT directory",
-			status:  "error",
+			status:  StatusError,
 			message: fmt.Sprintf("Directory does not exist: %s", root),
 			advice:  "Run 'goenv init' to create the directory structure",
 		}
@@ -423,18 +518,18 @@ func checkGoenvRoot(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "goenvroot-directory",
 		name:    "GOENV_ROOT directory",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("Set to: %s", root),
 	}
 }
 
 func checkShellConfig(_ *config.Config) checkResult {
-	shell := os.Getenv("SHELL")
+	shell := os.Getenv(utils.EnvVarShell)
 	if shell == "" {
 		return checkResult{
 			id:      "shell-configuration",
 			name:    "Shell configuration",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "SHELL environment variable not set",
 			advice:  "This is unusual. Check your shell configuration.",
 		}
@@ -446,18 +541,18 @@ func checkShellConfig(_ *config.Config) checkResult {
 
 	shellName := filepath.Base(shell)
 	switch shellName {
-	case "bash":
+	case string(shellutil.ShellTypeBash):
 		configFiles = []string{
 			filepath.Join(homeDir, ".bashrc"),
 			filepath.Join(homeDir, ".bash_profile"),
 			filepath.Join(homeDir, ".profile"),
 		}
-	case "zsh":
+	case string(shellutil.ShellTypeZsh):
 		configFiles = []string{
 			filepath.Join(homeDir, ".zshrc"),
 			filepath.Join(homeDir, ".zprofile"),
 		}
-	case "fish":
+	case string(shellutil.ShellTypeFish):
 		configFiles = []string{
 			filepath.Join(homeDir, ".config", "fish", "config.fish"),
 		}
@@ -465,7 +560,7 @@ func checkShellConfig(_ *config.Config) checkResult {
 		return checkResult{
 			id:      "shell-configuration",
 			name:    "Shell configuration",
-			status:  "warning",
+			status:  StatusWarning,
 			message: fmt.Sprintf("Unknown shell: %s", shellName),
 			advice:  "Manual configuration may be required",
 		}
@@ -489,7 +584,7 @@ func checkShellConfig(_ *config.Config) checkResult {
 		return checkResult{
 			id:      "shell-configuration",
 			name:    "Shell configuration",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("goenv detected in %s", foundIn),
 		}
 	}
@@ -497,14 +592,1395 @@ func checkShellConfig(_ *config.Config) checkResult {
 	return checkResult{
 		id:      "shell-configuration",
 		name:    "Shell configuration",
-		status:  "warning",
+		status:  StatusWarning,
 		message: "goenv init not found in shell config",
 		advice:  fmt.Sprintf("Add 'eval \"$(goenv init -)\"' to your %s", configFiles[0]),
 	}
 }
 
+func checkShellEnvironment(cfg *config.Config) checkResult {
+	// Check if GOENV_SHELL is set (indicates goenv init has been evaluated)
+	goenvShell := utils.GoenvEnvVarShell.UnsafeValue()
+
+	// Check GOENV_ROOT
+	goenvRoot := utils.GoenvEnvVarRoot.UnsafeValue()
+
+	// Detect current shell
+	currentShell := shellutil.DetectShell()
+
+	// Check if goenv shell function exists (for bash/zsh/ksh)
+	hasShellFunction := checkGoenvShellFunction(currentShell)
+
+	// Check for common "undo sourcing" scenarios
+	undoScenario := detectUndoSourcing(cfg, currentShell, goenvShell, goenvRoot, hasShellFunction)
+	if undoScenario != "" {
+		return checkResult{
+			id:        "shell-environment",
+			name:      "Shell environment",
+			status:    StatusError,
+			message:   undoScenario,
+			advice:    generateUndoSourcingFix(currentShell),
+			issueType: IssueTypeShellNotConfigured,
+		}
+	}
+
+	// Both missing - goenv init not evaluated
+	if goenvShell == "" && goenvRoot == "" {
+		// Check if function exists but env vars don't - might be un-sourced
+		if hasShellFunction {
+			return checkResult{
+				id:        "shell-environment",
+				name:      "Shell environment",
+				status:    StatusError,
+				message:   "goenv shell function exists but GOENV_SHELL not set - environment may have been reset or unsourced",
+				advice:    "Run 'eval \"$(goenv init -)\"' to re-activate goenv in your current shell, or check if another profile is overriding your PATH/environment",
+				issueType: IssueTypeShellNotConfigured,
+			}
+		}
+
+		return checkResult{
+			id:        "shell-environment",
+			name:      "Shell environment",
+			status:    StatusError,
+			message:   "GOENV_SHELL and GOENV_ROOT not set - goenv init has not been evaluated in current shell",
+			advice:    "Run 'eval \"$(goenv init -)\"' to activate goenv in your current shell, or restart your shell after adding it to your profile",
+			issueType: IssueTypeShellNotConfigured,
+		}
+	}
+
+	// GOENV_SHELL missing but GOENV_ROOT set - partial setup
+	if goenvShell == "" {
+		return checkResult{
+			id:        "shell-environment",
+			name:      "Shell environment",
+			status:    StatusWarning,
+			message:   "GOENV_SHELL not set but GOENV_ROOT is - incomplete shell integration",
+			advice:    "Run 'eval \"$(goenv init -)\"' to complete goenv shell integration",
+			issueType: IssueTypeShellNotConfigured,
+		}
+	}
+
+	// Check if GOENV_ROOT matches expected (in case of stale shell or config mismatch)
+	if goenvRoot != cfg.Root {
+		return checkResult{
+			id:        "shell-environment",
+			name:      "Shell environment",
+			status:    StatusWarning,
+			message:   fmt.Sprintf("GOENV_ROOT mismatch: shell has '%s' but config expects '%s'", goenvRoot, cfg.Root),
+			advice:    "Your shell environment may be outdated. Run 'eval \"$(goenv init -)\"' or restart your shell",
+			issueType: IssueTypeShellNotConfigured,
+		}
+	}
+
+	// Check if GOENV_SHELL matches current shell
+	if goenvShell != string(currentShell) && currentShell != "" {
+		return checkResult{
+			id:        "shell-environment",
+			name:      "Shell environment",
+			status:    StatusWarning,
+			message:   fmt.Sprintf("GOENV_SHELL mismatch: set to '%s' but running in '%s' shell", goenvShell, currentShell),
+			advice:    fmt.Sprintf("You may have switched shells. Run 'eval \"$(goenv init -)\"' to reinitialize for %s", currentShell),
+			issueType: IssueTypeShellNotConfigured,
+		}
+	}
+
+	// Check if shell function exists when it should (bash/zsh/ksh only)
+	// Only check if we're reasonably sure we're in a user's interactive shell
+	// Skip in test/subprocess environments where function detection is unreliable
+	if currentShell == shellutil.ShellTypeBash || currentShell == shellutil.ShellTypeZsh || currentShell == shellutil.ShellTypeKsh {
+		// Only check if SHLVL > 1 (indicates real shell, not subprocess)
+		// and if the shell binary exists
+		shlvl := os.Getenv(utils.EnvVarShlvl)
+		if shlvl != "" && shlvl != "0" && shlvl != "1" {
+			if _, err := exec.LookPath(string(currentShell)); err == nil {
+				// Shell binary exists, we can check for the function
+				if !hasShellFunction {
+					return checkResult{
+						id:        "shell-environment",
+						name:      "Shell environment",
+						status:    StatusWarning,
+						message:   "GOENV_SHELL is set but goenv shell function is missing - may have been unset or profile re-sourced incorrectly",
+						advice:    "Run 'eval \"$(goenv init -)\"' to restore the goenv shell function",
+						issueType: IssueTypeShellNotConfigured,
+					}
+				}
+			}
+		}
+	}
+
+	// Check if PATH still has shims (could be reset/modified)
+	// Only check this if shims directory actually exists - in test environments
+	// the temporary directory may not have shims set up
+	pathEnv := os.Getenv(utils.EnvVarPath)
+	shimsDir := cfg.ShimsDir()
+	if pathEnv != "" {
+		// Only perform this check if shims directory exists
+		if _, err := os.Stat(shimsDir); err == nil {
+			// Shims dir exists, check if it's in PATH
+			if !strings.Contains(pathEnv, shimsDir) {
+				return checkResult{
+					id:        "shell-environment",
+					name:      "Shell environment",
+					status:    StatusError,
+					message:   "GOENV_SHELL is set but shims directory not in PATH - environment may have been reset",
+					advice:    "Your PATH was modified or reset. Run 'eval \"$(goenv init -)\"' to restore goenv's PATH configuration",
+					issueType: IssueTypeShellNotConfigured,
+				}
+			}
+		}
+	}
+
+	// All good
+	return checkResult{
+		id:      "shell-environment",
+		name:    "Shell environment",
+		status:  StatusOK,
+		message: fmt.Sprintf("Shell integration active (shell: %s)", goenvShell),
+	}
+}
+
+// detectUndoSourcing detects if the user has "undone" their goenv sourcing
+// by running 'source ~/.profile' or similar commands that reset the environment.
+// Returns a descriptive error message if detected, empty string otherwise.
+func detectUndoSourcing(cfg *config.Config, currentShell shellutil.ShellType, goenvShell, goenvRoot string, hasFunction bool) string {
+	pathEnv := os.Getenv(utils.EnvVarPath)
+	shimsDir := cfg.ShimsDir()
+
+	// NEW CHECK 1: GOENV_SHELL set but shims not in PATH
+	// This is THE key "undo sourcing" scenario - re-source profile that resets PATH
+	// This check is NOT covered by existing logic which only looks at env var presence
+	if goenvShell != "" && pathEnv != "" {
+		if _, err := os.Stat(shimsDir); err == nil {
+			if !strings.Contains(pathEnv, shimsDir) {
+				return "GOENV_SHELL is set but shims directory not in PATH - likely caused by re-sourcing a profile that resets PATH without goenv init (e.g., 'source ~/.bashrc' or 'source ~/.zshrc')"
+			}
+		}
+	}
+
+	// NEW CHECK 2: Profile file has goenv init but shell is not initialized
+	// Catches cases where profile configuration is correct but environment was manually reset
+	homeDir, _ := os.UserHomeDir()
+	var profileFile string
+	switch currentShell {
+	case shellutil.ShellTypeBash:
+		// Check both .bashrc and .bash_profile
+		bashrc := filepath.Join(homeDir, ".bashrc")
+		bashProfile := filepath.Join(homeDir, ".bash_profile")
+		if _, err := os.Stat(bashProfile); err == nil {
+			profileFile = bashProfile
+		} else {
+			profileFile = bashrc
+		}
+	case shellutil.ShellTypeZsh:
+		profileFile = filepath.Join(homeDir, ".zshrc")
+	case shellutil.ShellTypeFish:
+		profileFile = filepath.Join(homeDir, ".config", "fish", "config.fish")
+	}
+
+	if profileFile != "" {
+		if data, err := os.ReadFile(profileFile); err == nil {
+			content := string(data)
+			hasGoenvInit := strings.Contains(content, "goenv init")
+
+			// Profile has goenv init but shell not initialized - environment was reset
+			if hasGoenvInit && goenvShell == "" {
+				return fmt.Sprintf("Profile file %s contains 'goenv init' but shell is not initialized - possible manual unsourcing or environment reset", filepath.Base(profileFile))
+			}
+
+			// Manually initialized but function missing - partial reset
+			if !hasGoenvInit && goenvShell != "" && !hasFunction {
+				return fmt.Sprintf("goenv initialized manually (not in %s) but shell function is missing - environment may have been partially reset", filepath.Base(profileFile))
+			}
+		}
+	}
+
+	// NEW CHECK 3: Environment variables set but goenv command doesn't work
+	// Final validation that the environment is truly functional, not just "looks good"
+	if goenvShell != "" && goenvRoot != "" {
+		cmd := exec.Command("goenv", "version-name")
+		cmd.Env = os.Environ()
+		if err := cmd.Run(); err != nil {
+			return "Shell environment variables are set but 'goenv' command fails - possible PATH override or broken shell function"
+		}
+	}
+
+	return ""
+}
+
+// generateUndoSourcingFix generates shell-specific instructions to fix undo sourcing issues
+func generateUndoSourcingFix(shell shellutil.ShellType) string {
+	var fix strings.Builder
+
+	fix.WriteString("To fix this issue:\n\n")
+
+	switch shell {
+	case shellutil.ShellTypeBash:
+		fix.WriteString("1. Re-initialize goenv in your current shell:\n")
+		fix.WriteString("   eval \"$(goenv init -)\"\n\n")
+		fix.WriteString("2. To prevent this in the future, ensure ~/.bashrc or ~/.bash_profile contains:\n")
+		fix.WriteString("   eval \"$(goenv init -)\"\n\n")
+		fix.WriteString("3. Avoid running 'source ~/.bashrc' if it resets PATH. Use 'exec bash' to restart the shell instead\n\n")
+		fix.WriteString("4. If you need to reload your profile, run:\n")
+		fix.WriteString("   source ~/.bashrc && eval \"$(goenv init -)\"")
+
+	case shellutil.ShellTypeZsh:
+		fix.WriteString("1. Re-initialize goenv in your current shell:\n")
+		fix.WriteString("   eval \"$(goenv init -)\"\n\n")
+		fix.WriteString("2. To prevent this in the future, ensure ~/.zshrc contains:\n")
+		fix.WriteString("   eval \"$(goenv init -)\"\n\n")
+		fix.WriteString("3. Avoid running 'source ~/.zshrc' if it resets PATH. Use 'exec zsh' to restart the shell instead\n\n")
+		fix.WriteString("4. If you need to reload your profile, run:\n")
+		fix.WriteString("   source ~/.zshrc && eval \"$(goenv init -)\"")
+
+	case shellutil.ShellTypeFish:
+		fix.WriteString("1. Re-initialize goenv in your current shell:\n")
+		fix.WriteString("   source (goenv init -|psub)\n\n")
+		fix.WriteString("2. To prevent this in the future, ensure ~/.config/fish/config.fish contains:\n")
+		fix.WriteString("   status --is-interactive; and source (goenv init -|psub)\n\n")
+		fix.WriteString("3. If you need to reload your profile, run:\n")
+		fix.WriteString("   source ~/.config/fish/config.fish")
+
+	case shellutil.ShellTypePowerShell:
+		fix.WriteString("1. Re-initialize goenv in your current shell:\n")
+		fix.WriteString("   Invoke-Expression (goenv init - | Out-String)\n\n")
+		fix.WriteString("2. To prevent this in the future, ensure your PowerShell profile contains:\n")
+		fix.WriteString("   Invoke-Expression (goenv init - | Out-String)\n\n")
+		fix.WriteString("3. If you need to reload your profile, run:\n")
+		fix.WriteString("   . $PROFILE; Invoke-Expression (goenv init - | Out-String)")
+
+	default:
+		fix.WriteString("1. Re-initialize goenv in your current shell:\n")
+		fix.WriteString("   eval \"$(goenv init -)\"\n\n")
+		fix.WriteString("2. Ensure your shell profile contains:\n")
+		fix.WriteString("   eval \"$(goenv init -)\"\n\n")
+		fix.WriteString("3. Restart your shell or re-source your profile")
+	}
+
+	return fix.String()
+}
+
+// checkProfileSourcingIssues detects when profiles have been unsourced or incorrectly sourced
+// This catches scenarios like:
+// - Running `source ~/.bash_profile` which re-exports PATH without goenv
+// - Profile files that reset PATH completely
+// - Conflicting profile configurations
+// - Profiles sourced in wrong order
+func checkProfileSourcingIssues(cfg *config.Config) checkResult {
+	// Only run this check if we have basic shell integration
+	goenvShell := utils.GoenvEnvVarShell.UnsafeValue()
+	if goenvShell == "" {
+		// Shell not initialized at all - already caught by checkShellEnvironment
+		return checkResult{
+			id:      "profile-sourcing",
+			name:    "Profile sourcing",
+			status:  StatusOK,
+			message: "Skipped (shell not initialized)",
+		}
+	}
+
+	currentShell := shellutil.DetectShell()
+	homeDir, _ := os.UserHomeDir()
+
+	var issues []string
+	var advice []string
+	status := StatusOK
+
+	// Check 1: Look for profile files that might reset PATH without including goenv
+	var profileFiles []string
+	switch currentShell {
+	case shellutil.ShellTypeBash:
+		profileFiles = []string{
+			filepath.Join(homeDir, ".bash_profile"),
+			filepath.Join(homeDir, ".bashrc"),
+			filepath.Join(homeDir, ".profile"),
+		}
+	case shellutil.ShellTypeZsh:
+		profileFiles = []string{
+			filepath.Join(homeDir, ".zshrc"),
+			filepath.Join(homeDir, ".zprofile"),
+			filepath.Join(homeDir, ".zshenv"),
+		}
+	case shellutil.ShellTypeFish:
+		profileFiles = []string{
+			filepath.Join(homeDir, ".config", "fish", "config.fish"),
+		}
+	}
+
+	hasGoenvInit := false
+	hasPathReset := false
+	resetFile := ""
+	goenvFile := ""
+
+	for _, profileFile := range profileFiles {
+		data, err := os.ReadFile(profileFile)
+		if err != nil {
+			continue
+		}
+		content := string(data)
+
+		// Check if this file has goenv init
+		if strings.Contains(content, "goenv init") {
+			hasGoenvInit = true
+			goenvFile = filepath.Base(profileFile)
+		}
+
+		// Check for patterns that might reset PATH
+		// Common patterns that reset PATH:
+		// - export PATH="/some/path"  (without $PATH)
+		// - PATH="/some/path"
+		// - export PATH=...  (without $PATH in the value)
+		lines := strings.Split(content, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+
+			// Skip comments
+			if strings.HasPrefix(line, "#") {
+				continue
+			}
+
+			// Check for PATH reset patterns
+			// Match: PATH="/something" or export PATH="/something" where something doesn't contain $PATH
+			if (strings.Contains(line, "PATH=") || strings.Contains(line, "PATH =")) &&
+				!strings.Contains(line, "goenv") {
+				// Extract the value part
+				parts := strings.SplitN(line, "=", 2)
+				if len(parts) == 2 {
+					value := strings.TrimSpace(parts[1])
+					// If PATH is set but doesn't reference previous PATH, it's a reset
+					if !strings.Contains(value, "$PATH") &&
+						!strings.Contains(value, "${PATH}") &&
+						!strings.Contains(value, "goenv") {
+						// This looks like a PATH reset
+						hasPathReset = true
+						resetFile = filepath.Base(profileFile)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Check 2: Detect if goenv init appears BEFORE path reset
+	// This is a common issue where .bashrc has goenv but .bash_profile resets PATH
+	if hasGoenvInit && hasPathReset && goenvFile != resetFile {
+		issues = append(issues, fmt.Sprintf("PATH reset detected in %s after goenv init in %s", resetFile, goenvFile))
+		advice = append(advice, fmt.Sprintf("Move goenv init in %s to appear AFTER the PATH reset in %s, or remove the PATH reset", goenvFile, resetFile))
+		status = StatusWarning
+	}
+
+	// Check 3: Detect profiles that source other profiles after goenv
+	// e.g., .bash_profile sources .bashrc, but .bashrc then resets PATH
+	if hasGoenvInit {
+		for _, profileFile := range profileFiles {
+			data, err := os.ReadFile(profileFile)
+			if err != nil {
+				continue
+			}
+			content := string(data)
+
+			// Check if file sources another file AFTER goenv init
+			goenvIdx := strings.Index(content, "goenv init")
+			if goenvIdx == -1 {
+				continue
+			}
+
+			// Look for source/. commands after goenv init
+			afterGoenv := content[goenvIdx:]
+			if strings.Contains(afterGoenv, "source ") || strings.Contains(afterGoenv, ". ") {
+				// Extract what's being sourced
+				lines := strings.Split(afterGoenv, "\n")
+				for _, line := range lines[1:] { // Skip the goenv init line
+					line = strings.TrimSpace(line)
+					if strings.HasPrefix(line, "source ") || strings.HasPrefix(line, ". ") {
+						issues = append(issues, fmt.Sprintf("Profile %s sources another file after goenv init", filepath.Base(profileFile)))
+						advice = append(advice, fmt.Sprintf("Ensure files sourced after goenv init don't reset PATH. Consider moving goenv init to the end of %s", filepath.Base(profileFile)))
+						status = StatusWarning
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Check 4: Detect if user is in a subshell without goenv
+	// Compare parent process environment
+	ppid := os.Getppid()
+	if ppid > 1 {
+		// Try to read parent's environment
+		// This is Linux-specific but won't hurt on other systems
+		parentEnvFile := fmt.Sprintf("/proc/%d/environ", ppid)
+		if data, err := os.ReadFile(parentEnvFile); err == nil {
+			parentEnv := string(data)
+			// Check if parent had GOENV_SHELL but we're in a subshell that doesn't
+			if !strings.Contains(parentEnv, "GOENV_SHELL=") && goenvShell != "" {
+				// This is fine - we initialized in this shell
+			} else if strings.Contains(parentEnv, "GOENV_SHELL=") && goenvShell == "" {
+				issues = append(issues, "Parent shell has goenv but current shell doesn't - possible subshell without re-init")
+				advice = append(advice, "Run 'eval \"$(goenv init -)\"' in this shell, or ensure subshells inherit goenv configuration")
+				status = StatusWarning
+			}
+		}
+	}
+
+	// Check 5: Verify the shell function is actually functional
+	// Try to get goenv's help output via the function
+	if currentShell == shellutil.ShellTypeBash || currentShell == shellutil.ShellTypeZsh {
+		shimsDir := cfg.ShimsDir()
+		pathEnv := os.Getenv(utils.EnvVarPath)
+
+		// If shims are in PATH but function doesn't work, it's been reset
+		if strings.Contains(pathEnv, shimsDir) {
+			// Try to execute goenv via shell function
+			cmd := exec.Command(string(currentShell), "-c", "goenv --version 2>&1")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				issues = append(issues, "goenv command fails despite shims in PATH - shell function may be broken")
+				advice = append(advice, "Run 'eval \"$(goenv init -)\"' to restore the shell function")
+				status = StatusError
+			} else if !strings.Contains(string(output), "goenv") {
+				issues = append(issues, "goenv command returns unexpected output - shell function may be misconfigured")
+				advice = append(advice, "Run 'eval \"$(goenv init -)\"' to fix the shell function")
+				status = StatusWarning
+			}
+		}
+	}
+
+	// Summarize results
+	if len(issues) == 0 {
+		return checkResult{
+			id:      "profile-sourcing",
+			name:    "Profile sourcing",
+			status:  StatusOK,
+			message: "No profile sourcing issues detected",
+		}
+	}
+
+	message := strings.Join(issues, "; ")
+	adviceStr := strings.Join(advice, "\n")
+
+	return checkResult{
+		id:        "profile-sourcing",
+		name:      "Profile sourcing",
+		status:    status,
+		message:   message,
+		advice:    adviceStr,
+		issueType: IssueTypeProfileDuplicates,
+	}
+}
+
+// InstallationType enum for goenv installation types
+type InstallationType string
+
+const (
+	InstallTypeHomebrewArm   InstallationType = "homebrew-arm"
+	InstallTypeHomebrewIntel InstallationType = "homebrew-intel"
+	InstallTypeHomebrewLinux InstallationType = "homebrew-linux"
+	InstallTypeManual        InstallationType = "manual"
+	InstallTypeSystem        InstallationType = "system"
+	InstallTypeScoop         InstallationType = "scoop"
+	InstallTypeChocolatey    InstallationType = "chocolatey"
+	InstallTypeUnknown       InstallationType = "unknown"
+)
+
+// Architecture represents CPU architecture types
+type Architecture string
+
+const (
+	ArchARM64   Architecture = "arm64"
+	ArchAMD64   Architecture = "amd64"
+	ArchUnknown Architecture = "unknown"
+)
+
+// installationType represents the type of goenv installation
+type installationType struct {
+	path         string
+	installType  InstallationType
+	architecture Architecture
+	recommended  bool // whether this installation is recommended to keep
+}
+
+// checkMultipleInstallations detects if multiple goenv installations exist
+// Multiple installations can cause confusion and conflicts
+func checkMultipleInstallations() checkResult {
+	installations := detectAllGoenvInstallations()
+
+	if len(installations) == 0 {
+		// This shouldn't happen if doctor is running, but handle it
+		return checkResult{
+			id:      "multiple-installations",
+			name:    "Multiple installations",
+			status:  StatusOK,
+			message: "No goenv installations found (running from source?)",
+		}
+	}
+
+	if len(installations) == 1 {
+		return checkResult{
+			id:      "multiple-installations",
+			name:    "Multiple installations",
+			status:  StatusOK,
+			message: fmt.Sprintf("Single installation: %s", installations[0]),
+		}
+	}
+
+	// Multiple installations found - classify them
+	classified := classifyInstallations(installations)
+
+	// Generate recommendation
+	recommendation := generateCleanupRecommendation(classified)
+
+	// Build display list
+	installList := ""
+	for i, inst := range classified {
+		if i > 0 {
+			installList += "\n     "
+		}
+		marker := ""
+		if inst.recommended {
+			marker = " [KEEP]"
+		} else {
+			marker = " [can remove]"
+		}
+		installList += fmt.Sprintf("%d. %s (%s)%s", i+1, inst.path, inst.installType, marker)
+	}
+
+	advice := fmt.Sprintf("Multiple installations can cause conflicts. %s\n   Run 'goenv doctor --fix' to interactively remove duplicates.", recommendation)
+
+	return checkResult{
+		id:        "multiple-installations",
+		name:      "Multiple installations",
+		status:    StatusWarning,
+		message:   fmt.Sprintf("Found %d goenv installations:\n     %s", len(installations), installList),
+		advice:    advice,
+		issueType: IssueTypeMultipleInstalls,
+	}
+}
+
+// detectAllGoenvInstallations finds all goenv binaries on the system
+func detectAllGoenvInstallations() []string {
+	var found []string
+	seen := make(map[string]bool)
+
+	// Method 1: Check PATH
+	if path, err := exec.LookPath("goenv"); err == nil {
+		resolved := path
+		if r, err := filepath.EvalSymlinks(path); err == nil {
+			resolved = r
+		}
+		if !seen[resolved] {
+			found = append(found, resolved)
+			seen[resolved] = true
+		}
+	}
+
+	// Build list of common locations
+	homeDir, _ := os.UserHomeDir()
+	locations := []string{}
+
+	// Method 2: Homebrew locations
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		locations = append(locations,
+			"/opt/homebrew/bin/goenv",              // ARM Mac
+			"/usr/local/bin/goenv",                 // Intel Mac / Linux Homebrew
+			"/home/linuxbrew/.linuxbrew/bin/goenv", // Linux Homebrew
+		)
+	}
+
+	// Method 3: Manual installation
+	locations = append(locations, filepath.Join(homeDir, ".goenv", "bin", "goenv"))
+
+	// Method 4: System locations (Unix)
+	if !utils.IsWindows() {
+		locations = append(locations,
+			"/usr/bin/goenv",
+			"/usr/local/bin/goenv",
+			"/opt/goenv/bin/goenv",
+		)
+	}
+
+	// Method 5: Windows locations
+	if utils.IsWindows() {
+		locations = append(locations,
+			filepath.Join(homeDir, "bin", "goenv.exe"),
+			filepath.Join(homeDir, ".goenv", "bin", "goenv.exe"),
+			"C:\\Program Files\\goenv\\goenv.exe",
+			"C:\\goenv\\bin\\goenv.exe",
+		)
+
+		// Check scoop
+		if scoopPath := os.Getenv("SCOOP"); scoopPath != "" {
+			locations = append(locations, filepath.Join(scoopPath, "shims", "goenv.exe"))
+		}
+
+		// Check chocolatey
+		if programData := os.Getenv(utils.EnvVarProgramData); programData != "" {
+			locations = append(locations, filepath.Join(programData, "chocolatey", "bin", "goenv.exe"))
+		}
+	}
+
+	// Check all locations
+	for _, loc := range locations {
+		if stat, err := os.Stat(loc); err == nil && !stat.IsDir() {
+			// Resolve symlinks
+			resolved := loc
+			if r, err := filepath.EvalSymlinks(loc); err == nil {
+				resolved = r
+			}
+
+			if !seen[resolved] {
+				found = append(found, resolved)
+				seen[resolved] = true
+			}
+		}
+	}
+
+	return found
+}
+
+// classifyInstallations determines the type of each installation
+func classifyInstallations(paths []string) []installationType {
+	classified := make([]installationType, 0, len(paths))
+
+	for _, path := range paths {
+		inst := installationType{
+			path:         path,
+			installType:  "unknown",
+			architecture: ArchUnknown,
+			recommended:  false,
+		}
+
+		// Determine installation type
+		if strings.Contains(path, "/opt/homebrew/") {
+			inst.installType = InstallTypeHomebrewArm
+			inst.architecture = ArchARM64
+		} else if strings.Contains(path, "/usr/local/") && strings.Contains(path, "Cellar/goenv") {
+			inst.installType = InstallTypeHomebrewIntel
+			inst.architecture = ArchAMD64
+		} else if strings.Contains(path, "/home/linuxbrew/") || strings.Contains(path, "linuxbrew") {
+			inst.installType = InstallTypeHomebrewLinux
+		} else if strings.Contains(path, "/.goenv/bin/") {
+			inst.installType = InstallTypeManual
+		} else if strings.HasPrefix(path, "/usr/bin/") || strings.HasPrefix(path, "/usr/local/bin/") {
+			inst.installType = InstallTypeSystem
+		} else if strings.Contains(path, "scoop") {
+			inst.installType = InstallTypeScoop
+		} else if strings.Contains(path, "chocolatey") {
+			inst.installType = InstallTypeChocolatey
+		}
+
+		classified = append(classified, inst)
+	}
+
+	// Determine recommendations based on platform and installation types
+	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		// On M1/M2 Mac, recommend ARM homebrew or manual, remove Intel homebrew
+		for i := range classified {
+			if classified[i].installType == InstallTypeHomebrewArm || classified[i].installType == InstallTypeManual {
+				classified[i].recommended = true
+				break // Only keep one
+			}
+		}
+	} else if runtime.GOOS == "darwin" && runtime.GOARCH == "amd64" {
+		// On Intel Mac, recommend Intel homebrew or manual
+		for i := range classified {
+			if classified[i].installType == InstallTypeHomebrewIntel || classified[i].installType == InstallTypeManual {
+				classified[i].recommended = true
+				break
+			}
+		}
+	} else {
+		// On other platforms, recommend manual over system, or homebrew over manual
+		for i := range classified {
+			if classified[i].installType == InstallTypeHomebrewLinux || classified[i].installType == InstallTypeManual {
+				classified[i].recommended = true
+				break
+			}
+		}
+	}
+
+	// If nothing was marked as recommended (edge case), recommend the first one in PATH
+	hasRecommended := false
+	for _, inst := range classified {
+		if inst.recommended {
+			hasRecommended = true
+			break
+		}
+	}
+	if !hasRecommended && len(classified) > 0 {
+		classified[0].recommended = true
+	}
+
+	return classified
+}
+
+// generateCleanupRecommendation generates human-readable advice
+func generateCleanupRecommendation(installations []installationType) string {
+	if len(installations) <= 1 {
+		return ""
+	}
+
+	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		// Check if there's an Intel homebrew installation
+		for _, inst := range installations {
+			if inst.installType == InstallTypeHomebrewIntel {
+				return "On Apple Silicon, remove the Intel Homebrew installation."
+			}
+		}
+	}
+
+	// Count types
+	homebrewCount := 0
+	manualCount := 0
+	systemCount := 0
+
+	for _, inst := range installations {
+		if strings.Contains(string(inst.installType), "homebrew") {
+			homebrewCount++
+		} else if inst.installType == InstallTypeManual {
+			manualCount++
+		} else if inst.installType == InstallTypeSystem {
+			systemCount++
+		}
+	}
+
+	if homebrewCount > 0 && manualCount > 0 {
+		return "Consider keeping only Homebrew installation for easier updates."
+	}
+
+	if homebrewCount > 1 {
+		return "Multiple Homebrew installations found. Keep only one."
+	}
+
+	return "Keep the installation that's first in your PATH."
+}
+
+// runFixMode provides unified interactive fixing for all detected issues
+func runFixMode(cmd *cobra.Command, results []checkResult, cfg *config.Config) error {
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sInteractive Fix Mode\n", utils.Emoji("🔧 "))
+	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Detect all fixable issues from results
+	issues := detectFixableIssues(results, cfg)
+
+	if len(issues) == 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sNo fixable issues detected.\n", utils.Emoji("✅ "))
+		return nil
+	}
+
+	// Organize by tier
+	autoFixes := []fixableIssue{}
+	promptFixes := []fixableIssue{}
+	manualFixes := []fixableIssue{}
+
+	for _, issue := range issues {
+		switch issue.tier {
+		case FixTierAuto:
+			autoFixes = append(autoFixes, issue)
+		case FixTierPrompt:
+			promptFixes = append(promptFixes, issue)
+		case FixTierManual:
+			manualFixes = append(manualFixes, issue)
+		}
+	}
+
+	// Show summary of detected issues
+	fmt.Fprintf(cmd.OutOrStdout(), "Detected %d fixable issue(s):\n\n", len(issues))
+	issueNum := 1
+	for _, issue := range issues {
+		icon := "🔧"
+		if issue.tier == FixTierAuto {
+			icon = "⚡"
+		} else if issue.tier == FixTierManual {
+			icon = "📝"
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "  %d. %s %s\n", issueNum, icon, issue.name)
+		fmt.Fprintf(cmd.OutOrStdout(), "     %s\n\n", issue.description)
+		issueNum++
+	}
+
+	fixedCount := 0
+
+	// Tier 1: Auto-run fixes (no prompt)
+	if len(autoFixes) > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sAuto-fixing safe issues...\n\n", utils.Emoji("⚡ "))
+
+		for _, issue := range autoFixes {
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s %s...", utils.Emoji("⚡"), issue.name)
+			err := issue.fixFunc(cmd, cfg)
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), " %s\n", utils.Emoji("❌"))
+				fmt.Fprintf(cmd.OutOrStdout(), "    Error: %v\n", err)
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), " %s\n", utils.Emoji("✅"))
+				fixedCount++
+			}
+		}
+		fmt.Fprintln(cmd.OutOrStdout())
+	}
+
+	// Tier 2: Prompted fixes
+	reader := bufio.NewReader(doctorStdin)
+	if len(promptFixes) > 0 {
+		for _, issue := range promptFixes {
+			fmt.Fprintln(cmd.OutOrStdout(), "──────────────────────────────────────────────────")
+			fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", utils.Emoji("🔧 "), issue.name)
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", issue.description)
+			fmt.Fprintf(cmd.OutOrStdout(), "Would you like to fix this? [Y/n]: ")
+
+			response, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "%sSkipping (input error)\n\n", utils.Emoji("⏭️  "))
+				continue
+			}
+
+			response = strings.TrimSpace(strings.ToLower(response))
+			if response != "" && response != "y" && response != "yes" {
+				fmt.Fprintf(cmd.OutOrStdout(), "%sSkipped\n\n", utils.Emoji("⏭️  "))
+				continue
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout())
+			err = issue.fixFunc(cmd, cfg)
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%sError: %v\n\n", utils.Emoji("❌ "), err)
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%sFixed successfully\n\n", utils.Emoji("✅ "))
+				fixedCount++
+			}
+		}
+	}
+
+	// Tier 3: Manual fixes (show instructions)
+	if len(manualFixes) > 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "──────────────────────────────────────────────────")
+		fmt.Fprintf(cmd.OutOrStdout(), "%sManual fixes required:\n\n", utils.Emoji("📝 "))
+
+		for _, issue := range manualFixes {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", utils.Emoji("📝 "), issue.name)
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", issue.description)
+
+			// Execute the "fix" function which just shows instructions
+			issue.fixFunc(cmd, cfg)
+			fmt.Fprintln(cmd.OutOrStdout())
+		}
+
+		// Pause so user can read and copy the manual fix commands
+		utils.PauseForUser(cmd.OutOrStdout(), reader)
+		fmt.Fprintln(cmd.OutOrStdout())
+	}
+
+	// Summary
+	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	if fixedCount > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sFixed %d issue(s)! Run 'goenv doctor' to verify.\n", utils.Emoji("✨ "), fixedCount)
+	} else if len(manualFixes) > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sPlease apply the manual fixes above.\n", utils.Emoji("📝 "))
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sNo issues were fixed.\n", utils.Emoji("ℹ️  "))
+	}
+
+	return nil
+}
+
+// detectFixableIssues analyzes check results and creates fixable issues
+func detectFixableIssues(results []checkResult, cfg *config.Config) []fixableIssue {
+	var issues []fixableIssue
+
+	for _, result := range results {
+		if result.status == StatusOK {
+			continue
+		}
+
+		// Use structured issueType instead of string matching
+		switch result.issueType {
+		// Auto-fix tier: Safe operations that don't need confirmation
+		case IssueTypeShimsMissing, IssueTypeShimsEmpty:
+			issues = append(issues, fixableIssue{
+				id:          "rehash",
+				name:        "Missing Shims",
+				description: "Shims directory missing or empty",
+				tier:        FixTierAuto,
+				fixFunc:     fixRehash,
+			})
+
+		case IssueTypeCacheStale, IssueTypeCacheArchMismatch:
+			issues = append(issues, fixableIssue{
+				id:          "cache-clean",
+				name:        "Stale Build Cache",
+				description: "Old or incompatible build cache detected",
+				tier:        FixTierAuto,
+				fixFunc:     fixCacheClean,
+			})
+
+		case IssueTypeVersionMismatch:
+			// Version mismatch that needs rehash
+			issues = append(issues, fixableIssue{
+				id:          "rehash-mismatch",
+				name:        "Rehash After Mismatch",
+				description: "Go binary version mismatch detected",
+				tier:        FixTierAuto,
+				fixFunc:     fixRehash,
+			})
+
+		// Prompt tier: Operations that need user confirmation
+		case IssueTypeVersionNotInstalled:
+			version, ok := result.fixData.(string)
+			if ok && version != "" {
+				issues = append(issues, fixableIssue{
+					id:          "install-missing-version",
+					name:        fmt.Sprintf("Install Missing Go %s", version),
+					description: fmt.Sprintf("Current version %s is set but not installed", version),
+					tier:        FixTierPrompt,
+					fixFunc: func(cmd *cobra.Command, cfg *config.Config) error {
+						return fixInstallMissingVersion(cmd, cfg, version)
+					},
+				})
+			}
+
+		case IssueTypeVersionCorrupted:
+			version, ok := result.fixData.(string)
+			if ok && version != "" {
+				issues = append(issues, fixableIssue{
+					id:          "reinstall-corrupted",
+					name:        fmt.Sprintf("Reinstall Corrupted Go %s", version),
+					description: fmt.Sprintf("Go %s installation is corrupted", version),
+					tier:        FixTierPrompt,
+					fixFunc: func(cmd *cobra.Command, cfg *config.Config) error {
+						return fixReinstallCorrupted(cmd, cfg, version)
+					},
+				})
+			}
+
+		case IssueTypeVersionNotSet:
+			issues = append(issues, fixableIssue{
+				id:          "set-version",
+				name:        "Set Go Version",
+				description: "No Go version is currently set",
+				tier:        FixTierPrompt,
+				fixFunc:     fixSetVersion,
+			})
+
+		case IssueTypeNoVersionsInstalled:
+			issues = append(issues, fixableIssue{
+				id:          "install-latest",
+				name:        "Install Latest Go",
+				description: "No Go versions are installed",
+				tier:        FixTierPrompt,
+				fixFunc:     fixInstallLatest,
+			})
+
+		case IssueTypeGoModMismatch:
+			version, ok := result.fixData.(string)
+			if ok && version != "" {
+				issues = append(issues, fixableIssue{
+					id:          "fix-gomod-version",
+					name:        fmt.Sprintf("Install Go %s for go.mod", version),
+					description: fmt.Sprintf("go.mod requires Go %s", version),
+					tier:        FixTierPrompt,
+					fixFunc: func(cmd *cobra.Command, cfg *config.Config) error {
+						return fixGoModVersion(cmd, cfg, version)
+					},
+				})
+			}
+
+		case IssueTypeVSCodeMissing:
+			issues = append(issues, fixableIssue{
+				id:          "vscode-init",
+				name:        "Initialize VS Code",
+				description: "VS Code is missing goenv configuration",
+				tier:        FixTierPrompt,
+				fixFunc:     fixVSCodeInit,
+			})
+
+		case IssueTypeVSCodeMismatch:
+			issues = append(issues, fixableIssue{
+				id:          "vscode-sync",
+				name:        "Sync VS Code Settings",
+				description: "VS Code settings don't match current Go version",
+				tier:        FixTierPrompt,
+				fixFunc:     fixVSCodeSync,
+			})
+
+		case IssueTypeToolsMissing:
+			issues = append(issues, fixableIssue{
+				id:          "tool-sync",
+				name:        "Sync Go Tools",
+				description: "Current Go version has no tools installed",
+				tier:        FixTierPrompt,
+				fixFunc:     fixToolSync,
+			})
+
+		case IssueTypeMultipleInstalls:
+			issues = append(issues, fixableIssue{
+				id:          "cleanup-duplicates",
+				name:        "Remove Duplicate Installations",
+				description: "Multiple goenv installations detected",
+				tier:        FixTierPrompt,
+				fixFunc:     fixDuplicateInstallations,
+			})
+
+		// Manual tier: Show instructions only
+		case IssueTypeShellNotConfigured:
+			issues = append(issues, fixableIssue{
+				id:          "shell-init",
+				name:        "Shell Configuration",
+				description: "Shell environment needs configuration",
+				tier:        FixTierManual,
+				fixFunc:     fixShellEnvironment,
+			})
+
+		case IssueTypeProfileDuplicates:
+			issues = append(issues, fixableIssue{
+				id:          "cleanup-shell-profiles",
+				name:        "Clean Up Shell Profiles",
+				description: "Duplicate goenv entries in shell profiles",
+				tier:        FixTierManual,
+				fixFunc:     fixShellProfiles,
+			})
+		}
+	}
+
+	// Deduplicate issues by ID
+	seen := make(map[string]bool)
+	unique := []fixableIssue{}
+	for _, issue := range issues {
+		if !seen[issue.id] {
+			unique = append(unique, issue)
+			seen[issue.id] = true
+		}
+	}
+
+	return unique
+}
+
+// Fix helper functions
+
+func fixRehash(cmd *cobra.Command, cfg *config.Config) error {
+	shimMgr := shims.NewShimManager(cfg)
+	return shimMgr.Rehash()
+}
+
+func fixCacheClean(cmd *cobra.Command, cfg *config.Config) error {
+	buildCache := os.Getenv("GOCACHE")
+	if buildCache == "" {
+		buildCache = filepath.Join(cfg.Root, "go-build")
+	}
+	return os.RemoveAll(buildCache)
+}
+
+func fixInstallMissingVersion(cmd *cobra.Command, cfg *config.Config, version string) error {
+	// For now, show instructions - actual install would need to import install package
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv install %s\n", version)
+	return fmt.Errorf("please run the command manually")
+}
+
+func fixReinstallCorrupted(cmd *cobra.Command, cfg *config.Config, version string) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv uninstall %s && goenv install %s\n", version, version)
+	return fmt.Errorf("please run the commands manually")
+}
+
+func fixSetVersion(cmd *cobra.Command, cfg *config.Config) error {
+	mgr := manager.NewManager(cfg)
+	versions, err := mgr.ListInstalledVersions()
+	if err != nil || len(versions) == 0 {
+		return fmt.Errorf("no versions installed")
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv global %s\n", versions[0])
+	return fmt.Errorf("please run the command manually")
+}
+
+func fixInstallLatest(cmd *cobra.Command, cfg *config.Config) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv install\n")
+	return fmt.Errorf("please run the command manually")
+}
+
+func fixGoModVersion(cmd *cobra.Command, cfg *config.Config, version string) error {
+	mgr := manager.NewManager(cfg)
+	if mgr.IsVersionInstalled(version) {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv local %s\n", version)
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv install %s && goenv local %s\n", version, version)
+	}
+	return fmt.Errorf("please run the command manually")
+}
+
+func fixVSCodeInit(cmd *cobra.Command, cfg *config.Config) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv vscode init\n")
+	return fmt.Errorf("please run the command manually")
+}
+
+func fixVSCodeSync(cmd *cobra.Command, cfg *config.Config) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv vscode sync\n")
+	return fmt.Errorf("please run the command manually")
+}
+
+func fixToolSync(cmd *cobra.Command, cfg *config.Config) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv tools sync\n")
+	return fmt.Errorf("please run the command manually")
+}
+
+func fixDuplicateInstallations(cmd *cobra.Command, cfg *config.Config) error {
+	return cleanupDuplicateInstallations(cmd)
+}
+
+func fixShellEnvironment(cmd *cobra.Command, cfg *config.Config) error {
+	shell := shellutil.DetectShell()
+	initCommand := shellutil.GetInitLine(shell)
+	profilePath := shellutil.GetProfilePathDisplay(shell)
+
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run this command in your current shell:\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "    %s\n\n", initCommand)
+	fmt.Fprintf(cmd.OutOrStdout(), "  To make it permanent, add to %s:\n", profilePath)
+	fmt.Fprintf(cmd.OutOrStdout(), "    %s\n", initCommand)
+	return nil
+}
+
+func fixShellProfiles(cmd *cobra.Command, cfg *config.Config) error {
+	return cleanupShellProfiles(cmd, cfg)
+}
+
+// FixTier type for categorizing fix operations
+type FixTier string
+
+const (
+	FixTierAuto   FixTier = "auto"   // Auto-run without prompt
+	FixTierPrompt FixTier = "prompt" // Prompt user before running
+	FixTierManual FixTier = "manual" // Show instructions, don't auto-run
+)
+
+// fixableIssue represents an issue that can be automatically or interactively fixed
+type fixableIssue struct {
+	id          string
+	name        string
+	description string
+	tier        FixTier
+	fixFunc     func(*cobra.Command, *config.Config) error
+}
+
+// cleanupDuplicateInstallations removes duplicate goenv installations
+func cleanupDuplicateInstallations(cmd *cobra.Command) error {
+	// Detect all installations
+	installations := detectAllGoenvInstallations()
+
+	if len(installations) <= 1 {
+		fmt.Printf("%sNo duplicates found.\n", utils.Emoji("✅ "))
+		return nil
+	}
+
+	// Classify installations
+	classified := classifyInstallations(installations)
+
+	// Display installations
+	fmt.Printf("%sFound %d goenv installations:\n\n", utils.Emoji("🔍 "), len(classified))
+
+	for i, inst := range classified {
+		marker := ""
+		color := ""
+		if inst.recommended {
+			marker = " [RECOMMENDED TO KEEP]"
+			color = "\033[0;32m" // green
+		} else {
+			marker = " [can safely remove]"
+			color = "\033[0;33m" // yellow
+		}
+		fmt.Printf("  %d. %s%s%s\n", i+1, color, inst.path, "\033[0m")
+		fmt.Printf("     Type: %s\n", inst.installType)
+		if inst.architecture != ArchUnknown {
+			fmt.Printf("     Architecture: %s\n", inst.architecture)
+		}
+		fmt.Printf("     %s\n", marker)
+		fmt.Println()
+	}
+
+	// Show recommendation
+	recommendation := generateCleanupRecommendation(classified)
+	if recommendation != "" {
+		fmt.Printf("%sRecommendation: %s\n\n", utils.Emoji("💡 "), recommendation)
+	}
+
+	// Prompt for which to remove
+	fmt.Println("Which installations would you like to remove?")
+	fmt.Println("Enter numbers separated by spaces (e.g., '2 3'), or 'none' to cancel:")
+	fmt.Print("> ")
+
+	scanner := bufio.NewScanner(doctorStdin)
+	if !scanner.Scan() {
+		return fmt.Errorf("failed to read input")
+	}
+
+	input := strings.TrimSpace(scanner.Text())
+	if input == "none" || input == "" {
+		fmt.Println("\n" + utils.Emoji("❌ ") + "Cleanup cancelled.")
+		return nil
+	}
+
+	// Parse selection
+	toRemove := []int{}
+	parts := strings.Fields(input)
+	for _, part := range parts {
+		var num int
+		if _, err := fmt.Sscanf(part, "%d", &num); err == nil {
+			if num >= 1 && num <= len(classified) {
+				// Don't allow removing the recommended one
+				if classified[num-1].recommended {
+					fmt.Printf("\n%sWarning: Installation %d is recommended to keep. Skipping.\n", utils.Emoji("⚠️  "), num)
+					continue
+				}
+				toRemove = append(toRemove, num-1)
+			}
+		}
+	}
+
+	if len(toRemove) == 0 {
+		fmt.Println("\n" + utils.Emoji("❌ ") + "No valid selections. Cleanup cancelled.")
+		return nil
+	}
+
+	// Confirm removal
+	fmt.Printf("\n%sYou are about to remove %d installation(s):\n", utils.Emoji("⚠️  "), len(toRemove))
+	for _, idx := range toRemove {
+		fmt.Printf("  - %s\n", classified[idx].path)
+	}
+	fmt.Print("\nProceed? (yes/no): ")
+
+	if !scanner.Scan() {
+		return fmt.Errorf("failed to read confirmation")
+	}
+
+	confirmation := strings.ToLower(strings.TrimSpace(scanner.Text()))
+	if confirmation != "yes" && confirmation != "y" {
+		fmt.Println("\n" + utils.Emoji("❌ ") + "Cleanup cancelled.")
+		return nil
+	}
+
+	// Remove installations
+	fmt.Println()
+	for _, idx := range toRemove {
+		path := classified[idx].path
+		fmt.Printf("%sRemoving: %s\n", utils.Emoji("🗑️  "), path)
+
+		if err := os.Remove(path); err != nil {
+			fmt.Printf("%sFailed to remove: %v\n", utils.Emoji("❌ "), err)
+			fmt.Printf("   You may need to run: sudo rm %s\n", path)
+			continue
+		}
+
+		fmt.Printf("%sSuccessfully removed\n", utils.Emoji("✅ "))
+	}
+
+	fmt.Printf("%sRemoved %d duplicate installation(s)\n", utils.Emoji("✅ "), len(toRemove))
+
+	return nil
+}
+
+// cleanupShellProfiles removes duplicate or stale goenv entries from shell profiles
+func cleanupShellProfiles(cmd *cobra.Command, cfg *config.Config) error {
+	homeDir, _ := os.UserHomeDir()
+	profiles := map[string]string{
+		".bashrc":       filepath.Join(homeDir, ".bashrc"),
+		".bash_profile": filepath.Join(homeDir, ".bash_profile"),
+		".zshrc":        filepath.Join(homeDir, ".zshrc"),
+		".profile":      filepath.Join(homeDir, ".profile"),
+	}
+
+	var foundIssues []string
+
+	for name, path := range profiles {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		content := string(data)
+		lines := strings.Split(content, "\n")
+
+		// Find goenv-related lines
+		var goenvLines []int
+		for i, line := range lines {
+			if strings.Contains(line, "goenv init") || strings.Contains(line, "GOENV_ROOT") {
+				goenvLines = append(goenvLines, i)
+			}
+		}
+
+		if len(goenvLines) > 1 {
+			foundIssues = append(foundIssues, fmt.Sprintf("%s has %d goenv entries", name, len(goenvLines)))
+		}
+	}
+
+	if len(foundIssues) == 0 {
+		fmt.Printf("%sNo duplicate profile entries found.\n", utils.Emoji("✅ "))
+		return nil
+	}
+
+	fmt.Println("Found potential issues:")
+	for _, issue := range foundIssues {
+		fmt.Printf("  - %s\n", issue)
+	}
+	fmt.Println()
+	fmt.Println(utils.Emoji("💡 ") + "Tip: Manually review your shell profile files to remove duplicates.")
+	fmt.Println("Run 'goenv setup' to reconfigure your shell properly.")
+
+	return nil
+}
+
+// checkGoenvShellFunction checks if the goenv shell function exists in the current shell
+// This helps detect if the environment was un-sourced or reset
+// Returns true if function exists, false if it doesn't or can't be checked
+func checkGoenvShellFunction(shell shellutil.ShellType) bool {
+	// Only check for shells that use the function
+	if shell != shellutil.ShellTypeBash && shell != shellutil.ShellTypeZsh && shell != shellutil.ShellTypeKsh {
+		return true // Not applicable for fish/pwsh/cmd - assume OK
+	}
+
+	// Check if BASH_FUNC_goenv%% or similar exists (more direct check)
+	// This works when running IN the shell that has the function
+	for _, key := range os.Environ() {
+		// Bash stores functions as BASH_FUNC_name%%=...
+		// zsh/ksh don't export functions this way, but we can try
+		if strings.HasPrefix(key, "BASH_FUNC_goenv") {
+			return true
+		}
+	}
+
+	// Fallback: Try to check if the function exists using shell-specific commands
+	// This creates a subprocess so may not work in all cases
+	var cmd *exec.Cmd
+	switch shell {
+	case shellutil.ShellTypeBash:
+		// Check if goenv function exists in bash
+		cmd = exec.Command(string(shell), "-c", "declare -F goenv >/dev/null 2>&1")
+	case shellutil.ShellTypeZsh:
+		// Check if goenv function exists in zsh
+		cmd = exec.Command(string(shell), "-c", "whence -w goenv | grep -q function")
+	case shellutil.ShellTypeKsh:
+		// Check if goenv function exists in ksh
+		cmd = exec.Command(string(shell), "-c", "typeset -f goenv >/dev/null 2>&1")
+	default:
+		return true // Unknown shell, assume OK
+	}
+
+	// If the command fails to run (shell not found, etc), assume OK
+	// We don't want to false-positive in test or restricted environments
+	err := cmd.Run()
+	if err != nil {
+		// Could be that shell isn't available, function doesn't exist, or other error
+		// In a real doctor run, we'd already know the shell works (they're running goenv)
+		// So only return false if we're confident function is missing
+		if _, lookErr := exec.LookPath(string(shell)); lookErr != nil {
+			// Shell binary doesn't exist, can't check - assume OK
+			return true
+		}
+		// Shell exists but function check failed - function likely missing
+		return false
+	}
+	return true
+}
+
 func checkPath(cfg *config.Config) checkResult {
-	pathEnv := os.Getenv("PATH")
+	pathEnv := os.Getenv(utils.EnvVarPath)
 	pathDirs := filepath.SplitList(pathEnv)
 
 	goenvBin := filepath.Join(cfg.Root, "bin")
@@ -528,7 +2004,7 @@ func checkPath(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "path-configuration",
 			name:    "PATH configuration",
-			status:  "error",
+			status:  StatusError,
 			message: fmt.Sprintf("%s not in PATH", goenvBin),
 			advice:  fmt.Sprintf("Add 'export PATH=\"%s:$PATH\"' to your shell config", goenvBin),
 		}
@@ -538,7 +2014,7 @@ func checkPath(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "path-configuration",
 			name:    "PATH configuration",
-			status:  "warning",
+			status:  StatusWarning,
 			message: fmt.Sprintf("%s not in PATH", shimsDir),
 			advice:  "Run 'eval \"$(goenv init -)\"' in your shell config",
 		}
@@ -549,7 +2025,7 @@ func checkPath(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "path-configuration",
 			name:    "PATH configuration",
-			status:  "warning",
+			status:  StatusWarning,
 			message: fmt.Sprintf("Shims directory is at position %d in PATH", shimsPosition),
 			advice:  "Shims should be near the beginning of PATH for proper version switching",
 		}
@@ -558,7 +2034,7 @@ func checkPath(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "path-configuration",
 		name:    "PATH configuration",
-		status:  "ok",
+		status:  StatusOK,
 		message: "goenv bin and shims directories are in PATH",
 	}
 }
@@ -569,18 +2045,19 @@ func checkShimsDir(cfg *config.Config) checkResult {
 	stat, err := os.Stat(shimsDir)
 	if os.IsNotExist(err) {
 		return checkResult{
-			id:      "shims-directory",
-			name:    "Shims directory",
-			status:  "warning",
-			message: fmt.Sprintf("Shims directory does not exist: %s", shimsDir),
-			advice:  "Run 'goenv rehash' to create shims",
+			id:        "shims-directory",
+			name:      "Shims directory",
+			status:    StatusWarning,
+			message:   fmt.Sprintf("Shims directory does not exist: %s", shimsDir),
+			advice:    "Run 'goenv rehash' to create shims",
+			issueType: IssueTypeShimsMissing,
 		}
 	}
 	if err != nil {
 		return checkResult{
 			id:      "shims-directory",
 			name:    "Shims directory",
-			status:  "error",
+			status:  StatusError,
 			message: fmt.Sprintf("Cannot access shims directory: %v", err),
 			advice:  "Check file permissions",
 		}
@@ -590,7 +2067,7 @@ func checkShimsDir(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "shims-directory",
 			name:    "Shims directory",
-			status:  "error",
+			status:  StatusError,
 			message: fmt.Sprintf("Shims path exists but is not a directory: %s", shimsDir),
 			advice:  "Remove the file and run 'goenv rehash'",
 		}
@@ -602,7 +2079,7 @@ func checkShimsDir(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "shims-directory",
 			name:    "Shims directory",
-			status:  "warning",
+			status:  StatusWarning,
 			message: fmt.Sprintf("Cannot read shims directory: %v", err),
 		}
 	}
@@ -610,18 +2087,19 @@ func checkShimsDir(cfg *config.Config) checkResult {
 	shimCount := len(entries)
 	if shimCount == 0 {
 		return checkResult{
-			id:      "shims-directory",
-			name:    "Shims directory",
-			status:  "warning",
-			message: "No shims found",
-			advice:  "Run 'goenv rehash' to create shims",
+			id:        "shims-directory",
+			name:      "Shims directory",
+			status:    StatusWarning,
+			message:   "No shims found",
+			advice:    "Run 'goenv rehash' to create shims",
+			issueType: IssueTypeShimsEmpty,
 		}
 	}
 
 	return checkResult{
 		id:      "shims-directory",
 		name:    "Shims directory",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("Found %d shim(s)", shimCount),
 	}
 }
@@ -634,7 +2112,7 @@ func checkInstalledVersions(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "installed-go-versions",
 			name:    "Installed Go versions",
-			status:  "error",
+			status:  StatusError,
 			message: fmt.Sprintf("Cannot list versions: %v", err),
 			advice:  "Check GOENV_ROOT and versions directory",
 		}
@@ -642,11 +2120,12 @@ func checkInstalledVersions(cfg *config.Config) checkResult {
 
 	if len(versions) == 0 {
 		return checkResult{
-			id:      "installed-go-versions",
-			name:    "Installed Go versions",
-			status:  "warning",
-			message: "No Go versions installed",
-			advice:  "Install a Go version with 'goenv install <version>'",
+			id:        "installed-go-versions",
+			name:      "Installed Go versions",
+			status:    StatusWarning,
+			message:   "No Go versions installed",
+			advice:    "Install a Go version with 'goenv install <version>'",
+			issueType: IssueTypeNoVersionsInstalled,
 		}
 	}
 
@@ -668,18 +2147,20 @@ func checkInstalledVersions(cfg *config.Config) checkResult {
 
 	if len(corruptedVersions) > 0 {
 		return checkResult{
-			id:      "installed-go-versions",
-			name:    "Installed Go versions",
-			status:  "error",
-			message: fmt.Sprintf("Found %d version(s), but %d are CORRUPTED: %s", len(versions), len(corruptedVersions), strings.Join(corruptedVersions, ", ")),
-			advice:  fmt.Sprintf("Reinstall corrupted versions: goenv uninstall %s && goenv install %s", corruptedVersions[0], corruptedVersions[0]),
+			id:        "installed-go-versions",
+			name:      "Installed Go versions",
+			status:    StatusError,
+			message:   fmt.Sprintf("Found %d version(s), but %d are CORRUPTED: %s", len(versions), len(corruptedVersions), strings.Join(corruptedVersions, ", ")),
+			advice:    fmt.Sprintf("Reinstall corrupted versions: goenv uninstall %s && goenv install %s", corruptedVersions[0], corruptedVersions[0]),
+			issueType: IssueTypeVersionCorrupted,
+			fixData:   corruptedVersions[0],
 		}
 	}
 
 	return checkResult{
 		id:      "installed-go-versions",
 		name:    "Installed Go versions",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("Found %d valid version(s): %s", len(validVersions), strings.Join(validVersions, ", ")),
 	}
 }
@@ -690,11 +2171,12 @@ func checkCurrentVersion(cfg *config.Config) checkResult {
 
 	if err != nil {
 		return checkResult{
-			id:      "current-go-version",
-			name:    "Current Go version",
-			status:  "warning",
-			message: fmt.Sprintf("No version set: %v", err),
-			advice:  "Set a version with 'goenv global <version>' or create a .go-version file",
+			id:        "current-go-version",
+			name:      "Current Go version",
+			status:    StatusWarning,
+			message:   fmt.Sprintf("No version set: %v", err),
+			advice:    "Set a version with 'goenv global <version>' or create a .go-version file",
+			issueType: IssueTypeVersionNotSet,
 		}
 	}
 
@@ -702,7 +2184,7 @@ func checkCurrentVersion(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "current-go-version",
 			name:    "Current Go version",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("Using system Go (set by %s)", source),
 		}
 	}
@@ -710,11 +2192,13 @@ func checkCurrentVersion(cfg *config.Config) checkResult {
 	// Validate version is installed
 	if err := mgr.ValidateVersion(version); err != nil {
 		return checkResult{
-			id:      "current-go-version",
-			name:    "Current Go version",
-			status:  "error",
-			message: fmt.Sprintf("Version '%s' is set but not installed (set by %s)", version, source),
-			advice:  fmt.Sprintf("Install the version with 'goenv install %s'", version),
+			id:        "current-go-version",
+			name:      "Current Go version",
+			status:    StatusError,
+			message:   fmt.Sprintf("Version '%s' is set but not installed (set by %s)", version, source),
+			advice:    fmt.Sprintf("Install the version with 'goenv install %s'", version),
+			issueType: IssueTypeVersionNotInstalled,
+			fixData:   version,
 		}
 	}
 
@@ -725,25 +2209,27 @@ func checkCurrentVersion(cfg *config.Config) checkResult {
 	// Check if go binary exists (handles .exe and .bat on Windows)
 	if _, err := pathutil.FindExecutable(goBinaryBase); err != nil {
 		return checkResult{
-			id:      "current-go-version",
-			name:    "Current Go version",
-			status:  "error",
-			message: fmt.Sprintf("Version '%s' is CORRUPTED - go binary missing (set by %s)", version, source),
-			advice:  fmt.Sprintf("Reinstall: goenv uninstall %s && goenv install %s", version, version),
+			id:        "current-go-version",
+			name:      "Current Go version",
+			status:    StatusError,
+			message:   fmt.Sprintf("Version '%s' is CORRUPTED - go binary missing (set by %s)", version, source),
+			advice:    fmt.Sprintf("Reinstall: goenv uninstall %s && goenv install %s", version, version),
+			issueType: IssueTypeVersionCorrupted,
+			fixData:   version,
 		}
 	}
 
 	return checkResult{
 		id:      "current-go-version",
 		name:    "Current Go version",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("%s (set by %s)", version, source),
 	}
 }
 
 func checkConflictingGo(cfg *config.Config) checkResult {
 	// Check for system Go installations that might conflict
-	pathEnv := os.Getenv("PATH")
+	pathEnv := os.Getenv(utils.EnvVarPath)
 	pathDirs := filepath.SplitList(pathEnv)
 	shimsDir := cfg.ShimsDir()
 
@@ -757,7 +2243,7 @@ func checkConflictingGo(cfg *config.Config) checkResult {
 
 		// Check for 'go' binary
 		goBinary := filepath.Join(dir, "go")
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			goBinary += ".exe"
 		}
 
@@ -770,7 +2256,7 @@ func checkConflictingGo(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "conflicting-go-installations",
 			name:    "Conflicting Go installations",
-			status:  "ok",
+			status:  StatusOK,
 			message: "No system Go installations found that could conflict",
 		}
 	}
@@ -795,7 +2281,7 @@ func checkConflictingGo(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "conflicting-go-installations",
 			name:    "Conflicting Go installations",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("Found system Go at %s, but goenv shims have priority", strings.Join(systemGoLocations, ", ")),
 		}
 	}
@@ -803,7 +2289,7 @@ func checkConflictingGo(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "conflicting-go-installations",
 		name:    "Conflicting Go installations",
-		status:  "warning",
+		status:  StatusWarning,
 		message: fmt.Sprintf("System Go at %s may take priority over goenv", strings.Join(systemGoLocations, ", ")),
 		advice:  "Ensure goenv shims directory comes before system Go in PATH",
 	}
@@ -827,7 +2313,7 @@ func checkCacheFiles(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "cache-files",
 			name:    "Cache files",
-			status:  "ok",
+			status:  StatusOK,
 			message: "No cache files (will be created when needed)",
 		}
 	}
@@ -839,7 +2325,7 @@ func checkCacheFiles(cfg *config.Config) checkResult {
 			return checkResult{
 				id:      "cache-files",
 				name:    "Cache files",
-				status:  "warning",
+				status:  StatusWarning,
 				message: fmt.Sprintf("Cannot read %s: %v", cacheName, err),
 				advice:  "Run 'goenv refresh cache' to regenerate cache files",
 			}
@@ -849,7 +2335,7 @@ func checkCacheFiles(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "cache-files",
 		name:    "Cache files",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("Found %d cache file(s): %v", len(foundCaches), foundCaches),
 	}
 }
@@ -871,7 +2357,7 @@ func checkNetwork() checkResult {
 		return checkResult{
 			id:      "network-connectivity",
 			name:    "Network connectivity",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "Failed to create network request",
 			advice:  "This is unusual and may indicate a system configuration issue.",
 		}
@@ -885,7 +2371,7 @@ func checkNetwork() checkResult {
 		return checkResult{
 			id:      "network-connectivity",
 			name:    "Network connectivity",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "Cannot reach go.dev",
 			advice:  "You may not be able to fetch new Go versions. Check your internet connection and firewall settings.",
 		}
@@ -897,7 +2383,7 @@ func checkNetwork() checkResult {
 		return checkResult{
 			id:      "network-connectivity",
 			name:    "Network connectivity",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Can reach go.dev",
 		}
 	}
@@ -906,7 +2392,7 @@ func checkNetwork() checkResult {
 	return checkResult{
 		id:      "network-connectivity",
 		name:    "Network connectivity",
-		status:  "warning",
+		status:  StatusWarning,
 		message: fmt.Sprintf("Unexpected response from go.dev (HTTP %d)", resp.StatusCode),
 		advice:  "Network connectivity exists but may have issues. You should still be able to fetch Go versions.",
 	}
@@ -920,7 +2406,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "vs-code-integration",
 			name:    "VS Code integration",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Unable to check (not in a project directory)",
 		}
 	}
@@ -934,7 +2420,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "vs-code-integration",
 			name:    "VS Code integration",
-			status:  "ok",
+			status:  StatusOK,
 			message: "No .vscode directory found",
 			advice:  "Run 'goenv vscode init' to set up VS Code integration with Go settings",
 		}
@@ -943,11 +2429,12 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 	// Check if settings.json exists
 	if _, err := os.Stat(settingsFile); os.IsNotExist(err) {
 		return checkResult{
-			id:      "vs-code-integration",
-			name:    "VS Code integration",
-			status:  "warning",
-			message: "Found .vscode directory but no settings.json",
-			advice:  "Run 'goenv vscode init' to configure Go extension, or 'goenv vscode doctor' for detailed diagnostics",
+			id:        "vs-code-integration",
+			name:      "VS Code integration",
+			status:    StatusWarning,
+			message:   "Found .vscode directory but no settings.json",
+			advice:    "Run 'goenv vscode init' to configure Go extension, or 'goenv vscode doctor' for detailed diagnostics",
+			issueType: IssueTypeVSCodeMissing,
 		}
 	}
 
@@ -959,7 +2446,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "vs-code-integration",
 			name:    "VS Code integration",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "Cannot determine current Go version for validation",
 			advice:  "Set a Go version with 'goenv global' or 'goenv local' first",
 		}
@@ -970,11 +2457,12 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 
 	if !result.HasSettings {
 		return checkResult{
-			id:      "vs-code-integration",
-			name:    "VS Code integration",
-			status:  "warning",
-			message: "settings.json exists but missing Go configuration",
-			advice:  "Run 'goenv vscode init' to add goenv configuration, or 'goenv vscode doctor' for detailed diagnostics",
+			id:        "vs-code-integration",
+			name:      "VS Code integration",
+			status:    StatusWarning,
+			message:   "settings.json exists but missing Go configuration",
+			advice:    "Run 'goenv vscode init' to add goenv configuration, or 'goenv vscode doctor' for detailed diagnostics",
+			issueType: IssueTypeVSCodeMissing,
 		}
 	}
 
@@ -982,18 +2470,19 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "vs-code-integration",
 			name:    "VS Code integration",
-			status:  "ok",
+			status:  StatusOK,
 			message: "VS Code configured to use goenv environment variables (${env:GOROOT})",
 		}
 	}
 
 	if result.Mismatch {
 		return checkResult{
-			id:      "vs-code-integration",
-			name:    "VS Code integration",
-			status:  "warning",
-			message: fmt.Sprintf("VS Code settings use Go %s but current version is %s", result.ConfiguredVersion, currentVersion),
-			advice:  "Run 'goenv vscode sync' to fix, or 'goenv vscode doctor' for detailed diagnostics",
+			id:        "vs-code-integration",
+			name:      "VS Code integration",
+			status:    StatusWarning,
+			message:   fmt.Sprintf("VS Code settings use Go %s but current version is %s", result.ConfiguredVersion, currentVersion),
+			advice:    "Run 'goenv vscode sync' to fix, or 'goenv vscode doctor' for detailed diagnostics",
+			issueType: IssueTypeVSCodeMismatch,
 		}
 	}
 
@@ -1001,7 +2490,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "vs-code-integration",
 			name:    "VS Code integration",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("VS Code configured with absolute path for Go %s", result.ConfiguredVersion),
 		}
 	}
@@ -1010,7 +2499,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "vs-code-integration",
 		name:    "VS Code integration",
-		status:  "warning",
+		status:  StatusWarning,
 		message: "VS Code has Go configuration but cannot determine version",
 		advice:  "Run 'goenv vscode init --force' to update settings, or 'goenv vscode doctor' for detailed diagnostics",
 	}
@@ -1025,7 +2514,7 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "gomod-version",
 			name:    "go.mod version",
-			status:  "ok",
+			status:  StatusOK,
 			message: "No go.mod file in current directory",
 		}
 	}
@@ -1037,7 +2526,7 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "gomod-version",
 			name:    "go.mod version",
-			status:  "error",
+			status:  StatusError,
 			message: "Cannot determine current Go version",
 			advice:  "Ensure a Go version is set with 'goenv global' or 'goenv local'",
 		}
@@ -1049,7 +2538,7 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "gomod-version",
 			name:    "go.mod version",
-			status:  "warning",
+			status:  StatusWarning,
 			message: fmt.Sprintf("Cannot parse go.mod: %v", err),
 			advice:  "Ensure go.mod has a valid 'go' directive",
 		}
@@ -1075,18 +2564,20 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 		}
 
 		return checkResult{
-			id:      "gomod-version",
-			name:    "go.mod version",
-			status:  "error",
-			message: fmt.Sprintf("go.mod requires Go %s but current version is %s", requiredVersion, currentVersion),
-			advice:  advice,
+			id:        "gomod-version",
+			name:      "go.mod version",
+			status:    StatusError,
+			message:   fmt.Sprintf("go.mod requires Go %s but current version is %s", requiredVersion, currentVersion),
+			advice:    advice,
+			issueType: IssueTypeGoModMismatch,
+			fixData:   requiredVersion,
 		}
 	}
 
 	return checkResult{
 		id:      "gomod-version",
 		name:    "go.mod version",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("Current Go %s satisfies go.mod requirement (>= %s)", currentVersion, requiredVersion),
 	}
 }
@@ -1099,7 +2590,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "actual-go-binary",
 			name:    "Actual 'go' binary",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "Cannot determine expected Go version",
 			advice:  "Set a Go version with 'goenv global' or 'goenv local'",
 		}
@@ -1111,7 +2602,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "actual-go-binary",
 			name:    "Actual 'go' binary",
-			status:  "error",
+			status:  StatusError,
 			message: "No 'go' binary found in PATH",
 			advice:  "Ensure goenv is properly initialized and a version is installed",
 		}
@@ -1124,7 +2615,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "actual-go-binary",
 			name:    "Actual 'go' binary",
-			status:  "error",
+			status:  StatusError,
 			message: fmt.Sprintf("Cannot determine actual Go version at %s", goPath),
 			advice:  "Verify the Go installation is not corrupted",
 		}
@@ -1140,7 +2631,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "actual-go-binary",
 			name:    "Actual 'go' binary",
-			status:  "warning",
+			status:  StatusWarning,
 			message: fmt.Sprintf("Cannot parse 'go version' output: %s", versionStr),
 		}
 	}
@@ -1155,14 +2646,14 @@ func checkWhichGo(cfg *config.Config) checkResult {
 			return checkResult{
 				id:      "actual-go-binary",
 				name:    "Actual 'go' binary",
-				status:  "ok",
+				status:  StatusOK,
 				message: fmt.Sprintf("Using system Go %s via goenv shim at %s", actualVersion, goPath),
 			}
 		}
 		return checkResult{
 			id:      "actual-go-binary",
 			name:    "Actual 'go' binary",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("Using system Go %s at %s (set by %s)", actualVersion, goPath, source),
 		}
 	}
@@ -1173,7 +2664,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 			return checkResult{
 				id:      "actual-go-binary",
 				name:    "Actual 'go' binary",
-				status:  "error",
+				status:  StatusError,
 				message: fmt.Sprintf("Version mismatch: expected %s (set by %s) but 'go version' reports %s", expectedVersion, source, actualVersion),
 				advice:  "This may indicate a corrupted installation. Try: goenv rehash",
 			}
@@ -1183,7 +2674,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "actual-go-binary",
 			name:    "Actual 'go' binary",
-			status:  "error",
+			status:  StatusError,
 			message: fmt.Sprintf("Version mismatch: expected %s (set by %s) but using %s at %s", expectedVersion, source, actualVersion, goPath),
 			advice:  "The 'go' binary at " + goPath + " is taking precedence. Ensure goenv shims directory (" + shimsDir + ") is first in your PATH. Run: eval \"$(goenv init -)\". If you see build cache errors, run: goenv cache clean build",
 		}
@@ -1194,7 +2685,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "actual-go-binary",
 			name:    "Actual 'go' binary",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("Correctly using Go %s via goenv shim", actualVersion),
 		}
 	}
@@ -1203,7 +2694,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "actual-go-binary",
 		name:    "Actual 'go' binary",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("Using Go %s at %s (not via shim)", actualVersion, goPath),
 	}
 }
@@ -1218,7 +2709,7 @@ func checkToolMigration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "tool-migration",
 			name:    "Tool migration",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (no managed version active)",
 		}
 	}
@@ -1230,7 +2721,7 @@ func checkToolMigration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "tool-migration",
 			name:    "Tool migration",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Only one Go version installed",
 		}
 	}
@@ -1241,7 +2732,7 @@ func checkToolMigration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "tool-migration",
 			name:    "Tool migration",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Cannot detect installed tools",
 		}
 	}
@@ -1251,7 +2742,7 @@ func checkToolMigration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "tool-migration",
 			name:    "Tool migration",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("Found %d tool(s) in current version", len(currentTools)),
 		}
 	}
@@ -1285,7 +2776,7 @@ func checkToolMigration(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "tool-migration",
 			name:    "Tool migration",
-			status:  "ok",
+			status:  StatusOK,
 			message: "No tools installed in any version",
 		}
 	}
@@ -1293,21 +2784,23 @@ func checkToolMigration(cfg *config.Config) checkResult {
 	// Found tools in other versions but not current - suggest sync
 	if len(versionsWithTools) == 1 {
 		return checkResult{
-			id:      "tool-sync",
-			name:    "Tool sync",
-			status:  "warning",
-			message: fmt.Sprintf("Current Go %s has no tools, but Go %s has %d tool(s)", currentVersion, bestSourceVersion, maxToolCount),
-			advice:  fmt.Sprintf("Sync tools with: goenv tools sync (or: goenv tools sync %s)", bestSourceVersion),
+			id:        "tool-sync",
+			name:      "Tool sync",
+			status:    StatusWarning,
+			message:   fmt.Sprintf("Current Go %s has no tools, but Go %s has %d tool(s)", currentVersion, bestSourceVersion, maxToolCount),
+			advice:    fmt.Sprintf("Sync tools with: goenv tools sync (or: goenv tools sync %s)", bestSourceVersion),
+			issueType: IssueTypeToolsMissing,
 		}
 	}
 
 	// Multiple versions have tools
 	return checkResult{
-		id:      "tool-sync",
-		name:    "Tool sync",
-		status:  "warning",
-		message: fmt.Sprintf("Current Go %s has no tools, but %d other version(s) have tools (e.g., Go %s has %d tool(s))", currentVersion, len(versionsWithTools), bestSourceVersion, maxToolCount),
-		advice:  fmt.Sprintf("Sync tools from best source: goenv tools sync (will auto-select Go %s)", bestSourceVersion),
+		id:        "tool-sync",
+		name:      "Tool sync",
+		status:    StatusWarning,
+		message:   fmt.Sprintf("Current Go %s has no tools, but %d other version(s) have tools (e.g., Go %s has %d tool(s))", currentVersion, len(versionsWithTools), bestSourceVersion, maxToolCount),
+		advice:    fmt.Sprintf("Sync tools from best source: goenv tools sync (will auto-select Go %s)", bestSourceVersion),
+		issueType: IssueTypeToolsMissing,
 	}
 }
 
@@ -1318,7 +2811,7 @@ func checkGocacheIsolation(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "build-cache-isolation",
 			name:    "Build cache isolation",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (no version set)",
 		}
 	}
@@ -1327,24 +2820,24 @@ func checkGocacheIsolation(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "build-cache-isolation",
 			name:    "Build cache isolation",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (using system Go)",
 		}
 	}
 
 	// Check if GOCACHE isolation is disabled
-	if os.Getenv("GOENV_DISABLE_GOCACHE") == "1" {
+	if utils.GoenvEnvVarDisableGocache.IsTrue() {
 		return checkResult{
 			id:      "build-cache-isolation",
 			name:    "Build cache isolation",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Cache isolation disabled by GOENV_DISABLE_GOCACHE",
 		}
 	}
 
 	// Get expected GOCACHE path
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
-	customGocacheDir := os.Getenv("GOENV_GOCACHE_DIR")
+	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
 	var expectedGocache string
 	if customGocacheDir != "" {
 		expectedGocache = filepath.Join(customGocacheDir, version)
@@ -1357,7 +2850,7 @@ func checkGocacheIsolation(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "build-cache-isolation",
 		name:    "Build cache isolation",
-		status:  "ok",
+		status:  StatusOK,
 		message: fmt.Sprintf("Version-specific cache: %s", expectedGocache),
 		advice:  "Cache isolation prevents 'exec format error' when switching versions",
 	}
@@ -1383,7 +2876,7 @@ func checkCacheArchitecture(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "cache-architecture",
 			name:    "Cache architecture",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Cannot determine GOCACHE location",
 		}
 	}
@@ -1394,7 +2887,7 @@ func checkCacheArchitecture(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "cache-architecture",
 			name:    "Cache architecture",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Build cache is empty or doesn't exist yet",
 		}
 	}
@@ -1406,17 +2899,18 @@ func checkCacheArchitecture(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "cache-architecture",
 			name:    "Cache architecture",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("Using version-specific cache for %s/%s", currentOS, currentArch),
 		}
 	}
 
 	return checkResult{
-		id:      "cache-architecture",
-		name:    "Cache architecture",
-		status:  "warning",
-		message: fmt.Sprintf("Using shared system cache at %s for %s/%s", gocache, currentOS, currentArch),
-		advice:  "If you see 'exec format error', run: goenv cache clean build",
+		id:        "cache-architecture",
+		name:      "Cache architecture",
+		status:    StatusWarning,
+		message:   fmt.Sprintf("Using shared system cache at %s for %s/%s", gocache, currentOS, currentArch),
+		advice:    "If you see 'exec format error', run: goenv cache clean build",
+		issueType: IssueTypeCacheArchMismatch,
 	}
 }
 
@@ -1443,9 +2937,11 @@ func listToolsForVersion(cfg *config.Config, version string) ([]string, error) {
 		}
 
 		name := entry.Name()
-		// Remove .exe extension on Windows
-		if runtime.GOOS == "windows" && strings.HasSuffix(name, ".exe") {
-			name = strings.TrimSuffix(name, ".exe")
+		// Remove Windows executable extensions for deduplication
+		if utils.IsWindows() {
+			for _, ext := range utils.WindowsExecutableExtensions() {
+				name = strings.TrimSuffix(name, ext)
+			}
 		}
 
 		// Skip common non-tool files
@@ -1466,7 +2962,7 @@ func checkCacheMountType(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "cache-mount-type",
 			name:    "Cache mount type",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (no version set)",
 		}
 	}
@@ -1475,24 +2971,24 @@ func checkCacheMountType(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "cache-mount-type",
 			name:    "Cache mount type",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (using system Go)",
 		}
 	}
 
 	// Check if GOCACHE isolation is disabled
-	if os.Getenv("GOENV_DISABLE_GOCACHE") == "1" {
+	if utils.GoenvEnvVarDisableGocache.IsTrue() {
 		return checkResult{
 			id:      "cache-mount-type",
 			name:    "Cache mount type",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Cache isolation disabled by GOENV_DISABLE_GOCACHE",
 		}
 	}
 
 	// Get expected GOCACHE path
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
-	customGocacheDir := os.Getenv("GOENV_GOCACHE_DIR")
+	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
 	var cachePath string
 	if customGocacheDir != "" {
 		cachePath = filepath.Join(customGocacheDir, version)
@@ -1506,7 +3002,7 @@ func checkCacheMountType(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "cache-mount-type",
 			name:    "Cache mount type",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "Cache directory is on a potentially problematic filesystem",
 			advice:  warning,
 		}
@@ -1517,7 +3013,7 @@ func checkCacheMountType(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "cache-mount-type",
 			name:    "Cache mount type",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Running in container (ensure cache directory is properly mounted)",
 			advice:  "For best performance in containers, use Docker volumes instead of bind mounts",
 		}
@@ -1526,7 +3022,7 @@ func checkCacheMountType(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "cache-mount-type",
 		name:    "Cache mount type",
-		status:  "ok",
+		status:  StatusOK,
 		message: "Cache directory is on a suitable filesystem",
 	}
 }
@@ -1538,7 +3034,7 @@ func checkGoToolchain() checkResult {
 		return checkResult{
 			id:      "gotoolchain-setting",
 			name:    "GOTOOLCHAIN setting",
-			status:  "ok",
+			status:  StatusOK,
 			message: "GOTOOLCHAIN not set (using default behavior)",
 		}
 	}
@@ -1547,7 +3043,7 @@ func checkGoToolchain() checkResult {
 		return checkResult{
 			id:      "gotoolchain-setting",
 			name:    "GOTOOLCHAIN setting",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "GOTOOLCHAIN=auto can cause issues with goenv version management",
 			advice:  "Consider setting GOTOOLCHAIN=local to prevent automatic toolchain switching. Add 'export GOTOOLCHAIN=local' to your shell config.",
 		}
@@ -1557,7 +3053,7 @@ func checkGoToolchain() checkResult {
 		return checkResult{
 			id:      "gotoolchain-setting",
 			name:    "GOTOOLCHAIN setting",
-			status:  "ok",
+			status:  StatusOK,
 			message: "GOTOOLCHAIN=local (recommended for goenv users)",
 		}
 	}
@@ -1566,7 +3062,7 @@ func checkGoToolchain() checkResult {
 	return checkResult{
 		id:      "gotoolchain-setting",
 		name:    "GOTOOLCHAIN setting",
-		status:  "warning",
+		status:  StatusWarning,
 		message: fmt.Sprintf("GOTOOLCHAIN=%s may interfere with goenv", gotoolchain),
 		advice:  "Consider setting GOTOOLCHAIN=local for consistent goenv behavior",
 	}
@@ -1579,17 +3075,17 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "architecture-aware-cache-isolation",
 			name:    "Architecture-aware cache isolation",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (no managed version active)",
 		}
 	}
 
 	// Check if cache isolation is disabled
-	if os.Getenv("GOENV_DISABLE_GOCACHE") == "1" {
+	if utils.GoenvEnvVarDisableGocache.IsTrue() {
 		return checkResult{
 			id:      "architecture-aware-cache-isolation",
 			name:    "Architecture-aware cache isolation",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Cache isolation disabled by GOENV_DISABLE_GOCACHE",
 		}
 	}
@@ -1607,7 +3103,7 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 	// Get Go binary path for ABI detection
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
 	goBinaryPath := filepath.Join(versionPath, "bin", "go")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinaryPath += ".exe"
 	}
 
@@ -1633,7 +3129,7 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 		}
 	}
 
-	customGocacheDir := os.Getenv("GOENV_GOCACHE_DIR")
+	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
 
 	var expectedGocache string
 	if customGocacheDir != "" {
@@ -1659,7 +3155,7 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "architecture-aware-cache-isolation",
 			name:    "Architecture-aware cache isolation",
-			status:  "ok",
+			status:  StatusOK,
 			message: fmt.Sprintf("Cache will be created at: %s", expectedGocache),
 			advice:  "Architecture-aware isolation prevents 'exec format error' during cross-compilation",
 		}
@@ -1674,7 +3170,7 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "architecture-aware-cache-isolation",
 			name:    "Architecture-aware cache isolation",
-			status:  "ok",
+			status:  StatusOK,
 			message: message,
 			advice:  "This prevents tool binary conflicts between native builds and cross-compilation",
 		}
@@ -1684,7 +3180,7 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "architecture-aware-cache-isolation",
 		name:    "Architecture-aware cache isolation",
-		status:  "warning",
+		status:  StatusWarning,
 		message: fmt.Sprintf("Found old-style cache at %s", oldCachePath),
 		advice:  fmt.Sprintf("New architecture-aware cache will be created at: %s. Old cache can be removed with: goenv cache clean build", expectedGocache),
 	}
@@ -1696,7 +3192,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (not macOS)",
 		}
 	}
@@ -1713,7 +3209,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (not Apple Silicon)",
 		}
 	}
@@ -1724,7 +3220,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (Intel Mac)",
 		}
 	}
@@ -1737,7 +3233,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Cannot determine executable path",
 		}
 	}
@@ -1749,7 +3245,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Cannot determine binary architecture",
 		}
 	}
@@ -1761,7 +3257,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "Running under Rosetta (x86_64 binary on Apple Silicon)",
 			advice:  "For better performance, use native arm64 version of goenv. Reinstall via: brew reinstall goenv",
 		}
@@ -1775,7 +3271,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "ok",
+			status:  StatusOK,
 			message: "goenv is native arm64",
 		}
 	}
@@ -1786,7 +3282,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "ok",
+			status:  StatusOK,
 			message: "goenv is native arm64",
 		}
 	}
@@ -1797,7 +3293,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "ok",
+			status:  StatusOK,
 			message: "goenv is native arm64",
 		}
 	}
@@ -1807,7 +3303,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
-			status:  "warning",
+			status:  StatusWarning,
 			message: fmt.Sprintf("Go %s is x86_64 (will run under Rosetta)", currentVersion),
 			advice:  "Consider using native arm64 Go version for better performance. Install with: goenv install <version>",
 		}
@@ -1817,19 +3313,19 @@ func checkRosetta(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "rosetta-detection",
 		name:    "Rosetta detection",
-		status:  "ok",
+		status:  StatusOK,
 		message: "Running natively on Apple Silicon (arm64)",
 	}
 }
 
 func checkPathOrder(cfg *config.Config) checkResult {
 	// Check that goenv shims directory appears before system Go in PATH
-	pathEnv := os.Getenv("PATH")
+	pathEnv := os.Getenv(utils.EnvVarPath)
 	if pathEnv == "" {
 		return checkResult{
 			id:      "path-order",
 			name:    "PATH order",
-			status:  "error",
+			status:  StatusError,
 			message: "PATH environment variable is empty",
 			advice:  "Ensure your shell is properly configured",
 		}
@@ -1851,7 +3347,7 @@ func checkPathOrder(cfg *config.Config) checkResult {
 		// Check if this directory contains a system 'go' binary
 		if systemGoIndex == -1 { // Only find first occurrence
 			goPath := filepath.Join(dir, "go")
-			if runtime.GOOS == "windows" {
+			if utils.IsWindows() {
 				goPath += ".exe"
 			}
 
@@ -1870,7 +3366,7 @@ func checkPathOrder(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "path-order",
 			name:    "PATH order",
-			status:  "warning",
+			status:  StatusWarning,
 			message: fmt.Sprintf("goenv shims directory not in PATH: %s", shimsDir),
 			advice:  "Add goenv shims to PATH. Run: eval \"$(goenv init -)\"",
 		}
@@ -1881,7 +3377,7 @@ func checkPathOrder(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "path-order",
 			name:    "PATH order",
-			status:  "ok",
+			status:  StatusOK,
 			message: "goenv shims are in PATH (no system Go detected)",
 		}
 	}
@@ -1891,7 +3387,7 @@ func checkPathOrder(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "path-order",
 			name:    "PATH order",
-			status:  "ok",
+			status:  StatusOK,
 			message: "goenv shims appear before system Go in PATH",
 		}
 	}
@@ -1900,7 +3396,7 @@ func checkPathOrder(cfg *config.Config) checkResult {
 	return checkResult{
 		id:      "path-order",
 		name:    "PATH order",
-		status:  "warning",
+		status:  StatusWarning,
 		message: "System Go appears before goenv shims in PATH",
 		advice:  fmt.Sprintf("System Go at position %d, goenv shims at position %d. Commands like 'go' will bypass goenv. Fix: eval \"$(goenv init -)\" in your shell config", systemGoIndex+1, shimsIndex+1),
 	}
@@ -1914,7 +3410,7 @@ func checkLibcCompatibility(_ *config.Config) checkResult {
 		return checkResult{
 			id:      "system-c-library",
 			name:    "System C library",
-			status:  "warning",
+			status:  StatusWarning,
 			message: "Could not detect system C library (glibc/musl)",
 			advice:  "This may indicate an unusual system configuration. CGO-based builds may fail.",
 		}
@@ -1953,7 +3449,7 @@ func checkLibcCompatibility(_ *config.Config) checkResult {
 	return checkResult{
 		id:      "system-c-library",
 		name:    "System C library",
-		status:  "ok",
+		status:  StatusOK,
 		message: message,
 		advice:  advice,
 	}
@@ -1967,7 +3463,7 @@ func checkMacOSDeploymentTarget(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "macos-deployment-target",
 			name:    "macOS deployment target",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (no managed version active)",
 		}
 	}
@@ -1978,7 +3474,7 @@ func checkMacOSDeploymentTarget(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "macos-deployment-target",
 			name:    "macOS deployment target",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Could not find Go binary to check",
 		}
 	}
@@ -1989,7 +3485,7 @@ func checkMacOSDeploymentTarget(cfg *config.Config) checkResult {
 		return checkResult{
 			id:      "macos-deployment-target",
 			name:    "macOS deployment target",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Binary is not a Mach-O file or could not be checked",
 		}
 	}
@@ -2001,12 +3497,12 @@ func checkMacOSDeploymentTarget(cfg *config.Config) checkResult {
 	}
 
 	// Determine status from issues
-	status := "ok"
+	status := StatusOK
 	advice := ""
 	if len(issues) > 0 {
 		for _, issue := range issues {
 			if issue.Severity == "warning" || issue.Severity == "error" {
-				status = "warning"
+				status = StatusWarning
 			}
 		}
 		// Collect advice
@@ -2036,7 +3532,7 @@ func checkWindowsCompiler(_ *config.Config) checkResult {
 		return checkResult{
 			id:      "windows-compiler",
 			name:    "Windows compiler",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (not on Windows)",
 		}
 	}
@@ -2053,17 +3549,17 @@ func checkWindowsCompiler(_ *config.Config) checkResult {
 	}
 
 	// Determine status
-	status := "ok"
+	status := StatusOK
 	advice := ""
 	if winInfo.Compiler == "unknown" {
-		status = "warning"
+		status = StatusWarning
 	}
 
 	// Collect advice from issues
 	if len(issues) > 0 {
 		for _, issue := range issues {
 			if issue.Severity == "warning" || issue.Severity == "error" {
-				status = "warning"
+				status = StatusWarning
 			}
 		}
 		adviceList := []string{}
@@ -2092,7 +3588,7 @@ func checkWindowsARM64(_ *config.Config) checkResult {
 		return checkResult{
 			id:      "windows-arm64arm64ec",
 			name:    "Windows ARM64/ARM64EC",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (not on Windows)",
 		}
 	}
@@ -2104,7 +3600,7 @@ func checkWindowsARM64(_ *config.Config) checkResult {
 	}
 
 	// Determine status and advice
-	status := "ok"
+	status := StatusOK
 	advice := ""
 	if len(issues) > 0 {
 		adviceList := []string{}
@@ -2133,7 +3629,7 @@ func checkLinuxKernelVersion(_ *config.Config) checkResult {
 		return checkResult{
 			id:      "linux-kernel-version",
 			name:    "Linux kernel version",
-			status:  "ok",
+			status:  StatusOK,
 			message: "Not applicable (not on Linux)",
 		}
 	}
@@ -2142,14 +3638,14 @@ func checkLinuxKernelVersion(_ *config.Config) checkResult {
 	message := fmt.Sprintf("Kernel: %s (v%d.%d.%d)", linuxInfo.KernelVersion, linuxInfo.KernelMajor, linuxInfo.KernelMinor, linuxInfo.KernelPatch)
 
 	// Determine status
-	status := "ok"
+	status := StatusOK
 	advice := ""
 	if len(issues) > 0 {
 		for _, issue := range issues {
 			if issue.Severity == "error" {
-				status = "error"
+				status = StatusError
 			} else if issue.Severity == "warning" && status != "error" {
-				status = "warning"
+				status = StatusWarning
 			}
 		}
 		// Collect advice
@@ -2170,5 +3666,79 @@ func checkLinuxKernelVersion(_ *config.Config) checkResult {
 		status:  status,
 		message: message,
 		advice:  advice,
+	}
+}
+
+// isInteractive checks if the terminal is interactive
+func isInteractive() bool {
+	// Check if stdin is a terminal
+	fileInfo, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+}
+
+// offerShellEnvironmentFix prompts the user to fix shell environment issues
+func offerShellEnvironmentFix(cmd *cobra.Command, results []checkResult, cfg *config.Config) {
+	// Find the shell-environment check result
+	var shellEnvResult *checkResult
+	for _, result := range results {
+		if result.id == "shell-environment" {
+			shellEnvResult = &result
+			break
+		}
+	}
+
+	// Only offer fix if there's an issue
+	if shellEnvResult == nil || shellEnvResult.status == StatusOK {
+		return
+	}
+
+	// Determine the appropriate init command for the shell
+	shell := shellutil.DetectShell()
+	initCommand := shellutil.GetInitLine(shell)
+	profilePath := shellutil.GetProfilePathDisplay(shell)
+
+	// Print a clear separator
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintf(cmd.OutOrStdout(), "%sShell Environment Issue Detected\n", utils.Emoji("⚠️  "))
+	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", utils.Emoji("❌"), shellEnvResult.message)
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Ask if they want to see the fix
+	fmt.Fprintf(cmd.OutOrStdout(), "Would you like to see the command to fix this? [Y/n]: ")
+
+	reader := bufio.NewReader(doctorStdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		// If we can't read input, just continue
+		return
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response == "" || response == "y" || response == "yes" {
+		// Show the fix command prominently with extra spacing
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Fprintf(cmd.OutOrStdout(), "%s Quick Fix\n", utils.Emoji("🔧 "))
+		fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintf(cmd.OutOrStdout(), "%sRun this command to activate goenv in your current shell:\n\n", utils.Emoji("💡 "))
+		fmt.Fprintf(cmd.OutOrStdout(), "    %s\n\n", utils.BoldGreen(initCommand))
+		fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Fprintln(cmd.OutOrStdout())
+
+		// Also provide instructions for making it permanent
+		fmt.Fprintf(cmd.OutOrStdout(), "%sTo make this permanent, add the following to %s:\n\n", utils.Emoji("📝 "), profilePath)
+		fmt.Fprintf(cmd.OutOrStdout(), "    %s\n", initCommand)
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+		// Pause so user can read and copy the command before more output
+		utils.PauseForUser(cmd.OutOrStdout(), reader)
 	}
 }

@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestCheckSettings_EnvVars(t *testing.T) {
@@ -758,7 +759,7 @@ func TestConvertToWorkspacePaths(t *testing.T) {
 	var workspaceRoot string
 	var externalPath1, externalPath2 string
 
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		workspaceRoot = `C:\Users\adam\projects\myapp`
 		externalPath1 = `C:\Program Files\Go`
 		externalPath2 = `C:\Users\adam\go\tools`

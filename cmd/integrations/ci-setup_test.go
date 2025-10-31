@@ -5,11 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestCISetupPowerShellQuoting(t *testing.T) {
@@ -53,7 +53,7 @@ func TestCISetupPowerShellQuoting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.skipOnNonWin && runtime.GOOS != "windows" {
+			if tt.skipOnNonWin && !utils.IsWindows() {
 				t.Skip("Skipping Windows-only test on non-Windows platform")
 			}
 
@@ -115,7 +115,7 @@ func TestCISetupPowerShellQuoting(t *testing.T) {
 }
 
 func TestCISetupPowerShellExecution(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Skipping PowerShell execution test on non-Windows platform")
 	}
 

@@ -1,12 +1,13 @@
 package version
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -115,7 +116,7 @@ func TestVersionFileWriteCommand(t *testing.T) {
 				}
 				goExec := filepath.Join(binDir, "go")
 				var content string
-				if runtime.GOOS == "windows" {
+				if utils.IsWindows() {
 					goExec += ".bat"
 					content = "@echo off\necho go version go1.21.0 windows/amd64\n"
 				} else {

@@ -8,6 +8,7 @@ import (
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
 	"github.com/go-nv/goenv/internal/completions"
+	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -57,57 +58,14 @@ func init() {
 	completionCmd.Flags().BoolVarP(&completionFlags.install, "install", "i", false, "Install completion script automatically")
 }
 
-func detectShell() string {
-	// Check SHELL environment variable
-	shell := os.Getenv("SHELL")
-	if shell != "" {
-		// Extract shell name from path
-		shell = filepath.Base(shell)
-
-		// Map shell names to completion types
-		switch shell {
-		case "bash":
-			return "bash"
-		case "zsh":
-			return "zsh"
-		case "fish":
-			return "fish"
-		}
-	}
-
-	// Check for PowerShell on Windows
-	if os.Getenv("PSModulePath") != "" || os.Getenv("PSMODULEPATH") != "" {
-		return "powershell"
-	}
-
-	// Check for specific shell environment variables
-	if os.Getenv("ZSH_VERSION") != "" {
-		return "zsh"
-	}
-	if os.Getenv("FISH_VERSION") != "" {
-		return "fish"
-	}
-	if os.Getenv("BASH_VERSION") != "" {
-		return "bash"
-	}
-
-	// Default to bash on Unix-like systems, PowerShell on Windows
-	if os.Getenv("COMSPEC") != "" {
-		return "powershell"
-	}
-
-	// Fallback to bash
-	return "bash"
-}
-
 func runCompletion(cmd *cobra.Command, args []string) error {
 	// Auto-detect shell if not specified
-	var shell string
+	var shell shellutil.ShellType
 	if len(args) == 0 {
-		shell = detectShell()
+		shell = shellutil.DetectShell()
 		fmt.Fprintf(cmd.OutOrStderr(), "Auto-detected shell: %s\n\n", shell)
 	} else {
-		shell = args[0]
+		shell = shellutil.ParseShellType(args[0])
 	}
 
 	var script string
@@ -115,14 +73,14 @@ func runCompletion(cmd *cobra.Command, args []string) error {
 	var installInstructions string
 
 	switch shell {
-	case "bash":
+	case shellutil.ShellTypeBash:
 		script = completions.Bash
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("cannot determine home directory: %w", err)
 		}
 		installPath = filepath.Join(home, ".bashrc")
-		installInstructions = fmt.Sprintf(`
+		installInstructions = `
 Bash completion script generated.
 
 To install manually:
@@ -131,9 +89,9 @@ To install manually:
 
 Or install system-wide (requires sudo):
   sudo goenv completion bash > /etc/bash_completion.d/goenv
-`)
+`
 
-	case "zsh":
+	case shellutil.ShellTypeZsh:
 		script = completions.Zsh
 		// Try to find zsh fpath
 		home, err := os.UserHomeDir()
@@ -143,7 +101,7 @@ Or install system-wide (requires sudo):
 		// Use user's home directory for zsh completions (cross-platform)
 		fpath := filepath.Join(home, ".zsh", "completions")
 		installPath = filepath.Join(fpath, "_goenv")
-		installInstructions = fmt.Sprintf(`
+		installInstructions = `
 Zsh completion script generated.
 
 To install manually:
@@ -153,24 +111,24 @@ To install manually:
   # Add to ~/.zshrc if not already there:
   fpath=(~/.zsh/completions $fpath)
   autoload -U compinit && compinit
-`)
+`
 
-	case "fish":
+	case shellutil.ShellTypeFish:
 		script = completions.Fish
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("cannot determine home directory: %w", err)
 		}
 		installPath = filepath.Join(home, ".config", "fish", "completions", "goenv.fish")
-		installInstructions = fmt.Sprintf(`
+		installInstructions = `
 Fish completion script generated.
 
 To install:
   mkdir -p ~/.config/fish/completions
   goenv completion fish > ~/.config/fish/completions/goenv.fish
-`)
+`
 
-	case "powershell":
+	case shellutil.ShellTypePowerShell:
 		script = completions.PowerShell
 		installInstructions = `
 PowerShell completion script generated.
@@ -206,13 +164,13 @@ To find your profile location:
 	return nil
 }
 
-func installCompletion(shell, script, installPath string) error {
+func installCompletion(shell shellutil.ShellType, script, installPath string) error {
 	switch shell {
-	case "bash":
+	case shellutil.ShellTypeBash:
 		// Append to .bashrc
 		return appendToFile(installPath, "\n# goenv shell completion\n"+script)
 
-	case "zsh":
+	case shellutil.ShellTypeZsh:
 		// Create directory and write file
 		dir := filepath.Dir(installPath)
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -220,7 +178,7 @@ func installCompletion(shell, script, installPath string) error {
 		}
 		return os.WriteFile(installPath, []byte(script), 0644)
 
-	case "fish":
+	case shellutil.ShellTypeFish:
 		// Create directory and write file
 		dir := filepath.Dir(installPath)
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -228,7 +186,7 @@ func installCompletion(shell, script, installPath string) error {
 		}
 		return os.WriteFile(installPath, []byte(script), 0644)
 
-	case "powershell":
+	case shellutil.ShellTypePowerShell:
 		// Would need to find $PROFILE on Windows
 		return fmt.Errorf("automatic installation not supported for PowerShell, use: goenv completion powershell >> $PROFILE")
 

@@ -19,11 +19,14 @@ const (
 )
 
 var (
-	scriptDir string
-	goBinary  string
-	backupDir string
-	goenvPath string
-	useColor  = true
+	scriptDir   string
+	goBinary    string
+	backupDir   string
+	goenvPath   string
+	useColor    = true
+	dryRun      bool
+	updateAll   bool
+	interactive = true
 )
 
 func init() {
@@ -88,47 +91,114 @@ func errorExit(msg string) {
 }
 
 func detectGoenv() (string, error) {
+	installations := detectAllGoenv()
+	if len(installations) == 0 {
+		return "", fmt.Errorf("goenv not found")
+	}
+	return installations[0], nil
+}
+
+func detectAllGoenv() []string {
+	var found []string
+	seen := make(map[string]bool)
+
 	// Method 1: Check PATH
-	path, err := exec.LookPath("goenv")
-	if err == nil {
-		// Resolve symlinks
-		resolved, err := filepath.EvalSymlinks(path)
-		if err == nil {
-			return resolved, nil
+	if path, err := exec.LookPath("goenv"); err == nil {
+		// Resolve symlinks to get actual file
+		resolved := path
+		if r, err := filepath.EvalSymlinks(path); err == nil {
+			resolved = r
 		}
-		return path, nil
+		if !seen[resolved] {
+			found = append(found, resolved)
+			seen[resolved] = true
+		}
 	}
 
-	// Method 2: Check Homebrew
+	// Build list of common locations to check
+	homeDir, _ := os.UserHomeDir()
+	locations := []string{}
+
+	// Method 2: Homebrew locations
 	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
-		brewPaths := []string{
+		locations = append(locations,
 			"/opt/homebrew/bin/goenv",              // ARM Mac
 			"/usr/local/bin/goenv",                 // Intel Mac / Linux Homebrew
 			"/home/linuxbrew/.linuxbrew/bin/goenv", // Linux Homebrew
+		)
+	}
+
+	// Method 3: Manual installation
+	locations = append(locations, filepath.Join(homeDir, ".goenv", "bin", "goenv"))
+
+	// Method 4: System locations (Unix)
+	if runtime.GOOS != "windows" {
+		locations = append(locations,
+			"/usr/bin/goenv",
+			"/usr/local/bin/goenv",
+			"/opt/goenv/bin/goenv",
+		)
+	}
+
+	// Method 5: Windows locations
+	if runtime.GOOS == "windows" {
+		locations = append(locations,
+			filepath.Join(homeDir, "bin", "goenv.exe"),
+			filepath.Join(homeDir, ".goenv", "bin", "goenv.exe"),
+			"C:\\Program Files\\goenv\\goenv.exe",
+			"C:\\goenv\\bin\\goenv.exe",
+		)
+
+		// Check scoop
+		if scoopPath := os.Getenv("SCOOP"); scoopPath != "" {
+			locations = append(locations, filepath.Join(scoopPath, "shims", "goenv.exe"))
 		}
 
-		for _, p := range brewPaths {
-			if _, err := os.Stat(p); err == nil {
-				return p, nil
+		// Check chocolatey
+		if programData := os.Getenv("ProgramData"); programData != "" {
+			locations = append(locations, filepath.Join(programData, "chocolatey", "bin", "goenv.exe"))
+		}
+	}
+
+	// Check all locations
+	for _, loc := range locations {
+		if stat, err := os.Stat(loc); err == nil && !stat.IsDir() {
+			// Resolve symlinks
+			resolved := loc
+			if r, err := filepath.EvalSymlinks(loc); err == nil {
+				resolved = r
+			}
+
+			if !seen[resolved] {
+				found = append(found, resolved)
+				seen[resolved] = true
 			}
 		}
 	}
 
-	// Method 3: Check manual installation
-	homeDir, _ := os.UserHomeDir()
-	manualPath := filepath.Join(homeDir, ".goenv", "bin", "goenv")
-	if _, err := os.Stat(manualPath); err == nil {
-		return manualPath, nil
-	}
+	return found
+}
 
-	// Method 4: Check system (Unix only)
-	if runtime.GOOS != "windows" {
-		if _, err := os.Stat("/usr/bin/goenv"); err == nil {
-			return "/usr/bin/goenv", nil
+func detectShellOverrides() []string {
+	var warnings []string
+
+	// Check for shell function/alias (bash)
+	shells := []string{"bash", "zsh"}
+	for _, shell := range shells {
+		if _, err := exec.LookPath(shell); err == nil {
+			cmd := exec.Command(shell, "-c", "type -t goenv 2>/dev/null")
+			if output, err := cmd.Output(); err == nil {
+				outStr := string(output)
+				if outStr == "function\n" {
+					warnings = append(warnings, fmt.Sprintf("Shell function 'goenv' detected in %s", shell))
+				} else if outStr == "alias\n" {
+					warnings = append(warnings, fmt.Sprintf("Shell alias 'goenv' detected in %s", shell))
+				}
+			}
 		}
 	}
 
-	return "", fmt.Errorf("goenv not found")
+	return warnings
 }
 
 func checkGoenv() {
@@ -193,44 +263,32 @@ func cmdStatus() {
 	fmt.Println("  goenv Status")
 	fmt.Println("═══════════════════════════════════════")
 
-	goenvPath, err := detectGoenv()
-
 	log(fmt.Sprintf("System: %s %s", runtime.GOOS, runtime.GOARCH))
+	fmt.Println()
 
-	if err == nil {
-		log(fmt.Sprintf("goenv location: %s", goenvPath))
-
-		if fileInfo, err := os.Stat(goenvPath); err == nil {
-			// Check if it's a binary or script
-			if fileInfo.Mode()&0111 != 0 {
-				// Read first bytes to determine type
-				f, err := os.Open(goenvPath)
-				if err == nil {
-					buf := make([]byte, 4)
-					f.Read(buf)
-					f.Close()
-
-					// Check for ELF (Linux) or Mach-O (macOS) magic numbers
-					if buf[0] == 0x7f && buf[1] == 0x45 && buf[2] == 0x4c && buf[3] == 0x46 {
-						success("Currently: Go version (ELF binary)")
-					} else if buf[0] == 0xcf && buf[1] == 0xfa {
-						success("Currently: Go version (Mach-O binary)")
-					} else if buf[0] == '#' && buf[1] == '!' {
-						warn("Currently: Bash version (script)")
-					} else {
-						fmt.Printf("  Type: Unknown\n")
-					}
-				}
-			}
-
-			log("Version:")
-			cmd := exec.Command(goenvPath, "--version")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			cmd.Run()
-		}
-	} else {
+	installations := detectAllGoenv()
+	if len(installations) == 0 {
 		warn("goenv not found in PATH or common locations")
+	} else if len(installations) == 1 {
+		log(fmt.Sprintf("goenv location: %s", installations[0]))
+		showGoenvInfo(installations[0])
+	} else {
+		warn(fmt.Sprintf("Found %d goenv installations:", len(installations)))
+		for i, path := range installations {
+			fmt.Printf("\n  %d. %s\n", i+1, path)
+			showGoenvInfo(path)
+		}
+		fmt.Println()
+		warn("Multiple installations may cause conflicts!")
+		warn("Use 'goenv doctor' to check for issues")
+	}
+
+	// Check for shell overrides
+	if overrides := detectShellOverrides(); len(overrides) > 0 {
+		fmt.Println()
+		for _, override := range overrides {
+			warn(override)
+		}
 	}
 
 	fmt.Println()
@@ -252,10 +310,52 @@ func cmdStatus() {
 	fmt.Println("═══════════════════════════════════════")
 }
 
+func showGoenvInfo(path string) {
+	if fileInfo, err := os.Stat(path); err == nil {
+		// Check if it's a binary or script
+		if fileInfo.Mode()&0111 != 0 {
+			// Read first bytes to determine type
+			f, err := os.Open(path)
+			if err == nil {
+				buf := make([]byte, 4)
+				f.Read(buf)
+				f.Close()
+
+				// Check for ELF (Linux) or Mach-O (macOS) magic numbers
+				if buf[0] == 0x7f && buf[1] == 0x45 && buf[2] == 0x4c && buf[3] == 0x46 {
+					fmt.Printf("     Type: Go version (ELF binary)\n")
+				} else if buf[0] == 0xcf && buf[1] == 0xfa {
+					fmt.Printf("     Type: Go version (Mach-O binary)\n")
+				} else if buf[0] == 0x4d && buf[1] == 0x5a {
+					fmt.Printf("     Type: Go version (PE binary)\n")
+				} else if buf[0] == '#' && buf[1] == '!' {
+					fmt.Printf("     Type: Bash version (script)\n")
+				} else {
+					fmt.Printf("     Type: Unknown\n")
+				}
+			}
+		}
+
+		// Show version
+		cmd := exec.Command(path, "--version")
+		if output, err := cmd.Output(); err == nil {
+			fmt.Printf("     Version: %s", string(output))
+		}
+	}
+}
+
 func cmdGo() {
 	log("Switching to Go version...")
 
-	checkGoenv()
+	installations := detectAllGoenv()
+	if len(installations) == 0 {
+		errorExit(`goenv not found. Please install goenv first.
+
+Options:
+  - Homebrew:    brew install goenv
+  - Manual:      git clone https://github.com/go-nv/goenv ~/.goenv
+  - Package mgr: apt/yum/pkg install goenv`)
+	}
 
 	// Check if Go binary exists
 	if _, err := os.Stat(goBinary); os.IsNotExist(err) {
@@ -263,13 +363,73 @@ func cmdGo() {
 		cmdBuild()
 	}
 
+	// Determine which installations to update
+	targets := []string{}
+	if updateAll {
+		targets = installations
+		log(fmt.Sprintf("Updating all %d installations...", len(installations)))
+	} else if len(installations) > 1 && interactive && !dryRun {
+		// Interactive selection
+		fmt.Println()
+		warn(fmt.Sprintf("Found %d goenv installations:", len(installations)))
+		for i, path := range installations {
+			fmt.Printf("  %d. %s\n", i+1, path)
+		}
+		fmt.Println()
+		fmt.Print("Which installation do you want to update? [1, or 'all']: ")
+
+		var choice string
+		fmt.Scanln(&choice)
+
+		if choice == "all" || choice == "a" {
+			targets = installations
+		} else if choice == "" || choice == "1" {
+			targets = []string{installations[0]}
+		} else {
+			// Parse number
+			var num int
+			fmt.Sscanf(choice, "%d", &num)
+			if num > 0 && num <= len(installations) {
+				targets = []string{installations[num-1]}
+			} else {
+				errorExit("Invalid selection")
+			}
+		}
+	} else {
+		targets = []string{installations[0]}
+	}
+
+	// Update each target
+	for _, target := range targets {
+		fmt.Println()
+		log(fmt.Sprintf("Updating: %s", target))
+
+		if dryRun {
+			success(fmt.Sprintf("[DRY RUN] Would update: %s", target))
+			continue
+		}
+
+		swapGoenvBinary(target)
+	}
+
+	fmt.Println()
+	success("Switch successful!")
+	warn("IMPORTANT: Reload your shell before testing:")
+	fmt.Println("  hash -r")
+	fmt.Println("  # OR restart your terminal")
+	fmt.Println()
+	warn("To test: goenv --version")
+	warn("If it hangs, swap back with: ./swap bash")
+}
+
+func swapGoenvBinary(target string) {
 	// Create backup if it doesn't exist
-	backupFile := filepath.Join(backupDir, "goenv.bash")
+	backupFile := filepath.Join(backupDir, filepath.Base(target)+".bash")
 	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
 		log("Creating backup...")
 		os.MkdirAll(backupDir, 0755)
 
-		src, err := os.Open(goenvPath)
+		src, err := os.Open(target)
 		if err != nil {
 			errorExit(fmt.Sprintf("Cannot read goenv: %v", err))
 		}
@@ -297,19 +457,19 @@ func cmdGo() {
 	}
 	defer src.Close()
 
-	dst, err := os.Create(goenvPath)
+	dst, err := os.Create(target)
 	if err != nil {
 		// Try with sudo if regular copy fails (Unix only)
 		if runtime.GOOS != "windows" {
 			log("Regular copy failed, trying with sudo...")
-			cmd := exec.Command("sudo", "cp", goBinary, goenvPath)
+			cmd := exec.Command("sudo", "cp", goBinary, target)
 			if err := cmd.Run(); err == nil {
-				success(fmt.Sprintf("Copied: %s → %s (with sudo)", goBinary, goenvPath))
+				success(fmt.Sprintf("Copied: %s → %s (with sudo)", goBinary, target))
 			} else {
-				errorExit(fmt.Sprintf("Cannot copy to %s\n\nTry manually:\n  sudo cp %s %s", goenvPath, goBinary, goenvPath))
+				errorExit(fmt.Sprintf("Cannot copy to %s\n\nTry manually:\n  sudo cp %s %s", target, goBinary, target))
 			}
 		} else {
-			errorExit(fmt.Sprintf("Cannot write to %s: %v", goenvPath, err))
+			errorExit(fmt.Sprintf("Cannot write to %s: %v", target, err))
 		}
 	} else {
 		defer dst.Close()
@@ -317,28 +477,22 @@ func cmdGo() {
 			errorExit(fmt.Sprintf("Copy failed: %v", err))
 		}
 		dst.Chmod(0755)
-		success(fmt.Sprintf("Copied: %s → %s", goBinary, goenvPath))
+		success(fmt.Sprintf("Copied: %s → %s", goBinary, target))
 
-		// Make executable
-		if err := os.Chmod(goenvPath, 0755); err != nil {
-			warn(fmt.Sprintf("Could not set executable permission: %v", err))
+		// Make executable (Unix only - Windows uses file extension)
+		if runtime.GOOS != "windows" {
+			if err := os.Chmod(target, 0755); err != nil {
+				warn(fmt.Sprintf("Could not set executable permission: %v", err))
+			}
 		}
 	}
-	
+
 	// Verify file was copied
-	if stat, err := os.Stat(goenvPath); err == nil {
+	if stat, err := os.Stat(target); err == nil {
 		success(fmt.Sprintf("Binary installed (%d bytes)", stat.Size()))
 	} else {
 		errorExit(fmt.Sprintf("Verification failed: %v", err))
 	}
-	
-	success("Switch successful!")
-	warn("IMPORTANT: Reload your shell before testing:")
-	fmt.Println("  hash -r")
-	fmt.Println("  # OR restart your terminal")
-	fmt.Println()
-	warn("To test: goenv --version")
-	warn("If it hangs, swap back with: ./swap bash")
 }
 
 func cmdBash() {
@@ -406,7 +560,7 @@ func cmdBash() {
 }
 
 func printUsage() {
-	fmt.Println("Usage: swap {build|go|bash|status}")
+	fmt.Println("Usage: swap {build|go|bash|status} [flags]")
 	fmt.Println()
 	fmt.Println("Commands:")
 	fmt.Println("  build   - Build the Go version")
@@ -414,13 +568,21 @@ func printUsage() {
 	fmt.Println("  bash    - Switch back to bash version")
 	fmt.Println("  status  - Show current version and status")
 	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  --all       Update all goenv installations (use with 'go')")
+	fmt.Println("  --dry-run   Show what would be done without actually doing it")
+	fmt.Println("  --yes       Non-interactive mode, use default selection")
+	fmt.Println()
 	fmt.Println("Cross-platform: Works on macOS, Linux, BSD, WSL, Windows")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  swap build    # Build Go version first")
-	fmt.Println("  swap status   # Check current version")
-	fmt.Println("  swap go       # Switch to Go version")
-	fmt.Println("  swap bash     # Switch back to bash version")
+	fmt.Println("  swap build              # Build Go version first")
+	fmt.Println("  swap status             # Check current version")
+	fmt.Println("  swap go                 # Switch to Go version (interactive)")
+	fmt.Println("  swap go --all           # Update all installations")
+	fmt.Println("  swap go --dry-run       # Preview changes without applying")
+	fmt.Println("  swap go --yes           # Non-interactive, update first found")
+	fmt.Println("  swap bash               # Switch back to bash version")
 }
 
 func main() {
@@ -429,7 +591,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	switch os.Args[1] {
+	// Parse flags
+	cmd := os.Args[1]
+	for i := 2; i < len(os.Args); i++ {
+		switch os.Args[i] {
+		case "--all", "-a":
+			updateAll = true
+		case "--dry-run", "-n":
+			dryRun = true
+		case "--yes", "-y":
+			interactive = false
+		case "--help", "-h":
+			printUsage()
+			os.Exit(0)
+		default:
+			errorExit(fmt.Sprintf("Unknown flag: %s", os.Args[i]))
+		}
+	}
+
+	switch cmd {
 	case "build":
 		cmdBuild()
 	case "go":
@@ -441,6 +621,10 @@ func main() {
 			fmt.Println("Switching to Go version of goenv")
 		}
 		fmt.Println()
+		if dryRun {
+			log("[DRY RUN MODE] - No changes will be made")
+			fmt.Println()
+		}
 		cmdGo()
 	case "bash":
 		if useColor {

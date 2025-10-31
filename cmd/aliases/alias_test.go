@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/cmd/legacy"
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/spf13/cobra"
 )
 
@@ -88,7 +88,7 @@ func TestAliasCommand(t *testing.T) {
 		{
 			name:          "error on too many arguments",
 			args:          []string{"stable", "1.23.0", "extra"},
-			expectedError: "Usage: goenv alias [name] [version]",
+			expectedError: "usage: goenv alias [name] [version]",
 		},
 	}
 
@@ -200,12 +200,12 @@ func TestUnaliasCommand(t *testing.T) {
 		{
 			name:          "error on no arguments",
 			args:          []string{},
-			expectedError: "Usage: goenv unalias <name>",
+			expectedError: "usage: goenv unalias <name>",
 		},
 		{
 			name:          "error on too many arguments",
 			args:          []string{"stable", "extra"},
-			expectedError: "Usage: goenv unalias <name>",
+			expectedError: "usage: goenv unalias <name>",
 		},
 	}
 

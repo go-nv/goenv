@@ -388,7 +388,7 @@ goenv hooks validate
 goenv hooks test post_install
 ```
 
-**See:** [Hooks Guide](HOOKS.md) for complete documentation
+**See:** [Hooks Guide](../reference/HOOKS.md) for complete documentation
 
 ### 2. GOPATH Structure Change (If Enabled)
 
@@ -767,8 +767,8 @@ The Go version is a true **drop-in replacement**:
 
 ## Further Reading
 
-- [New Features Overview](NEW_FEATURES.md)
-- [Hooks Guide](HOOKS.md)
+- [New Features Overview](../internal/NEW_FEATURES.md)
+- [Hooks Guide](../reference/HOOKS.md)
 - [Smart Caching Guide](advanced/SMART_CACHING.md)
 - [GOPATH Integration Guide](advanced/GOPATH_INTEGRATION.md)
 - [Commands Reference](reference/COMMANDS.md)

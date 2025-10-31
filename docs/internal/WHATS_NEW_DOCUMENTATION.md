@@ -6,7 +6,7 @@ Recent documentation improvements to help you get more out of goenv.
 
 ## 🎉 New Comprehensive Guides
 
-### [Hooks System Quick Start](./HOOKS_QUICKSTART.md) ⭐ NEW
+### [Hooks System Quick Start](../reference/HOOKS_QUICKSTART.md) ⭐ NEW
 
 **Get productive with hooks in 5 minutes**
 
@@ -27,7 +27,7 @@ goenv hooks validate
 
 ---
 
-### [Compliance Use Cases Guide](./COMPLIANCE_USE_CASES.md) ⭐ NEW
+### [Compliance Use Cases Guide](../advanced/COMPLIANCE_USE_CASES.md) ⭐ NEW
 
 **Complete compliance and security reference**
 
@@ -51,7 +51,7 @@ goenv sbom project --tool=cyclonedx-gomod --output=sbom.json
 
 ---
 
-### [Platform Support Matrix](./PLATFORM_SUPPORT.md) ⭐ NEW
+### [Platform Support Matrix](../reference/PLATFORM_SUPPORT.md) ⭐ NEW
 
 **Know exactly what works on your platform**
 
@@ -68,7 +68,7 @@ goenv sbom project --tool=cyclonedx-gomod --output=sbom.json
 
 ---
 
-### [Modern vs Legacy Commands](./MODERN_COMMANDS.md) ⭐ NEW
+### [Modern vs Legacy Commands](../user-guide/MODERN_COMMANDS.md) ⭐ NEW
 
 **Learn the recommended command interface**
 
@@ -95,7 +95,7 @@ goenv install --list
 
 ---
 
-### [Cache Troubleshooting Guide](./CACHE_TROUBLESHOOTING.md) ⭐ NEW
+### [Cache Troubleshooting Guide](../advanced/CACHE_TROUBLESHOOTING.md) ⭐ NEW
 
 **Solve cache issues fast**
 
@@ -117,7 +117,7 @@ goenv cache clean all --force  # Nuclear option
 
 ---
 
-### [JSON Output Guide](./JSON_OUTPUT_GUIDE.md) ⭐ NEW
+### [JSON Output Guide](../reference/JSON_OUTPUT_GUIDE.md) ⭐ NEW
 
 **Automate everything with structured output**
 
@@ -142,7 +142,7 @@ goenv list --json | jq -r '.[] | select(.active) | .version'
 
 ### Enhanced: Command Reference
 
-**Location:** [docs/reference/COMMANDS.md](./reference/COMMANDS.md)
+**Location:** [docs/reference/COMMANDS.md](../reference/COMMANDS.md)
 
 **What's new:**
 - ✅ `--force` guidance for non-interactive commands
@@ -156,7 +156,7 @@ goenv list --json | jq -r '.[] | select(.active) | .version'
 
 ### Enhanced: VS Code Integration
 
-**Location:** [docs/user-guide/VSCODE_INTEGRATION.md](./user-guide/VSCODE_INTEGRATION.md)
+**Location:** [docs/user-guide/VSCODE_INTEGRATION.md](../user-guide/VSCODE_INTEGRATION.md)
 
 **What's new:**
 - ✅ `goenv vscode setup` as primary option
@@ -176,7 +176,7 @@ goenv vscode setup
 
 ### Enhanced: Hooks Security
 
-**Location:** [docs/HOOKS.md](./HOOKS.md)
+**Location:** [docs/HOOKS.md](../reference/HOOKS.md)
 
 **What's new:**
 - ✅ Stronger `run_command` security guidance
@@ -255,86 +255,86 @@ goenv vscode setup
 ### New Users
 
 **Start here:**
-1. [Installation Guide](./user-guide/INSTALL.md)
-2. [Modern Commands Guide](./MODERN_COMMANDS.md) - Learn the right way
-3. [Quick Reference](./QUICK_REFERENCE.md) - Cheat sheet
-4. [FAQ](./FAQ.md) - Common questions
+1. [Installation Guide](../user-guide/INSTALL.md)
+2. [Modern Commands Guide](../user-guide/MODERN_COMMANDS.md) - Learn the right way
+3. [Quick Reference](../QUICK_REFERENCE.md) - Cheat sheet
+4. [FAQ](../FAQ.md) - Common questions
 
 ### Existing Users
 
 **Check out:**
-1. [What's New](./WHATS_NEW_DOCUMENTATION.md) - This document!
-2. [Modern Commands](./MODERN_COMMANDS.md) - Update your workflows
-3. [Cache Troubleshooting](./CACHE_TROUBLESHOOTING.md) - Solve issues
-4. [JSON Output Guide](./JSON_OUTPUT_GUIDE.md) - Automate more
+1. [What's New](WHATS_NEW_DOCUMENTATION.md) - This document!
+2. [Modern Commands](../user-guide/MODERN_COMMANDS.md) - Update your workflows
+3. [Cache Troubleshooting](../advanced/CACHE_TROUBLESHOOTING.md) - Solve issues
+4. [JSON Output Guide](../reference/JSON_OUTPUT_GUIDE.md) - Automate more
 
 ### Compliance Teams
 
 **Essential reading:**
-1. [Compliance Use Cases](./COMPLIANCE_USE_CASES.md) - SOC 2, ISO 27001
-2. [SBOM Command Reference](./reference/COMMANDS.md#goenv-sbom)
-3. [Inventory Command Reference](./reference/COMMANDS.md#goenv-inventory)
-4. [Hooks Quick Start](./HOOKS_QUICKSTART.md) - Automation
+1. [Compliance Use Cases](../advanced/COMPLIANCE_USE_CASES.md) - SOC 2, ISO 27001
+2. [SBOM Command Reference](../reference/COMMANDS.md#goenv-sbom)
+3. [Inventory Command Reference](../reference/COMMANDS.md#goenv-inventory)
+4. [Hooks Quick Start](../reference/HOOKS_QUICKSTART.md) - Automation
 
 ### CI/CD Engineers
 
 **Must read:**
-1. [CI/CD Guide](./CI_CD_GUIDE.md)
-2. [JSON Output Guide](./JSON_OUTPUT_GUIDE.md) - Automation
-3. [Cache Troubleshooting](./CACHE_TROUBLESHOOTING.md) - Optimization
-4. [Platform Support](./PLATFORM_SUPPORT.md) - Cross-platform
+1. [CI/CD Guide](../advanced/CI_CD_GUIDE.md)
+2. [JSON Output Guide](../reference/JSON_OUTPUT_GUIDE.md) - Automation
+3. [Cache Troubleshooting](../advanced/CACHE_TROUBLESHOOTING.md) - Optimization
+4. [Platform Support](../reference/PLATFORM_SUPPORT.md) - Cross-platform
 
 ### Security Engineers
 
 **Security-focused:**
-1. [Hooks Security Model](./HOOKS.md#security-model)
-2. [Compliance Use Cases](./COMPLIANCE_USE_CASES.md)
-3. [Platform Support](./PLATFORM_SUPPORT.md) - Security features
-4. [run_command Security](./HOOKS.md#run_command)
+1. [Hooks Security Model](../reference/HOOKS.md#security-model)
+2. [Compliance Use Cases](../advanced/COMPLIANCE_USE_CASES.md)
+3. [Platform Support](../reference/PLATFORM_SUPPORT.md) - Security features
+4. [run_command Security](../reference/HOOKS.md#run_command)
 
 ### Platform Engineers
 
 **Platform-specific:**
-1. [Platform Support Matrix](./PLATFORM_SUPPORT.md)
-2. [Cache Troubleshooting](./CACHE_TROUBLESHOOTING.md)
-3. [Cross-Building Guide](./advanced/CROSS_BUILDING.md)
-4. [What NOT to Sync](./advanced/WHAT_NOT_TO_SYNC.md)
+1. [Platform Support Matrix](../reference/PLATFORM_SUPPORT.md)
+2. [Cache Troubleshooting](../advanced/CACHE_TROUBLESHOOTING.md)
+3. [Cross-Building Guide](../advanced/CROSS_BUILDING.md)
+4. [What NOT to Sync](../advanced/WHAT_NOT_TO_SYNC.md)
 
 ## 🔍 Finding Documentation
 
 ### By Topic
 
 **Installation & Setup:**
-- [Installation Guide](./user-guide/INSTALL.md)
-- [How It Works](./user-guide/HOW_IT_WORKS.md)
-- [VS Code Integration](./user-guide/VSCODE_INTEGRATION.md)
+- [Installation Guide](../user-guide/INSTALL.md)
+- [How It Works](../user-guide/HOW_IT_WORKS.md)
+- [VS Code Integration](../user-guide/VSCODE_INTEGRATION.md)
 
 **Commands:**
-- [Command Reference](./reference/COMMANDS.md)
-- [Modern Commands Guide](./MODERN_COMMANDS.md)
-- [Quick Reference](./QUICK_REFERENCE.md)
+- [Command Reference](../reference/COMMANDS.md)
+- [Modern Commands Guide](../user-guide/MODERN_COMMANDS.md)
+- [Quick Reference](../QUICK_REFERENCE.md)
 
 **Automation:**
-- [Hooks Quick Start](./HOOKS_QUICKSTART.md)
-- [Hooks (Complete)](./HOOKS.md)
-- [JSON Output Guide](./JSON_OUTPUT_GUIDE.md)
-- [CI/CD Guide](./CI_CD_GUIDE.md)
+- [Hooks Quick Start](../reference/HOOKS_QUICKSTART.md)
+- [Hooks (Complete)](../reference/HOOKS.md)
+- [JSON Output Guide](../reference/JSON_OUTPUT_GUIDE.md)
+- [CI/CD Guide](../advanced/CI_CD_GUIDE.md)
 
 **Compliance:**
-- [Compliance Use Cases](./COMPLIANCE_USE_CASES.md)
-- [SBOM Command](./reference/COMMANDS.md#goenv-sbom)
-- [Inventory Command](./reference/COMMANDS.md#goenv-inventory)
+- [Compliance Use Cases](../advanced/COMPLIANCE_USE_CASES.md)
+- [SBOM Command](../reference/COMMANDS.md#goenv-sbom)
+- [Inventory Command](../reference/COMMANDS.md#goenv-inventory)
 
 **Troubleshooting:**
-- [Cache Troubleshooting](./CACHE_TROUBLESHOOTING.md)
-- [Platform Support](./PLATFORM_SUPPORT.md)
-- [FAQ](./FAQ.md)
+- [Cache Troubleshooting](../advanced/CACHE_TROUBLESHOOTING.md)
+- [Platform Support](../reference/PLATFORM_SUPPORT.md)
+- [FAQ](../FAQ.md)
 
 **Advanced:**
-- [Smart Caching](./advanced/SMART_CACHING.md)
-- [Cross-Building](./advanced/CROSS_BUILDING.md)
-- [GOPATH Integration](./advanced/GOPATH_INTEGRATION.md)
-- [What NOT to Sync](./advanced/WHAT_NOT_TO_SYNC.md)
+- [Smart Caching](../advanced/SMART_CACHING.md)
+- [Cross-Building](../advanced/CROSS_BUILDING.md)
+- [GOPATH Integration](../advanced/GOPATH_INTEGRATION.md)
+- [What NOT to Sync](../advanced/WHAT_NOT_TO_SYNC.md)
 
 ## 💡 Documentation Highlights
 
@@ -350,29 +350,29 @@ goenv vscode setup
 
 **Want to write great docs? Learn from these:**
 
-- [Hooks Quick Start](./HOOKS_QUICKSTART.md) - Perfect quick start pattern
-- [goenv vscode setup](./reference/COMMANDS.md#goenv-vscode-setup) - Clear command docs
-- [run_command action](./HOOKS.md#run_command) - Security-first approach
-- [Compliance Use Cases](./COMPLIANCE_USE_CASES.md) - Comprehensive how-to
+- [Hooks Quick Start](../reference/HOOKS_QUICKSTART.md) - Perfect quick start pattern
+- [goenv vscode setup](../reference/COMMANDS.md#goenv-vscode-setup) - Clear command docs
+- [run_command action](../reference/HOOKS.md#run_command) - Security-first approach
+- [Compliance Use Cases](../advanced/COMPLIANCE_USE_CASES.md) - Comprehensive how-to
 
 ### Hidden Gems
 
 **Lesser-known but valuable:**
 
-- [JSON schemas](./JSON_OUTPUT_GUIDE.md#json-schemas) - For tool developers
-- [Cache types](./CACHE_TROUBLESHOOTING.md#cache-types) - Understanding internals
-- [Shell support matrix](./PLATFORM_SUPPORT.md#shell-support) - Platform compatibility
+- [JSON schemas](../reference/JSON_OUTPUT_GUIDE.md#json-schemas) - For tool developers
+- [Cache types](../advanced/CACHE_TROUBLESHOOTING.md#cache-types) - Understanding internals
+- [Shell support matrix](../reference/PLATFORM_SUPPORT.md#shell-support) - Platform compatibility
 - [Documentation patterns](./CONTRIBUTING.md#common-documentation-patterns) - For contributors
 
 ## 🎓 Learning Paths
 
 ### Path 1: Complete Beginner
 
-1. [Installation Guide](./user-guide/INSTALL.md) - Get goenv installed
-2. [Quick Reference](./QUICK_REFERENCE.md) - Learn basic commands
-3. [Modern Commands](./MODERN_COMMANDS.md) - Use recommended interface
-4. [VS Code Integration](./user-guide/VSCODE_INTEGRATION.md) - Set up your editor
-5. [FAQ](./FAQ.md) - Common questions answered
+1. [Installation Guide](../user-guide/INSTALL.md) - Get goenv installed
+2. [Quick Reference](../QUICK_REFERENCE.md) - Learn basic commands
+3. [Modern Commands](../user-guide/MODERN_COMMANDS.md) - Use recommended interface
+4. [VS Code Integration](../user-guide/VSCODE_INTEGRATION.md) - Set up your editor
+5. [FAQ](../FAQ.md) - Common questions answered
 
 **Time:** ~1 hour
 
@@ -380,10 +380,10 @@ goenv vscode setup
 
 ### Path 2: Automation Engineer
 
-1. [JSON Output Guide](./JSON_OUTPUT_GUIDE.md) - Structured output
-2. [Hooks Quick Start](./HOOKS_QUICKSTART.md) - Automate workflows
-3. [CI/CD Guide](./CI_CD_GUIDE.md) - Pipeline integration
-4. [Cache Troubleshooting](./CACHE_TROUBLESHOOTING.md) - Optimize performance
+1. [JSON Output Guide](../reference/JSON_OUTPUT_GUIDE.md) - Structured output
+2. [Hooks Quick Start](../reference/HOOKS_QUICKSTART.md) - Automate workflows
+3. [CI/CD Guide](../advanced/CI_CD_GUIDE.md) - Pipeline integration
+4. [Cache Troubleshooting](../advanced/CACHE_TROUBLESHOOTING.md) - Optimize performance
 
 **Time:** ~2 hours
 
@@ -391,10 +391,10 @@ goenv vscode setup
 
 ### Path 3: Compliance Professional
 
-1. [Compliance Use Cases](./COMPLIANCE_USE_CASES.md) - Overview
-2. [SBOM Command](./reference/COMMANDS.md#goenv-sbom) - Generate SBOMs
-3. [Inventory Command](./reference/COMMANDS.md#goenv-inventory) - Track installations
-4. [Hooks System](./HOOKS_QUICKSTART.md) - Automate audit trails
+1. [Compliance Use Cases](../advanced/COMPLIANCE_USE_CASES.md) - Overview
+2. [SBOM Command](../reference/COMMANDS.md#goenv-sbom) - Generate SBOMs
+3. [Inventory Command](../reference/COMMANDS.md#goenv-inventory) - Track installations
+4. [Hooks System](../reference/HOOKS_QUICKSTART.md) - Automate audit trails
 
 **Time:** ~1.5 hours
 
@@ -402,10 +402,10 @@ goenv vscode setup
 
 ### Path 4: Platform Engineer
 
-1. [Platform Support Matrix](./PLATFORM_SUPPORT.md) - Know what works where
-2. [Cross-Building Guide](./advanced/CROSS_BUILDING.md) - Multi-platform builds
-3. [Cache Troubleshooting](./CACHE_TROUBLESHOOTING.md) - Platform-specific issues
-4. [What NOT to Sync](./advanced/WHAT_NOT_TO_SYNC.md) - Multi-machine setup
+1. [Platform Support Matrix](../reference/PLATFORM_SUPPORT.md) - Know what works where
+2. [Cross-Building Guide](../advanced/CROSS_BUILDING.md) - Multi-platform builds
+3. [Cache Troubleshooting](../advanced/CACHE_TROUBLESHOOTING.md) - Platform-specific issues
+4. [What NOT to Sync](../advanced/WHAT_NOT_TO_SYNC.md) - Multi-machine setup
 
 **Time:** ~2 hours
 

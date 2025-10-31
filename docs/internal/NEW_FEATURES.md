@@ -8,9 +8,10 @@ This document summarizes all the new features and improvements in the Go impleme
 | ---------------------------- | ---------------------- | --------------------- | -------- | ------------------------------------------------------------- |
 | SBOM Generation & Inventory  | Not Available          | ✅ Fully Functional   | High     | [Commands Reference](reference/COMMANDS.md#goenv-sbom)        |
 | Smart Caching & Offline Mode | Not Available          | ✅ Fully Functional   | High     | [Smart Caching Guide](advanced/SMART_CACHING.md)              |
-| Configuration Hooks          | Not Available          | ✅ YAML config (NEW)  | High     | [Hooks Guide](HOOKS.md)                                       |
+| Configuration Hooks          | Not Available          | ✅ YAML config (NEW)  | High     | [Hooks Guide](../reference/HOOKS.md)                                       |
 | GOPATH Integration           | Not Available          | ✅ Fully Functional   | High     | [GOPATH Integration](advanced/GOPATH_INTEGRATION.md)          |
 | Auto-Rehash Control          | Not Available          | ✅ Automatic (NEW)    | High     | [Commands Reference](reference/COMMANDS.md#install)           |
+| Enhanced UX Commands         | Not Available          | ✅ 6 new commands     | High     | [Quick Reference](QUICK_REFERENCE.md)                         |
 | Version Shorthand            | Not Available          | ✅ Fully Functional   | Medium   | [Commands Reference](reference/COMMANDS.md#version-shorthand) |
 | File Arg Detection           | Not Available          | ✅ Fully Functional   | Low      | [Hooks Guide](HOOKS.md#environment-variables)                 |
 | Shell Completion             | Partial                | ✅ Complete           | Medium   | [Commands Reference](reference/COMMANDS.md)                   |
@@ -359,8 +360,8 @@ All actions support dynamic variable interpolation:
 
 ### Documentation
 
-- **[Complete Hooks Guide](HOOKS.md)** - Comprehensive user documentation
-- **[Internal Hooks Reference](../internal/hooks/HOOKPOINTS.md)** - Developer documentation for internal implementation
+- **[Complete Hooks Guide](../reference/HOOKS.md)** - Comprehensive user documentation
+- **[Internal Hooks Reference](hooks/HOOKPOINTS.md)** - Developer documentation for internal implementation
 
 ---
 
@@ -916,7 +917,7 @@ goenv rehash  # Creates shims for GOPATH tools
 
 ### For Existing Users
 
-See [Migration Guide](MIGRATION_GUIDE.md) for detailed upgrade instructions.
+See [Migration Guide](../user-guide/MIGRATION_GUIDE.md) for detailed upgrade instructions.
 
 Key points:
 
@@ -929,9 +930,9 @@ Key points:
 
 ## Documentation Index
 
-- **[Migration Guide](MIGRATION_GUIDE.md)** - Upgrading from bash version
-- **[Hooks Guide](HOOKS.md)** - Complete hook system documentation
-- **[GOPATH Integration](advanced/GOPATH_INTEGRATION.md)** - GOPATH management guide
+- **[Migration Guide](../user-guide/MIGRATION_GUIDE.md)** - Upgrading from bash version
+- **[Hooks Guide](../reference/HOOKS.md)** - Complete hook system documentation
+- **[GOPATH Integration](../advanced/GOPATH_INTEGRATION.md)** - GOPATH management guide
 - **[Commands Reference](reference/COMMANDS.md)** - All available commands including custom ones
 - **[Commands Reference](reference/COMMANDS.md)** - All commands with new features
 - **[Environment Variables](reference/ENVIRONMENT_VARIABLES.md)** - Configuration reference
@@ -946,9 +947,94 @@ Key points:
 
 ---
 
+## 10. New User Experience Commands 🎯
+
+### What They Do
+
+Six new commands designed to improve user experience, particularly for first-time users and daily operations:
+
+1. **`goenv info <version>`** - Detailed version information with lifecycle tracking
+2. **`goenv compare <v1> <v2>`** - Side-by-side version comparison
+3. **`goenv status`** - Quick installation health check
+4. **`goenv setup`** - Automatic first-time configuration wizard
+5. **`goenv get-started`** - Interactive beginner's guide
+6. **`goenv explore`** - Command discovery by intent/category
+
+### Why They Matter
+
+- **Onboarding:** Dramatically simplified first-time setup
+- **Decision Making:** Better information for version selection
+- **Diagnostics:** Quick health checks complement comprehensive doctor command
+- **Discovery:** Easy command navigation for new users
+- **Lifecycle Management:** Track version EOL status and get upgrade recommendations
+
+### Quick Start
+
+**First-time setup:**
+```bash
+# Automatic configuration (detects shell, adds initialization, etc.)
+goenv setup
+
+# Interactive beginner guide
+goenv get-started
+
+# Quick health check
+goenv status
+```
+
+**Version information:**
+```bash
+# Detailed version info (release date, EOL status, size, etc.)
+goenv info 1.25.2
+
+# Compare two versions side-by-side
+goenv compare 1.21.5 1.23.2
+
+# Check if current version is EOL
+goenv info $(goenv current --bare)
+```
+
+**Command discovery:**
+```bash
+# Browse commands by category
+goenv explore
+# Shows: Getting Started, Version Management, Tools, Diagnostics, etc.
+```
+
+### Enhanced Doctor Command
+
+The existing `goenv doctor` command has been significantly enhanced with interactive fix mode:
+
+```bash
+# Comprehensive diagnostics (existing)
+goenv doctor
+
+# NEW: Interactive repair mode
+goenv doctor --fix
+```
+
+**Doctor improvements:**
+- 18 structured issue types with automated fixes
+- 3 new diagnostic checks (shell environment, profile sourcing, duplicate installations)
+- Interactive fix mode that can automatically repair common issues
+- Detects "undo sourcing" scenarios (major pain point)
+- Better UX with colors, emojis, and clearer messages
+
+### Documentation
+
+- [Commands Reference - info](reference/COMMANDS.md#goenv-info)
+- [Commands Reference - compare](reference/COMMANDS.md#goenv-compare)
+- [Commands Reference - status](reference/COMMANDS.md#goenv-status)
+- [Commands Reference - setup](reference/COMMANDS.md#goenv-setup)
+- [Commands Reference - get-started](reference/COMMANDS.md#goenv-get-started)
+- [Commands Reference - explore](reference/COMMANDS.md#goenv-explore)
+- [Commands Reference - doctor](reference/COMMANDS.md#goenv-doctor)
+
+---
+
 ## Summary
 
-The Go implementation adds **9 major features** that enhance goenv's functionality:
+The Go implementation adds **10 major feature sets** that enhance goenv's functionality:
 
 1. 🚀 **Smart Caching & Offline Mode** - 10-50x faster with intelligent caching and complete offline support
 2. ⚡ **Hook System** - Extend goenv with custom scripts at 7 execution points
@@ -959,6 +1045,7 @@ The Go implementation adds **9 major features** that enhance goenv's functionali
 7. 📄 **File Arg Detection** - Context-aware hooks with automatic file detection
 8. 🔄 **Complete Completion** - Better shell integration with comprehensive tab completion
 9. 🎯 **VS Code Integration** - Native VS Code settings management with security validation and portability
+10. 🎯 **Enhanced UX Commands** - 6 new commands for better onboarding, diagnostics, and version management
 
 ### Key Improvements
 

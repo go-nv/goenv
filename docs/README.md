@@ -11,17 +11,17 @@ Welcome to the goenv documentation! This directory contains comprehensive docume
 - **[FAQ](FAQ.md)** - Frequently asked questions ⭐ **NEW**
 - **[How It Works](user-guide/HOW_IT_WORKS.md)** - Understanding goenv's architecture and workflow
 - **[VS Code Integration](user-guide/VSCODE_INTEGRATION.md)** - Setting up VS Code with goenv
-- **[What's New in Documentation](WHATS_NEW_DOCUMENTATION.md)** - Recent documentation improvements ⭐ **NEW**
-- **[New Features](NEW_FEATURES.md)** - Summary of new features in Go implementation
-- **[Migration Guide](MIGRATION_GUIDE.md)** - Migrating from bash to Go implementation
+- **[What's New in Documentation](internal/WHATS_NEW_DOCUMENTATION.md)** - Recent documentation improvements ⭐ **NEW**
+- **[New Features](internal/NEW_FEATURES.md)** - Summary of new features in Go implementation
+- **[Migration Guide](user-guide/MIGRATION_GUIDE.md)** - Migrating from bash to Go implementation
 
 ### Reference Documentation
 
 - **[Commands Reference](reference/COMMANDS.md)** - Complete command-line interface documentation
 - **[Environment Variables](reference/ENVIRONMENT_VARIABLES.md)** - All configuration options via environment variables
-- **[Platform Support Matrix](PLATFORM_SUPPORT.md)** - OS and architecture compatibility guide
-- **[Modern vs Legacy Commands](MODERN_COMMANDS.md)** - Command modernization guide
-- **[JSON Output Guide](JSON_OUTPUT_GUIDE.md)** - JSON output for automation and CI/CD
+- **[Platform Support Matrix](reference/PLATFORM_SUPPORT.md)** - OS and architecture compatibility guide
+- **[Modern vs Legacy Commands](user-guide/MODERN_COMMANDS.md)** - Command modernization guide
+- **[JSON Output Guide](reference/JSON_OUTPUT_GUIDE.md)** - JSON output for automation and CI/CD
 
 ### Advanced Topics
 
@@ -31,22 +31,20 @@ Welcome to the goenv documentation! This directory contains comprehensive docume
 - **[GOPATH Integration](advanced/GOPATH_INTEGRATION.md)** - Managing GOPATH binaries per version
 - **[Cross-Building](advanced/CROSS_BUILDING.md)** - Cross-compilation and architecture-specific builds
 - **[What NOT to Sync](advanced/WHAT_NOT_TO_SYNC.md)** - Sharing goenv across machines and containers
-- **[Hooks System Quick Start](HOOKS_QUICKSTART.md)** - 5-minute hooks setup guide
-- **[Hooks System (Full)](HOOKS.md)** - Complete hooks documentation
-- **[Compliance Use Cases](COMPLIANCE_USE_CASES.md)** - SOC 2, ISO 27001, SBOM generation
+- **[Hooks System Quick Start](reference/HOOKS_QUICKSTART.md)** - 5-minute hooks setup guide
+- **[Hooks System (Full)](reference/HOOKS.md)** - Complete hooks documentation
+- **[Compliance Use Cases](advanced/COMPLIANCE_USE_CASES.md)** - SOC 2, ISO 27001, SBOM generation
 
 ### Troubleshooting & Diagnostics
 
-- **[Cache Troubleshooting](CACHE_TROUBLESHOOTING.md)** - Cache issues, migration, and optimization
-- **[System Go Coexistence](SYSTEM_GO_COEXISTENCE.md)** - Using goenv with system-installed Go ⭐ **NEW**
-- **[Environment Detection](../ENVIRONMENT_DETECTION.md)** - Container, WSL, and filesystem detection
-- **[Environment Detection Quick Reference](ENVIRONMENT_DETECTION_QUICKREF.md)** - Quick reference for environment issues
-- **[Platform-Specific Enhancements](../PLATFORM_SPECIFIC_ENHANCEMENTS.md)** - macOS, Windows, and Linux platform checks
+- **[Cache Troubleshooting](advanced/CACHE_TROUBLESHOOTING.md)** - Cache issues, migration, and optimization
+- **[System Go Coexistence](user-guide/SYSTEM_GO_COEXISTENCE.md)** - Using goenv with system-installed Go ⭐ **NEW**
+- **[Environment Detection Quick Reference](reference/ENVIRONMENT_DETECTION_QUICKREF.md)** - Quick reference for environment detection issues
+- **[Platform Support Matrix](reference/PLATFORM_SUPPORT.md)** - Platform compatibility and OS-specific features
 
 ### Contributing
 
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to goenv (includes documentation guidelines)
-- **[Documentation Review Checklist](DOCUMENTATION_REVIEW_CHECKLIST.md)** - Quality checklist for docs ⭐ **NEW**
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community guidelines
 - **[Release Process](RELEASE_PROCESS.md)** - Release workflow for maintainers
 
@@ -202,23 +200,45 @@ See [Commands Reference](reference/COMMANDS.md) for complete command documentati
 
 ```
 docs/
-├── README.md                    # This file - documentation index
-├── user-guide/                  # User-facing documentation
-│   ├── INSTALL.md              # Installation instructions
-│   ├── HOW_IT_WORKS.md         # Architecture overview
-│   └── VSCODE_INTEGRATION.md   # VS Code setup guide
-├── reference/                   # Reference documentation
-│   ├── COMMANDS.md             # Command reference
-│   └── ENVIRONMENT_VARIABLES.md # Environment variable reference
-├── advanced/                    # Advanced topics
-│   ├── ADVANCED_CONFIGURATION.md # Advanced configuration
-│   ├── SMART_CACHING.md        # Caching internals
-│   ├── EMBEDDED_VERSIONS.md    # Offline mode details
-│   └── GOPATH_INTEGRATION.md   # GOPATH management
-├── CONTRIBUTING.md              # Contribution guidelines
-├── CODE_OF_CONDUCT.md          # Community guidelines
-├── CHANGELOG.md                 # Version history
-└── RELEASE_PROCESS.md          # Release workflow
+├── README.md                           # This file - documentation index
+├── QUICK_REFERENCE.md                  # One-page cheat sheet (high-traffic)
+├── FAQ.md                              # Frequently asked questions (high-traffic)
+├── CHANGELOG.md                        # Version history
+├── CONTRIBUTING.md                     # Contribution guidelines
+├── CODE_OF_CONDUCT.md                  # Community guidelines
+├── RELEASE_PROCESS.md                  # Release workflow
+│
+├── user-guide/                         # User-facing guides
+│   ├── INSTALL.md                      # Installation instructions
+│   ├── HOW_IT_WORKS.md                 # Architecture overview
+│   ├── VSCODE_INTEGRATION.md           # VS Code setup guide
+│   ├── MIGRATION_GUIDE.md              # Migrating from bash to Go
+│   ├── MODERN_COMMANDS.md              # Command modernization guide
+│   └── SYSTEM_GO_COEXISTENCE.md        # Using goenv with system Go
+│
+├── reference/                          # Complete references
+│   ├── COMMANDS.md                     # Command reference
+│   ├── ENVIRONMENT_VARIABLES.md        # Environment variable reference
+│   ├── PLATFORM_SUPPORT.md             # Platform compatibility matrix
+│   ├── ENVIRONMENT_DETECTION_QUICKREF.md # Environment detection guide
+│   ├── HOOKS.md                        # Complete hooks documentation
+│   ├── HOOKS_QUICKSTART.md             # 5-minute hooks setup
+│   └── JSON_OUTPUT_GUIDE.md            # JSON output for automation
+│
+├── advanced/                           # Advanced topics & integrations
+│   ├── ADVANCED_CONFIGURATION.md       # Advanced configuration
+│   ├── SMART_CACHING.md                # Caching internals
+│   ├── EMBEDDED_VERSIONS.md            # Offline mode details
+│   ├── GOPATH_INTEGRATION.md           # GOPATH management
+│   ├── CROSS_BUILDING.md               # Cross-compilation
+│   ├── WHAT_NOT_TO_SYNC.md             # Sharing goenv configs
+│   ├── CACHE_TROUBLESHOOTING.md        # Cache issues & optimization
+│   ├── COMPLIANCE_USE_CASES.md         # SOC 2, ISO 27001, SBOM
+│   └── CI_CD_GUIDE.md                  # CI/CD integration guide
+│
+└── internal/                           # Internal docs (historical/development)
+    ├── NEW_FEATURES.md                 # Feature tracking
+    └── WHATS_NEW_DOCUMENTATION.md      # Documentation updates
 ```
 
 ## 🔍 Key Features

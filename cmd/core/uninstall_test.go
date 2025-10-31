@@ -5,10 +5,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -26,12 +26,12 @@ func TestUninstallCommand(t *testing.T) {
 		{
 			name:          "no arguments provided",
 			args:          []string{},
-			expectedError: "Usage: goenv uninstall <version>",
+			expectedError: "usage: goenv uninstall <version>",
 		},
 		{
 			name:          "too many arguments provided",
 			args:          []string{"1.21.0", "1.22.0"},
-			expectedError: "Usage: goenv uninstall <version>",
+			expectedError: "usage: goenv uninstall <version>",
 		},
 		{
 			name:           "uninstall non-existent version",
@@ -228,7 +228,7 @@ func TestUninstallCompletion(t *testing.T) {
 		// Create go binary for version detection
 		goExe := filepath.Join(binPath, "go")
 		content := []byte("#!/bin/sh\necho mock go")
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			goExe += ".bat"
 			content = []byte("@echo off\necho mock go")
 		}

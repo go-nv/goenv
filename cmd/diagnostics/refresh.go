@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
@@ -14,8 +13,9 @@ import (
 )
 
 var refreshCmd = &cobra.Command{
-	Use:   "refresh",
-	Short: "Clear caches and fetch fresh version data",
+	Use:     "refresh",
+	Short:   "Clear caches and fetch fresh version data",
+	GroupID: string(cmdpkg.GroupDiagnostics),
 	Long: `Clear all cached version data and force a fresh fetch from the official Go API.
 
 This removes:
@@ -38,7 +38,7 @@ func init() {
 func runRefresh(cmd *cobra.Command, args []string) error {
 	// Validate: refresh command takes no positional arguments (only --verbose flag)
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv refresh [--verbose]")
+		return fmt.Errorf("usage: goenv refresh [--verbose]")
 	}
 
 	cfg := config.Load()
@@ -97,7 +97,7 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 // ensureCacheDirPermissions ensures the cache directory has secure permissions (0700)
 func ensureCacheDirPermissions(cacheDir string, cmd *cobra.Command) error {
 	// Skip permission checks on Windows (uses ACLs instead of POSIX permissions)
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		return nil
 	}
 

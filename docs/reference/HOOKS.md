@@ -732,7 +732,7 @@ Add-Content $PROFILE "Set-Variable -Name MY_VAR -Value 'value'"
 For more details on platform support, cross-platform compatibility, and architecture-specific features, see:
 
 - **[Platform Support Matrix](PLATFORM_SUPPORT.md)** - Comprehensive OS/architecture compatibility
-- **[CI/CD Guide](CI_CD_GUIDE.md)** - Platform-specific CI/CD examples (GitHub Actions, GitLab CI)
+- **[CI/CD Guide](../advanced/CI_CD_GUIDE.md)** - Platform-specific CI/CD examples (GitHub Actions, GitLab CI)
 - **[Advanced Configuration](advanced/ADVANCED_CONFIGURATION.md)** - Platform-specific environment setup
 
 ## Hook Points

@@ -3,8 +3,9 @@ package tooldetect
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestCompareVersions(t *testing.T) {
@@ -168,7 +169,7 @@ func TestListInstalledTools(t *testing.T) {
 			for _, tool := range tt.setupTools {
 				toolPath := filepath.Join(gopathBin, tool)
 				var content string
-				if runtime.GOOS == "windows" {
+				if utils.IsWindows() {
 					toolPath += ".bat"
 					content = "@echo off\necho mock tool\n"
 				} else {
@@ -233,7 +234,7 @@ func TestListInstalledTools_SkipsDirectories(t *testing.T) {
 	// Create a tool binary
 	toolPath := filepath.Join(gopathBin, "gopls")
 	ext := ""
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		ext = ".exe"
 		toolPath += ext
 	}
@@ -264,7 +265,7 @@ func TestListInstalledTools_SkipsDirectories(t *testing.T) {
 }
 
 func TestListInstalledTools_WindowsExeHandling(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Windows-specific test")
 	}
 
@@ -317,7 +318,7 @@ func TestIsGoTool(t *testing.T) {
 	// Create a mock Go binary that can be executed
 	mockGoBinary := filepath.Join(tmpDir, "mock_tool")
 	ext := ""
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		ext = ".exe"
 		mockGoBinary += ext
 	}

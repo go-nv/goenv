@@ -715,5 +715,5 @@ goenv use system && go env GOROOT
 - [FAQ - System Go Question](./FAQ.md#i-already-have-go-installed-globally-will-goenv-interfere)
 - [How It Works](./user-guide/HOW_IT_WORKS.md)
 - [GOPATH Integration](./advanced/GOPATH_INTEGRATION.md)
-- [Platform Support](./PLATFORM_SUPPORT.md)
-- [Troubleshooting](./CACHE_TROUBLESHOOTING.md)
+- [Platform Support](../reference/PLATFORM_SUPPORT.md)
+- [Troubleshooting](../advanced/CACHE_TROUBLESHOOTING.md)

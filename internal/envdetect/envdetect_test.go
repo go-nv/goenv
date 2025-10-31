@@ -4,6 +4,8 @@ import (
 	"os"
 	"runtime"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestDetect(t *testing.T) {
@@ -114,7 +116,7 @@ func TestDetectDarwinFilesystem(t *testing.T) {
 }
 
 func TestDetectWindowsFilesystem(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Windows filesystem detection only works on Windows")
 	}
 
@@ -156,7 +158,7 @@ func TestDetectWindowsFilesystemUNC(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Skip WSL mount test on native Windows (only valid in WSL)
-			if tt.name == "WSL mount" && runtime.GOOS == "windows" {
+			if tt.name == "WSL mount" && utils.IsWindows() {
 				// Check if we're in WSL by looking for /proc/version
 				if _, err := os.Stat("/proc/version"); os.IsNotExist(err) {
 					t.Skip("Skipping WSL mount test on native Windows")

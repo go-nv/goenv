@@ -27,7 +27,7 @@ Traditional CI approach:
 ```bash
 # Install and use in one step - harder to cache effectively
 goenv install 1.23.2
-goenv global 1.23.2
+goenv use 1.23.2 --global
 ```
 
 Two-phase approach (optimized):
@@ -37,7 +37,7 @@ Two-phase approach (optimized):
 goenv ci-setup --install 1.23.2
 
 # Phase 2: Use the cached version (fast)
-goenv global 1.23.2
+goenv use 1.23.2 --global
 ```
 
 **Benefits:**
@@ -212,7 +212,7 @@ goenv ci-setup --install --from-file
 goenv ci-setup --install --from-file --skip-rehash
 
 # After installation, use the version
-goenv global 1.23.2
+goenv use 1.23.2 --global
 # or
 goenv use --auto
 ```
@@ -330,89 +330,125 @@ goenv rehash
 
 ---
 
-### ⚠️ CRITICAL: `--force` Flag Required in CI
+### ⚠️ IMPORTANT: Non-Interactive Confirmation in CI
 
-**Without `--force`, cache cleaning commands WILL FAIL in CI/CD pipelines.**
+**Cache cleaning commands require confirmation in CI/CD pipelines.**
 
-```bash
-# ❌ This will FAIL in CI (non-interactive environment)
-goenv cache clean build
+You have **two options** to handle this:
 
-# Error you'll see:
-# Error: non-interactive mode requires --force
-#
-# This command requires confirmation when run interactively.
-# Refusing to clean caches in non-interactive environment without --force flag.
-# In CI/automation, use: goenv cache clean --force
+#### Option 1: `GOENV_ASSUME_YES` Environment Variable (Recommended)
 
-# ✅ CORRECT - Always use --force in CI
-goenv cache clean build --force
+Set `GOENV_ASSUME_YES=1` to auto-confirm all prompts globally:
+
+```yaml
+# GitHub Actions (recommended)
+env:
+  GOENV_ASSUME_YES: 1
+run: |
+  goenv cache clean build
+  goenv cache migrate
+  # All prompts auto-confirmed
 ```
 
-**Why this exists:**
+```bash
+# GitLab CI / Jenkins
+export GOENV_ASSUME_YES=1
+goenv cache clean all
+```
 
-- Prevents accidental CI hangs waiting for confirmation prompts
-- Non-TTY detection (standard in CI) requires explicit `--force` flag
-- Protects against unintended cache deletion in interactive environments
-- Forces deliberate choice in automation scripts
+**Why this is better:**
+- ✅ More explicit about intent (auto-confirming vs forcing)
+- ✅ Works globally for all goenv commands
+- ✅ Self-documenting in CI config files
+- ✅ Follows industry standards (like `DEBIAN_FRONTEND=noninteractive`)
 
-**The rule:** Every `goenv cache clean` or `goenv cache migrate` command in CI **MUST** include `--force`
+#### Option 2: `--force` Flag (Alternative)
+
+Add `--force` to individual commands:
+
+```bash
+# Per-command approach
+goenv cache clean build --force
+goenv cache migrate --force
+```
+
+#### What happens without either?
+
+You'll see a helpful error with suggestions:
+
+```
+⚠️  Running in non-interactive mode (no TTY detected)
+
+This command requires confirmation. Options:
+  1. Add --force flag: goenv cache clean all --force
+  2. Use dry-run first: goenv cache clean all --dry-run
+  3. Set env var: GOENV_ASSUME_YES=1 goenv cache clean
+
+For CI/CD, we recommend: GOENV_ASSUME_YES=1
+```
+
+**The rule:** Use `GOENV_ASSUME_YES=1` globally (recommended) or add `--force` to each cache command.
 
 ---
 
-> **🚨 CRITICAL: Always use `--force` in CI environments**
+> **📝 Best Practice: Use `GOENV_ASSUME_YES` in CI**
 >
-> Cache cleaning commands require interactive confirmation by default. **Without `--force`, the command will fail in non-interactive CI/CD pipelines** with an error like:
+> For CI/CD pipelines, set `GOENV_ASSUME_YES=1` in your environment variables. This auto-confirms all prompts without needing `--force` on every command.
 >
-> ```
-> Error: cache cleaning requires --force flag in non-interactive environments
-> cannot prompt for confirmation: not a terminal
-> ```
->
-> **All cache clean examples below use `--force` - this is mandatory for CI!**
+> **Examples below show both approaches** - choose what works best for your pipeline.
 
-When managing cache sizes or cleaning up between builds, the `--force` flag prevents CI hangs on confirmation prompts.
+When managing cache sizes or cleaning up between builds, non-interactive confirmation prevents CI pipeline hangs.
 
 ### Clean Build Caches
 
 ```bash
-# Clean all build caches (non-interactive) - REQUIRES --force
+# Approach 1: Using GOENV_ASSUME_YES (recommended)
+export GOENV_ASSUME_YES=1
+goenv cache clean build
+goenv cache clean build --older-than 30d
+goenv cache clean all
+
+# Approach 2: Using --force flag
 goenv cache clean build --force
-
-# Clean build caches older than 30 days
 goenv cache clean build --older-than 30d --force
-
-# Clean all caches (build + module)
 goenv cache clean all --force
 
-# Preview what would be deleted (dry-run doesn't need --force)
+# Preview what would be deleted (no confirmation needed)
 goenv cache clean all --older-than 30d --dry-run
 ```
 
 ### Size-Based Cleanup
 
 ```bash
-# Keep only 1GB of build caches (delete oldest first)
-goenv cache clean build --max-bytes 1GB --force
+# Approach 1: Using GOENV_ASSUME_YES
+GOENV_ASSUME_YES=1 goenv cache clean build --max-bytes 1GB
+GOENV_ASSUME_YES=1 goenv cache clean all --max-bytes 500MB
 
-# Keep 500MB total across all caches
+# Approach 2: Using --force flag
+goenv cache clean build --max-bytes 1GB --force
 goenv cache clean all --max-bytes 500MB --force
 ```
 
 ### Best Practices
 
-- **Always use `--force` in CI**: Required in non-interactive CI environments (will fail without it)
+- **Use `GOENV_ASSUME_YES=1`** (recommended): Set globally for all commands
+- **Alternative: use `--force`**: Add to individual cache commands
 - **Use `--older-than`**: Clean caches by age rather than deleting all
-- **Test with `--dry-run`**: Preview cleanup before applying (doesn't require `--force`)
+- **Test with `--dry-run`**: Preview cleanup before applying (no confirmation needed)
 - **Monitor cache sizes**: Use `goenv cache status --fast` for quick checks
 
-**Example error without `--force` in CI:**
+**Example: Helpful error without GOENV_ASSUME_YES or --force:**
 
 ```
 $ goenv cache clean build
-Error: cache cleaning requires --force flag in non-interactive environments
-Run with --force to skip confirmation, or --dry-run to preview changes
-Exit code: 1
+⚠️  Running in non-interactive mode (no TTY detected)
+
+This command requires confirmation. Options:
+  1. Add --force flag: goenv cache clean build --force
+  2. Use dry-run first: goenv cache clean build --dry-run
+  3. Set env var: GOENV_ASSUME_YES=1 goenv cache clean
+
+For CI/CD, we recommend: GOENV_ASSUME_YES=1
 ```
 
 ### Example: Scheduled Cache Cleanup
@@ -894,7 +930,7 @@ jobs:
       - name: Install Go
         run: goenv ci-setup --install ${{ matrix.go-version }} --skip-rehash
       - name: Use Go
-        run: goenv global ${{ matrix.go-version }}
+        run: goenv use ${{ matrix.go-version }} --global
       - name: Test
         run: go test ./...
 ```
@@ -926,7 +962,7 @@ goenv ci-setup --install 1.21.0 1.22.0 1.23.2 --skip-rehash
 
 # Test each version
 for version in 1.21.0 1.22.0 1.23.2; do
-  goenv global $version
+  goenv use $version --global
   go test ./...
 done
 ```
@@ -1265,7 +1301,7 @@ jobs:
         run: goenv ci-setup --install ${{ matrix.go }}
 
       - name: Set Go version
-        run: goenv global ${{ matrix.go }}
+        run: goenv use ${{ matrix.go }} --global
 
       - name: Validate (${{ runner.os }})
         run: goenv doctor --json --fail-on=error

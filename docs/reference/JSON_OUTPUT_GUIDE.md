@@ -22,6 +22,9 @@ Complete reference for using goenv's JSON output in automation, CI/CD, and tooli
 | `goenv current` | `--json` | Show active version | ✅ Stable |
 | `goenv inventory go` | `--json` | Inventory report | ✅ Stable |
 | `goenv doctor` | `--json` | Diagnostic results | ⚠️ Beta |
+| `goenv tools list` | `--json` | List installed tools | ✅ Stable |
+| `goenv tools outdated` | `--json` | Show outdated tools | ✅ Stable |
+| `goenv tools status` | `--json` | Tool consistency report | ✅ Stable |
 
 ### Commands Without JSON Support
 
@@ -31,7 +34,8 @@ These commands provide text output only:
 - `goenv uninstall` - Confirmation prompts (text)
 - `goenv use` - Success messages (text)
 - `goenv cache` - Cache operations (text)
-- `goenv tools` - Tool management (text)
+- `goenv tools install` - Installation progress (text)
+- `goenv tools update` - Update progress (text)
 
 **Note:** Use exit codes for success/failure detection with these commands.
 
@@ -222,6 +226,157 @@ These commands provide text output only:
 ```
 
 **Note:** This schema is in beta and may change in future versions.
+
+### `goenv tools list --json`
+
+**Schema:**
+```json
+{
+  "schema_version": "1",
+  "versions": [
+    {
+      "version": "string",
+      "tools": ["string"]
+    }
+  ]
+}
+```
+
+**Example:**
+```json
+{
+  "schema_version": "1",
+  "versions": [
+    {
+      "version": "1.21.0",
+      "tools": ["gopls", "staticcheck"]
+    },
+    {
+      "version": "1.23.0",
+      "tools": ["gopls", "staticcheck", "gofmt"]
+    }
+  ]
+}
+```
+
+**Fields:**
+- `schema_version` - Schema version for compatibility (currently "1")
+- `versions` - Array of Go versions with their tools
+  - `version` - Go version string
+  - `tools` - Array of tool names installed for this version
+
+### `goenv tools outdated --json`
+
+**Schema:**
+```json
+{
+  "schema_version": "1",
+  "outdated_tools": [
+    {
+      "name": "string",
+      "go_version": "string",
+      "current_version": "string",
+      "latest_version": "string",
+      "package_path": "string"
+    }
+  ]
+}
+```
+
+**Example:**
+```json
+{
+  "schema_version": "1",
+  "outdated_tools": [
+    {
+      "name": "gopls",
+      "go_version": "1.21.0",
+      "current_version": "v0.12.0",
+      "latest_version": "v0.13.2",
+      "package_path": "golang.org/x/tools/gopls"
+    },
+    {
+      "name": "staticcheck",
+      "go_version": "1.21.0",
+      "current_version": "v0.4.0",
+      "latest_version": "v0.4.6",
+      "package_path": "honnef.co/go/tools/cmd/staticcheck"
+    }
+  ]
+}
+```
+
+**Fields:**
+- `schema_version` - Schema version for compatibility (currently "1")
+- `outdated_tools` - Array of tools that need updating
+  - `name` - Tool binary name
+  - `go_version` - Go version where the tool is installed
+  - `current_version` - Currently installed version
+  - `latest_version` - Latest available version
+  - `package_path` - Full Go package path
+
+### `goenv tools status --json`
+
+**Schema:**
+```json
+{
+  "schema_version": "1",
+  "go_versions": ["string"],
+  "tools": [
+    {
+      "name": "string",
+      "total_versions": number,
+      "installed_in": number,
+      "version_presence": {
+        "version": boolean
+      },
+      "consistency_score": number
+    }
+  ]
+}
+```
+
+**Example:**
+```json
+{
+  "schema_version": "1",
+  "go_versions": ["1.21.0", "1.22.0", "1.23.0"],
+  "tools": [
+    {
+      "name": "gopls",
+      "total_versions": 3,
+      "installed_in": 3,
+      "version_presence": {
+        "1.21.0": true,
+        "1.22.0": true,
+        "1.23.0": true
+      },
+      "consistency_score": 100.0
+    },
+    {
+      "name": "staticcheck",
+      "total_versions": 3,
+      "installed_in": 2,
+      "version_presence": {
+        "1.21.0": true,
+        "1.22.0": false,
+        "1.23.0": true
+      },
+      "consistency_score": 66.66666666666666
+    }
+  ]
+}
+```
+
+**Fields:**
+- `schema_version` - Schema version for compatibility (currently "1")
+- `go_versions` - Array of all installed Go versions
+- `tools` - Array of tool status information
+  - `name` - Tool binary name
+  - `total_versions` - Total number of Go versions installed
+  - `installed_in` - Number of versions where this tool is installed
+  - `version_presence` - Map of version -> presence (true/false)
+  - `consistency_score` - Percentage of versions with this tool (0-100)
 
 ## Common Use Cases
 
@@ -772,5 +927,5 @@ fi
 ## See Also
 
 - [Command Reference](./reference/COMMANDS.md) - All commands and flags
-- [CI/CD Guide](./CI_CD_GUIDE.md) - CI/CD integration patterns
-- [Automation Examples](./CI_CD_GUIDE.md#automation-examples) - More automation examples
+- [CI/CD Guide](../advanced/CI_CD_GUIDE.md) - CI/CD integration patterns
+- [Automation Examples](../advanced/CI_CD_GUIDE.md#automation-examples) - More automation examples

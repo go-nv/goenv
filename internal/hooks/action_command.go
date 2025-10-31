@@ -7,9 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
+
+	"github.com/go-nv/goenv/internal/shellutil"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // RunCommandAction executes a shell command during hook execution
@@ -96,8 +98,9 @@ func (a *RunCommandAction) Validate(params map[string]interface{}) error {
 	// Validate shell parameter (optional)
 	if shell, ok := params["shell"].(string); ok {
 		shell = strings.ToLower(shell)
-		if shell != "auto" && shell != "bash" && shell != "sh" && shell != "cmd" && shell != "powershell" {
-			return fmt.Errorf("invalid shell: %s (must be auto, bash, sh, cmd, or powershell)", shell)
+		// Allow "auto" and "sh" as special cases, plus all valid shell types
+		if shell != "auto" && shell != "sh" && shellutil.ParseShellType(shell) == shellutil.ShellTypeUnknown {
+			return fmt.Errorf("invalid shell: %s (must be auto, bash, zsh, fish, sh, cmd, powershell, or ksh)", shell)
 		}
 	}
 
@@ -228,33 +231,45 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 }
 
 // prepareCommand prepares the command and arguments based on the shell type
-func prepareCommand(command string, args []string, shellType string) (string, []string) {
-	// Auto-detect shell based on platform
-	if shellType == "auto" {
-		if runtime.GOOS == "windows" {
-			shellType = "cmd"
-		} else {
-			shellType = "sh"
-		}
-	}
-
+func prepareCommand(command string, args []string, shellTypeStr string) (string, []string) {
 	// If no args, we need to run the command through a shell
 	if len(args) == 0 {
-		switch shellType {
-		case "bash":
-			return "bash", []string{"-c", command}
+		// Handle special cases and auto-detection
+		if shellTypeStr == "auto" {
+			// Auto-detect: use sh on Unix for POSIX compatibility, cmd on Windows
+			if utils.IsWindows() {
+				return "cmd", []string{"/C", command}
+			}
+			return "sh", []string{"-c", command}
+		}
+
+		// Handle explicit shell types
+		switch shellTypeStr {
 		case "sh":
 			return "sh", []string{"-c", command}
+		case "bash":
+			return "bash", []string{"-c", command}
 		case "cmd":
 			return "cmd", []string{"/C", command}
 		case "powershell":
 			return "powershell", []string{"-Command", command}
 		default:
-			// Default to sh on Unix, cmd on Windows
-			if runtime.GOOS == "windows" {
+			// Parse as shellutil type for other cases
+			shellType := shellutil.ParseShellType(shellTypeStr)
+			switch shellType {
+			case shellutil.ShellTypeBash:
+				return "bash", []string{"-c", command}
+			case shellutil.ShellTypeCmd:
 				return "cmd", []string{"/C", command}
+			case shellutil.ShellTypePowerShell:
+				return "powershell", []string{"-Command", command}
+			default:
+				// Default to sh on Unix, cmd on Windows
+				if utils.IsWindows() {
+					return "cmd", []string{"/C", command}
+				}
+				return "sh", []string{"-c", command}
 			}
-			return "sh", []string{"-c", command}
 		}
 	}
 

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // EnvironmentType represents the type of environment goenv is running in
@@ -21,11 +23,11 @@ const (
 type FilesystemType string
 
 const (
-	FSTypeLocal  FilesystemType = "local"
-	FSTypeNFS    FilesystemType = "nfs"
-	FSTypeSMB    FilesystemType = "smb"
-	FSTypeBind   FilesystemType = "bind"
-	FSTypeFUSE   FilesystemType = "fuse"
+	FSTypeLocal   FilesystemType = "local"
+	FSTypeNFS     FilesystemType = "nfs"
+	FSTypeSMB     FilesystemType = "smb"
+	FSTypeBind    FilesystemType = "bind"
+	FSTypeFUSE    FilesystemType = "fuse"
 	FSTypeUnknown FilesystemType = "unknown"
 )
 
@@ -86,7 +88,7 @@ func DetectFilesystem(path string) *EnvironmentInfo {
 		info.FilesystemType = detectLinuxFilesystem(path)
 	} else if runtime.GOOS == "darwin" {
 		info.FilesystemType = detectDarwinFilesystem(path)
-	} else if runtime.GOOS == "windows" {
+	} else if utils.IsWindows() {
 		info.FilesystemType = detectWindowsFilesystem(path)
 	} else {
 		info.FilesystemType = FSTypeLocal
@@ -271,7 +273,7 @@ func detectDarwinFilesystem(path string) FilesystemType {
 	// Common indicators on macOS:
 	// - /Volumes/ prefix often indicates external or network volumes
 	// - NFS mounts typically show up in mount output
-	
+
 	if strings.HasPrefix(absPath, "/Volumes/") {
 		// Could be network mount or external drive
 		// This is a heuristic - more detailed checking would require parsing mount output

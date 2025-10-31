@@ -3,6 +3,8 @@ package legacy
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
@@ -15,9 +17,34 @@ import (
 )
 
 var versionsCmd = &cobra.Command{
-	Use:    "versions",
-	Short:  "List all installed Go versions",
-	Long:   "Show all locally installed Go versions with the current version highlighted",
+	Use:   "versions",
+	Short: "List all installed Go versions",
+	Long: `Show all locally installed Go versions with the current version highlighted.
+
+Usage: goenv versions [--bare] [--skip-aliases] [--used]
+
+Lists all Go versions found in '$GOENV_ROOT/versions/*'.
+
+Options:
+  --bare          List version numbers only (one per line)
+  --skip-aliases  Skip showing system Go as an alias
+  --used          Scan current directory tree for version usage
+  --depth N       Maximum scan depth (default: 3, used with --used)
+  --json          Output in JSON format
+
+Examples:
+  # List installed versions
+  goenv versions
+
+  # Check which versions are used by your projects
+  cd ~/work
+  goenv versions --used
+
+  # Quick scan (only immediate subdirectories)
+  goenv versions --used --depth 1
+
+  # Deep scan (search deeper)
+  goenv versions --used --depth 5`,
 	RunE:   RunVersions,
 	Hidden: true, // Legacy command - use 'goenv list' instead
 }
@@ -27,6 +54,8 @@ var VersionsFlags struct {
 	SkipAliases bool
 	Complete    bool
 	Json        bool
+	Used        bool
+	Depth       int
 }
 
 func init() {
@@ -34,6 +63,8 @@ func init() {
 	versionsCmd.Flags().BoolVarP(&VersionsFlags.Bare, "bare", "b", false, "Display bare version numbers only")
 	versionsCmd.Flags().BoolVar(&VersionsFlags.SkipAliases, "skip-aliases", false, "Skip aliases")
 	versionsCmd.Flags().BoolVar(&VersionsFlags.Json, "json", false, "Output in JSON format")
+	versionsCmd.Flags().BoolVar(&VersionsFlags.Used, "used", false, "Scan current directory tree for version usage")
+	versionsCmd.Flags().IntVar(&VersionsFlags.Depth, "depth", 3, "Maximum scan depth (used with --used)")
 	versionsCmd.Flags().BoolVar(&VersionsFlags.Complete, "complete", false, "Internal flag for shell completions")
 	_ = versionsCmd.Flags().MarkHidden("complete")
 	helptext.SetCommandHelp(versionsCmd)
@@ -53,11 +84,34 @@ func simplifySource(source string, cfg *config.Config) string {
 	return source
 }
 
+// findLatestVersion finds the highest semantic version from a list of versions
+func findLatestVersion(versions []string) string {
+	if len(versions) == 0 {
+		return ""
+	}
+
+	latest := versions[0]
+	for _, v := range versions[1:] {
+		// Skip system and special versions
+		if v == "system" || latest == "system" {
+			continue
+		}
+
+		// Compare versions using semantic version logic
+		if utils.CompareGoVersions(v, latest) > 0 {
+			latest = v
+		}
+	}
+
+	return latest
+}
+
 func RunVersions(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if VersionsFlags.Complete {
 		fmt.Fprintln(cmd.OutOrStdout(), "--bare")
 		fmt.Fprintln(cmd.OutOrStdout(), "--skip-aliases")
+		fmt.Fprintln(cmd.OutOrStdout(), "--used")
 		return nil
 	}
 
@@ -68,11 +122,16 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 
 	// Handle invalid arguments (BATS test expects usage error)
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv versions [--bare] [--skip-aliases]")
+		return fmt.Errorf("usage: goenv versions [--bare] [--skip-aliases] [--used]")
 	}
 
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
+
+	// If --used flag is set, show usage analysis
+	if VersionsFlags.Used {
+		return runVersionsWithUsage(cmd, mgr, cfg)
+	}
 
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
@@ -102,7 +161,17 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 				}
 				return nil
 			}
-			return fmt.Errorf("Warning: no Go detected on the system")
+
+			// Provide helpful message when no versions are installed
+			fmt.Fprintf(cmd.OutOrStderr(), "%s%s\n\n", utils.Emoji("ℹ️  "), utils.Yellow("no Go versions installed yet"))
+			fmt.Fprintf(cmd.OutOrStderr(), "%s\n", utils.BoldBlue("Get started by installing a version:"))
+			fmt.Fprintf(cmd.OutOrStderr(), "  %s        %s Install latest Go\n", utils.Cyan("goenv install"), utils.Gray("→"))
+			fmt.Fprintf(cmd.OutOrStderr(), "  %s %s Install specific version\n", utils.Cyan("goenv install 1.21.5"), utils.Gray("→"))
+			fmt.Fprintf(cmd.OutOrStderr(), "  goenv install -l     %s List available versions\n\n", utils.Emoji("→"))
+			fmt.Fprintf(cmd.OutOrStderr(), "After installing, set it as your default:\n")
+			fmt.Fprintf(cmd.OutOrStderr(), "  goenv global <version>\n")
+
+			return fmt.Errorf("no Go versions installed")
 		}
 
 		// Only system version available
@@ -201,6 +270,9 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "%ssystem%s\n", prefix, suffix)
 	}
 
+	// Find the latest version (highest semantic version)
+	latestVersion := findLatestVersion(versions)
+
 	// Display installed versions
 	for _, version := range versions {
 		if VersionsFlags.Bare {
@@ -208,16 +280,37 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 		} else {
 			prefix := "  "
 			suffix := ""
+			isCurrent := version == currentVersion
+			isLatest := version == latestVersion
 
-			if version == currentVersion {
-				prefix = "* "
+			if isCurrent {
+				prefix = utils.Green("* ")
 				displaySource := simplifySource(source, cfg)
 				if displaySource != "" {
-					suffix = fmt.Sprintf(" (set by %s)", displaySource)
+					suffix = fmt.Sprintf(" %s", utils.Gray(fmt.Sprintf("(set by %s)", displaySource)))
 				}
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "%s%s%s\n", prefix, version, suffix)
+			// Add latest indicator for the newest installed version
+			if isLatest && !isCurrent {
+				suffix = fmt.Sprintf(" %s", utils.Gray("(latest installed)"))
+			} else if isLatest && isCurrent {
+				// Both current and latest
+				if suffix != "" {
+					// Append to existing suffix
+					suffix = suffix + utils.Gray(" [latest]")
+				} else {
+					suffix = fmt.Sprintf(" %s", utils.Gray("[latest]"))
+				}
+			}
+
+			// Format version with color if it's current
+			versionDisplay := version
+			if isCurrent {
+				versionDisplay = utils.Cyan(version)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "%s%s%s\n", prefix, versionDisplay, suffix)
 		}
 	}
 
@@ -251,6 +344,115 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(cmd.OutOrStdout(), "%s%s -> %s\n", prefix, name, targetVersion)
 			}
 		}
+	}
+
+	return nil
+}
+
+// runVersionsWithUsage displays versions with project usage information
+func runVersionsWithUsage(cmd *cobra.Command, mgr *manager.Manager, cfg *config.Config) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Get installed versions
+	versions, err := mgr.ListInstalledVersions()
+	if err != nil {
+		return fmt.Errorf("failed to list versions: %w", err)
+	}
+
+	if len(versions) == 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sno Go versions installed.\n", utils.Emoji("ℹ️  "))
+		return nil
+	}
+
+	// Show scanning message
+	fmt.Fprintf(cmd.OutOrStdout(), "%sScanning for Go projects in %s...\n\n", utils.Emoji("🔍 "), cwd)
+
+	// Scan for projects
+	projects, err := manager.ScanProjects(cwd, VersionsFlags.Depth)
+	if err != nil {
+		return fmt.Errorf("scan failed: %w", err)
+	}
+
+	// Build usage map: version -> []projects
+	usageMap := make(map[string][]manager.ProjectInfo)
+	for _, proj := range projects {
+		usageMap[proj.Version] = append(usageMap[proj.Version], proj)
+	}
+
+	// Get current version for highlighting
+	currentVersion, _, _ := mgr.GetCurrentVersion()
+
+	// Display versions with usage
+	fmt.Fprintf(cmd.OutOrStdout(), "%sInstalled versions:\n", utils.Emoji("📊 "))
+
+	for _, ver := range versions {
+		prefix := "  "
+		if ver == currentVersion {
+			prefix = utils.Green("* ")
+		}
+
+		projs := usageMap[ver]
+		status := ""
+		if len(projs) > 0 {
+			status = fmt.Sprintf(" - %s Used by %d project(s)", utils.Emoji("✓"), len(projs))
+		} else {
+			status = fmt.Sprintf(" - %s Not found (may be safe to remove)", utils.Emoji("⚠️  "))
+		}
+
+		versionDisplay := ver
+		if ver == currentVersion {
+			versionDisplay = utils.Cyan(ver)
+		}
+
+		fmt.Fprintf(cmd.OutOrStdout(), "%s%s%s\n", prefix, versionDisplay, status)
+	}
+
+	// Show project details if any found
+	if len(projects) > 0 {
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintf(cmd.OutOrStdout(), "%sProjects found:\n", utils.Emoji("📁 "))
+
+		// Sort versions for consistent display
+		sortedVersions := make([]string, 0, len(usageMap))
+		for ver := range usageMap {
+			sortedVersions = append(sortedVersions, ver)
+		}
+		sort.Slice(sortedVersions, func(i, j int) bool {
+			return utils.CompareGoVersions(sortedVersions[i], sortedVersions[j]) < 0
+		})
+
+		// Display projects grouped by version
+		for _, ver := range sortedVersions {
+			projs := usageMap[ver]
+			fmt.Fprintf(cmd.OutOrStdout(), "  Go %s:\n", ver)
+			for _, proj := range projs {
+				relPath, err := filepath.Rel(cwd, proj.Path)
+				if err != nil {
+					relPath = proj.Path
+				}
+				// Ensure we show it as a directory
+				if !filepath.IsAbs(relPath) && relPath != "." {
+					relPath = relPath + "/"
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "    %s %s (%s)\n", utils.Emoji("•"), relPath, proj.Source)
+			}
+		}
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintf(cmd.OutOrStdout(), "%sNo projects found in current directory tree\n", utils.Emoji("ℹ️  "))
+	}
+
+	// Show tips
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintf(cmd.OutOrStdout(), "%sTips:\n", utils.Emoji("💡 "))
+	fmt.Fprintln(cmd.OutOrStdout(), "  • Navigate to your projects directory before running this command")
+	fmt.Fprintln(cmd.OutOrStdout(), "  • This only scans current directory tree, not entire system")
+	fmt.Fprintf(cmd.OutOrStdout(), "  • Use --depth to control scan depth (current: %d)\n", VersionsFlags.Depth)
+	if len(usageMap) < len(versions) {
+		fmt.Fprintln(cmd.OutOrStdout(), "  • Versions marked 'Not found' may be used elsewhere or safe to remove")
 	}
 
 	return nil

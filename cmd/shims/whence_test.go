@@ -21,7 +21,7 @@ func TestWhenceCommand(t *testing.T) {
 		{
 			name:          "fails when no argument given",
 			args:          []string{},
-			expectedError: "Usage: goenv whence",
+			expectedError: "usage: goenv whence",
 		},
 		{
 			name: "prints versions when executable exists in multiple versions",

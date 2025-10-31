@@ -1,10 +1,11 @@
 package legacy
 
 import (
-	"github.com/go-nv/goenv/cmd/integrations"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/go-nv/goenv/cmd/integrations"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
@@ -17,9 +18,23 @@ import (
 )
 
 var localCmd = &cobra.Command{
-	Use:    "local [version]",
-	Short:  "Set or show the local Go version for this directory",
-	Long:   "Set a local Go version for the current directory by creating a .go-version file",
+	Use:   "local [version]",
+	Short: "Set or show the local Go version for this directory",
+	Long:  "Set a local Go version for the current directory by creating a .go-version file",
+	Example: `  # Show current local version
+  goenv local
+
+  # Set local version for this project
+  goenv local 1.21.5
+
+  # Remove local version (use global)
+  goenv local --unset
+
+  # Set from go.mod file
+  goenv local --from-gomod
+
+  # Set and configure VS Code
+  goenv local 1.21.5 --vscode`,
 	RunE:   RunLocal,
 	Hidden: true, // Legacy command - use 'goenv use <version>' instead
 }
@@ -70,7 +85,7 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 	// Validate: local command takes 0 or 1 argument (not including flags)
 	// Exception: with --from-gomod, takes 0 arguments
 	if !localFlags.fromGoMod && len(args) > 1 {
-		return fmt.Errorf("Usage: goenv local [<version>]")
+		return fmt.Errorf("usage: goenv local [<version>]")
 	}
 	if localFlags.fromGoMod && len(args) > 0 {
 		return fmt.Errorf("--from-gomod flag cannot be used with a version argument")
@@ -81,7 +96,7 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 
 	if localFlags.unset {
 		if len(args) > 0 {
-			return fmt.Errorf("Usage: goenv local [<version>]")
+			return fmt.Errorf("usage: goenv local [<version>]")
 		}
 
 		if err := mgr.UnsetLocalVersion(); err != nil {
@@ -219,7 +234,7 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 
 				fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "local"))
+				fmt.Fprint(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "local"))
 				return fmt.Errorf("installation cancelled")
 			}
 		} else if status.Corrupted {
@@ -242,6 +257,9 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 	if err := mgr.SetLocalVersion(resolvedVersion); err != nil {
 		return err
 	}
+
+	// Check if version is outdated and show warning
+	displayVersionWarning(cmd, resolvedVersion)
 
 	// Check if go.mod exists and warn about version mismatch
 	cwd, _ := os.Getwd()

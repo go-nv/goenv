@@ -21,7 +21,6 @@ import (
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // completeCacheCleanTypes provides shell completion for cache clean command
@@ -35,7 +34,7 @@ func completeCacheCleanTypes(cmd *cobra.Command, args []string, toComplete strin
 var cacheCmd = &cobra.Command{
 	Use:     "cache",
 	Short:   "Manage goenv caches",
-	GroupID: "system",
+	GroupID: string(cmdpkg.GroupDiagnostics),
 	Long: `Manage build and module caches for installed Go versions.
 
 Subcommands:
@@ -291,6 +290,59 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), "No Go versions installed.")
 		return nil
+	}
+
+	// Auto-detect if user should use --fast mode for better performance
+	if !statusFast && !statusJSON {
+		shouldSuggestFast := false
+		estimatedTotalFiles := 0
+
+		// Quick sample: check first few caches to estimate total file count
+		sampleCount := 0
+		for _, version := range versions {
+			if sampleCount >= 3 { // Sample first 3 versions
+				break
+			}
+
+			versionPath := filepath.Join(cfg.VersionsDir(), version)
+			entries, err := os.ReadDir(versionPath)
+			if err != nil {
+				continue
+			}
+
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					continue
+				}
+				name := entry.Name()
+				if strings.HasPrefix(name, "go-build-") || name == "go-build" {
+					cachePath := filepath.Join(versionPath, name)
+					// Quick sample with very short timeout
+					_, sampleFiles := getDirSizeWithOptions(cachePath, false, 50*time.Millisecond)
+					if sampleFiles > 0 {
+						estimatedTotalFiles += sampleFiles
+						sampleCount++
+					}
+					break // One cache per version for sampling
+				}
+			}
+		}
+
+		// If sample suggests >5000 files total, recommend --fast
+		// Extrapolate: if 3 versions have N files, estimate total
+		if sampleCount > 0 {
+			estimatedTotal := (estimatedTotalFiles * len(versions)) / sampleCount
+			if estimatedTotal > 5000 {
+				shouldSuggestFast = true
+			}
+		}
+
+		if shouldSuggestFast {
+			fmt.Fprintf(cmd.OutOrStdout(),
+				"%s Large cache detected (estimated %s+ files). "+
+					"Use --fast for 5-10x faster scanning.\n\n",
+				utils.Emoji("💡"), formatNumber(estimatedTotalFiles))
+		}
 	}
 
 	// Collect all cache entries for JSON output
@@ -807,24 +859,28 @@ func runCacheClean(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Require --force in non-interactive environments (prevents CI hangs)
-	if !cleanForce && !term.IsTerminal(int(os.Stdin.Fd())) {
-		return fmt.Errorf("error: non-interactive mode requires --force\n\n" +
-			"This command requires confirmation when run interactively.\n" +
-			"Refusing to clean caches in non-interactive environment without --force flag.\n" +
-			"In CI/automation, use: goenv cache clean --force")
-	}
-
-	// Confirm unless --force
-	if !cleanForce {
-		fmt.Fprint(cmd.OutOrStdout(), "Proceed with cleaning? [y/N]: ")
-		var response string
-		fmt.Fscanln(os.Stdin, &response)
-		response = strings.ToLower(strings.TrimSpace(response))
-		if response != "y" && response != "yes" {
-			fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
-			return nil
-		}
+	// Confirm deletion using enhanced prompt with helpful non-interactive guidance
+	confirmed := utils.PromptYesNo(utils.PromptConfig{
+		Question: "Proceed with cleaning?",
+		NonInteractiveError: fmt.Sprintf(
+			"%sRunning in non-interactive mode (no TTY detected)",
+			utils.Emoji("⚠️  ")),
+		NonInteractiveHelp: []string{
+			"",
+			"This command requires confirmation. Options:",
+			fmt.Sprintf("  1. Add --force flag: goenv cache clean %s --force", cleanType),
+			fmt.Sprintf("  2. Use dry-run first: goenv cache clean %s --dry-run", cleanType),
+			"  3. Set env var: GOENV_ASSUME_YES=1 goenv cache clean",
+			"",
+			"For CI/CD, we recommend: GOENV_ASSUME_YES=1",
+		},
+		AutoConfirm: cleanForce,
+		Writer:      cmd.OutOrStdout(),
+		ErrWriter:   cmd.ErrOrStderr(),
+	})
+	if !confirmed {
+		fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
+		return nil
 	}
 
 	// Clean caches
@@ -1006,28 +1062,34 @@ func runCacheMigrate(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Total: %.2f GB (%s files)\n", totalSize, formatNumber(totalFiles))
 	fmt.Fprintln(cmd.OutOrStdout())
 
-	// Require --force in non-interactive environments (prevents CI hangs)
-	if !migrateForce && !term.IsTerminal(int(os.Stdin.Fd())) {
-		return fmt.Errorf("refusing to migrate caches in non-interactive environment without --force flag\n\n" +
-			"This command requires confirmation when run interactively.\n" +
-			"In CI/automation, use: goenv cache migrate --force")
-	}
+	// Show what migration will do
+	fmt.Fprintln(cmd.OutOrStdout(), "This will:")
+	fmt.Fprintln(cmd.OutOrStdout(), "  1. Move old format caches to architecture-specific directories")
+	fmt.Fprintln(cmd.OutOrStdout(), "  2. Preserve all cached build artifacts")
+	fmt.Fprintln(cmd.OutOrStdout(), "  3. Enable proper cache isolation")
+	fmt.Fprintln(cmd.OutOrStdout())
 
-	// Confirm unless --force
-	if !migrateForce {
-		fmt.Fprintln(cmd.OutOrStdout(), "This will:")
-		fmt.Fprintln(cmd.OutOrStdout(), "  1. Move old format caches to architecture-specific directories")
-		fmt.Fprintln(cmd.OutOrStdout(), "  2. Preserve all cached build artifacts")
-		fmt.Fprintln(cmd.OutOrStdout(), "  3. Enable proper cache isolation")
-		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprint(cmd.OutOrStdout(), "Proceed with migration? [y/N]: ")
-		var response string
-		fmt.Fscanln(os.Stdin, &response)
-		response = strings.ToLower(strings.TrimSpace(response))
-		if response != "y" && response != "yes" {
-			fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
-			return nil
-		}
+	// Confirm migration using enhanced prompt with helpful non-interactive guidance
+	confirmed := utils.PromptYesNo(utils.PromptConfig{
+		Question: "Proceed with migration?",
+		NonInteractiveError: fmt.Sprintf(
+			"%sRunning in non-interactive mode (no TTY detected)",
+			utils.Emoji("⚠️  ")),
+		NonInteractiveHelp: []string{
+			"",
+			"This command requires confirmation. Options:",
+			"  1. Add --force flag: goenv cache migrate --force",
+			"  2. Set env var: GOENV_ASSUME_YES=1 goenv cache migrate",
+			"",
+			"For CI/CD, we recommend: GOENV_ASSUME_YES=1",
+		},
+		AutoConfirm: migrateForce,
+		Writer:      cmd.OutOrStdout(),
+		ErrWriter:   cmd.ErrOrStderr(),
+	})
+	if !confirmed {
+		fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
+		return nil
 	}
 
 	// Perform migration

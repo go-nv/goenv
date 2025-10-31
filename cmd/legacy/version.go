@@ -34,7 +34,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 
 	// Validate: version command takes no arguments
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv version")
+		return fmt.Errorf("usage: goenv version")
 	}
 
 	cfg := config.Load()
@@ -46,7 +46,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle multiple versions separated by ':'
-	versions := SplitVersions(version)
+	versions := utils.SplitVersions(version)
 
 	if len(versions) > 1 {
 		// Multiple versions - check each one and report errors for missing ones
@@ -119,31 +119,4 @@ func runVersion(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-// splitVersions splits a version string by ':' delimiter
-func SplitVersions(version string) []string {
-	if version == "" {
-		return []string{}
-	}
-
-	result := []string{}
-	current := ""
-
-	for _, ch := range version {
-		if ch == ':' {
-			if current != "" {
-				result = append(result, current)
-				current = ""
-			}
-		} else {
-			current += string(ch)
-		}
-	}
-
-	if current != "" {
-		result = append(result, current)
-	}
-
-	return result
 }

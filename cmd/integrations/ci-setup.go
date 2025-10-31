@@ -3,7 +3,7 @@ package integrations
 import (
 	"fmt"
 	"os"
-	"runtime"
+	"path/filepath"
 	"strings"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
@@ -19,7 +19,7 @@ import (
 var ciSetupCmd = &cobra.Command{
 	Use:     "ci-setup",
 	Short:   "Configure goenv for CI/CD environments",
-	GroupID: "system",
+	GroupID: string(cmdpkg.GroupIntegrations),
 	Long: `Configures goenv for optimal CI/CD usage with two-phase caching optimization.
 
 This command supports two modes:
@@ -103,13 +103,13 @@ func runCISetup(cmd *cobra.Command, args []string) error {
 	}
 
 	// Detect CI environment
-	isGitHubActions := os.Getenv("GITHUB_ACTIONS") == "true"
-	isGitLabCI := os.Getenv("GITLAB_CI") == "true"
-	isCircleCI := os.Getenv("CIRCLECI") == "true"
-	isTravisCI := os.Getenv("TRAVIS") == "true"
+	isGitHubActions := os.Getenv(utils.EnvVarGitHubActions) == "true"
+	isGitLabCI := os.Getenv(utils.EnvVarGitLabCI) == "true"
+	isCircleCI := os.Getenv(utils.EnvVarCircleCI) == "true"
+	isTravisCI := os.Getenv(utils.EnvVarTravisCI) == "true"
 
 	// Auto-detect shell format based on platform and CI environment
-	if runtime.GOOS == "windows" && shellFormat == "bash" {
+	if utils.IsWindows() && shellFormat == "bash" {
 		shellFormat = "powershell"
 	} else if isGitHubActions && shellFormat == "bash" {
 		shellFormat = "github"
@@ -315,7 +315,7 @@ func runCIInstallPhase(cmd *cobra.Command, args []string, cfg *config.Config) er
 		fmt.Fprintf(cmd.OutOrStdout(), "[%d/%d] Installing Go %s...\n", i+1, len(versions), version)
 
 		// Check if already installed
-		versionPath := cfg.VersionsDir() + "/" + version
+		versionPath := filepath.Join(cfg.VersionsDir(), version)
 		if _, err := os.Stat(versionPath); err == nil {
 			fmt.Fprintf(cmd.OutOrStdout(), "  %sAlready installed (cached)\n", utils.Emoji("✅ "))
 			skippedCount++

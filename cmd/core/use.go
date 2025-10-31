@@ -1,8 +1,8 @@
 package core
 
 import (
-	"github.com/go-nv/goenv/cmd/integrations"
 	"fmt"
+	"github.com/go-nv/goenv/cmd/integrations"
 	"os"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
@@ -19,7 +19,7 @@ import (
 var useCmd = &cobra.Command{
 	Use:     "use <version>",
 	Short:   "Install (if needed) and set a Go version",
-	GroupID: "common",
+	GroupID: string(cmdpkg.GroupVersions),
 	Long: `Install (if needed) and set a Go version for the current directory or globally.
 
 This is a convenience command that combines install, local/global, and optionally
@@ -63,7 +63,7 @@ func init() {
 
 func runUse(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("Usage: goenv use <version>")
+		return fmt.Errorf("usage: goenv use <version>")
 	}
 
 	versionSpec := args[0]

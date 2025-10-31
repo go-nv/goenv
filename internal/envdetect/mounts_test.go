@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestDetectMountType(t *testing.T) {
@@ -169,7 +171,7 @@ func TestMountInfo_Fields(t *testing.T) {
 }
 
 func TestDetectMountType_Windows(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Windows-specific test")
 	}
 

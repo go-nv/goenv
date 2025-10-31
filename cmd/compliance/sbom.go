@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -12,13 +11,14 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var sbomCmd = &cobra.Command{
 	Use:     "sbom",
 	Short:   "Generate Software Bill of Materials for projects",
-	GroupID: "tools",
+	GroupID: string(cmdpkg.GroupTools),
 	Long: `Generate SBOMs using industry-standard tools (cyclonedx-gomod, syft) with goenv-managed toolchains.
 
 This command is a thin wrapper that ensures SBOM generation uses the correct Go version
@@ -156,14 +156,9 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 
 // resolveSBOMTool finds the tool binary in goenv-managed paths
 func resolveSBOMTool(cfg *config.Config, tool string) (string, error) {
-	// Check host-specific bin directory first
+	// Check host-specific bin directory first using consolidated utility
 	hostBin := cfg.HostBinDir()
-	toolPath := filepath.Join(hostBin, tool)
-	if runtime.GOOS == "windows" {
-		toolPath += ".exe"
-	}
-
-	if _, err := os.Stat(toolPath); err == nil {
+	if toolPath, err := utils.FindExecutable(hostBin, tool); err == nil {
 		return toolPath, nil
 	}
 

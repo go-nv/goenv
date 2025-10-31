@@ -1,9 +1,9 @@
 package core
 
 import (
-	"github.com/go-nv/goenv/cmd/legacy"
 	"encoding/json"
 	"fmt"
+	"github.com/go-nv/goenv/cmd/legacy"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
@@ -15,7 +15,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List installed Go versions",
-	GroupID: "common",
+	GroupID: string(cmdpkg.GroupVersions),
 	Long: `List all locally installed Go versions with the current version highlighted.
 
 By default, shows installed versions (same as 'goenv versions').
@@ -53,9 +53,9 @@ func runList(cmd *cobra.Command, args []string) error {
 	// Validate: list command takes no positional arguments
 	if len(args) > 0 {
 		if listFlags.remote {
-			return fmt.Errorf("Usage: goenv list --remote [--stable]")
+			return fmt.Errorf("usage: goenv list --remote [--stable]")
 		}
-		return fmt.Errorf("Usage: goenv list [--bare] [--skip-aliases] [--remote]")
+		return fmt.Errorf("usage: goenv list [--bare] [--skip-aliases] [--remote]")
 	}
 
 	// Route to appropriate handler

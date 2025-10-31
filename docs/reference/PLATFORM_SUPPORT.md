@@ -387,7 +387,7 @@ goenv doctor
 - Set timeouts for network operations
 - Pin Go versions with `.go-version` files
 
-See [CI/CD Integration Guide](./CI_CD_GUIDE.md) for detailed examples.
+See [CI/CD Integration Guide](../advanced/CI_CD_GUIDE.md) for detailed examples.
 
 ## Performance Characteristics
 
@@ -422,6 +422,6 @@ See [CI/CD Integration Guide](./CI_CD_GUIDE.md) for detailed examples.
 
 - [Installation Guide](./user-guide/INSTALL.md)
 - [Cross-Building Guide](./advanced/CROSS_BUILDING.md)
-- [CI/CD Integration](./CI_CD_GUIDE.md)
+- [CI/CD Integration](../advanced/CI_CD_GUIDE.md)
 - [VS Code Integration](./user-guide/VSCODE_INTEGRATION.md)
-- [Hooks System](./HOOKS_QUICKSTART.md)
+- [Hooks System](HOOKS_QUICKSTART.md)

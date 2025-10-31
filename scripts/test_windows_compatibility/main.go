@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	passed = 0
-	failed = 0
+	passed   = 0
+	failed   = 0
 	warnings = 0
 )
 
@@ -461,7 +461,7 @@ func testUnixCommands() {
 
 			// Track if file has shell-specific branching (fish/powershell/cmd/else)
 			if strings.Contains(line, "shell ==") &&
-			   (strings.Contains(line, "powershell") || strings.Contains(line, "cmd") || strings.Contains(line, "fish")) {
+				(strings.Contains(line, "powershell") || strings.Contains(line, "cmd") || strings.Contains(line, "fish")) {
 				hasShellBranching = true
 			}
 
@@ -627,7 +627,7 @@ func testHardcodedUnixPaths() {
 					prevLine := allLines[i-j]
 					// Check for Windows guards or function boundaries
 					if strings.Contains(prevLine, "runtime.GOOS") &&
-					   (strings.Contains(prevLine, "windows") || strings.Contains(prevLine, "!= \"windows\"")) {
+						(strings.Contains(prevLine, "windows") || strings.Contains(prevLine, "!= \"windows\"")) {
 						hasGuard = true
 						break
 					}
@@ -747,7 +747,7 @@ func testPowerShellProfileDetection() {
 	foundPowerShellHandling := false
 	foundProfilePath := false
 
-	err := filepath.Walk("cmd", func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk("../../cmd", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -915,8 +915,8 @@ func testBinaryCreationInTests() {
 
 			// Check for WriteFile creating binaries without Windows handling
 			if strings.Contains(line, "WriteFile") &&
-				(strings.Contains(line, `"go"`) || strings.Contains(line, "goExe") || 
-				 strings.Contains(line, "goBinary") || strings.Contains(line, "execPath")) &&
+				(strings.Contains(line, `"go"`) || strings.Contains(line, "goExe") ||
+					strings.Contains(line, "goBinary") || strings.Contains(line, "execPath")) &&
 				!strings.Contains(line, "//") {
 
 				// Check if runtime.GOOS or .bat exists nearby
@@ -933,7 +933,7 @@ func testBinaryCreationInTests() {
 
 				for j := startIdx; j <= endIdx; j++ {
 					if (strings.Contains(allLines[j], "runtime.GOOS") && strings.Contains(allLines[j], "windows")) ||
-					   strings.Contains(allLines[j], ".bat") {
+						strings.Contains(allLines[j], ".bat") {
 						hasRuntimeCheck = true
 						break
 					}
@@ -1392,8 +1392,8 @@ func testShimCreationPatterns() {
 
 				for j := startIdx; j <= endIdx; j++ {
 					if (strings.Contains(allLines[j], "runtime.GOOS") && strings.Contains(allLines[j], "windows")) ||
-					   strings.Contains(allLines[j], ".bat") ||
-					   strings.Contains(allLines[j], "@echo off") {
+						strings.Contains(allLines[j], ".bat") ||
+						strings.Contains(allLines[j], "@echo off") {
 						hasRuntimeCheck = true
 						break
 					}
@@ -1460,8 +1460,8 @@ func testExtensionStrippingForDisplay() {
 
 			// Check for functions that return shim/binary names without stripping extensions
 			if (strings.Contains(line, "return") && strings.Contains(line, "entry.Name()")) ||
-			   (strings.Contains(line, "append") && strings.Contains(line, "entry.Name()")) ||
-			   (strings.Contains(line, "Fprintln") && strings.Contains(line, "foundPath")) {
+				(strings.Contains(line, "append") && strings.Contains(line, "entry.Name()")) ||
+				(strings.Contains(line, "Fprintln") && strings.Contains(line, "foundPath")) {
 
 				// Look for Windows extension stripping nearby
 				hasExtensionStripping := false
@@ -1476,11 +1476,11 @@ func testExtensionStrippingForDisplay() {
 				}
 
 				for j := startIdx; j <= endIdx; j++ {
-					if (strings.Contains(allLines[j], "TrimSuffix") && 
-					    (strings.Contains(allLines[j], ".exe") || strings.Contains(allLines[j], ".bat"))) ||
-					   (strings.Contains(allLines[j], "runtime.GOOS") && 
-					    strings.Contains(allLines[j], "windows") &&
-					    strings.Contains(allLines[j], "TrimSuffix")) {
+					if (strings.Contains(allLines[j], "TrimSuffix") &&
+						(strings.Contains(allLines[j], ".exe") || strings.Contains(allLines[j], ".bat"))) ||
+						(strings.Contains(allLines[j], "runtime.GOOS") &&
+							strings.Contains(allLines[j], "windows") &&
+							strings.Contains(allLines[j], "TrimSuffix")) {
 						hasExtensionStripping = true
 						break
 					}
@@ -1489,11 +1489,11 @@ func testExtensionStrippingForDisplay() {
 				// Check if this is in a function that returns binary/shim names
 				inRelevantFunction := false
 				for j := i; j >= 0 && j > i-50; j-- {
-					if strings.Contains(allLines[j], "func") && 
-					   (strings.Contains(allLines[j], "ListShims") ||
-					    strings.Contains(allLines[j], "Whence") ||
-					    strings.Contains(allLines[j], "Which") ||
-					    strings.Contains(allLines[j], "FindBinary")) {
+					if strings.Contains(allLines[j], "func") &&
+						(strings.Contains(allLines[j], "ListShims") ||
+							strings.Contains(allLines[j], "Whence") ||
+							strings.Contains(allLines[j], "Which") ||
+							strings.Contains(allLines[j], "FindBinary")) {
 						inRelevantFunction = true
 						break
 					}
@@ -1580,10 +1580,10 @@ func testExeFilesWithScriptContent() {
 							if k < 0 {
 								continue
 							}
-							if strings.Contains(allLines[k], "#!/") || 
-							   strings.Contains(allLines[k], "@echo off") ||
-							   strings.Contains(allLines[k], "exit 0") ||
-							   strings.Contains(allLines[k], "exit 1") {
+							if strings.Contains(allLines[k], "#!/") ||
+								strings.Contains(allLines[k], "@echo off") ||
+								strings.Contains(allLines[k], "exit 0") ||
+								strings.Contains(allLines[k], "exit 1") {
 								hasScriptContent = true
 								break
 							}
@@ -1761,7 +1761,7 @@ func testBatchEchoQuotes() {
 
 				for j := startIdx; j <= endIdx; j++ {
 					if strings.Contains(allLines[j], "@echo off") ||
-					   (strings.Contains(allLines[j], `".bat"`) && strings.Contains(allLines[j], "WriteFile")) {
+						(strings.Contains(allLines[j], `".bat"`) && strings.Contains(allLines[j], "WriteFile")) {
 						isInBatchContext = true
 						break
 					}
@@ -1825,10 +1825,10 @@ func testContainsPathComparisons() {
 			line := scanner.Text()
 
 			// Check for path comparisons with forward slashes without ToSlash
-			if (strings.Contains(line, ".Contains(") || 
-			    strings.Contains(line, ".HasPrefix(") || 
-			    strings.Contains(line, ".HasSuffix(")) &&
-				(strings.Contains(line, `"/`) || strings.Contains(line, `"/`)) &&
+			if (strings.Contains(line, ".Contains(") ||
+				strings.Contains(line, ".HasPrefix(") ||
+				strings.Contains(line, ".HasSuffix(")) &&
+				(strings.Contains(line, `"/`) || strings.Contains(line, `"\`)) &&
 				!strings.Contains(line, "ToSlash") &&
 				!strings.Contains(line, "//") {
 				issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))

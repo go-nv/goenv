@@ -3,8 +3,9 @@ package pathutil
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // ExpandPath expands environment variables and tilde in a path
@@ -33,11 +34,11 @@ func ExpandPath(path string) string {
 }
 
 // FindExecutable finds an executable file, handling Windows executable extensions.
-// On Windows, it checks for both .exe (production) and .bat (tests) files.
+// On Windows, it checks for .exe, .bat, .cmd, and .com files.
 // On Unix, it returns the path as-is.
 // Returns the full path if the executable exists, or an error if not found.
 func FindExecutable(basePath string) (string, error) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		// On Unix, just check if the file exists
 		if _, err := os.Stat(basePath); err != nil {
 			return "", err
@@ -45,18 +46,15 @@ func FindExecutable(basePath string) (string, error) {
 		return basePath, nil
 	}
 
-	// On Windows, try .exe first (production), then .bat (tests)
-	exePath := basePath + ".exe"
-	if _, err := os.Stat(exePath); err == nil {
-		return exePath, nil
+	// On Windows, try common executable extensions from utils
+	for _, ext := range utils.WindowsExecutableExtensions() {
+		extPath := basePath + ext
+		if _, err := os.Stat(extPath); err == nil {
+			return extPath, nil
+		}
 	}
 
-	batPath := basePath + ".bat"
-	if _, err := os.Stat(batPath); err == nil {
-		return batPath, nil
-	}
-
-	// Neither exists, return error for .exe (expected in production)
-	_, err := os.Stat(exePath)
+	// None found, return error for .exe (expected in production)
+	_, err := os.Stat(basePath + ".exe")
 	return "", err
 }

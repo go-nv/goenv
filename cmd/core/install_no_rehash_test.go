@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestInstallCommand_NoRehashFlag(t *testing.T) {
@@ -29,7 +30,7 @@ func TestInstallCommand_NoRehashFlag(t *testing.T) {
 	// Create mock go binary
 	goBinary := filepath.Join(binDir, "go")
 	var content string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".bat"
 		content = "@echo off\necho go1.21.0\n"
 	} else {
@@ -78,7 +79,7 @@ func TestInstallCommand_NoRehashEnv(t *testing.T) {
 	// Create mock go binary
 	goBinary := filepath.Join(binDir, "go")
 	var content string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".bat"
 		content = "@echo off\necho go1.21.0\n"
 	} else {

@@ -7,15 +7,52 @@ One-page cheat sheet for common goenv commands. Perfect for printing or quick lo
 | Task | Command | Notes |
 |------|---------|-------|
 | **Install goenv** | `curl -sfL https://.../.../install.sh \| bash` | Binary installation (fastest) |
+| **First-time setup** | `goenv setup` | 🆕 Automatic shell & IDE configuration |
+| **Getting started** | `goenv get-started` | 🆕 Interactive beginner guide |
 | **Install Go version** | `goenv install 1.25.2` | Downloads and installs |
 | **Set project version** | `goenv use 1.25.2` | Creates `.go-version` file |
 | **Set global version** | `goenv use 1.25.2 --global` | Sets default for all projects |
 | **Check active version** | `goenv current` | Shows version and source |
+| **Check installation status** | `goenv status` | 🆕 Quick health overview |
 | **List installed** | `goenv list` | Includes `*` for active |
 | **List available** | `goenv list --remote` | All versions from golang.org |
+| **Check version usage** | `goenv versions --used` | 🆕 Scan projects for version usage |
+| **Version information** | `goenv info 1.25.2` | 🆕 Detailed info & lifecycle status |
+| **Compare versions** | `goenv compare 1.21.5 1.23.2` | 🆕 Side-by-side comparison |
 | **Uninstall version** | `goenv uninstall 1.24.0` | Removes installation |
 | **Update goenv** | `goenv update` | Self-update (git or binary) |
 | **Diagnostics** | `goenv doctor` | Health check |
+| **Fix issues** | `goenv doctor --fix` | 🆕 Interactive repair mode |
+| **Discover commands** | `goenv explore` | 🆕 Browse commands by category |
+
+## Getting Started (New Users)
+
+```bash
+# Automatic first-time setup
+goenv setup
+# Detects shell, adds to profile, configures VS Code
+# Safe to run multiple times - won't duplicate config
+
+# Interactive guide
+goenv get-started
+# Shows step-by-step instructions based on your setup status
+
+# Quick health check
+goenv status
+# Shows initialization status, current version, installed count
+
+# Comprehensive diagnostics
+goenv doctor
+# Checks 26+ aspects of your installation
+
+# Fix issues interactively
+goenv doctor --fix
+# Repairs shell config, duplicates, stale cache
+
+# Discover commands by category
+goenv explore
+# Browse: Getting Started, Versions, Tools, Diagnostics, etc.
+```
 
 ## Version Management
 
@@ -38,6 +75,14 @@ goenv current
 # Show all installed
 goenv list
 
+# Check which versions are used by projects (🆕)
+cd ~/work
+goenv versions --used
+# Shows which versions are in use by scanning .go-version and go.mod files
+
+# Quick scan (immediate subdirectories only)
+goenv versions --used --depth 1
+
 # Browse available versions
 goenv list --remote
 
@@ -46,6 +91,54 @@ goenv list --remote --stable
 
 # JSON output (automation)
 goenv list --json
+```
+
+## Version Usage Analysis (🆕)
+
+```bash
+# Navigate to your projects directory
+cd ~/work
+
+# Scan for version usage
+goenv versions --used
+# Output shows:
+#   ✓ Versions used by projects
+#   ⚠️  Versions not found (may be safe to remove)
+#   📁 List of projects using each version
+
+# Control scan depth
+goenv versions --used --depth 5  # Deep scan
+goenv versions --used --depth 1  # Quick scan
+
+# Before removing old versions
+goenv versions --used
+# Check if version shows "Not found" before uninstalling
+```
+
+## Version Information & Lifecycle
+
+```bash
+# Get detailed version info
+goenv info 1.23.2
+# Shows: install status, release date, EOL status, size
+
+# JSON output for automation
+goenv info 1.23.2 --json
+
+# Compare two versions side-by-side
+goenv compare 1.21.5 1.23.2
+# Shows: release dates, support status, size diff, recommendations
+
+# Check if version is EOL
+goenv info 1.20.0
+# Warns if version is no longer supported
+
+# Find recommended upgrade
+goenv info $(goenv current --bare)
+# Shows upgrade path if current version is EOL
+
+# Compare current with latest
+goenv compare $(goenv current --bare) $(goenv list --remote --stable --bare | tail -1)
 ```
 
 ## File-Based Version Selection
@@ -62,20 +155,42 @@ goenv current
 ## Tools Management
 
 ```bash
-# Install common tools
-goenv default-tools
-
-# Install specific tool
+# Install specific tool for current version
 goenv tools install gopls@latest
 
-# List installed tools
+# Install tool across ALL Go versions at once
+goenv tools install gopls@latest --all
+
+# Uninstall tool from current version
+goenv tools uninstall gopls
+
+# Uninstall tool from ALL Go versions
+goenv tools uninstall gopls --all
+
+# List tools for current version
 goenv tools list
 
-# Update tools
+# List tools across all versions
+goenv tools list --all
+
+# Check which tools are outdated
+goenv tools outdated
+
+# View tool consistency across versions
+goenv tools status
+
+# Update tools for current version
 goenv tools update
 
-# Sync tools between versions
-goenv sync-tools
+# Update tools across all versions
+goenv tools update --all
+
+# Sync tools between specific versions
+goenv tools sync 1.21.0 1.23.0
+
+# Manage default tools (auto-installed with new Go versions)
+goenv tools default list
+goenv tools default init
 ```
 
 ## Cache Management
@@ -185,6 +300,7 @@ goenv list --json | jq -r '.[] | select(.active) | .version'
 | `GOENV_OFFLINE` | Offline mode | `1` |
 | `GOENV_DEBUG` | Debug logging | `1` |
 | `GOENV_DISABLE_GOPATH` | Disable isolation | `1` |
+| `GOENV_ASSUME_YES` | 🆕 Auto-confirm prompts (CI) | `1` |
 
 ```bash
 # Set in shell config (~/.bashrc, ~/.zshrc)
@@ -233,13 +349,19 @@ goenv use 1.25.2 --global
 
 | Problem | Solution |
 |---------|----------|
-| `goenv: command not found` | Add to PATH: `export PATH="$GOENV_ROOT/bin:$PATH"` |
+| `goenv: command not found` | 🆕 Run: `goenv setup` or add to PATH: `export PATH="$GOENV_ROOT/bin:$PATH"` |
+| Not sure what's wrong | 🆕 Run: `goenv status` for quick check, `goenv doctor` for full diagnostic |
+| Shell not initialized | 🆕 Run: `goenv setup` or `eval "$(goenv init -)"` |
+| Issues detected by doctor | 🆕 Run: `goenv doctor --fix` for interactive repairs |
 | Wrong Go version active | Check: `goenv current`, fix with `goenv use <version>` |
+| Multiple goenv installations | 🆕 Run: `goenv doctor` to detect, `goenv doctor --fix` to resolve |
 | Tool not found after install | Run: `goenv rehash` |
 | Stale version list | Run: `goenv refresh` |
 | Cache corruption | Run: `goenv cache clean all --force` then `goenv refresh` |
 | Slow `list --remote` | Use: `GOENV_OFFLINE=1 goenv list --remote` |
 | VS Code wrong version | Run: `goenv vscode sync` |
+| Don't know which version to use | 🆕 Run: `goenv info <version>` or `goenv compare <v1> <v2>` |
+| Version is EOL/unsupported | 🆕 Run: `goenv info $(goenv current --bare)` for upgrade recommendations |
 
 ## Platform-Specific Commands
 
@@ -302,6 +424,11 @@ alias gl='goenv list'
 alias goenv-latest='goenv install $(goenv list --remote --stable --bare | tail -1)'
 alias goenv-doctor='goenv doctor && goenv cache status'
 alias goenv-clean='goenv cache clean all --force'
+
+# New commands (v3.0+)
+alias goenv-setup='goenv setup --verify'
+alias goenv-fix='goenv doctor --fix'
+alias goenv-health='goenv status && echo && goenv doctor'
 ```
 
 ## Tips & Tricks
@@ -372,19 +499,19 @@ goenv --version
 
 **Quick Start:**
 - [Installation Guide](./user-guide/INSTALL.md)
-- [Modern Commands](./MODERN_COMMANDS.md)
+- [Modern Commands](./user-guide/MODERN_COMMANDS.md)
 - [FAQ](./FAQ.md)
 
 **Reference:**
 - [Complete Command Reference](./reference/COMMANDS.md)
 - [Environment Variables](./reference/ENVIRONMENT_VARIABLES.md)
-- [Platform Support](./PLATFORM_SUPPORT.md)
+- [Platform Support](./reference/PLATFORM_SUPPORT.md)
 
 **Advanced:**
-- [Hooks System](./HOOKS_QUICKSTART.md)
-- [Compliance Use Cases](./COMPLIANCE_USE_CASES.md)
-- [JSON Output Guide](./JSON_OUTPUT_GUIDE.md)
-- [Cache Troubleshooting](./CACHE_TROUBLESHOOTING.md)
+- [Hooks System](./reference/HOOKS_QUICKSTART.md)
+- [Compliance Use Cases](./advanced/COMPLIANCE_USE_CASES.md)
+- [JSON Output Guide](./reference/JSON_OUTPUT_GUIDE.md)
+- [Cache Troubleshooting](./advanced/CACHE_TROUBLESHOOTING.md)
 
 ---
 

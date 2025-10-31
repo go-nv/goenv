@@ -3,7 +3,6 @@ package utils
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
@@ -26,40 +25,40 @@ func TestFindExecutable(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tests := []struct {
-		name          string
-		createFile    string
-		makeExec      bool
-		searchName    string
-		shouldFind    bool
-		expectedExt   string
+		name        string
+		createFile  string
+		makeExec    bool
+		searchName  string
+		shouldFind  bool
+		expectedExt string
 	}{
 		{
-			name:       "finds exe on windows",
-			createFile: "test.exe",
-			searchName: "test",
-			shouldFind: runtime.GOOS == "windows",
+			name:        "finds exe on windows",
+			createFile:  "test.exe",
+			searchName:  "test",
+			shouldFind:  IsWindows(),
 			expectedExt: ".exe",
 		},
 		{
-			name:       "finds bat on windows",
-			createFile: "test.bat",
-			searchName: "test",
-			shouldFind: runtime.GOOS == "windows",
+			name:        "finds bat on windows",
+			createFile:  "test.bat",
+			searchName:  "test",
+			shouldFind:  IsWindows(),
 			expectedExt: ".bat",
 		},
 		{
-			name:       "finds cmd on windows",
-			createFile: "test.cmd",
-			searchName: "test",
-			shouldFind: runtime.GOOS == "windows",
+			name:        "finds cmd on windows",
+			createFile:  "test.cmd",
+			searchName:  "test",
+			shouldFind:  IsWindows(),
 			expectedExt: ".cmd",
 		},
 		{
-			name:       "finds exact name on unix",
-			createFile: "test",
-			makeExec:   true,
-			searchName: "test",
-			shouldFind: runtime.GOOS != "windows",
+			name:        "finds exact name on unix",
+			createFile:  "test",
+			makeExec:    true,
+			searchName:  "test",
+			shouldFind:  !IsWindows(),
 			expectedExt: "",
 		},
 	}
@@ -74,7 +73,7 @@ func TestFindExecutable(t *testing.T) {
 			}
 
 			// Make executable on Unix if needed
-			if tt.makeExec && runtime.GOOS != "windows" {
+			if tt.makeExec && !IsWindows() {
 				err = os.Chmod(filePath, 0755)
 				if err != nil {
 					t.Fatalf("Failed to chmod file: %v", err)
@@ -118,12 +117,12 @@ func TestIsExecutable(t *testing.T) {
 		{
 			name:         "exe file on windows",
 			filename:     "test.exe",
-			shouldBeExec: runtime.GOOS == "windows",
+			shouldBeExec: IsWindows(),
 		},
 		{
 			name:         "bat file on windows",
 			filename:     "test.bat",
-			shouldBeExec: runtime.GOOS == "windows",
+			shouldBeExec: IsWindows(),
 		},
 		{
 			name:         "txt file not executable",
@@ -134,7 +133,7 @@ func TestIsExecutable(t *testing.T) {
 			name:         "file with exec bit on unix",
 			filename:     "test",
 			makeExec:     true,
-			shouldBeExec: runtime.GOOS != "windows",
+			shouldBeExec: !IsWindows(),
 		},
 		{
 			name:         "file without exec bit on unix",
@@ -153,7 +152,7 @@ func TestIsExecutable(t *testing.T) {
 			}
 			defer os.Remove(filePath)
 
-			if tt.makeExec && runtime.GOOS != "windows" {
+			if tt.makeExec && !IsWindows() {
 				err = os.Chmod(filePath, 0755)
 				if err != nil {
 					t.Fatalf("Failed to chmod file: %v", err)
@@ -169,7 +168,7 @@ func TestIsExecutable(t *testing.T) {
 }
 
 func TestHasExecutableExtension(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if IsWindows() {
 		// Test Windows-specific behavior
 		tests := []struct {
 			filename string

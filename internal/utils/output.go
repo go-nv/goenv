@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"os"
 
 	"golang.org/x/term"
@@ -84,4 +85,95 @@ func EmojiOr(emoji, fallback string) string {
 		return emoji
 	}
 	return fallback
+}
+
+// ANSI color codes
+const (
+	colorReset  = "\x1b[0m"
+	colorRed    = "\x1b[31m"
+	colorGreen  = "\x1b[32m"
+	colorYellow = "\x1b[33m"
+	colorBlue   = "\x1b[34m"
+	colorGray   = "\x1b[90m"
+	colorCyan   = "\x1b[36m"
+
+	colorBoldRed    = "\x1b[1;31m"
+	colorBoldGreen  = "\x1b[1;32m"
+	colorBoldYellow = "\x1b[1;33m"
+	colorBoldBlue   = "\x1b[1;34m"
+)
+
+// Color wraps the given string in ANSI color codes
+func Color(text, code string) string {
+	if !ShouldUseColor() {
+		return text
+	}
+	return code + text + colorReset
+}
+
+// Red returns text in red
+func Red(text string) string {
+	return Color(text, colorRed)
+}
+
+// Green returns text in green
+func Green(text string) string {
+	return Color(text, colorGreen)
+}
+
+// Yellow returns text in yellow
+func Yellow(text string) string {
+	return Color(text, colorYellow)
+}
+
+// Blue returns text in blue
+func Blue(text string) string {
+	return Color(text, colorBlue)
+}
+
+// Gray returns text in gray
+func Gray(text string) string {
+	return Color(text, colorGray)
+}
+
+// Cyan returns text in cyan
+func Cyan(text string) string {
+	return Color(text, colorCyan)
+}
+
+// BoldRed returns text in bold red
+func BoldRed(text string) string {
+	return Color(text, colorBoldRed)
+}
+
+// BoldGreen returns text in bold green
+func BoldGreen(text string) string {
+	return Color(text, colorBoldGreen)
+}
+
+// BoldYellow returns text in bold yellow
+func BoldYellow(text string) string {
+	return Color(text, colorBoldYellow)
+}
+
+// BoldBlue returns text in bold blue
+func BoldBlue(text string) string {
+	return Color(text, colorBoldBlue)
+}
+
+// BoldCyan returns text in bold cyan
+func BoldCyan(text string) string {
+	return Color(text, "\x1b[1;36m")
+}
+
+// BoldWhite returns text in bold white
+func BoldWhite(text string) string {
+	return Color(text, "\x1b[1;37m")
+}
+
+// PrintJSON encodes and prints JSON with proper indentation
+func PrintJSON(w interface{ Write([]byte) (int, error) }, v interface{}) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(v)
 }

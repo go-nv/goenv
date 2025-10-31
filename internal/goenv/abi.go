@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // ABIVariable represents a Go ABI-related environment variable
@@ -175,50 +177,40 @@ func buildABISuffixFallback(goarch string, env []string) string {
 
 	switch goarch {
 	case "amd64":
-		if amd64Level := getEnvValue(env, "GOAMD64"); amd64Level != "" && amd64Level != "v1" {
+		if amd64Level := utils.GetEnvValue(env, "GOAMD64"); amd64Level != "" && amd64Level != "v1" {
 			suffix += "-" + amd64Level
 		}
 	case "arm":
-		if armVersion := getEnvValue(env, "GOARM"); armVersion != "" && armVersion != "7" {
+		if armVersion := utils.GetEnvValue(env, "GOARM"); armVersion != "" && armVersion != "7" {
 			suffix += "-v" + armVersion
 		}
 	case "386":
-		if arch386 := getEnvValue(env, "GO386"); arch386 != "" && arch386 != "sse2" {
+		if arch386 := utils.GetEnvValue(env, "GO386"); arch386 != "" && arch386 != "sse2" {
 			suffix += "-" + arch386
 		}
 	case "mips", "mipsle":
-		if mipsABI := getEnvValue(env, "GOMIPS"); mipsABI != "" && mipsABI != "hardfloat" {
+		if mipsABI := utils.GetEnvValue(env, "GOMIPS"); mipsABI != "" && mipsABI != "hardfloat" {
 			suffix += "-" + mipsABI
 		}
 	case "mips64", "mips64le":
-		if mips64ABI := getEnvValue(env, "GOMIPS64"); mips64ABI != "" && mips64ABI != "hardfloat" {
+		if mips64ABI := utils.GetEnvValue(env, "GOMIPS64"); mips64ABI != "" && mips64ABI != "hardfloat" {
 			suffix += "-" + mips64ABI
 		}
 	case "ppc64", "ppc64le":
-		if ppc64Level := getEnvValue(env, "GOPPC64"); ppc64Level != "" && ppc64Level != "power8" {
+		if ppc64Level := utils.GetEnvValue(env, "GOPPC64"); ppc64Level != "" && ppc64Level != "power8" {
 			suffix += "-" + ppc64Level
 		}
 	case "riscv64":
-		if riscv64Level := getEnvValue(env, "GORISCV64"); riscv64Level != "" && riscv64Level != "rva20u64" {
+		if riscv64Level := utils.GetEnvValue(env, "GORISCV64"); riscv64Level != "" && riscv64Level != "rva20u64" {
 			suffix += "-" + riscv64Level
 		}
 	case "wasm":
-		if wasmABI := getEnvValue(env, "GOWASM"); wasmABI != "" {
+		if wasmABI := utils.GetEnvValue(env, "GOWASM"); wasmABI != "" {
 			suffix += "-" + wasmABI
 		}
 	}
 
 	return suffix
-}
-
-func getEnvValue(env []string, key string) string {
-	prefix := key + "="
-	for _, envVar := range env {
-		if strings.HasPrefix(envVar, prefix) {
-			return strings.TrimPrefix(envVar, prefix)
-		}
-	}
-	return ""
 }
 
 // ClearCache clears the cached ABI variables (useful for testing)

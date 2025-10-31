@@ -616,5 +616,5 @@ mv audits-archive-*.tar.gz /long-term-storage/
 
 - [goenv inventory command](./reference/COMMANDS.md#goenv-inventory)
 - [goenv sbom command](./reference/COMMANDS.md#goenv-sbom)
-- [Hooks System](./HOOKS_QUICKSTART.md)
-- [CI/CD Integration Guide](./CI_CD_GUIDE.md)
+- [Hooks System](../reference/HOOKS_QUICKSTART.md)
+- [CI/CD Integration Guide](CI_CD_GUIDE.md)

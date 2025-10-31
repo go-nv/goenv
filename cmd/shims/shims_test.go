@@ -3,13 +3,12 @@ package shims
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
-
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +56,7 @@ func TestShimsCommand(t *testing.T) {
 				for _, shim := range tt.setupShims {
 					shimPath := filepath.Join(shimsDir, shim)
 					var shimContent string
-					if runtime.GOOS == "windows" {
+					if utils.IsWindows() {
 						shimPath += ".bat"
 						shimContent = "@echo off\necho shim\n"
 					} else {
@@ -193,7 +192,7 @@ func TestFindInSystemPath(t *testing.T) {
 	createTestExecutable := func(dir, name string) {
 		path := filepath.Join(dir, name)
 		var content string
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			path += ".exe"
 			content = "@echo off\necho test\n"
 		} else {

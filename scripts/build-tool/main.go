@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 var (
@@ -188,12 +190,12 @@ func install(prefix string) {
 	}
 
 	dstBinary := filepath.Join(binDir, filepath.Base(srcBinary))
-	if err := copyFile(srcBinary, dstBinary); err != nil {
+	if err := utils.CopyFile(srcBinary, dstBinary); err != nil {
 		fmt.Printf("Failed to copy binary: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Make executable on Unix
+	// Ensure executable on Unix (CopyFile preserves permissions, but set explicitly for safety)
 	if runtime.GOOS != "windows" {
 		if err := os.Chmod(dstBinary, 0755); err != nil {
 			fmt.Printf("Failed to make binary executable: %v\n", err)
@@ -415,12 +417,4 @@ func getDefaultPrefix() string {
 		return "C:\\goenv"
 	}
 	return "/usr/local"
-}
-
-func copyFile(src, dst string) error {
-	input, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(dst, input, 0644)
 }

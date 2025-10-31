@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -81,7 +82,7 @@ func (a *CheckDiskSpaceAction) Execute(ctx *HookContext, params map[string]inter
 			freeMB, minFreeMB, totalMB, path)
 
 		if action == "error" {
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 		// For "warn", we just log but don't fail
 		fmt.Printf("Warning: %s\n", msg)

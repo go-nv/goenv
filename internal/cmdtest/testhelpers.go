@@ -3,7 +3,6 @@ package cmdtest
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -22,8 +21,8 @@ func SetupTestEnv(t *testing.T) (string, func()) {
 
 	// Set test environment variables
 	oldGoenvRoot := utils.GoenvEnvVarRoot.UnsafeValue()
-	oldHome := os.Getenv("HOME")
-	oldPath := os.Getenv("PATH")
+	oldHome := os.Getenv(utils.EnvVarHome)
+	oldPath := os.Getenv(utils.EnvVarPath)
 	oldGoenvVersion := utils.GoenvEnvVarVersion.UnsafeValue()
 
 	testRoot := filepath.Join(testDir, "root")
@@ -32,7 +31,7 @@ func SetupTestEnv(t *testing.T) (string, func()) {
 	utils.GoenvEnvVarRoot.Set(testRoot)
 	os.Setenv("HOME", testHome)
 	// Clear PATH to ensure no system go is found unless explicitly added by test
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		os.Setenv("PATH", "C:\\Windows\\System32")
 	} else {
 		os.Setenv("PATH", "/usr/bin:/bin")
@@ -94,7 +93,7 @@ func CreateTestBinary(t *testing.T, root, version, binaryName string) {
 	// Create mock binary
 	binaryPath := filepath.Join(binDir, binaryName)
 	var content string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		binaryPath += ".bat"
 		if binaryName == "go" {
 			content = "@echo off\necho go version go" + version + " windows/amd64\n"
@@ -135,7 +134,7 @@ func CreateExecutable(t *testing.T, testRoot, version, execName string) {
 
 	execPath := filepath.Join(binDir, execName)
 	content := "#!/bin/sh\necho 'mock executable'\n"
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		execPath += ".bat"
 		content = "@echo off\necho mock executable\n"
 	}
@@ -163,14 +162,61 @@ func CreateTestAlias(t *testing.T, root, name, target string) {
 	}
 }
 
+// CreateGoExecutable creates a mock go binary at the specified location.
+// This is a convenience wrapper for creating Go executables in test scenarios
+// where you need a go binary but don't need a full version installation.
+// Exported for use by subpackage tests.
+func CreateGoExecutable(t *testing.T, binDir string) string {
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
+
+	binaryPath := filepath.Join(binDir, "go")
+	content := "#!/bin/sh\necho go version go1.21.0 linux/amd64\n"
+	if utils.IsWindows() {
+		binaryPath += ".bat"
+		content = "@echo off\necho go version go1.21.0 windows/amd64\n"
+	}
+
+	if err := os.WriteFile(binaryPath, []byte(content), 0755); err != nil {
+		t.Fatalf("Failed to create go binary: %v", err)
+	}
+
+	return binaryPath
+}
+
+// CreateToolExecutable creates a mock tool binary at the specified location.
+// This is useful for testing tool commands without needing actual tool installations.
+// Exported for use by subpackage tests.
+func CreateToolExecutable(t *testing.T, binDir, toolName string) string {
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
+
+	toolPath := filepath.Join(binDir, toolName)
+	content := "#!/bin/sh\necho mock " + toolName + "\n"
+	if utils.IsWindows() {
+		toolPath += ".bat"
+		content = "@echo off\necho mock " + toolName + "\n"
+	}
+
+	if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
+		t.Fatalf("Failed to create tool binary: %v", err)
+	}
+
+	return toolPath
+}
+
 // StripDeprecationWarning removes deprecation warnings from command output.
 // This is useful for testing legacy commands that now show deprecation warnings.
 // The deprecation warning format is:
-//   Deprecation warning: ...
-//     Modern command: ...
-//     See: ...
-//   [blank line]
-//   [actual output]
+//
+//	Deprecation warning: ...
+//	  Modern command: ...
+//	  See: ...
+//	[blank line]
+//	[actual output]
+//
 // This function removes the warning block and returns only the actual output.
 // Exported for use by subpackage tests.
 func StripDeprecationWarning(output string) string {

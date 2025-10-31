@@ -29,7 +29,7 @@ func init() {
 func runVersionOrigin(cmd *cobra.Command, args []string) error {
 	// Validate: version-origin command takes no arguments
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv version-origin")
+		return fmt.Errorf("usage: goenv version-origin")
 	}
 
 	cfg := config.Load()
@@ -40,7 +40,7 @@ func runVersionOrigin(cmd *cobra.Command, args []string) error {
 
 	// Use the source we got earlier
 	if err != nil || source == "" {
-		// No version set or default fallback, return default global version file path
+		// no version set or default fallback, return default global version file path
 		fmt.Fprintln(cmd.OutOrStdout(), cfg.GlobalVersionFile())
 		return nil
 	}

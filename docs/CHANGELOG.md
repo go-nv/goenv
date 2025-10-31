@@ -55,13 +55,47 @@ Change line format:
 
 ### Added
 
+- **🎯 New User Experience Commands** - 6 new commands to improve onboarding and daily operations:
+  - `goenv info <version>` - Detailed version information with lifecycle tracking (release date, EOL status, size, upgrade recommendations)
+  - `goenv compare <v1> <v2>` - Side-by-side version comparison for better upgrade decisions
+  - `goenv status` - Quick installation health check (initialization status, current version, installed count)
+  - `goenv setup` - Automatic first-time configuration wizard (detects shell, adds initialization, safe to run multiple times)
+  - `goenv get-started` - Interactive beginner's guide with step-by-step instructions
+  - `goenv explore` - Command discovery by category (Getting Started, Version Management, Tools, Diagnostics, etc.)
 - **🩺 Doctor Command** - Comprehensive diagnostic tool with 25+ health checks including VS Code integration, go.mod compatibility, cache validation, PATH configuration, and environment detection
+- **🔧 Doctor Interactive Fix Mode** - New `--fix` flag for automated repair of common issues:
+  - Add missing shell initialization
+  - Fix PATH configuration
+  - Remove duplicate goenv installations
+  - Fix profile sourcing issues
+  - Clean stale cache
+  - Repair shims directory
+  - 18 structured issue types with automated fixes
+  - 3 new diagnostic checks (shell environment, profile sourcing, duplicate installations)
+  - Detects "undo sourcing" scenarios (major pain point)
 - **🌍 Environment Detection** - Automatic detection of containers (Docker, Podman, Kubernetes, LXC, BuildKit), WSL (versions 1/2), and filesystem types (NFS, SMB, FUSE, bind mounts) with actionable warnings
 - **🖥️  Platform-Specific Enhancements** - macOS deployment target validation, Windows MSVC/MinGW detection, Windows ARM64/ARM64EC support, Linux kernel version checks, and glibc compatibility suggestions
 - **⚡ Smart Caching System** - 10-50x faster version listing with intelligent cache validation, HTTP ETag support, and automatic freshness checking
-- **🔄 Cache Refresh Command** - `goenv refresh` command to clear cached data and force fresh fetch from go.dev API
-- **⚡ Hook System** - Fully functional hook execution at 8 lifecycle points (pre/post install, uninstall, exec, rehash) with 20+ built-in actions
+- **🔄 Cache Management Commands**:
+  - `goenv cache status` - Show cache sizes and locations with auto-detection for large caches (suggests `--fast` for 5-10x faster scanning when >5000 files detected)
+  - `goenv cache clean` - Clean build or module caches to reclaim disk space with interactive prompts
+  - `goenv cache migrate` - Migrate old format caches to architecture-aware format
+  - `goenv cache info` - Show CGO toolchain information for caches
+  - `goenv refresh` - Clear all cached metadata and force fresh fetch from go.dev API
+- **⚡ Hook System** - Fully functional hook execution at 8 lifecycle points (pre/post install, uninstall, exec, rehash) with 20+ built-in actions:
+  - `goenv hooks init` - Generate template hooks.yaml configuration
+  - `goenv hooks list` - Show all configured hooks
+  - `goenv hooks validate` - Validate hooks.yaml configuration
+  - `goenv hooks test` - Test hooks without executing them (dry-run)
+- **🔖 Version Aliases** - Create custom version aliases for easier version management:
+  - `goenv alias <name> <version>` - Create or update a version alias (e.g., `goenv alias stable 1.23.0`)
+  - `goenv unalias <name>` - Remove a version alias
+  - `goenv alias` - List all defined aliases
 - **⚙️ Auto-Rehash Control** - Configurable automatic rehashing with `--no-rehash` flag and `GOENV_NO_AUTO_REHASH` environment variable
+- **🚀 CI/CD Integration Command** - `goenv ci-setup` for optimal CI/CD configuration with two-phase caching optimization:
+  - Environment setup mode for shell configuration
+  - Two-phase installation mode (`--install`) separating Go installation (cacheable) from usage
+  - Automatic environment variable configuration for CI/CD pipelines
 - **🎯 VS Code Integration** - `goenv vscode init` command with templates (basic, advanced, monorepo) and smart settings merging
 - **📦 GOPATH Integration** - Automatic per-version GOPATH management and tool binary scanning during rehash
 - **🔒 SBOM Generation** - `goenv sbom project` command for generating Software Bill of Materials with industry-standard tools (cyclonedx-gomod, syft) in CycloneDX and SPDX formats
@@ -71,7 +105,26 @@ Change line format:
 - **🌐 Offline Mode** - Complete offline operation with embedded version data via `GOENV_OFFLINE=1`
 - **🔍 go.mod Version Mismatch Detection** - Automatic detection and warnings when local Go version doesn't match go.mod requirements
 - **📊 Performance Monitoring** - Debug output and timing information for all operations
+- **🔧 Enhanced Tools Management** - Comprehensive multi-version tool management:
+  - `goenv tools install --all` - Install tools across all Go versions at once
+  - `goenv tools uninstall --all` - Uninstall tools from current or all Go versions
+  - `goenv tools list --all` - List tools across all versions
+  - `goenv tools update --all` - Update tools across all versions
+  - `goenv tools sync <from> <to>` - Copy tools from one Go version to another
+  - `goenv tools outdated` - Check which tools need updating across versions
+  - `goenv tools status` - View tool consistency and identify gaps across versions
+  - `goenv tools default` - Manage automatic tool installation for new Go versions
+  - Dry-run mode (`--dry-run`) for previewing operations
+  - Verbose mode (`--verbose`) for detailed installation output
+  - Tool categorization: Consistent (all versions), Partial (some versions), Version-Specific (one version)
+- **🏗️ Internal Packages** - 5 new internal packages for enhanced functionality:
+  - `internal/lifecycle` - Go version EOL tracking (Go 1.12-1.25)
+  - `internal/shellutil` - Enhanced shell detection and management
+  - `internal/utils/prompt.go` - Interactive prompting system
+  - `internal/utils/firstrun.go` - First-run detection utilities
+  - `internal/utils/output.go` - Consistent output formatting with emoji/color control
 - `GO_BUILD_MIRROR_URL` environment variable for custom download mirrors (documented)
+- `GOENV_ASSUME_YES` environment variable for auto-confirming prompts in CI/CD
 - Comprehensive version discovery and precedence documentation in COMMANDS.md
 
 ### Changed

@@ -141,49 +141,49 @@ func TestDoctorCommand_JSONOutput(t *testing.T) {
 func TestDoctorCommand_ExitCodes(t *testing.T) {
 	tests := []struct {
 		name         string
-		failOn       string
+		failOn       FailOn
 		forceWarning bool // Simulate a warning condition
 		forceError   bool // Simulate an error condition
 		expectedExit int
 	}{
 		{
 			name:         "no issues, default fail-on",
-			failOn:       "error",
+			failOn:       FailOnError,
 			forceWarning: false,
 			forceError:   false,
 			expectedExit: -1, // No exit call
 		},
 		{
 			name:         "warnings only, fail-on error (default)",
-			failOn:       "error",
+			failOn:       FailOnError,
 			forceWarning: true,
 			forceError:   false,
 			expectedExit: -1, // No exit call (warnings don't trigger exit)
 		},
 		{
 			name:         "warnings only, fail-on warning",
-			failOn:       "warning",
+			failOn:       FailOnWarning,
 			forceWarning: true,
 			forceError:   false,
 			expectedExit: 2, // Exit code 2 for warnings
 		},
 		{
 			name:         "errors present, fail-on error",
-			failOn:       "error",
+			failOn:       FailOnError,
 			forceWarning: false,
 			forceError:   true,
 			expectedExit: 1, // Exit code 1 for errors
 		},
 		{
 			name:         "errors present, fail-on warning",
-			failOn:       "warning",
+			failOn:       FailOnWarning,
 			forceWarning: false,
 			forceError:   true,
 			expectedExit: 1, // Exit code 1 for errors (takes precedence)
 		},
 		{
 			name:         "both errors and warnings, fail-on warning",
-			failOn:       "warning",
+			failOn:       FailOnWarning,
 			forceWarning: true,
 			forceError:   true,
 			expectedExit: 1, // Exit code 1 (errors take precedence)
@@ -196,6 +196,12 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 			t.Setenv("GOENV_ROOT", tmpDir)
 			t.Setenv("GOENV_DIR", tmpDir)
 
+			// Set HOME to tmpDir to avoid checking user's real profile files
+			t.Setenv("HOME", tmpDir)
+
+			// Clear GOENV_SHELL to skip shell initialization checks
+			t.Setenv("GOENV_SHELL", "")
+
 			// Set up environment based on test needs
 			if tt.forceError {
 				// Create error conditions:
@@ -206,9 +212,11 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 			} else {
 				// Clear GOENV_VERSION to avoid picking up .go-version from repo
 				t.Setenv("GOENV_VERSION", "system")
-				// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
+				// Add both GOENV_ROOT/bin and shims to PATH to avoid PATH configuration errors
 				oldPath := os.Getenv("PATH")
-				t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+				shimsPath := filepath.Join(tmpDir, "shims")
+				binPath := filepath.Join(tmpDir, "bin")
+				t.Setenv("PATH", shimsPath+string(os.PathListSeparator)+binPath+string(os.PathListSeparator)+oldPath)
 			}
 
 			// Create directories for non-error tests
@@ -219,8 +227,14 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 				if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
 					t.Fatalf("Failed to create shims directory: %v", err)
 				}
+				// Only create versions directory if not forcing warnings
+				// (empty versions directory triggers "no versions installed" warning)
+				if !tt.forceWarning {
+					if err := os.MkdirAll(filepath.Join(tmpDir, "versions"), 0755); err != nil {
+						t.Fatalf("Failed to create versions directory: %v", err)
+					}
+				}
 			}
-			// Not creating versions directory can trigger warnings
 
 			// Capture exit code
 			exitCode := -1
@@ -230,10 +244,15 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 			}
 			defer func() { doctorExit = oldExit }()
 
-			// Set fail-on flag
+			// Set fail-on flag (need to set both the string and enum)
 			oldFailOn := doctorFailOn
+			oldFailOnStr := doctorFailOnStr
 			doctorFailOn = tt.failOn
-			defer func() { doctorFailOn = oldFailOn }()
+			doctorFailOnStr = string(tt.failOn)
+			defer func() {
+				doctorFailOn = oldFailOn
+				doctorFailOnStr = oldFailOnStr
+			}()
 
 			// Use JSON output for cleaner testing
 			oldJSON := doctorJSON

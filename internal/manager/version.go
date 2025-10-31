@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -687,9 +686,8 @@ func maxVersion(versions []string) string {
 // findExecutableInPath looks for an executable in a specific directory, handling Windows extensions
 func findExecutableInPath(dir, name string) (string, error) {
 	// On Windows, try common executable extensions
-	if runtime.GOOS == "windows" {
-		extensions := []string{".bat", ".cmd", ".exe"}
-		for _, ext := range extensions {
+	if utils.IsWindows() {
+		for _, ext := range utils.WindowsExecutableExtensions() {
 			path := filepath.Join(dir, name+ext)
 			if _, err := os.Stat(path); err == nil {
 				return path, nil
@@ -722,7 +720,7 @@ func (m *Manager) HasSystemGo() bool {
 
 		// For system go, GetGoBinaryPath returns "go", so we need to check PATH
 		// Simple check using which-like logic
-		pathEnv := os.Getenv("PATH")
+		pathEnv := os.Getenv(utils.EnvVarPath)
 		if pathEnv == "" {
 			return false
 		}
@@ -743,7 +741,7 @@ func (m *Manager) HasSystemGo() bool {
 
 // GetSystemGoDir returns the directory containing the system Go binary
 func (m *Manager) GetSystemGoDir() (string, error) {
-	pathEnv := os.Getenv("PATH")
+	pathEnv := os.Getenv(utils.EnvVarPath)
 	if pathEnv == "" {
 		return "", fmt.Errorf("system go not found in PATH")
 	}

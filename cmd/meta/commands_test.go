@@ -3,11 +3,11 @@ package meta
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -91,7 +91,7 @@ func TestCommandsCommand(t *testing.T) {
 				for _, cmdName := range tt.setupCommands {
 					cmdPath := filepath.Join(libexecDir, "goenv-"+cmdName)
 					var content string
-					if runtime.GOOS == "windows" {
+					if utils.IsWindows() {
 						cmdPath += ".bat"
 						content = "@echo off\n"
 					} else {

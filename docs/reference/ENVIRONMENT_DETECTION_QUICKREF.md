@@ -198,6 +198,6 @@ goenv which go
 
 ## Related Documentation
 
-- [ENVIRONMENT_DETECTION.md](../ENVIRONMENT_DETECTION.md) - Full documentation
-- [DOCTOR_COMMAND_FEATURE.md](../DOCTOR_COMMAND_FEATURE.md) - Doctor command details
-- [WINDOWS_SUPPORT.md](../WINDOWS_SUPPORT.md) - Windows/WSL support
+- [Commands Reference - doctor](reference/COMMANDS.md#goenv-doctor) - Doctor command details
+- [Platform Support Matrix](PLATFORM_SUPPORT.md) - Windows, macOS, Linux, and WSL support
+- [Installation Guide](user-guide/INSTALL.md) - Platform-specific installation instructions

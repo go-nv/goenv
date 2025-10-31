@@ -1,7 +1,6 @@
 package version
 
 import (
-	"github.com/go-nv/goenv/cmd/legacy"
 	"fmt"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
@@ -9,6 +8,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ func init() {
 func runVersionName(cmd *cobra.Command, args []string) error {
 	// Validate: version-name command takes no arguments
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv version-name")
+		return fmt.Errorf("usage: goenv version-name")
 	}
 
 	cfg := config.Load()
@@ -41,7 +41,7 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle multiple versions separated by ':'
-	versions := legacy.SplitVersions(version)
+	versions := utils.SplitVersions(version)
 
 	if len(versions) > 1 {
 		// Multiple versions - check each one and report errors for missing ones

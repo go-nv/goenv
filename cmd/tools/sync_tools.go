@@ -1,8 +1,8 @@
 package tools
 
 import (
-	"github.com/go-nv/goenv/cmd/shims"
 	"fmt"
+	"github.com/go-nv/goenv/cmd/shims"
 	"os"
 	"os/exec"
 	"path/filepath"

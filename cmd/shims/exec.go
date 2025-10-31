@@ -32,7 +32,7 @@ import (
 var execCmd = &cobra.Command{
 	Use:     "exec <command> [args...]",
 	Short:   "Execute a command with the selected Go version",
-	GroupID: "system",
+	GroupID: string(cmdpkg.GroupAdvanced),
 	Long: `Runs an executable by first preparing PATH so that the selected Go version's bin directory is at the front.
 
 goenv automatically rehashes after successful 'go install' commands, so installed tools are immediately available without running 'goenv rehash' manually.`,
@@ -44,7 +44,7 @@ goenv automatically rehashes after successful 'go install' commands, so installe
 			actualArgs = args[1:]
 		}
 		if len(actualArgs) == 0 {
-			return fmt.Errorf("Usage: goenv exec <command> [arg1 arg2...]")
+			return fmt.Errorf("usage: goenv exec <command> [arg1 arg2...]")
 		}
 		return nil
 	},
@@ -88,7 +88,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 	// Expand GOPATH early if it needs expansion (handles $HOME, ~/, etc.)
 	// This ensures Go doesn't error on shell metacharacters or variables
-	gopath := os.Getenv("GOPATH")
+	gopath := os.Getenv(utils.EnvVarGopath)
 	if gopath != "" {
 		expanded := pathutil.ExpandPath(gopath)
 		if expanded != gopath {
@@ -154,8 +154,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 			var versionGocache string
 
 			// Determine target GOOS/GOARCH for cache isolation
-			goos := getEnvValue(env, "GOOS")
-			goarch := getEnvValue(env, "GOARCH")
+			goos := utils.GetEnvValue(env, "GOOS")
+			goarch := utils.GetEnvValue(env, "GOARCH")
 			if goos == "" {
 				goos = "host" // Use "host" as marker when targeting host platform
 			}
@@ -225,7 +225,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 	// Execute the command
 	if len(args) == 0 {
-		return fmt.Errorf("Usage: goenv exec <command> [arg1 arg2...]")
+		return fmt.Errorf("usage: goenv exec <command> [arg1 arg2...]")
 	}
 	command := args[0]
 	commandArgs := args[1:]
@@ -372,9 +372,9 @@ func shouldAutoRehash(command string, args []string) bool {
 	// Check if command is 'go' (with or without path, with or without extension)
 	baseName := filepath.Base(command)
 	// Remove any Windows executable extensions
-	baseName = strings.TrimSuffix(baseName, ".exe")
-	baseName = strings.TrimSuffix(baseName, ".bat")
-	baseName = strings.TrimSuffix(baseName, ".cmd")
+	for _, ext := range utils.WindowsExecutableExtensions() {
+		baseName = strings.TrimSuffix(baseName, ext)
+	}
 
 	if baseName != "go" {
 		return false
@@ -426,7 +426,7 @@ func buildCacheSuffix(goBinaryPath, goos, goarch string, env []string) string {
 	suffix += abiSuffix
 
 	// Add GOEXPERIMENT if set (affects runtime behavior)
-	if goexp := getEnvValue(env, "GOEXPERIMENT"); goexp != "" {
+	if goexp := utils.GetEnvValue(env, "GOEXPERIMENT"); goexp != "" {
 		// Sanitize GOEXPERIMENT for use in filename (replace , with -)
 		goexp = strings.ReplaceAll(goexp, ",", "-")
 		suffix += "-exp-" + goexp
@@ -443,17 +443,6 @@ func buildCacheSuffix(goBinaryPath, goos, goarch string, env []string) string {
 	}
 
 	return suffix
-}
-
-// getEnvValue retrieves an environment variable value from the env slice
-func getEnvValue(env []string, key string) string {
-	prefix := key + "="
-	for _, envVar := range env {
-		if strings.HasPrefix(envVar, prefix) {
-			return strings.TrimPrefix(envVar, prefix)
-		}
-	}
-	return ""
 }
 
 // prependToPath prepends a directory to the PATH environment variable

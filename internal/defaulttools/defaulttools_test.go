@@ -3,9 +3,10 @@ package defaulttools
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -202,7 +203,7 @@ func TestInstallTools_GoNotFound(t *testing.T) {
 		t.Error("Expected error when Go binary not found")
 	}
 
-	if !strings.Contains(err.Error(), "Go binary not found") {
+	if !strings.Contains(err.Error(), "go binary not found") {
 		t.Errorf("Expected 'Go binary not found' error, got: %v", err)
 	}
 }
@@ -227,7 +228,7 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 	// Create mock go binary that succeeds
 	goBinary := filepath.Join(goBinDir, "go")
 	mockScript := "#!/bin/sh\nexit 0"
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".bat"
 		mockScript = "@echo off\nexit 0"
 	}
@@ -270,7 +271,7 @@ func TestInstallTools_Failure(t *testing.T) {
 	// Create mock go binary that fails
 	goBinary := filepath.Join(goBinDir, "go")
 	mockScript := "#!/bin/sh\nexit 1"
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".bat"
 		mockScript = "@echo off\nexit 1"
 	}
@@ -314,7 +315,7 @@ func TestVerifyTools(t *testing.T) {
 	// Create some tool binaries
 	tool1Binary := filepath.Join(gopathBin, "gopls")
 	tool2Binary := filepath.Join(gopathBin, "dlv")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		tool1Binary += ".exe"
 		tool2Binary += ".exe"
 	}
@@ -379,7 +380,7 @@ func TestVerifyTools_NoBinaryName(t *testing.T) {
 
 	// Create tool binary with name extracted from package path
 	toolBinary := filepath.Join(gopathBin, "staticcheck")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		toolBinary += ".exe"
 	}
 

@@ -5,27 +5,78 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
-func TestSyncToolsCommand(t *testing.T) {
+// setupSyncTestEnv creates a test environment with Go versions and tools
+func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string) string {
+	tmpDir := t.TempDir()
+	os.Setenv("GOENV_ROOT", tmpDir)
+	t.Cleanup(func() { os.Unsetenv("GOENV_ROOT") })
+
+	for _, version := range versions {
+		versionPath := filepath.Join(tmpDir, "versions", version)
+
+		// Create go binary directory
+		goBinDir := filepath.Join(versionPath, "bin")
+		if err := os.MkdirAll(goBinDir, 0755); err != nil {
+			t.Fatalf("Failed to create go bin directory: %v", err)
+		}
+
+		// Create mock go binary
+		goBinary := filepath.Join(goBinDir, "go")
+		var content string
+		if utils.IsWindows() {
+			goBinary += ".bat"
+			content = "@echo off\necho 'mock go'\n"
+		} else {
+			content = "#!/bin/sh\necho 'mock go'\n"
+		}
+
+		if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
+			t.Fatalf("Failed to create go binary: %v", err)
+		}
+
+		// Create GOPATH/bin directory
+		gopathBin := filepath.Join(versionPath, "gopath", "bin")
+		if err := os.MkdirAll(gopathBin, 0755); err != nil {
+			t.Fatalf("Failed to create GOPATH/bin: %v", err)
+		}
+
+		// Create tools for this version
+		if versionTools, ok := tools[version]; ok {
+			for _, tool := range versionTools {
+				toolPath := filepath.Join(gopathBin, tool)
+				content := "mock tool"
+				if utils.IsWindows() {
+					toolPath += ".bat"
+					content = "@echo off\necho mock tool\n"
+				}
+				if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
+					t.Fatalf("Failed to create tool %s: %v", tool, err)
+				}
+			}
+		}
+	}
+
+	return tmpDir
+}
+
+func TestSyncTools_ArgumentValidation(t *testing.T) {
 	tests := []struct {
-		name           string
-		args           []string
-		setupVersions  []string            // Go versions to create
-		setupTools     map[string][]string // version -> tool names
-		flags          map[string]string
-		expectedError  string
-		expectedOutput string
+		name          string
+		args          []string
+		setupVersions []string
+		expectedError string
 	}{
 		{
 			name:          "no arguments provided",
 			args:          []string{},
-			expectedError: "need at least 2 Go versions", // Auto-detect requires 2+ versions
+			expectedError: "need at least 2 Go versions",
 		},
 		{
 			name:          "only one argument provided",
@@ -37,6 +88,40 @@ func TestSyncToolsCommand(t *testing.T) {
 			args:          []string{"1.21.0", "1.22.0", "extra"},
 			expectedError: "accepts at most 2 arg(s), received 3",
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupSyncTestEnv(t, tt.setupVersions, nil)
+
+			syncToolsCmd.ResetFlags()
+			syncToolsCmd.Flags().BoolVar(&syncToolsFlags.dryRun, "dry-run", false, "")
+			syncToolsCmd.Flags().StringVar(&syncToolsFlags.select_, "select", "", "")
+			syncToolsCmd.Flags().StringVar(&syncToolsFlags.exclude, "exclude", "", "")
+
+			var err error
+			if len(tt.args) > 2 {
+				err = syncToolsCmd.Args(syncToolsCmd, tt.args)
+			} else {
+				err = runSyncTools(syncToolsCmd, tt.args)
+			}
+
+			if err == nil {
+				t.Errorf("Expected error containing %q, got nil", tt.expectedError)
+			} else if !strings.Contains(err.Error(), tt.expectedError) {
+				t.Errorf("Expected error containing %q, got %q", tt.expectedError, err.Error())
+			}
+		})
+	}
+}
+
+func TestSyncTools_VersionValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		setupVersions []string
+		expectedError string
+	}{
 		{
 			name:          "source and target versions are the same",
 			args:          []string{"1.21.0", "1.21.0"},
@@ -55,6 +140,37 @@ func TestSyncToolsCommand(t *testing.T) {
 			setupVersions: []string{"1.21.0"},
 			expectedError: "target Go version 99.99.99 is not installed",
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupSyncTestEnv(t, tt.setupVersions, nil)
+
+			syncToolsCmd.ResetFlags()
+			syncToolsCmd.Flags().BoolVar(&syncToolsFlags.dryRun, "dry-run", false, "")
+			syncToolsCmd.Flags().StringVar(&syncToolsFlags.select_, "select", "", "")
+			syncToolsCmd.Flags().StringVar(&syncToolsFlags.exclude, "exclude", "", "")
+
+			err := runSyncTools(syncToolsCmd, tt.args)
+
+			if err == nil {
+				t.Errorf("Expected error containing %q, got nil", tt.expectedError)
+			} else if !strings.Contains(err.Error(), tt.expectedError) {
+				t.Errorf("Expected error containing %q, got %q", tt.expectedError, err.Error())
+			}
+		})
+	}
+}
+
+func TestSyncTools_BasicOperation(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		setupVersions  []string
+		setupTools     map[string][]string
+		dryRun         bool
+		expectedOutput string
+	}{
 		{
 			name:           "no tools in source version",
 			args:           []string{"1.21.0", "1.22.0"},
@@ -78,130 +194,24 @@ func TestSyncToolsCommand(t *testing.T) {
 			setupTools: map[string][]string{
 				"1.21.0": {"mockgopls", "mockdelve"},
 			},
-			flags: map[string]string{
-				"dry-run": "true",
-			},
+			dryRun:         true,
 			expectedOutput: "Dry run mode",
-		},
-		{
-			name:          "select specific tools",
-			args:          []string{"1.21.0", "1.22.0"},
-			setupVersions: []string{"1.21.0", "1.22.0"},
-			setupTools: map[string][]string{
-				"1.21.0": {"mockgopls", "mockdelve", "mockstaticcheck"},
-			},
-			flags: map[string]string{
-				"select": "mockgopls,mockdelve",
-			},
-			expectedOutput: "2 tool(s) to sync",
-		},
-		{
-			name:          "exclude specific tools",
-			args:          []string{"1.21.0", "1.22.0"},
-			setupVersions: []string{"1.21.0", "1.22.0"},
-			setupTools: map[string][]string{
-				"1.21.0": {"mockgopls", "mockdelve", "mockstaticcheck"},
-			},
-			flags: map[string]string{
-				"exclude": "mockstaticcheck",
-			},
-			expectedOutput: "2 tool(s) to sync",
-		},
-		{
-			name:          "select and exclude together",
-			args:          []string{"1.21.0", "1.22.0"},
-			setupVersions: []string{"1.21.0", "1.22.0"},
-			setupTools: map[string][]string{
-				"1.21.0": {"mockgopls", "mockdelve", "mockstaticcheck"},
-			},
-			flags: map[string]string{
-				"select":  "mockgopls,mockdelve,mockstaticcheck",
-				"exclude": "mockdelve",
-			},
-			expectedOutput: "2 tool(s) to sync",
-		},
-		{
-			name:          "no tools after filtering",
-			args:          []string{"1.21.0", "1.22.0"},
-			setupVersions: []string{"1.21.0", "1.22.0"},
-			setupTools: map[string][]string{
-				"1.21.0": {"mockgopls"},
-			},
-			flags: map[string]string{
-				"select": "mockdelve", // Select tool that doesn't exist
-			},
-			expectedOutput: "No tools to sync",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary goenv root
-			tmpDir := t.TempDir()
-			os.Setenv("GOENV_ROOT", tmpDir)
-			defer os.Unsetenv("GOENV_ROOT")
+			setupSyncTestEnv(t, tt.setupVersions, tt.setupTools)
 
-			// Setup Go versions
-			for _, version := range tt.setupVersions {
-				versionPath := filepath.Join(tmpDir, "versions", version)
-
-				// Create go binary directory (version dir IS the GOROOT)
-				goBinDir := filepath.Join(versionPath, "bin")
-				if err := os.MkdirAll(goBinDir, 0755); err != nil {
-					t.Fatalf("Failed to create go bin directory: %v", err)
-				}
-
-				// Create mock go binary
-				goBinary := filepath.Join(goBinDir, "go")
-				var content string
-				if runtime.GOOS == "windows" {
-					goBinary += ".bat"
-					content = "@echo off\necho mock go\n"
-				} else {
-					content = "#!/bin/sh\necho 'mock go'\n"
-				}
-
-				if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
-					t.Fatalf("Failed to create go binary: %v", err)
-				}
-
-				// Create GOPATH/bin directory
-				gopathBin := filepath.Join(versionPath, "gopath", "bin")
-				if err := os.MkdirAll(gopathBin, 0755); err != nil {
-					t.Fatalf("Failed to create GOPATH/bin: %v", err)
-				}
-
-				// Create tools for this version
-				if tools, ok := tt.setupTools[version]; ok {
-					for _, tool := range tools {
-						toolPath := filepath.Join(gopathBin, tool)
-						content := "mock tool"
-						if runtime.GOOS == "windows" {
-							toolPath += ".bat"
-							content = "@echo off\necho mock tool\n"
-						}
-						if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
-							t.Fatalf("Failed to create tool %s: %v", tool, err)
-						}
-					}
-				}
-			}
-
-			// Create command
-			cmd := &cobra.Command{}
-			cmd.SetArgs(tt.args)
-
-			// Set flags
 			syncToolsCmd.ResetFlags()
 			syncToolsCmd.Flags().BoolVar(&syncToolsFlags.dryRun, "dry-run", false, "")
 			syncToolsCmd.Flags().StringVar(&syncToolsFlags.select_, "select", "", "")
 			syncToolsCmd.Flags().StringVar(&syncToolsFlags.exclude, "exclude", "", "")
 
-			for key, value := range tt.flags {
-				syncToolsCmd.Flags().Set(key, value)
+			if tt.dryRun {
+				syncToolsCmd.Flags().Set("dry-run", "true")
 			}
 
-			// Capture output
 			buf := new(bytes.Buffer)
 			oldStdout := os.Stdout
 			r, w, _ := os.Pipe()
@@ -210,43 +220,104 @@ func TestSyncToolsCommand(t *testing.T) {
 			syncToolsCmd.SetOut(buf)
 			syncToolsCmd.SetErr(buf)
 
-			// Execute - check Args validation first for cases with wrong number of args
-			var err error
-			if len(tt.args) > 2 {
-				// This will fail Args validation (MaximumNArgs(2))
-				err = syncToolsCmd.Args(syncToolsCmd, tt.args)
-			} else {
-				// 0, 1, or 2 args - execute normally (may fail in runSyncTools)
-				err = runSyncTools(syncToolsCmd, tt.args)
-			}
+			err := runSyncTools(syncToolsCmd, tt.args)
 
-			// Restore stdout and get output
 			w.Close()
 			os.Stdout = oldStdout
 			output, _ := io.ReadAll(r)
 			buf.Write(output)
 
-			// Check error
-			if tt.expectedError != "" {
-				if err == nil {
-					t.Errorf("Expected error containing %q, got nil", tt.expectedError)
-				} else if !strings.Contains(err.Error(), tt.expectedError) {
-					t.Errorf("Expected error containing %q, got %q", tt.expectedError, err.Error())
-				}
-			} else if err != nil {
+			if err != nil && tt.expectedOutput != "No Go tools found" {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
-			// Check output
-			if tt.expectedOutput != "" {
-				output := buf.String()
-				if !strings.Contains(output, tt.expectedOutput) {
-					t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, output)
-				}
+			if !strings.Contains(buf.String(), tt.expectedOutput) {
+				t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, buf.String())
 			}
 
-			// Reset flags after each test
 			syncToolsFlags.dryRun = false
+		})
+	}
+}
+
+func TestSyncTools_Filtering(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupTools     map[string][]string
+		selectFlag     string
+		excludeFlag    string
+		expectedOutput string
+	}{
+		{
+			name: "select specific tools",
+			setupTools: map[string][]string{
+				"1.21.0": {"mockgopls", "mockdelve", "mockstaticcheck"},
+			},
+			selectFlag:     "mockgopls,mockdelve",
+			expectedOutput: "2 tool(s) to sync",
+		},
+		{
+			name: "exclude specific tools",
+			setupTools: map[string][]string{
+				"1.21.0": {"mockgopls", "mockdelve", "mockstaticcheck"},
+			},
+			excludeFlag:    "mockstaticcheck",
+			expectedOutput: "2 tool(s) to sync",
+		},
+		{
+			name: "select and exclude together",
+			setupTools: map[string][]string{
+				"1.21.0": {"mockgopls", "mockdelve", "mockstaticcheck"},
+			},
+			selectFlag:     "mockgopls,mockdelve,mockstaticcheck",
+			excludeFlag:    "mockdelve",
+			expectedOutput: "2 tool(s) to sync",
+		},
+		{
+			name: "no tools after filtering",
+			setupTools: map[string][]string{
+				"1.21.0": {"mockgopls"},
+			},
+			selectFlag:     "mockdelve", // Select tool that doesn't exist
+			expectedOutput: "No tools to sync",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupSyncTestEnv(t, []string{"1.21.0", "1.22.0"}, tt.setupTools)
+
+			syncToolsCmd.ResetFlags()
+			syncToolsCmd.Flags().BoolVar(&syncToolsFlags.dryRun, "dry-run", false, "")
+			syncToolsCmd.Flags().StringVar(&syncToolsFlags.select_, "select", "", "")
+			syncToolsCmd.Flags().StringVar(&syncToolsFlags.exclude, "exclude", "", "")
+
+			if tt.selectFlag != "" {
+				syncToolsCmd.Flags().Set("select", tt.selectFlag)
+			}
+			if tt.excludeFlag != "" {
+				syncToolsCmd.Flags().Set("exclude", tt.excludeFlag)
+			}
+
+			buf := new(bytes.Buffer)
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			syncToolsCmd.SetOut(buf)
+			syncToolsCmd.SetErr(buf)
+
+			runSyncTools(syncToolsCmd, []string{"1.21.0", "1.22.0"})
+
+			w.Close()
+			os.Stdout = oldStdout
+			output, _ := io.ReadAll(r)
+			buf.Write(output)
+
+			if !strings.Contains(buf.String(), tt.expectedOutput) {
+				t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, buf.String())
+			}
+
 			syncToolsFlags.select_ = ""
 			syncToolsFlags.exclude = ""
 		})
@@ -259,7 +330,6 @@ func TestSyncToolsHelp(t *testing.T) {
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 
-	// Get help text by calling Help()
 	err := cmd.Help()
 	if err != nil {
 		t.Fatalf("Help command failed: %v", err)
@@ -267,7 +337,6 @@ func TestSyncToolsHelp(t *testing.T) {
 
 	output := buf.String()
 
-	// Check for key help text elements
 	expectedStrings := []string{
 		"tools", "sync",
 		"source-version",
@@ -286,9 +355,6 @@ func TestSyncToolsHelp(t *testing.T) {
 }
 
 func TestFilterTools(t *testing.T) {
-	// This function tests the filter logic conceptually
-	// The actual filterTools function is tested indirectly through TestSyncToolsCommand
-
 	tests := []struct {
 		name          string
 		selectFlag    string
@@ -324,14 +390,13 @@ func TestFilterTools(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Filter logic is tested through the main command tests
-			// This just validates the test structure
 			_ = tt.expectedCount
 		})
 	}
 }
 
 func TestSyncToolsWindowsCompatibility(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Windows-specific test")
 	}
 
@@ -339,11 +404,9 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 	os.Setenv("GOENV_ROOT", tmpDir)
 	defer os.Unsetenv("GOENV_ROOT")
 
-	// Setup versions with .bat binaries
 	for _, version := range []string{"1.21.0", "1.22.0"} {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
-		// Create go.bat binary (version directory IS the GOROOT, no extra 'go' subdirectory)
 		goBinDir := filepath.Join(versionPath, "bin")
 		if err := os.MkdirAll(goBinDir, 0755); err != nil {
 			t.Fatalf("Failed to create go bin directory: %v", err)
@@ -355,7 +418,6 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 			t.Fatalf("Failed to create go.bat: %v", err)
 		}
 
-		// Create tool .bat files
 		gopathBin := filepath.Join(versionPath, "gopath", "bin")
 		if err := os.MkdirAll(gopathBin, 0755); err != nil {
 			t.Fatalf("Failed to create GOPATH/bin: %v", err)
@@ -370,7 +432,6 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 		}
 	}
 
-	// Test that Windows .bat handling works
 	args := []string{"1.21.0", "1.22.0"}
 	cmd := &cobra.Command{}
 	buf := new(bytes.Buffer)
@@ -378,7 +439,6 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 
 	err := runSyncTools(cmd, args)
 
-	// Should successfully run without error on Windows with proper .bat handling
 	if err != nil {
 		t.Errorf("Expected sync to succeed on Windows with .bat binaries, got error: %v", err)
 	}

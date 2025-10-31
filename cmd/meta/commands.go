@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -81,7 +81,7 @@ func runCommands(cmd *cobra.Command, args []string) error {
 	commandPaths := make(map[string][]string)
 
 	// Check PATH for additional goenv commands
-	pathEnv := os.Getenv("PATH")
+	pathEnv := os.Getenv(utils.EnvVarPath)
 	for _, dir := range filepath.SplitList(pathEnv) {
 		if entries, err := os.ReadDir(dir); err == nil {
 			for _, entry := range entries {
@@ -93,7 +93,7 @@ func runCommands(cmd *cobra.Command, args []string) error {
 						fullPath := filepath.Join(dir, name)
 						if info, err := os.Stat(fullPath); err == nil {
 							// On Windows, all files are "executable"; on Unix, check the executable bit
-							if runtime.GOOS == "windows" || info.Mode()&0111 != 0 {
+							if utils.IsWindows() || utils.HasExecutableBit(info) {
 								commands = append(commands, cmdName)
 								commandPaths[cmdName] = append(commandPaths[cmdName], fullPath)
 							}

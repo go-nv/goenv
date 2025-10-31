@@ -2,11 +2,34 @@ package utils
 
 import (
 	"os"
-	"strconv"
+	"strings"
 )
 
 type GoenvEnvVar string
 type GoenvBoolEnv = GoenvEnvVar
+
+// Common system environment variable names
+const (
+	EnvVarPath        = "PATH"
+	EnvVarHome        = "HOME"
+	EnvVarShell       = "SHELL"
+	EnvVarGopath      = "GOPATH"
+	EnvVarGoroot      = "GOROOT"
+	EnvVarShlvl       = "SHLVL"
+	EnvVarUser        = "USER"
+	EnvVarUserProfile = "USERPROFILE" // Windows
+	EnvVarProgramData = "ProgramData" // Windows
+
+	// CI/CD environment variable names
+	EnvVarGitHubActions = "GITHUB_ACTIONS"
+	EnvVarGitHubToken   = "GITHUB_TOKEN"
+	EnvVarGitLabCI      = "GITLAB_CI"
+	EnvVarCircleCI      = "CIRCLECI"
+	EnvVarTravisCI      = "TRAVIS"
+
+	// PowerShell environment
+	EnvVarPSModulePath = "PSModulePath"
+)
 
 const (
 	// #region String Env Vars
@@ -20,6 +43,7 @@ const (
 	GoenvEnvVarPathOrder        GoenvEnvVar = "GOENV_PATH_ORDER"
 	GoenvEnvVarShimDebug        GoenvEnvVar = "GOENV_SHIM_DEBUG"
 	GoenvEnvVarHooksConfig      GoenvEnvVar = "GOENV_HOOKS_CONFIG"
+	GoenvEnvVarHooksLog         GoenvEnvVar = "GOENV_HOOKS_LOG"
 	GoenvEnvVarInstallRoot      GoenvEnvVar = "GOENV_INSTALL_ROOT"
 	GoenvEnvVarGocacheDir       GoenvEnvVar = "GOENV_GOCACHE_DIR"
 	GoenvEnvVarGomodcacheDir    GoenvEnvVar = "GOENV_GOMODCACHE_DIR"
@@ -38,6 +62,7 @@ const (
 	GoenvEnvVarDisableGocache    GoenvBoolEnv = "GOENV_DISABLE_GOCACHE"
 	GoenvEnvVarDisableGomodcache GoenvBoolEnv = "GOENV_DISABLE_GOMODCACHE"
 	GoenvEnvVarCacheBgRefresh    GoenvBoolEnv = "GOENV_CACHE_BG_REFRESH"
+	GoenvEnvVarAssumeYes         GoenvBoolEnv = "GOENV_ASSUME_YES"
 	// #endregion
 )
 
@@ -71,13 +96,36 @@ func (g GoenvEnvVar) IsSet() bool {
 }
 
 // IsEnvVarTrue checks if the environment variable is set to a truthy value.
+// Only accepts exact lowercase strings: "1", "true", "yes" for true
+// and "0", "false", "no" for false (returns false)
+// Any other value (including capitalized versions) is considered invalid and returns false
 func (g GoenvBoolEnv) IsTrue() bool {
 	val, ok := g.Value()
 	if !ok {
 		return false
 	}
 
-	isSet, err := strconv.ParseBool(val)
+	// Only accept exact lowercase strings
+	switch val {
+	case "1", "true", "yes":
+		return true
+	case "0", "false", "no":
+		return false
+	default:
+		// Invalid value - treat as false (will fall back to prompting)
+		return false
+	}
+}
 
-	return err == nil && isSet
+// GetEnvValue retrieves an environment variable value from an env slice
+// The env slice should be in the format ["KEY=value", "KEY2=value2", ...]
+// as returned by os.Environ()
+func GetEnvValue(env []string, key string) string {
+	prefix := key + "="
+	for _, envVar := range env {
+		if strings.HasPrefix(envVar, prefix) {
+			return strings.TrimPrefix(envVar, prefix)
+		}
+	}
+	return ""
 }

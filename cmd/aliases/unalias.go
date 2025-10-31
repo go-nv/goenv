@@ -28,7 +28,7 @@ func init() {
 
 func runUnalias(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("Usage: goenv unalias <name>")
+		return fmt.Errorf("usage: goenv unalias <name>")
 	}
 
 	cfg := config.Load()

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -57,11 +56,13 @@ func (s *ShimManager) Rehash() error {
 		for _, entry := range entries {
 			if !entry.IsDir() && isExecutable(filepath.Join(versionBinDir, entry.Name())) {
 				binaryName := entry.Name()
-				// On Windows, strip .exe and .bat extensions from shim name
-				if runtime.GOOS == "windows" {
-					ext := filepath.Ext(binaryName)
-					if ext == ".exe" || ext == ".bat" {
-						binaryName = binaryName[:len(binaryName)-len(ext)]
+				// On Windows, strip executable extensions from shim name
+				if utils.IsWindows() {
+					for _, ext := range utils.WindowsExecutableExtensions() {
+						if strings.HasSuffix(binaryName, ext) {
+							binaryName = binaryName[:len(binaryName)-len(ext)]
+							break
+						}
 					}
 				}
 				binaries[binaryName] = true
@@ -76,11 +77,13 @@ func (s *ShimManager) Rehash() error {
 				for _, entry := range gopathEntries {
 					if !entry.IsDir() && isExecutable(filepath.Join(gopathBinDir, entry.Name())) {
 						binaryName := entry.Name()
-						// On Windows, strip .exe and .bat extensions from shim name
-						if runtime.GOOS == "windows" {
-							ext := filepath.Ext(binaryName)
-							if ext == ".exe" || ext == ".bat" {
-								binaryName = binaryName[:len(binaryName)-len(ext)]
+						// On Windows, strip executable extensions from shim name
+						if utils.IsWindows() {
+							for _, ext := range utils.WindowsExecutableExtensions() {
+								if strings.HasSuffix(binaryName, ext) {
+									binaryName = binaryName[:len(binaryName)-len(ext)]
+									break
+								}
 							}
 						}
 						binaries[binaryName] = true
@@ -120,9 +123,14 @@ func (s *ShimManager) ListShims() ([]string, error) {
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			name := entry.Name()
-			// On Windows, strip .bat extension from shim names
-			if runtime.GOOS == "windows" && strings.HasSuffix(name, ".bat") {
-				name = strings.TrimSuffix(name, ".bat")
+			// On Windows, strip executable extensions from shim names
+			if utils.IsWindows() {
+				for _, ext := range utils.WindowsExecutableExtensions() {
+					if strings.HasSuffix(name, ext) {
+						name = strings.TrimSuffix(name, ext)
+						break
+					}
+				}
 			}
 			shims = append(shims, name)
 		}
@@ -166,23 +174,13 @@ func (s *ShimManager) WhichBinary(command string) (string, error) {
 	return "", fmt.Errorf("command not found: %s", command)
 }
 
-// findBinary searches for a binary, adding .exe on Windows if needed
+// findBinary searches for a binary using utils.FindExecutable
 func (s *ShimManager) findBinary(binDir, command string) string {
-	// Try exact name first
-	binaryPath := filepath.Join(binDir, command)
-	if _, err := os.Stat(binaryPath); err == nil {
-		return binaryPath
+	path, err := utils.FindExecutable(binDir, command)
+	if err != nil {
+		return ""
 	}
-
-	// On Windows, try adding .exe extension
-	if runtime.GOOS == "windows" {
-		exePath := filepath.Join(binDir, command+".exe")
-		if _, err := os.Stat(exePath); err == nil {
-			return exePath
-		}
-	}
-
-	return ""
+	return path
 }
 
 // WhenceVersions returns all versions that contain the specified command
@@ -248,7 +246,7 @@ func (s *ShimManager) clearShims() error {
 
 // createShim creates a shim file for the specified binary
 func (s *ShimManager) createShim(binaryName string) error {
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		return s.createWindowsShim(binaryName)
 	}
 	return s.createUnixShim(binaryName)
@@ -375,11 +373,16 @@ func isExecutable(path string) bool {
 	}
 
 	// On Windows, check file extension
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		ext := filepath.Ext(path)
-		return ext == ".exe" || ext == ".bat" || ext == ".cmd" || ext == ".com"
+		for _, validExt := range utils.WindowsExecutableExtensions() {
+			if ext == validExt {
+				return true
+			}
+		}
+		return false
 	}
 
 	// On Unix, check execute bit
-	return info.Mode()&0111 != 0
+	return utils.HasExecutableBit(info)
 }

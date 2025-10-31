@@ -8,15 +8,24 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/install"
+	"github.com/go-nv/goenv/internal/lifecycle"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var globalCmd = &cobra.Command{
-	Use:    "global [version]",
-	Short:  "Set or show the global Go version",
-	Long:   "Set the global Go version that is used in all directories unless overridden by a local .go-version file",
+	Use:   "global [version]",
+	Short: "Set or show the global Go version",
+	Long:  "Set the global Go version that is used in all directories unless overridden by a local .go-version file",
+	Example: `  # Show current global version
+  goenv global
+
+  # Set global version
+  goenv global 1.21.5
+
+  # Use system Go
+  goenv global system`,
 	RunE:   RunGlobal,
 	Hidden: true, // Legacy command - use 'goenv use <version> --global' instead
 }
@@ -55,7 +64,7 @@ func RunGlobal(cmd *cobra.Command, args []string) error {
 
 	// Validate: global command takes 0 or 1 argument
 	if len(args) > 1 {
-		return fmt.Errorf("Usage: goenv global [version]")
+		return fmt.Errorf("usage: goenv global [version]")
 	}
 
 	cfg := config.Load()
@@ -71,7 +80,7 @@ func RunGlobal(cmd *cobra.Command, args []string) error {
 		}
 		// Convert colon-separated to newline-separated for display
 		// (ReadVersionFile joins multiple lines with colons)
-		versions := SplitVersions(version)
+		versions := utils.SplitVersions(version)
 		for _, v := range versions {
 			fmt.Fprintln(cmd.OutOrStdout(), v)
 		}
@@ -107,7 +116,7 @@ func RunGlobal(cmd *cobra.Command, args []string) error {
 
 			fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
 		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "global"))
+			fmt.Fprint(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "global"))
 			return fmt.Errorf("installation cancelled")
 		}
 	} else if status.Corrupted {
@@ -130,6 +139,23 @@ func RunGlobal(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Check if version is outdated and show warning
+	displayVersionWarning(cmd, resolvedVersion)
+
 	// Silent success - no output when setting version (matches BATS behavior)
 	return nil
+}
+
+// displayVersionWarning shows a warning if the version is outdated or EOL
+func displayVersionWarning(cmd *cobra.Command, version string) {
+	// Skip warning for system version
+	if version == "system" {
+		return
+	}
+
+	warning := lifecycle.FormatWarning(version)
+	if warning != "" {
+		fmt.Fprintf(cmd.OutOrStderr(), "\n%s%s\n", utils.EmojiOr("⚠️  ", "Warning: "), utils.Yellow(warning))
+		fmt.Fprintln(cmd.OutOrStderr())
+	}
 }

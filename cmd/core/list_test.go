@@ -1,8 +1,8 @@
 package core
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"encoding/json"
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"strings"
 	"testing"
 

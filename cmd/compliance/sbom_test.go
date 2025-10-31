@@ -3,11 +3,11 @@ package compliance
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestSBOMProject_FlagValidation(t *testing.T) {
@@ -100,7 +100,7 @@ func TestResolveSBOMTool(t *testing.T) {
 	toolName := "cyclonedx-gomod"
 	toolPath := filepath.Join(hostBinDir, toolName)
 	var content string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		toolPath += ".exe"
 		content = "@echo off\necho mock"
 	} else {

@@ -10,28 +10,30 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // BuildInfo contains metadata about the CGO toolchain used for a cache
 type BuildInfo struct {
-	Created        time.Time         `json:"created"`
-	CC             string            `json:"cc,omitempty"`
-	CCVersion      string            `json:"cc_version,omitempty"`
-	CXX            string            `json:"cxx,omitempty"`
-	CXXVersion     string            `json:"cxx_version,omitempty"`
-	CFLAGS         string            `json:"cflags,omitempty"`
-	CXXFLAGS       string            `json:"cxxflags,omitempty"`
-	LDFLAGS        string            `json:"ldflags,omitempty"`
-	PKGConfig      string            `json:"pkg_config,omitempty"`
-	PKGConfigPath  string            `json:"pkg_config_path,omitempty"`
-	CGOEnabled     string            `json:"cgo_enabled,omitempty"`
-	Sysroot        string            `json:"sysroot,omitempty"`
-	ToolchainHash  string            `json:"toolchain_hash"`
+	Created       time.Time `json:"created"`
+	CC            string    `json:"cc,omitempty"`
+	CCVersion     string    `json:"cc_version,omitempty"`
+	CXX           string    `json:"cxx,omitempty"`
+	CXXVersion    string    `json:"cxx_version,omitempty"`
+	CFLAGS        string    `json:"cflags,omitempty"`
+	CXXFLAGS      string    `json:"cxxflags,omitempty"`
+	LDFLAGS       string    `json:"ldflags,omitempty"`
+	PKGConfig     string    `json:"pkg_config,omitempty"`
+	PKGConfigPath string    `json:"pkg_config_path,omitempty"`
+	CGOEnabled    string    `json:"cgo_enabled,omitempty"`
+	Sysroot       string    `json:"sysroot,omitempty"`
+	ToolchainHash string    `json:"toolchain_hash"`
 }
 
 // IsCGOEnabled checks if CGO is enabled in the environment
 func IsCGOEnabled(env []string) bool {
-	cgoEnabled := getEnvValue(env, "CGO_ENABLED")
+	cgoEnabled := utils.GetEnvValue(env, "CGO_ENABLED")
 	// CGO is enabled by default if not explicitly disabled
 	return cgoEnabled != "0"
 }
@@ -53,19 +55,19 @@ func ComputeToolchainHash(env []string) string {
 	}
 
 	for _, key := range cgoCriticalVars {
-		if val := getEnvValue(env, key); val != "" {
+		if val := utils.GetEnvValue(env, key); val != "" {
 			components = append(components, key+"="+val)
 		}
 	}
 
 	// Get compiler version strings
-	if ccPath := getEnvValue(env, "CC"); ccPath != "" {
+	if ccPath := utils.GetEnvValue(env, "CC"); ccPath != "" {
 		if version := getCompilerVersion(ccPath); version != "" {
 			components = append(components, "CC_VERSION="+version)
 		}
 	}
 
-	if cxxPath := getEnvValue(env, "CXX"); cxxPath != "" {
+	if cxxPath := utils.GetEnvValue(env, "CXX"); cxxPath != "" {
 		if version := getCompilerVersion(cxxPath); version != "" {
 			components = append(components, "CXX_VERSION="+version)
 		}
@@ -87,8 +89,8 @@ func ComputeToolchainHash(env []string) string {
 // GetBuildInfo extracts full CGO toolchain information
 func GetBuildInfo(env []string) *BuildInfo {
 	info := &BuildInfo{
-		Created:       time.Now(),
-		CGOEnabled:    getEnvValue(env, "CGO_ENABLED"),
+		Created:    time.Now(),
+		CGOEnabled: utils.GetEnvValue(env, "CGO_ENABLED"),
 	}
 
 	if !IsCGOEnabled(env) {
@@ -96,14 +98,14 @@ func GetBuildInfo(env []string) *BuildInfo {
 	}
 
 	// Collect environment variables
-	info.CC = getEnvValue(env, "CC")
-	info.CXX = getEnvValue(env, "CXX")
-	info.CFLAGS = getEnvValue(env, "CFLAGS")
-	info.CXXFLAGS = getEnvValue(env, "CXXFLAGS")
-	info.LDFLAGS = getEnvValue(env, "LDFLAGS")
-	info.PKGConfig = getEnvValue(env, "PKG_CONFIG")
-	info.PKGConfigPath = getEnvValue(env, "PKG_CONFIG_PATH")
-	info.Sysroot = getEnvValue(env, "SYSROOT")
+	info.CC = utils.GetEnvValue(env, "CC")
+	info.CXX = utils.GetEnvValue(env, "CXX")
+	info.CFLAGS = utils.GetEnvValue(env, "CFLAGS")
+	info.CXXFLAGS = utils.GetEnvValue(env, "CXXFLAGS")
+	info.LDFLAGS = utils.GetEnvValue(env, "LDFLAGS")
+	info.PKGConfig = utils.GetEnvValue(env, "PKG_CONFIG")
+	info.PKGConfigPath = utils.GetEnvValue(env, "PKG_CONFIG_PATH")
+	info.Sysroot = utils.GetEnvValue(env, "SYSROOT")
 
 	// Get compiler versions
 	if info.CC != "" {
@@ -196,16 +198,5 @@ func getCompilerVersion(compilerPath string) string {
 		return version
 	}
 
-	return ""
-}
-
-// getEnvValue retrieves an environment variable value from the env slice
-func getEnvValue(env []string, key string) string {
-	prefix := key + "="
-	for _, envVar := range env {
-		if strings.HasPrefix(envVar, prefix) {
-			return strings.TrimPrefix(envVar, prefix)
-		}
-	}
 	return ""
 }

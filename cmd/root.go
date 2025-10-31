@@ -12,6 +12,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// CommandGroup represents command group IDs for organizing help output
+type CommandGroup string
+
+const (
+	GroupGettingStarted CommandGroup = "getting-started"
+	GroupVersions       CommandGroup = "versions"
+	GroupTools          CommandGroup = "tools"
+	GroupShell          CommandGroup = "shell"
+	GroupDiagnostics    CommandGroup = "diagnostics"
+	GroupIntegrations   CommandGroup = "integrations"
+	GroupAdvanced       CommandGroup = "advanced"
+	GroupMeta           CommandGroup = "meta"
+)
+
+// Store the default help function to call for subcommands
+var defaultHelpFunc func(*cobra.Command, []string)
+
 var RootCmd = &cobra.Command{
 	Use:   "goenv",
 	Short: "Simple Go version management",
@@ -20,6 +37,7 @@ var RootCmd = &cobra.Command{
 - Switch between Go versions globally or per project
 - Automatically download the latest Go versions
 - Manage Go installations with ease`,
+	SuggestionsMinimumDistance: 2,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Only run smart detection if no subcommands or flags were provided
 		// This prevents blocking on stdin when user runs "goenv --version" etc.
@@ -191,24 +209,160 @@ func isVersionLike(s string) bool {
 	return len(s) > 0
 }
 
+// customHelpFunc provides context-aware help that adapts to first-run scenarios
+func customHelpFunc(cmd *cobra.Command, args []string) {
+	// Only show custom first-run help for the root command
+	// For subcommands, always show their standard help using the default help function
+	if cmd.Parent() != nil {
+		// This is a subcommand, use the default help
+		if defaultHelpFunc != nil {
+			defaultHelpFunc(cmd, args)
+		}
+		return
+	}
+
+	// This is the root command - check for first-run scenario
+	cfg := config.Load()
+	hasVersions := utils.HasAnyVersionsInstalled(cfg.Root)
+
+	if !hasVersions {
+		// Show focused help for first-time users
+		showFirstRunHelp(cmd)
+	} else {
+		// Show standard help using default function
+		if defaultHelpFunc != nil {
+			defaultHelpFunc(cmd, args)
+		}
+	}
+}
+
+// showFirstRunHelp displays a focused, beginner-friendly help message
+func showFirstRunHelp(cmd *cobra.Command) {
+	w := cmd.OutOrStdout()
+
+	// Welcome message
+	fmt.Fprintln(w, utils.BoldBlue("goenv")+" - Go version manager")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, cmd.Short)
+	fmt.Fprintln(w)
+
+	// Getting started section
+	fmt.Fprintln(w, utils.BoldYellow("🚀 Getting Started"))
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "  No Go versions installed yet. Here's how to get started:")
+	fmt.Fprintln(w)
+
+	// Essential commands
+	essential := []struct {
+		name, desc string
+	}{
+		{"get-started", "Interactive guide to set up goenv (recommended for first-time users)"},
+		{"install <version>", "Install a Go version (e.g., goenv install 1.21.5)"},
+		{"install -l", "List available Go versions to install"},
+		{"doctor", "Check your goenv installation and environment"},
+		{"init", "Print shell initialization code"},
+	}
+
+	for _, item := range essential {
+		fmt.Fprintf(w, "  %s %-20s %s %s\n",
+			utils.Green("●"),
+			utils.Cyan(item.name),
+			utils.Gray("→"),
+			item.desc)
+	}
+
+	fmt.Fprintln(w)
+
+	// Quick start example
+	fmt.Fprintln(w, utils.BoldYellow("📝 Quick Start"))
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "  "+utils.Gray("# Interactive setup (easiest)"))
+	fmt.Fprintln(w, "  "+utils.BoldGreen("goenv get-started"))
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "  "+utils.Gray("# Or install manually"))
+	fmt.Fprintln(w, "  "+utils.BoldGreen("goenv install 1.21.5"))
+	fmt.Fprintln(w, "  "+utils.BoldGreen("goenv global 1.21.5"))
+	fmt.Fprintln(w)
+
+	// More help
+	fmt.Fprintln(w, utils.BoldYellow("💡 More Information"))
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "  To see all available commands:")
+	fmt.Fprintln(w, "  "+utils.BoldGreen("goenv --help")+" (after installing a version)")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "  For help on a specific command:")
+	fmt.Fprintln(w, "  "+utils.BoldGreen("goenv <command> --help"))
+	fmt.Fprintln(w)
+}
+
+// handleFlagError provides contextual help for unknown flags or commands
+func handleFlagError(cmd *cobra.Command, err error) error {
+	fmt.Fprintf(cmd.ErrOrStderr(), "%sError: %v\n\n", utils.EmojiOr("❌ ", ""), err)
+
+	// Check if error is about unknown command
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "unknown command") || strings.Contains(errMsg, "unknown flag") {
+		// Suggest exploring commands
+		fmt.Fprintf(cmd.ErrOrStderr(), "%s\n", utils.BoldYellow("Not sure what command to use?"))
+		fmt.Fprintf(cmd.ErrOrStderr(), "  • Run %s to browse commands by category\n", utils.Cyan("goenv explore"))
+		fmt.Fprintf(cmd.ErrOrStderr(), "  • Run %s to see all available commands\n", utils.Cyan("goenv --help"))
+		fmt.Fprintf(cmd.ErrOrStderr(), "  • Run %s to troubleshoot issues\n\n", utils.Cyan("goenv doctor"))
+	}
+
+	return err
+}
+
 func init() {
+	// Save the default help function before we replace it
+	defaultHelpFunc = RootCmd.HelpFunc()
+
+	// Set custom help function that adapts to first-run scenarios
+	RootCmd.SetHelpFunc(customHelpFunc)
+
+	// Enable "did you mean" suggestions for mistyped commands
+	RootCmd.SuggestionsMinimumDistance = 2 // Suggest on 2+ char difference
+	RootCmd.SuggestFor = []string{}        // Allow suggestions for all commands
+
+	// Custom unknown command handler with contextual suggestions
+	RootCmd.SetFlagErrorFunc(handleFlagError)
+
+	// Add helpful message after unknown command suggestions
+	RootCmd.SilenceErrors = false // Show errors
+	RootCmd.SilenceUsage = true   // Don't show full usage on every error
+
 	// Add command groups to organize help output
 	RootCmd.AddGroup(
 		&cobra.Group{
-			ID:    "common",
-			Title: "Common Commands:",
+			ID:    string(GroupGettingStarted),
+			Title: "Getting Started:",
 		},
 		&cobra.Group{
-			ID:    "tools",
+			ID:    string(GroupVersions),
+			Title: "Version Management:",
+		},
+		&cobra.Group{
+			ID:    string(GroupTools),
 			Title: "Tool Management:",
 		},
 		&cobra.Group{
-			ID:    "config",
-			Title: "Configuration:",
+			ID:    string(GroupShell),
+			Title: "Shell Integration:",
 		},
 		&cobra.Group{
-			ID:    "system",
-			Title: "System Commands:",
+			ID:    string(GroupDiagnostics),
+			Title: "Diagnostics & Maintenance:",
+		},
+		&cobra.Group{
+			ID:    string(GroupIntegrations),
+			Title: "IDE & CI Integration:",
+		},
+		&cobra.Group{
+			ID:    string(GroupAdvanced),
+			Title: "Advanced Commands:",
+		},
+		&cobra.Group{
+			ID:    string(GroupMeta),
+			Title: "Meta Commands:",
 		},
 	)
 

@@ -62,9 +62,7 @@ func (h *CommandHelp) format(substituteVersions bool) string {
 	// Examples section
 	if len(h.Examples) > 0 {
 		parts = append(parts, "")
-		for _, example := range h.Examples {
-			parts = append(parts, example)
-		}
+		parts = append(parts, h.Examples...)
 	}
 
 	// Add trailing newline to match bash version
@@ -151,8 +149,20 @@ selected. To obtain only the version string, use ` + "`goenv version-name'." + `
 		Description: "If a specified version is not installed, only display an error message and abort.\nIf only a single <version> `system` is specified and installed, display previous version (if any) and remove file (similar to --unset).\n\n<version> should be a string matching a Go version known to goenv.\n<version> `latest` writes the latest installed version.\n<version> `1` writes the latest installed major version.\n<version> `23` or `1.23` writes the latest installed minor version.\n<version> `1.23.4` writes this installed version.\nRun `goenv versions` for a list of available Go versions.",
 	},
 	"versions": {
-		Usage:       "goenv versions [--bare] [--skip-aliases]",
-		Description: "Lists all Go versions found in `$GOENV_ROOT/versions/*'.",
+		Usage: "goenv versions [--bare] [--skip-aliases] [--used]",
+		Description: `Lists all Go versions found in '$GOENV_ROOT/versions/*'.
+
+Options:
+  --bare          List version numbers only (one per line)
+  --skip-aliases  Skip showing system Go as an alias
+  --used          Scan current directory tree for version usage
+  --depth N       Maximum scan depth (default: 3, used with --used)
+  --json          Output in JSON format
+
+Examples:
+  goenv versions                    # List installed versions
+  goenv versions --used             # Check which versions are used by projects
+  goenv versions --used --depth 1   # Quick scan (immediate subdirectories)`,
 	},
 	"whence": {
 		Usage:   "goenv whence [--path] <command>",

@@ -611,7 +611,7 @@ Then document the `goenv vscode sync` command for when versions change.
 
 **For more platform details, see:**
 
-- **[Platform Support Matrix](../PLATFORM_SUPPORT.md)** - Comprehensive OS/architecture compatibility
+- **[Platform Support Matrix](../reference/PLATFORM_SUPPORT.md)** - Comprehensive OS/architecture compatibility
 - **[Installation Guide](INSTALL.md)** - Platform-specific installation instructions
 - **[How It Works](HOW_IT_WORKS.md)** - Understanding goenv's cross-platform architecture
 

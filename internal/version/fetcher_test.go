@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -200,7 +199,7 @@ func TestSHA256Verification(t *testing.T) {
 // TestCachePermissions tests that cache files have secure permissions
 func TestCachePermissions(t *testing.T) {
 	// Skip on Windows - permissions work differently
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		t.Skip("Skipping permission test on Windows")
 	}
 
@@ -244,7 +243,7 @@ func TestCachePermissions(t *testing.T) {
 // TestPermissionFixing tests that insecure permissions are auto-fixed
 func TestPermissionFixing(t *testing.T) {
 	// Skip on Windows
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		t.Skip("Skipping permission test on Windows")
 	}
 

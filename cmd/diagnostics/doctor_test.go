@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/shellutil"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestDoctorCommand_BasicRun(t *testing.T) {
@@ -105,6 +107,7 @@ func TestDoctorCommand_ChecksExecuted(t *testing.T) {
 		"GOENV_ROOT directory",
 		"GOENV_ROOT filesystem",
 		"Shell configuration",
+		"Shell environment",
 		"PATH configuration",
 		"Shims directory",
 	}
@@ -157,7 +160,7 @@ func TestDoctorCommand_WithInstalledVersion(t *testing.T) {
 	// Create mock go binary
 	goBinary := filepath.Join(binDir, "go")
 	var content string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".bat"
 		content = "@echo off\necho go1.21.0\n"
 	} else {
@@ -404,7 +407,7 @@ func TestDoctorCommand_SuccessScenario(t *testing.T) {
 
 	goBinary := filepath.Join(binDir, "go")
 	var content string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".bat"
 		content = "@echo off\necho go1.21.0\n"
 	} else {
@@ -483,7 +486,7 @@ func TestDoctorCommand_ShellDetection(t *testing.T) {
 
 	// Set a specific shell
 	originalShell := os.Getenv("SHELL")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		t.Setenv("SHELL", "powershell")
 	} else {
 		t.Setenv("SHELL", "/bin/bash")
@@ -567,37 +570,37 @@ func TestCheckGoToolchain(t *testing.T) {
 	tests := []struct {
 		name           string
 		gotoolchain    string
-		expectedStatus string
+		expectedStatus Status
 		shouldContain  string
 	}{
 		{
 			name:           "GOTOOLCHAIN not set",
 			gotoolchain:    "",
-			expectedStatus: "ok",
+			expectedStatus: StatusOK,
 			shouldContain:  "not set",
 		},
 		{
 			name:           "GOTOOLCHAIN=auto (warning)",
 			gotoolchain:    "auto",
-			expectedStatus: "warning",
+			expectedStatus: StatusWarning,
 			shouldContain:  "can cause issues",
 		},
 		{
 			name:           "GOTOOLCHAIN=local (recommended)",
 			gotoolchain:    "local",
-			expectedStatus: "ok",
+			expectedStatus: StatusOK,
 			shouldContain:  "recommended",
 		},
 		{
 			name:           "GOTOOLCHAIN with specific version",
 			gotoolchain:    "go1.23.2",
-			expectedStatus: "warning",
+			expectedStatus: StatusWarning,
 			shouldContain:  "may interfere",
 		},
 		{
 			name:           "GOTOOLCHAIN=local+auto",
 			gotoolchain:    "local+auto",
-			expectedStatus: "warning",
+			expectedStatus: StatusWarning,
 			shouldContain:  "may interfere",
 		},
 	}
@@ -626,7 +629,7 @@ func TestCheckGoToolchain(t *testing.T) {
 			}
 
 			// Warnings should have advice
-			if result.status == "warning" && result.advice == "" {
+			if result.status == StatusWarning && result.advice == "" {
 				t.Error("Warning status should have advice")
 			}
 		})
@@ -641,26 +644,26 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 		setupCache     bool
 		setupOldCache  bool
 		disableCache   bool
-		expectedStatus string
+		expectedStatus Status
 		shouldContain  string
 	}{
 		{
 			name:           "No managed version active",
 			setupVersion:   "",
-			expectedStatus: "ok",
+			expectedStatus: StatusOK,
 			shouldContain:  "Not applicable",
 		},
 		{
 			name:           "System version active",
 			setupVersion:   "system",
-			expectedStatus: "ok",
+			expectedStatus: StatusOK,
 			shouldContain:  "Not applicable",
 		},
 		{
 			name:           "Cache isolation disabled",
 			setupVersion:   "1.21.0",
 			disableCache:   true,
-			expectedStatus: "ok",
+			expectedStatus: StatusOK,
 			shouldContain:  "disabled",
 		},
 		{
@@ -668,7 +671,7 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 			setupVersion:   "1.21.0",
 			setupCache:     false,
 			setupOldCache:  false,
-			expectedStatus: "ok",
+			expectedStatus: StatusOK,
 			shouldContain:  "will be created",
 		},
 		{
@@ -676,7 +679,7 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 			setupVersion:   "1.21.0",
 			setupCache:     true,
 			setupOldCache:  false,
-			expectedStatus: "ok",
+			expectedStatus: StatusOK,
 			shouldContain:  "go-build-", // Cache path will contain go-build-
 		},
 		{
@@ -684,7 +687,7 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 			setupVersion:   "1.21.0",
 			setupCache:     false,
 			setupOldCache:  true,
-			expectedStatus: "warning",
+			expectedStatus: StatusWarning,
 			shouldContain:  "old-style cache",
 		},
 		{
@@ -692,7 +695,7 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 			setupVersion:   "1.21.0",
 			setupCache:     true,
 			setupOldCache:  true,
-			expectedStatus: "warning", // Test setup doesn't create cache matching expected name (with CGO hash), so only old cache is found
+			expectedStatus: StatusWarning, // Test setup doesn't create cache matching expected name (with CGO hash), so only old cache is found
 			shouldContain:  "old-style cache",
 		},
 	}
@@ -811,7 +814,7 @@ func TestCheckRosetta(t *testing.T) {
 	}
 
 	// Status should be one of ok, warning, or error
-	validStatuses := []string{"ok", "warning", "error"}
+	validStatuses := []Status{StatusOK, StatusWarning, StatusError}
 	if !slices.Contains(validStatuses, result.status) {
 		t.Errorf("Invalid status %q, expected one of %v", result.status, validStatuses)
 	}
@@ -900,7 +903,7 @@ func TestCheckEnvironment(t *testing.T) {
 		t.Errorf("Expected check name 'Runtime environment', got %s", result.name)
 	}
 
-	if result.status != "ok" && result.status != "warning" {
+	if result.status != StatusOK && result.status != StatusWarning {
 		t.Errorf("Expected status 'ok' or 'warning', got %s", result.status)
 	}
 
@@ -969,13 +972,13 @@ func TestCheckMacOSDeploymentTarget(t *testing.T) {
 	}
 
 	// Should be ok or have a message about not finding binary
-	if result.status != "ok" {
+	if result.status != StatusOK {
 		t.Logf("Status: %s, Message: %s", result.status, result.message)
 	}
 }
 
 func TestCheckWindowsCompiler(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Windows compiler check only works on Windows")
 	}
 
@@ -994,7 +997,7 @@ func TestCheckWindowsCompiler(t *testing.T) {
 }
 
 func TestCheckWindowsARM64(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Skip("Windows ARM64 check only works on Windows")
 	}
 
@@ -1123,13 +1126,13 @@ func TestPlatformChecksCrossOSBehavior(t *testing.T) {
 	cfg := config.Load()
 
 	// Test Windows checks on non-Windows platforms
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		t.Run("WindowsChecksOnNonWindows", func(t *testing.T) {
 			result := checkWindowsCompiler(cfg)
 			if result.id != "windows-compiler" {
 				t.Errorf("Expected id 'windows-compiler', got %s", result.id)
 			}
-			if result.status != "ok" {
+			if result.status != StatusOK {
 				t.Errorf("Expected status 'ok' (not applicable), got %s", result.status)
 			}
 			if !strings.Contains(result.message, "Not applicable") {
@@ -1146,7 +1149,7 @@ func TestPlatformChecksCrossOSBehavior(t *testing.T) {
 				t.Errorf("Expected id 'macos-deployment-target', got %s", result.id)
 			}
 			// Check should handle non-macOS gracefully
-			if result.status == "error" {
+			if result.status == StatusError {
 				t.Errorf("Check should not error on non-macOS, got status: %s", result.status)
 			}
 		})
@@ -1159,11 +1162,274 @@ func TestPlatformChecksCrossOSBehavior(t *testing.T) {
 			if result.id != "linux-kernel-version" {
 				t.Errorf("Expected id 'linux-kernel-version', got %s", result.id)
 			}
-			if result.status != "ok" {
+			if result.status != StatusOK {
 				t.Errorf("Expected status 'ok' (not applicable), got %s", result.status)
 			}
 			if !strings.Contains(result.message, "Not applicable") {
 				t.Errorf("Expected 'Not applicable' message on non-Linux, got: %s", result.message)
+			}
+		})
+	}
+}
+
+func TestCheckShellEnvironment(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		Root: tmpDir,
+	}
+
+	tests := []struct {
+		name           string
+		goenvShell     string
+		goenvRoot      string
+		expectedStatus Status
+		expectedMsg    string
+	}{
+		{
+			name:           "Both variables missing",
+			goenvShell:     "",
+			goenvRoot:      "",
+			expectedStatus: StatusError,
+			expectedMsg:    "goenv init has not been evaluated",
+		},
+		{
+			name:           "Only GOENV_SHELL missing",
+			goenvShell:     "",
+			goenvRoot:      tmpDir,
+			expectedStatus: StatusWarning,
+			expectedMsg:    "incomplete shell integration",
+		},
+		{
+			name:           "GOENV_ROOT mismatch",
+			goenvShell:     "bash",
+			goenvRoot:      "/wrong/path",
+			expectedStatus: StatusWarning,
+			expectedMsg:    "GOENV_ROOT mismatch",
+		},
+		{
+			name:           "All correct - bash",
+			goenvShell:     "bash",
+			goenvRoot:      tmpDir,
+			expectedStatus: StatusOK,
+			expectedMsg:    "Shell integration active",
+		},
+		{
+			name:           "All correct - zsh",
+			goenvShell:     "zsh",
+			goenvRoot:      tmpDir,
+			expectedStatus: StatusOK,
+			expectedMsg:    "shell: zsh",
+		},
+		{
+			name:           "All correct - fish",
+			goenvShell:     "fish",
+			goenvRoot:      tmpDir,
+			expectedStatus: StatusOK,
+			expectedMsg:    "shell: fish",
+		},
+		{
+			name:           "All correct - powershell",
+			goenvShell:     "powershell",
+			goenvRoot:      tmpDir,
+			expectedStatus: StatusOK,
+			expectedMsg:    "shell: powershell",
+		},
+		{
+			name:           "All correct - cmd",
+			goenvShell:     "cmd",
+			goenvRoot:      tmpDir,
+			expectedStatus: StatusOK,
+			expectedMsg:    "shell: cmd",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set HOME to tmpDir to avoid checking user's real profile files
+			t.Setenv("HOME", tmpDir)
+
+			// Set up PATH with shims directory when GOENV_SHELL is set
+			if tt.goenvShell != "" {
+				// Create shims directory
+				shimsDir := filepath.Join(tmpDir, "shims")
+				if err := os.MkdirAll(shimsDir, 0755); err != nil {
+					t.Fatalf("Failed to create shims directory: %v", err)
+				}
+
+				// Create a fake goenv executable for command validation checks
+				binDir := filepath.Join(tmpDir, "bin")
+				if err := os.MkdirAll(binDir, 0755); err != nil {
+					t.Fatalf("Failed to create bin directory: %v", err)
+				}
+				goenvBin := filepath.Join(binDir, "goenv")
+				// Create a simple script that exits successfully
+				if err := os.WriteFile(goenvBin, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+					t.Fatalf("Failed to create fake goenv: %v", err)
+				}
+
+				// Add shims and bin to PATH
+				oldPath := os.Getenv("PATH")
+				t.Setenv("PATH", binDir+string(os.PathListSeparator)+shimsDir+string(os.PathListSeparator)+oldPath)
+			}
+
+			// Set environment variables
+			if tt.goenvShell != "" {
+				t.Setenv("GOENV_SHELL", tt.goenvShell)
+
+				// For bash/zsh, set BASH_FUNC_goenv to simulate the shell function
+				// This tells checkGoenvShellFunction that the function exists
+				if tt.goenvShell == "bash" || tt.goenvShell == "zsh" {
+					t.Setenv("BASH_FUNC_goenv%%", "() { echo fake; }")
+				}
+			} else {
+				os.Unsetenv("GOENV_SHELL")
+			}
+			if tt.goenvRoot != "" {
+				t.Setenv("GOENV_ROOT", tt.goenvRoot)
+			} else {
+				os.Unsetenv("GOENV_ROOT")
+			}
+
+			result := checkShellEnvironment(cfg)
+
+			if result.id != "shell-environment" {
+				t.Errorf("Expected id 'shell-environment', got %s", result.id)
+			}
+			if result.status != tt.expectedStatus {
+				t.Errorf("Expected status '%s', got '%s'", tt.expectedStatus, result.status)
+			}
+			if !strings.Contains(result.message, tt.expectedMsg) {
+				t.Errorf("Expected message to contain '%s', got: %s", tt.expectedMsg, result.message)
+			}
+
+			// Verify advice is present for non-ok statuses
+			if result.status != StatusOK && result.advice == "" {
+				t.Errorf("Expected advice for status '%s', but got empty advice", result.status)
+			}
+		})
+	}
+}
+
+func TestOfferShellEnvironmentFix(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		Root: tmpDir,
+	}
+
+	tests := []struct {
+		name           string
+		shellEnvStatus Status
+		goenvShell     string
+		userInput      string
+		expectPrompt   bool
+	}{
+		{
+			name:           "OK status - no prompt",
+			shellEnvStatus: StatusOK,
+			goenvShell:     "bash",
+			userInput:      "",
+			expectPrompt:   false,
+		},
+		{
+			name:           "Error status - prompt shown, user accepts",
+			shellEnvStatus: StatusError,
+			goenvShell:     "",
+			userInput:      "y\n",
+			expectPrompt:   true,
+		},
+		{
+			name:           "Warning status - prompt shown, user declines",
+			shellEnvStatus: StatusWarning,
+			goenvShell:     "",
+			userInput:      "n\n",
+			expectPrompt:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set environment
+			if tt.goenvShell != "" {
+				t.Setenv("GOENV_SHELL", tt.goenvShell)
+			} else {
+				os.Unsetenv("GOENV_SHELL")
+			}
+
+			// Create mock results
+			results := []checkResult{
+				{
+					id:      "shell-environment",
+					name:    "Shell environment",
+					status:  tt.shellEnvStatus,
+					message: "Test message",
+					advice:  "Test advice",
+				},
+			}
+
+			// Create mock stdin
+			oldStdin := doctorStdin
+			doctorStdin = strings.NewReader(tt.userInput)
+			defer func() { doctorStdin = oldStdin }()
+
+			// Capture output
+			buf := new(bytes.Buffer)
+			doctorCmd.SetOut(buf)
+			doctorCmd.SetErr(buf)
+
+			// Call the function
+			offerShellEnvironmentFix(doctorCmd, results, cfg)
+
+			output := buf.String()
+
+			if tt.expectPrompt {
+				if !strings.Contains(output, "Shell Environment Issue Detected") {
+					t.Errorf("Expected prompt header in output, got: %s", output)
+				}
+				if !strings.Contains(output, "Would you like to see the command") {
+					t.Errorf("Expected prompt question in output, got: %s", output)
+				}
+
+				if strings.Contains(tt.userInput, "y") {
+					// Should show the fix command
+					if !strings.Contains(output, "Run this command") {
+						t.Errorf("Expected fix command in output when user accepts, got: %s", output)
+					}
+				}
+			} else {
+				if strings.Contains(output, "Shell Environment Issue Detected") {
+					t.Errorf("Did not expect prompt for status %s, got: %s", tt.shellEnvStatus, output)
+				}
+			}
+		})
+	}
+}
+
+func TestIsInteractive(t *testing.T) {
+	// This test is mostly for code coverage
+	// The actual behavior depends on the terminal state
+	result := isInteractive()
+	// Just ensure it returns without panic
+	t.Logf("isInteractive returned: %v", result)
+}
+
+func TestDetermineProfilePath(t *testing.T) {
+	tests := []struct {
+		shell    shellutil.ShellType
+		expected string
+	}{
+		{shellutil.ShellTypeBash, "~/.bashrc or ~/.bash_profile"},
+		{shellutil.ShellTypeZsh, "~/.zshrc"},
+		{shellutil.ShellTypeFish, "~/.config/fish/config.fish"},
+		{shellutil.ShellTypePowerShell, "$PROFILE"},
+		{shellutil.ShellTypeCmd, "%USERPROFILE%\\autorun.cmd"},
+		{shellutil.ShellTypeUnknown, "your shell profile"},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.shell), func(t *testing.T) {
+			result := shellutil.GetProfilePathDisplay(tt.shell)
+			if result != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, result)
 			}
 		})
 	}

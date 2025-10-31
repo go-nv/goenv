@@ -142,7 +142,7 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 	// Find the executable (handles .exe and .bat on Windows)
 	goBin, err := pathutil.FindExecutable(goBinBase)
 	if err != nil {
-		return fmt.Errorf("Go binary not found for version %s: %w", goVersion, err)
+		return fmt.Errorf("go binary not found for version %s: %w", goVersion, err)
 	}
 
 	if verbose {

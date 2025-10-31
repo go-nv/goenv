@@ -49,7 +49,7 @@ func runAlias(cmd *cobra.Command, args []string) error {
 		// Set alias
 		return setAlias(cmd, mgr, args[0], args[1])
 	default:
-		return fmt.Errorf("Usage: goenv alias [name] [version]")
+		return fmt.Errorf("usage: goenv alias [name] [version]")
 	}
 }
 

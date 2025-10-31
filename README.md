@@ -28,11 +28,21 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
 - Search commands from **multiple versions of Go at a time**.
 - Provide **tab completion** for bash, zsh, fish, and PowerShell.
 - **Automatically rehash** after `go install` - tools available immediately (can be disabled with `--no-rehash` flag)
-- **Diagnostic tool** (`goenv doctor`) for troubleshooting installation issues
+- **Enhanced diagnostics** (`goenv doctor`) with interactive fix mode and 18 issue types
+- **Quick status check** (`goenv status`) for installation health overview
+- **Version usage analysis** (`goenv versions --used`) - scan projects to see which versions are in use
+- **Version lifecycle tracking** (`goenv info`) with EOL detection and upgrade recommendations
+- **Version comparison** (`goenv compare`) for side-by-side analysis
+- **First-time setup wizard** (`goenv setup`) for automatic shell and IDE configuration
+- **Interactive beginner guide** (`goenv get-started`) for new users
+- **Command discovery** (`goenv explore`) to find commands by intent or category
 - **Self-update capability** (`goenv update`) for both git and binary installations
-- **Default tools** (`goenv default-tools`) - auto-install common tools with new Go versions
-- **Update tools** (`goenv update-tools`) - keep all installed Go tools current
-- **Sync tools** (`goenv sync-tools`) - replicate tools when upgrading Go versions (with smart auto-detection)
+- **Tool management** (`goenv tools`) - comprehensive tool management across Go versions:
+  - Install/uninstall tools across all versions with `--all` flag
+  - Check tool consistency with `goenv tools status`
+  - Find outdated tools with `goenv tools outdated`
+  - Auto-install common tools with `goenv tools default`
+  - Sync tools between versions with `goenv tools sync`
 - **Version aliases** (`goenv alias`) - create convenient shorthand names for versions
 - **VS Code integration** (`goenv vscode`) - sync Go settings with workspace-relative paths and security validation
 

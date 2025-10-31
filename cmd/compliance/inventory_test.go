@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestInventoryGo_NoVersions(t *testing.T) {
@@ -59,7 +60,7 @@ func TestInventoryGo_WithVersions(t *testing.T) {
 
 		// Create mock go binary
 		goBinary := filepath.Join(versionPath, "go")
-		if runtime.GOOS == "windows" {
+		if utils.IsWindows() {
 			goBinary += ".exe"
 		}
 		if err := os.WriteFile(goBinary, []byte("mock go binary"), 0755); err != nil {
@@ -109,7 +110,7 @@ func TestInventoryGo_JSON(t *testing.T) {
 	}
 
 	goBinary := filepath.Join(versionPath, "go")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".exe"
 	}
 	if err := os.WriteFile(goBinary, []byte("mock go binary"), 0755); err != nil {
@@ -174,7 +175,7 @@ func TestInventoryGo_WithChecksums(t *testing.T) {
 	}
 
 	goBinary := filepath.Join(versionPath, "go")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".exe"
 	}
 	if err := os.WriteFile(goBinary, []byte("mock go binary"), 0755); err != nil {
@@ -228,7 +229,7 @@ func TestCollectGoInstallation(t *testing.T) {
 	}
 
 	goBinary := filepath.Join(versionPath, "go")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		goBinary += ".exe"
 	}
 	if err := os.WriteFile(goBinary, []byte("test content"), 0755); err != nil {

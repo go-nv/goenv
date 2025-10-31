@@ -317,7 +317,7 @@ func Test_isLockError(t *testing.T) {
 		{
 			name: "lock error",
 			err:  os.ErrPermission, // Simulate a lock error for testing purposes
-			want: false,           // This specific error doesn't contain "locked"
+			want: false,            // This specific error doesn't contain "locked"
 		},
 	}
 

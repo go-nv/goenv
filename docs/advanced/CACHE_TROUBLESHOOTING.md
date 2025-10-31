@@ -678,6 +678,6 @@ goenv inventory go --checksums
 ## See Also
 
 - [Smart Caching](./advanced/SMART_CACHING.md) - Cache internals and strategy
-- [Platform Support](./PLATFORM_SUPPORT.md) - Platform-specific cache locations
-- [CI/CD Guide](./CI_CD_GUIDE.md) - CI/CD cache optimization
+- [Platform Support](../reference/PLATFORM_SUPPORT.md) - Platform-specific cache locations
+- [CI/CD Guide](CI_CD_GUIDE.md) - CI/CD cache optimization
 - [What NOT to Sync](./advanced/WHAT_NOT_TO_SYNC.md) - Cache portability

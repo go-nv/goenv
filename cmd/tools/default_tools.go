@@ -65,7 +65,7 @@ var disableCmd = &cobra.Command{
 	RunE:  runDisable,
 }
 
-var installToolsCmd = &cobra.Command{
+var installDefaultToolsCmd = &cobra.Command{
 	Use:   "install <version>",
 	Short: "Install default tools for a specific Go version",
 	Long: `Manually installs all configured default tools for a specific Go version.
@@ -92,7 +92,7 @@ func init() {
 	defaultToolsCmd.AddCommand(defaultToolsInitCmd)
 	defaultToolsCmd.AddCommand(enableCmd)
 	defaultToolsCmd.AddCommand(disableCmd)
-	defaultToolsCmd.AddCommand(installToolsCmd)
+	defaultToolsCmd.AddCommand(installDefaultToolsCmd)
 	defaultToolsCmd.AddCommand(verifyCmd)
 }
 

@@ -1,12 +1,13 @@
 package meta
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -129,7 +130,7 @@ func TestPrefixCommand(t *testing.T) {
 				os.MkdirAll(systemBinDir, 0755)
 				systemGo := filepath.Join(systemBinDir, "go")
 				var content string
-				if runtime.GOOS == "windows" {
+				if utils.IsWindows() {
 					systemGo += ".bat"
 					content = "@echo off\necho go version go1.20.1 windows/amd64\n"
 				} else {

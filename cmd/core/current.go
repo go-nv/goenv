@@ -1,20 +1,20 @@
 package core
 
 import (
-	"github.com/go-nv/goenv/cmd/legacy"
 	"fmt"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var currentCmd = &cobra.Command{
 	Use:     "current",
 	Short:   "Show the current Go version",
-	GroupID: "common",
+	GroupID: string(cmdpkg.GroupVersions),
 	Long: `Display the currently active Go version and how it was set.
 
 This is the modern command for checking the current version.
@@ -41,7 +41,7 @@ func init() {
 func runCurrent(cmd *cobra.Command, args []string) error {
 	// Validate: current command takes no positional arguments
 	if len(args) > 0 {
-		return fmt.Errorf("Usage: goenv current [--verbose] [--file]")
+		return fmt.Errorf("usage: goenv current [--verbose] [--file]")
 	}
 
 	cfg := config.Load()
@@ -63,7 +63,7 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle multiple versions separated by ':'
-	versions := legacy.SplitVersions(version)
+	versions := utils.SplitVersions(version)
 
 	if len(versions) > 1 {
 		// Multiple versions - check each one and report errors for missing ones

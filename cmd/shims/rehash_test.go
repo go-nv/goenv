@@ -1,14 +1,14 @@
 package shims
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -205,7 +205,7 @@ func TestRehashCommand(t *testing.T) {
 			}
 
 			// Skip permission tests on Windows - permissions work differently
-			if tt.shimsDirPerms != 0 && runtime.GOOS == "windows" {
+			if tt.shimsDirPerms != 0 && utils.IsWindows() {
 				t.Skip("skipping permission test on Windows")
 			}
 
@@ -231,7 +231,7 @@ func TestRehashCommand(t *testing.T) {
 				for _, shim := range tt.existingShims {
 					shimPath := filepath.Join(shimsDir, shim)
 					var shimContent string
-					if runtime.GOOS == "windows" {
+					if utils.IsWindows() {
 						shimPath += ".bat"
 						shimContent = "@echo off\necho old shim\n"
 					} else {
@@ -250,7 +250,7 @@ func TestRehashCommand(t *testing.T) {
 
 			// Setup permissions if specified
 			if tt.shimsDirPerms != 0 {
-				if runtime.GOOS == "windows" {
+				if utils.IsWindows() {
 					t.Skip("skipping permission test on Windows")
 				}
 				os.MkdirAll(shimsDir, 0755)
@@ -320,7 +320,7 @@ func TestRehashCommand(t *testing.T) {
 			for _, expectedShim := range tt.expectedShims {
 				// On Windows, shims have .bat extension
 				shimName := expectedShim
-				if runtime.GOOS == "windows" {
+				if utils.IsWindows() {
 					shimName = expectedShim + ".bat"
 				}
 
@@ -332,13 +332,13 @@ func TestRehashCommand(t *testing.T) {
 				shimPath := filepath.Join(shimsDir, shimName)
 
 				// Check that shim is executable (Unix only)
-				if runtime.GOOS != "windows" {
+				if !utils.IsWindows() {
 					info, err := os.Stat(shimPath)
 					if err != nil {
 						t.Errorf("Failed to stat shim %q: %v", expectedShim, err)
 						continue
 					}
-					if info.Mode()&0111 == 0 {
+					if !utils.HasExecutableBit(info) {
 						t.Errorf("Expected shim %q to be executable but it isn't (mode: %o)", expectedShim, info.Mode())
 					}
 				}
@@ -353,7 +353,7 @@ func TestRehashCommand(t *testing.T) {
 				contentStr := string(content)
 
 				// Verify shim structure (bash shim)
-				if runtime.GOOS != "windows" {
+				if !utils.IsWindows() {
 					if !strings.Contains(contentStr, "#!/usr/bin/env bash") {
 						t.Errorf("Expected bash shebang in shim %q", expectedShim)
 					}
@@ -373,7 +373,7 @@ func TestRehashCommand(t *testing.T) {
 				for _, expectedShim := range tt.expectedShims {
 					// On Windows, expected shims have .bat extension
 					shimName := expectedShim
-					if runtime.GOOS == "windows" {
+					if utils.IsWindows() {
 						shimName = expectedShim + ".bat"
 					}
 
@@ -436,7 +436,7 @@ func TestRehashShimContent(t *testing.T) {
 
 	// Read and verify shim content
 	shimPath := filepath.Join(testRoot, "shims", "go")
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		shimPath += ".bat"
 	}
 	content, err := os.ReadFile(shimPath)
@@ -446,7 +446,7 @@ func TestRehashShimContent(t *testing.T) {
 
 	contentStr := string(content)
 
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		// Unix shim structure checks
 		requiredElements := []string{
 			"#!/usr/bin/env bash",

@@ -347,7 +347,7 @@ func TestLocalCommandRejectsExtraArguments(t *testing.T) {
 		return
 	}
 
-	if !strings.Contains(err.Error(), "Usage: goenv local [<version>]") {
+	if !strings.Contains(err.Error(), "usage: goenv local [<version>]") {
 		t.Errorf("Expected usage error, got: %v", err)
 	}
 }

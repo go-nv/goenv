@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // PlatformInfo contains platform-specific information
@@ -193,7 +195,7 @@ func isVersionCompatible(current, minimum string) bool {
 
 // CheckWindowsCompiler detects Windows compiler and runtime availability
 func CheckWindowsCompiler() (*WindowsInfo, []CompatibilityIssue) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		return nil, nil
 	}
 
@@ -261,7 +263,7 @@ func CheckWindowsCompiler() (*WindowsInfo, []CompatibilityIssue) {
 
 // CheckWindowsARM64 checks Windows ARM64/ARM64EC process mode
 func CheckWindowsARM64() (*WindowsInfo, []CompatibilityIssue) {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		return nil, nil
 	}
 
@@ -365,7 +367,7 @@ func CheckLinuxKernelVersion() (*LinuxInfo, []CompatibilityIssue) {
 
 // CheckWindowsScriptShims checks if scripts need .cmd/.ps1 wrapper shims
 func CheckWindowsScriptShims(scriptPath string) []CompatibilityIssue {
-	if runtime.GOOS != "windows" {
+	if !utils.IsWindows() {
 		return nil
 	}
 
@@ -442,7 +444,7 @@ func SuggestGlibcCompatibility(requiredGlibc, currentGlibc string) []Compatibili
 		issues = append(issues, CompatibilityIssue{
 			Severity: "error",
 			Message:  fmt.Sprintf("Binary requires glibc %s but system has %s", requiredGlibc, currentGlibc),
-			Hint:     fmt.Sprintf("Build in a container with older glibc: docker run -v $PWD:/app -w /app ubuntu:18.04 go build"),
+			Hint:     "Build in a container with older glibc: docker run -v $PWD:/app -w /app ubuntu:18.04 go build",
 		})
 
 		issues = append(issues, CompatibilityIssue{

@@ -1,9 +1,10 @@
 package hooks
 
 import (
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestRunCommandAction_Name(t *testing.T) {
@@ -227,7 +228,7 @@ func TestRunCommandAction_Execute_Simple(t *testing.T) {
 
 	// Simple echo command (cross-platform)
 	var params map[string]interface{}
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		params = map[string]interface{}{
 			"command": "echo hello",
 			"shell":   "cmd",
@@ -258,7 +259,7 @@ func TestRunCommandAction_Execute_WithArgs(t *testing.T) {
 
 	// Use echo with arguments
 	var cmdName string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		cmdName = "cmd"
 	} else {
 		cmdName = "echo"
@@ -270,7 +271,7 @@ func TestRunCommandAction_Execute_WithArgs(t *testing.T) {
 	}
 
 	// On Windows, we need to adjust the command
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		params["args"] = []interface{}{"/C", "echo", "hello", "world"}
 	}
 
@@ -292,7 +293,7 @@ func TestRunCommandAction_Execute_CaptureOutput(t *testing.T) {
 	}
 
 	var params map[string]interface{}
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		params = map[string]interface{}{
 			"command":        "echo test output",
 			"capture_output": true,
@@ -336,7 +337,7 @@ func TestRunCommandAction_Execute_FailOnError(t *testing.T) {
 
 	// Use a command that will fail
 	var params map[string]interface{}
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		params = map[string]interface{}{
 			"command":       "exit 1",
 			"fail_on_error": true,
@@ -370,7 +371,7 @@ func TestRunCommandAction_Execute_NoFailOnError(t *testing.T) {
 
 	// Use a command that will fail, but with fail_on_error=false
 	var params map[string]interface{}
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		params = map[string]interface{}{
 			"command":       "exit 1",
 			"fail_on_error": false,
@@ -406,7 +407,7 @@ func TestRunCommandAction_Execute_Interpolation(t *testing.T) {
 	}
 
 	var params map[string]interface{}
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		params = map[string]interface{}{
 			"command":        "echo {text} {version}",
 			"capture_output": true,
@@ -447,7 +448,7 @@ func TestRunCommandAction_Execute_Timeout(t *testing.T) {
 
 	// Command that takes longer than timeout
 	var params map[string]interface{}
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		params = map[string]interface{}{
 			"command":       "Start-Sleep -Seconds 10",
 			"timeout":       "1s",
@@ -549,7 +550,7 @@ func TestPrepareCommand_Auto(t *testing.T) {
 	// Test auto-detection
 	cmd, args := prepareCommand("echo test", []string{}, "auto")
 
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		if cmd != "cmd" {
 			t.Errorf("Auto-detect on Windows: cmd = %q, want 'cmd'", cmd)
 		}

@@ -1,25 +1,87 @@
 package tools
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"bytes"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
-func TestUpdateToolsCommand(t *testing.T) {
+// Helper struct for test setup
+type testToolInfo struct {
+	name    string
+	pkgPath string
+	version string
+}
+
+// setupUpdateTestEnv creates a test environment for update tests
+func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shouldCreateVersion bool) string {
+	tmpDir := t.TempDir()
+	os.Setenv("GOENV_ROOT", tmpDir)
+	os.Setenv("GOENV_DIR", tmpDir)
+	t.Cleanup(func() {
+		os.Unsetenv("GOENV_ROOT")
+		os.Unsetenv("GOENV_DIR")
+	})
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	t.Cleanup(func() { os.Chdir(oldDir) })
+
+	if version != "" {
+		os.Setenv("GOENV_VERSION", version)
+		t.Cleanup(func() { os.Unsetenv("GOENV_VERSION") })
+	}
+
+	if shouldCreateVersion && version != "" && version != "system" {
+		versionPath := filepath.Join(tmpDir, "versions", version)
+
+		goBinDir := filepath.Join(versionPath, "go", "bin")
+		if err := os.MkdirAll(goBinDir, 0755); err != nil {
+			t.Fatalf("Failed to create go bin directory: %v", err)
+		}
+
+		goBinary := filepath.Join(goBinDir, "go")
+		mockScript := "#!/bin/sh\nexit 0"
+		if utils.IsWindows() {
+			goBinary += ".bat"
+			mockScript = "@echo off\nexit 0"
+		}
+		if err := os.WriteFile(goBinary, []byte(mockScript), 0755); err != nil {
+			t.Fatalf("Failed to create go binary: %v", err)
+		}
+
+		gopathBin := filepath.Join(versionPath, "gopath", "bin")
+		if err := os.MkdirAll(gopathBin, 0755); err != nil {
+			t.Fatalf("Failed to create GOPATH/bin: %v", err)
+		}
+
+		for _, tool := range tools {
+			toolPath := filepath.Join(gopathBin, tool.name)
+			mockContent := "mock tool binary"
+			if utils.IsWindows() {
+				toolPath += ".bat"
+				mockContent = "@echo off\necho mock tool binary\n"
+			}
+
+			if err := os.WriteFile(toolPath, []byte(mockContent), 0755); err != nil {
+				t.Fatalf("Failed to create tool %s: %v", tool.name, err)
+			}
+		}
+	}
+
+	return tmpDir
+}
+
+func TestUpdateTools_VersionValidation(t *testing.T) {
 	tests := []struct {
-		name           string
-		setupVersion   string
-		setupTools     []testToolInfo
-		flags          map[string]string
-		expectedError  string
-		expectedOutput string
+		name          string
+		setupVersion  string
+		expectedError string
 	}{
 		{
 			name:          "system go version",
@@ -29,77 +91,193 @@ func TestUpdateToolsCommand(t *testing.T) {
 		{
 			name:          "go version not installed",
 			setupVersion:  "1.21.0",
-			expectedError: "Go version 1.21.0 is not installed",
+			expectedError: "go version 1.21.0 is not installed",
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupUpdateTestEnv(t, tt.setupVersion, nil, false)
+
+			updateToolsCmd.ResetFlags()
+			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "")
+			updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "")
+			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "")
+			updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "")
+
+			buf := new(bytes.Buffer)
+			updateToolsCmd.SetOut(buf)
+			updateToolsCmd.SetErr(buf)
+
+			err := runUpdateTools(updateToolsCmd, []string{})
+
+			if err == nil {
+				t.Errorf("Expected error containing %q, got nil", tt.expectedError)
+			} else if !strings.Contains(err.Error(), tt.expectedError) {
+				t.Errorf("Expected error containing %q, got %q", tt.expectedError, err.Error())
+			}
+
+			updateToolsFlags.check = false
+			updateToolsFlags.tool = ""
+			updateToolsFlags.dryRun = false
+			updateToolsFlags.version = "latest"
+		})
+	}
+}
+
+func TestUpdateTools_BasicOperation(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupTools     []testToolInfo
+		expectedOutput string
+	}{
 		{
 			name:           "no tools installed",
-			setupVersion:   "1.21.0",
+			setupTools:     nil,
 			expectedOutput: "No Go tools installed yet",
 		},
 		{
-			name:         "tools up to date",
-			setupVersion: "1.21.0",
+			name: "tools up to date",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v1.0.0"},
 			},
 			expectedOutput: "Found 1 tool(s)",
 		},
 		{
-			name:         "tool needs update - skipped without package path",
-			setupVersion: "1.21.0",
+			name: "tool needs update - skipped without package path",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
 			expectedOutput: "unknown package path, skipping",
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupUpdateTestEnv(t, "1.21.0", tt.setupTools, true)
+
+			updateToolsCmd.ResetFlags()
+			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "")
+			updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "")
+			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "")
+			updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "")
+
+			buf := new(bytes.Buffer)
+			updateToolsCmd.SetOut(buf)
+			updateToolsCmd.SetErr(buf)
+
+			err := runUpdateTools(updateToolsCmd, []string{})
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			output := buf.String()
+			if !strings.Contains(output, tt.expectedOutput) {
+				t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, output)
+			}
+
+			updateToolsFlags.check = false
+			updateToolsFlags.tool = ""
+			updateToolsFlags.dryRun = false
+			updateToolsFlags.version = "latest"
+		})
+	}
+}
+
+func TestUpdateTools_Modes(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupTools     []testToolInfo
+		checkMode      bool
+		dryRunMode     bool
+		expectedOutput string
+	}{
 		{
-			name:         "check mode",
-			setupVersion: "1.21.0",
+			name: "check mode",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
-			flags: map[string]string{
-				"check": "true",
-			},
+			checkMode:      true,
 			expectedOutput: "All tools are up to date",
 		},
 		{
-			name:         "dry-run mode",
-			setupVersion: "1.21.0",
+			name: "dry-run mode",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
-			flags: map[string]string{
-				"dry-run": "true",
-			},
+			dryRunMode:     true,
 			expectedOutput: "All tools are up to date",
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupUpdateTestEnv(t, "1.21.0", tt.setupTools, true)
+
+			updateToolsCmd.ResetFlags()
+			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "")
+			updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "")
+			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "")
+			updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "")
+
+			if tt.checkMode {
+				updateToolsCmd.Flags().Set("check", "true")
+			}
+			if tt.dryRunMode {
+				updateToolsCmd.Flags().Set("dry-run", "true")
+			}
+
+			buf := new(bytes.Buffer)
+			updateToolsCmd.SetOut(buf)
+			updateToolsCmd.SetErr(buf)
+
+			err := runUpdateTools(updateToolsCmd, []string{})
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			output := buf.String()
+			if !strings.Contains(output, tt.expectedOutput) {
+				t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, output)
+			}
+
+			updateToolsFlags.check = false
+			updateToolsFlags.tool = ""
+			updateToolsFlags.dryRun = false
+			updateToolsFlags.version = "latest"
+		})
+	}
+}
+
+func TestUpdateTools_ToolSelection(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupTools     []testToolInfo
+		toolFlag       string
+		expectedError  string
+		expectedOutput string
+	}{
 		{
-			name:         "update specific tool",
-			setupVersion: "1.21.0",
+			name: "update specific tool",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 				{name: "mockdelve", pkgPath: "github.com/go-delve/delve/cmd/dlv", version: "v1.0.0"},
 			},
-			flags: map[string]string{
-				"tool": "mockgopls",
-			},
+			toolFlag:       "mockgopls",
 			expectedOutput: "Found 1 tool(s)",
 		},
 		{
-			name:         "tool not found",
-			setupVersion: "1.21.0",
+			name: "tool not found",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
-			flags: map[string]string{
-				"tool": "nonexistent",
-			},
+			toolFlag:      "nonexistent",
 			expectedError: "tool 'nonexistent' not found",
 		},
 		{
-			name:         "tool without package path",
-			setupVersion: "1.21.0",
+			name: "tool without package path",
 			setupTools: []testToolInfo{
 				{name: "mocktool", pkgPath: "", version: "unknown"},
 			},
@@ -109,100 +287,24 @@ func TestUpdateToolsCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			os.Setenv("GOENV_ROOT", tmpDir)
-			defer os.Unsetenv("GOENV_ROOT")
+			setupUpdateTestEnv(t, "1.21.0", tt.setupTools, true)
 
-			// Set GOENV_DIR to tmpDir to prevent FindVersionFile from looking in parent directories
-			os.Setenv("GOENV_DIR", tmpDir)
-			defer os.Unsetenv("GOENV_DIR")
-
-			// Change to tmpDir to avoid picking up .go-version from test directory
-			oldDir, _ := os.Getwd()
-			os.Chdir(tmpDir)
-			defer os.Chdir(oldDir)
-
-			// Set GOENV_VERSION to control which version is active (only if not empty)
-			if tt.setupVersion != "" {
-				os.Setenv("GOENV_VERSION", tt.setupVersion)
-				defer os.Unsetenv("GOENV_VERSION")
-			}
-
-			// Setup version directory if specified (but not for "not installed" test case)
-			shouldCreateVersionDir := tt.setupVersion != "" && tt.setupVersion != "system" && tt.expectedError != "Go version 1.21.0 is not installed"
-			if shouldCreateVersionDir {
-				versionPath := filepath.Join(tmpDir, "versions", tt.setupVersion)
-
-				// Create go binary directory
-				goBinDir := filepath.Join(versionPath, "go", "bin")
-				if err := os.MkdirAll(goBinDir, 0755); err != nil {
-					t.Fatalf("Failed to create go bin directory: %v", err)
-				}
-
-				// Create mock go binary
-				goBinary := filepath.Join(goBinDir, "go")
-				// Mock go install that succeeds
-				mockScript := "#!/bin/sh\nexit 0"
-				if runtime.GOOS == "windows" {
-					goBinary += ".bat"
-					mockScript = "@echo off\nexit 0"
-				}
-				if err := os.WriteFile(goBinary, []byte(mockScript), 0755); err != nil {
-					t.Fatalf("Failed to create go binary: %v", err)
-				}
-
-				// Create GOPATH/bin directory
-				gopathBin := filepath.Join(versionPath, "gopath", "bin")
-				if err := os.MkdirAll(gopathBin, 0755); err != nil {
-					t.Fatalf("Failed to create GOPATH/bin: %v", err)
-				}
-
-				// Create tools
-				for _, tool := range tt.setupTools {
-					toolPath := filepath.Join(gopathBin, tool.name)
-					mockContent := "mock tool binary"
-					if runtime.GOOS == "windows" {
-						toolPath += ".bat"
-						mockContent = "@echo off\necho mock tool binary\n"
-					}
-
-					// Create mock binary with module info
-					if err := os.WriteFile(toolPath, []byte(mockContent), 0755); err != nil {
-						t.Fatalf("Failed to create tool %s: %v", tool.name, err)
-					}
-
-					// Note: Package path discovery requires `go version -m` which reads build info
-					// For testing, tooldetect.ListInstalledTools will return tools without package paths
-					// unless the binary was built with proper build info
-				}
-			} else if tt.setupVersion == "system" {
-				// GOENV_VERSION is already set to "system" above
-			}
-
-			// Create command
-			cmd := &cobra.Command{}
-			cmd.SetArgs([]string{})
-
-			// Reset and set flags
 			updateToolsCmd.ResetFlags()
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "")
 			updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "")
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "")
 			updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "")
 
-			for key, value := range tt.flags {
-				updateToolsCmd.Flags().Set(key, value)
+			if tt.toolFlag != "" {
+				updateToolsCmd.Flags().Set("tool", tt.toolFlag)
 			}
 
-			// Capture output
 			buf := new(bytes.Buffer)
 			updateToolsCmd.SetOut(buf)
 			updateToolsCmd.SetErr(buf)
 
-			// Execute
 			err := runUpdateTools(updateToolsCmd, []string{})
 
-			// Check error
 			if tt.expectedError != "" {
 				if err == nil {
 					t.Errorf("Expected error containing %q, got nil", tt.expectedError)
@@ -213,7 +315,6 @@ func TestUpdateToolsCommand(t *testing.T) {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
-			// Check output
 			if tt.expectedOutput != "" {
 				output := buf.String()
 				if !strings.Contains(output, tt.expectedOutput) {
@@ -221,7 +322,6 @@ func TestUpdateToolsCommand(t *testing.T) {
 				}
 			}
 
-			// Reset flags after each test
 			updateToolsFlags.check = false
 			updateToolsFlags.tool = ""
 			updateToolsFlags.dryRun = false
@@ -236,7 +336,6 @@ func TestUpdateToolsHelp(t *testing.T) {
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 
-	// Get help text
 	err := cmd.Help()
 	if err != nil {
 		t.Fatalf("Help command failed: %v", err)
@@ -244,7 +343,6 @@ func TestUpdateToolsHelp(t *testing.T) {
 
 	output := buf.String()
 
-	// Check for key help text elements
 	expectedStrings := []string{
 		"tools", "update",
 		"Updates all installed Go tools",
@@ -263,58 +361,40 @@ func TestUpdateToolsHelp(t *testing.T) {
 
 // TestUpdateToolsVersionFlag tests that the --version flag is properly used
 func TestUpdateToolsVersionFlag(t *testing.T) {
-	// This test verifies that the --version flag value is used when constructing
-	// the go install command, rather than always using @latest
-
-	// Create test environment
 	testRoot, cleanup := cmdtest.SetupTestEnv(t)
 	defer cleanup()
 
-	// Create a mock Go version
 	goVersion := "1.21.0"
 	cmdtest.CreateTestVersion(t, testRoot, goVersion)
 
-	// Set as current version
 	globalFile := filepath.Join(testRoot, "version")
 	if err := os.WriteFile(globalFile, []byte(goVersion), 0644); err != nil {
 		t.Fatalf("Failed to set global version: %v", err)
 	}
 
-	// Reset and set flags
 	updateToolsFlags.check = false
 	updateToolsFlags.tool = ""
-	updateToolsFlags.dryRun = true       // Use dry-run to avoid actual installation
-	updateToolsFlags.version = "v0.12.5" // Specific version
+	updateToolsFlags.dryRun = true
+	updateToolsFlags.version = "v0.12.5"
 
-	// Use the existing updateToolsCmd
 	cmd := updateToolsCmd
 	output := &strings.Builder{}
 	cmd.SetOut(output)
 	cmd.SetErr(output)
 
-	// Run the command
 	err := runUpdateTools(cmd, []string{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Verify the version flag was set and used correctly
 	if updateToolsFlags.version != "v0.12.5" {
 		t.Errorf("Expected version flag to be 'v0.12.5', got '%s'", updateToolsFlags.version)
 	}
 
 	t.Log("✓ Version flag properly stored and accessible")
 
-	// Reset flags after test
 	updateToolsFlags.check = false
 	updateToolsFlags.tool = ""
 	updateToolsFlags.dryRun = false
 	updateToolsFlags.version = "latest"
-}
-
-// Helper struct for test setup
-type testToolInfo struct {
-	name    string
-	pkgPath string
-	version string
 }

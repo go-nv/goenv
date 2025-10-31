@@ -1,12 +1,13 @@
 package legacy
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
@@ -29,14 +30,14 @@ func TestVersionsCommand(t *testing.T) {
 			args:           []string{},
 			setupVersions:  []string{"1.21.5", "1.22.2", "1.23.0"},
 			globalVersion:  "1.22.2",
-			expectedOutput: []string{"  1.21.5", "* 1.22.2 (set by global)", "  1.23.0"},
+			expectedOutput: []string{"  1.21.5", "* 1.22.2 (set by global)", "  1.23.0 (latest installed)"},
 		},
 		{
 			name:           "list with system version as current",
 			args:           []string{},
 			setupVersions:  []string{"1.21.5", "1.22.2"},
 			expectSystemGo: true,
-			expectedOutput: []string{"* system", "  1.21.5", "  1.22.2"},
+			expectedOutput: []string{"* system", "  1.21.5", "  1.22.2 (latest installed)"},
 		},
 		{
 			name:           "list with system explicitly set in global file",
@@ -44,7 +45,7 @@ func TestVersionsCommand(t *testing.T) {
 			setupVersions:  []string{"1.21.5", "1.22.2"},
 			globalVersion:  "system",
 			expectSystemGo: true,
-			expectedOutput: []string{"* system (set by global)", "  1.21.5", "  1.22.2"},
+			expectedOutput: []string{"* system (set by global)", "  1.21.5", "  1.22.2 (latest installed)"},
 		},
 		{
 			name:           "bare output without indicators",
@@ -59,7 +60,7 @@ func TestVersionsCommand(t *testing.T) {
 			setupVersions:  []string{"1.21.5", "1.22.2", "1.23.0"},
 			setupAliases:   map[string]string{"stable": "1.22.2", "dev": "1.23.0"},
 			globalVersion:  "1.22.2",
-			expectedOutput: []string{"  1.21.5", "* 1.22.2 (set by global)", "  1.23.0", "", "Aliases:", "  dev -> 1.23.0", "* stable -> 1.22.2"},
+			expectedOutput: []string{"  1.21.5", "* 1.22.2 (set by global)", "  1.23.0 (latest installed)", "", "Aliases:", "  dev -> 1.23.0", "* stable -> 1.22.2"},
 		},
 		{
 			name:           "skip aliases flag hides aliases",
@@ -67,7 +68,7 @@ func TestVersionsCommand(t *testing.T) {
 			setupVersions:  []string{"1.21.5", "1.22.2"},
 			setupAliases:   map[string]string{"stable": "1.22.2"},
 			globalVersion:  "1.21.5",
-			expectedOutput: []string{"* 1.21.5 (set by global)", "  1.22.2"},
+			expectedOutput: []string{"* 1.21.5 (set by global)", "  1.22.2 (latest installed)"},
 		},
 		{
 			name:           "bare mode hides aliases",
@@ -86,12 +87,12 @@ func TestVersionsCommand(t *testing.T) {
 		{
 			name:          "error with invalid arguments",
 			args:          []string{"invalid", "args"},
-			expectedError: "Usage:",
+			expectedError: "usage:",
 		},
 		{
 			name:           "completion support",
 			args:           []string{"--complete"},
-			expectedOutput: []string{"--bare", "--skip-aliases"},
+			expectedOutput: []string{"--bare", "--skip-aliases", "--used"},
 		},
 	}
 
@@ -126,7 +127,7 @@ func TestVersionsCommand(t *testing.T) {
 				os.MkdirAll(systemBinDir, 0755)
 				systemGo := filepath.Join(systemBinDir, "go")
 				var content string
-				if runtime.GOOS == "windows" {
+				if utils.IsWindows() {
 					systemGo += ".bat"
 					content = "@echo off\necho go version go1.20.1 windows/amd64\n"
 				} else {
@@ -317,12 +318,13 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 		t.Errorf("Line %d: expected '  1.21.5', got '%s'", 0+offset, gotLines[0+offset])
 	}
 
-	// Check line: current version with suffix
+	// Check line: current version with suffix (also the latest version)
 	expectedPrefix := "* 1.22.2 (set by "
-	expectedSuffix := ".go-version)"
+	expectedContains := ".go-version)"
+	expectedSuffix := "[latest]" // latest version tag
 	normalizedLine := filepath.ToSlash(gotLines[1+offset])
-	if !strings.HasPrefix(normalizedLine, expectedPrefix) || !strings.HasSuffix(normalizedLine, expectedSuffix) {
-		t.Errorf("Line %d: expected to match '* 1.22.2 (set by .../.go-version)', got '%s'", 1+offset, gotLines[1+offset])
+	if !strings.HasPrefix(normalizedLine, expectedPrefix) || !strings.Contains(normalizedLine, expectedContains) || !strings.HasSuffix(normalizedLine, expectedSuffix) {
+		t.Errorf("Line %d: expected to match '* 1.22.2 (set by .../.go-version) [latest]', got '%s'", 1+offset, gotLines[1+offset])
 	}
 }
 
@@ -389,7 +391,7 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 	os.MkdirAll(systemBinDir, 0755)
 	systemGo := filepath.Join(systemBinDir, "go")
 	var content string
-	if runtime.GOOS == "windows" {
+	if utils.IsWindows() {
 		systemGo += ".bat"
 		content = "@echo off\necho go version go1.20.1 windows/amd64\n"
 	} else {
@@ -444,4 +446,196 @@ func hasSystemGoInTest() bool {
 	cfg := config.Load()
 	mgr := manager.NewManager(cfg)
 	return mgr.HasSystemGo()
+}
+
+func TestVersionsUsedFlag(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Create temporary directory structure with test projects
+	tmpDir := t.TempDir()
+
+	// Project 1: .go-version
+	proj1 := filepath.Join(tmpDir, "proj1")
+	if err := os.MkdirAll(proj1, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Project 2: go.mod
+	proj2 := filepath.Join(tmpDir, "proj2")
+	if err := os.MkdirAll(proj2, 0755); err != nil {
+		t.Fatal(err)
+	}
+	gomodContent := "module test\n\ngo 1.22.3\n"
+	if err := os.WriteFile(filepath.Join(proj2, "go.mod"), []byte(gomodContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Setup test environment with installed versions
+	cfg := &config.Config{
+		Root: t.TempDir(),
+	}
+
+	// Create mock installed versions
+	versionsDir := filepath.Join(cfg.Root, "versions")
+	for _, ver := range []string{"1.21.5", "1.22.3", "1.23.2"} {
+		versionPath := filepath.Join(versionsDir, ver, "bin")
+		if err := os.MkdirAll(versionPath, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create mock go binary
+		goBinary := filepath.Join(versionPath, "go")
+		if utils.IsWindows() {
+			goBinary += ".exe"
+		}
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\necho go\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Set environment to use test root
+	oldRoot := os.Getenv("GOENV_ROOT")
+	defer os.Setenv("GOENV_ROOT", oldRoot)
+	os.Setenv("GOENV_ROOT", cfg.Root)
+
+	// Change to tmp directory for scanning
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	// Create a new command instance to avoid state issues
+	cmd := &cobra.Command{
+		Use:  "versions",
+		RunE: RunVersions,
+	}
+
+	// Add flags
+	cmd.Flags().BoolVar(&VersionsFlags.Used, "used", false, "Scan projects")
+	cmd.Flags().IntVar(&VersionsFlags.Depth, "depth", 3, "Scan depth")
+
+	// Set flags
+	cmd.Flags().Set("used", "true")
+
+	output := &strings.Builder{}
+	cmd.SetOut(output)
+	cmd.SetErr(output)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v\nOutput: %s", err, output.String())
+	}
+
+	result := output.String()
+
+	// Strip deprecation warning for easier testing
+	result = cmdtest.StripDeprecationWarning(result)
+
+	// Verify output contains expected elements
+	if !strings.Contains(result, "Scanning for Go projects") {
+		t.Errorf("Expected scanning message in output. Got:\n%s", result)
+	}
+
+	if !strings.Contains(result, "Installed versions:") {
+		t.Errorf("Expected 'Installed versions:' section. Got:\n%s", result)
+	}
+
+	if !strings.Contains(result, "Projects found:") {
+		t.Errorf("Expected 'Projects found:' section. Got:\n%s", result)
+	}
+
+	if !strings.Contains(result, "proj1") {
+		t.Errorf("Expected proj1 in output. Got:\n%s", result)
+	}
+
+	if !strings.Contains(result, "proj2") {
+		t.Errorf("Expected proj2 in output. Got:\n%s", result)
+	}
+
+	// Check for tips section
+	if !strings.Contains(result, "Tips:") {
+		t.Errorf("Expected tips section in output. Got:\n%s", result)
+	}
+}
+
+func TestVersionsUsedDepthFlag(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Create nested directory structure
+	tmpDir := t.TempDir()
+
+	// Project at depth 1
+	proj1 := filepath.Join(tmpDir, "proj1")
+	os.MkdirAll(proj1, 0755)
+	os.WriteFile(filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), 0644)
+
+	// Project at depth 3
+	proj2 := filepath.Join(tmpDir, "a", "b", "proj2")
+	os.MkdirAll(proj2, 0755)
+	os.WriteFile(filepath.Join(proj2, ".go-version"), []byte("1.22.3\n"), 0644)
+
+	// Setup mock environment
+	cfg := &config.Config{
+		Root: t.TempDir(),
+	}
+
+	versionsDir := filepath.Join(cfg.Root, "versions")
+	for _, ver := range []string{"1.21.5", "1.22.3"} {
+		versionPath := filepath.Join(versionsDir, ver, "bin")
+		os.MkdirAll(versionPath, 0755)
+		goBinary := filepath.Join(versionPath, "go")
+		if utils.IsWindows() {
+			goBinary += ".exe"
+		}
+		os.WriteFile(goBinary, []byte("#!/bin/sh\necho go\n"), 0755)
+	}
+
+	oldRoot := os.Getenv("GOENV_ROOT")
+	defer os.Setenv("GOENV_ROOT", oldRoot)
+	os.Setenv("GOENV_ROOT", cfg.Root)
+
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	// Test with depth 1 - should only find proj1
+	cmd := &cobra.Command{
+		Use:  "versions",
+		RunE: RunVersions,
+	}
+
+	// Add flags
+	cmd.Flags().BoolVar(&VersionsFlags.Used, "used", false, "Scan projects")
+	cmd.Flags().IntVar(&VersionsFlags.Depth, "depth", 3, "Scan depth")
+
+	cmd.Flags().Set("used", "true")
+	cmd.Flags().Set("depth", "1")
+
+	output := &strings.Builder{}
+	cmd.SetOut(output)
+	cmd.SetErr(output)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v\nOutput: %s", err, output.String())
+	}
+
+	result := cmdtest.StripDeprecationWarning(output.String())
+
+	// Should find proj1
+	if !strings.Contains(result, "proj1") {
+		t.Errorf("Expected to find proj1 at depth 1. Got:\n%s", result)
+	}
+
+	// Should NOT find proj2 (it's at depth 3)
+	if strings.Contains(result, "proj2") {
+		t.Errorf("Should not find proj2 at depth 3 with --depth 1. Got:\n%s", result)
+	}
 }

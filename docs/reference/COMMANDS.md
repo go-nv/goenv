@@ -66,6 +66,7 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
     - [Machine-Readable Output](#machine-readable-output)
   - [🚀 Modern Unified Commands (Recommended)](#-modern-unified-commands-recommended)
   - [📋 All Subcommands](#-all-subcommands)
+  - [`goenv get-started`](#goenv-get-started)
   - [`goenv alias`](#goenv-alias)
   - [`goenv cache`](#goenv-cache)
     - [`goenv cache status`](#goenv-cache-status)
@@ -74,6 +75,7 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
     - [`goenv cache info`](#goenv-cache-info)
   - [`goenv ci-setup`](#goenv-ci-setup)
   - [`goenv commands`](#goenv-commands)
+  - [`goenv explore`](#goenv-explore)
   - [`goenv completions`](#goenv-completions)
   - [`goenv tools`](#goenv-tools)
   - [`goenv tools default`](#goenv-tools-default)
@@ -87,13 +89,17 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
     - [JSON Output (Recommended for CI/CD)](#json-output-recommended-for-cicd)
     - [CI/CD Integration Examples](#cicd-integration-examples)
     - [Advanced: Parse Specific Checks](#advanced-parse-specific-checks)
+  - [`goenv status`](#goenv-status)
   - [`goenv use`](#goenv-use)
   - [`goenv current`](#goenv-current)
   - [`goenv list`](#goenv-list)
+  - [`goenv info`](#goenv-info)
+  - [`goenv compare`](#goenv-compare)
   - [`goenv exec`](#goenv-exec)
   - [`goenv global`](#goenv-global)
   - [`goenv help`](#goenv-help)
   - [`goenv init`](#goenv-init)
+  - [`goenv setup`](#goenv-setup)
   - [`goenv install`](#goenv-install)
     - [Options](#options)
     - [Using a Custom Mirror](#using-a-custom-mirror)
@@ -159,6 +165,151 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
       - [For CI/CD](#for-cicd)
     - [Troubleshooting](#troubleshooting-1)
   - [🔄 Legacy Commands (Backward Compatibility)](#-legacy-commands-backward-compatibility)
+
+## `goenv get-started`
+
+Interactive beginner's guide that shows step-by-step instructions for setting up and using goenv. Perfect for first-time users or when you need a quick refresher on the basics.
+
+**Usage:**
+
+```shell
+# Show getting started guide
+> goenv get-started
+👋 Welcome to goenv!
+
+Step 1: Initialize goenv in your shell
+To get started, add goenv to your shell by running:
+
+  echo 'eval "$(goenv init -)"' >> ~/.zshrc
+  source ~/.zshrc
+
+Or for just this session:
+  eval "$(goenv init -)"
+
+Step 2: Install a Go version
+Install your first Go version:
+
+  goenv install        → Install latest stable Go
+  goenv install 1.21.5 → Install specific version
+  goenv install -l     → List all available versions
+
+Step 3: Set your default version
+After installing:
+
+  goenv global <version>
+
+Helpful Commands:
+  goenv doctor    Check your goenv installation
+  goenv status    Show your current configuration
+  goenv --help    List all commands
+  goenv install -l List installable versions
+```
+
+**Adaptive Content:**
+
+The guide adapts based on your setup status:
+
+1. **Shell not initialized**: Shows shell-specific initialization steps
+2. **No versions installed**: Shows how to install Go versions
+3. **Already set up**: Confirms setup and shows helpful commands
+
+**Shell-Specific Instructions:**
+
+The command detects your shell and provides tailored setup instructions:
+
+- **bash**: Uses `~/.bashrc`
+- **zsh**: Uses `~/.zshrc`
+- **fish**: Uses `~/.config/fish/config.fish` with fish syntax
+- **Other**: Shows generic `eval` command
+
+**What It Covers:**
+
+1. **Shell Initialization**
+   - How to add goenv to your shell
+   - Shell-specific configuration files
+   - Temporary vs permanent setup
+
+2. **Installing Go Versions**
+   - How to install latest version
+   - How to install specific versions
+   - How to list available versions
+
+3. **Setting Default Version**
+   - Using `goenv global` to set default
+   - Understanding version selection
+
+4. **Helpful Commands**
+   - Quick reference to common commands
+   - Links to detailed documentation
+
+**Examples:**
+
+```shell
+# First time setup - shell not initialized
+> goenv get-started
+👋 Welcome to goenv!
+
+Step 1: Initialize goenv in your shell
+To get started, add goenv to your shell by running:
+
+  echo 'eval "$(goenv init -)"' >> ~/.zshrc
+  source ~/.zshrc
+
+# After shell initialization
+> goenv get-started
+👋 Welcome to goenv!
+
+✓ goenv is initialized in your shell
+
+Step 2: Install a Go version
+Install your first Go version:
+
+  goenv install        → Install latest stable Go
+  goenv install 1.21.5 → Install specific version
+
+# Fully set up
+> goenv get-started
+👋 Welcome to goenv!
+
+✓ goenv is initialized in your shell
+
+✓ You have Go versions installed
+
+Helpful Commands:
+  goenv doctor    Check your goenv installation
+  goenv status    Show your current configuration
+  goenv --help    List all commands
+```
+
+**When to Use:**
+
+- **First installation**: Guide for initial setup
+- **Quick refresher**: Reminder of basic commands
+- **Teaching others**: Show to new team members
+- **Troubleshooting**: Verify setup steps
+- **Documentation**: Quick reference
+
+**Comparison with Related Commands:**
+
+- **`goenv get-started`**: Step-by-step guide, educational, shows what to do next
+- **`goenv setup`**: Automated configuration, modifies files, does the work for you
+- **`goenv doctor`**: Diagnostic tool, checks for problems, provides detailed analysis
+- **`goenv status`**: Quick snapshot, shows current state, minimal output
+
+**Aliases:**
+
+The command has several aliases for convenience:
+- `goenv getting-started`
+- `goenv quickstart`
+- `goenv first-run`
+
+**Related Commands:**
+
+- [`goenv setup`](#goenv-setup) - Automatic configuration wizard
+- [`goenv doctor`](#goenv-doctor) - Diagnose installation issues
+- [`goenv status`](#goenv-status) - Quick health check
+- [`goenv explore`](#goenv-explore) - Discover commands by category
+- [`goenv init`](#goenv-init) - Manual shell initialization
 
 ## `goenv alias`
 
@@ -331,10 +482,28 @@ goenv cache clean all --force
 
 **Non-Interactive Environments:**
 
-When running in CI/CD, scripts, or non-interactive shells, use `--force` to bypass the confirmation prompt:
+When running in CI/CD, scripts, or non-interactive shells, you have two options:
+
+**Option 1: Use `GOENV_ASSUME_YES` environment variable (Recommended for CI/CD)**
 
 ```bash
-# CI/CD pipeline
+# CI/CD pipeline (recommended)
+export GOENV_ASSUME_YES=1
+goenv cache clean all
+
+# Or inline
+GOENV_ASSUME_YES=1 goenv cache clean build --older-than 30d
+
+# GitHub Actions / GitLab CI
+env:
+  GOENV_ASSUME_YES: 1
+run: goenv cache clean all
+```
+
+**Option 2: Use `--force` flag**
+
+```bash
+# Quick one-off commands
 goenv cache clean all --force
 
 # Automated cleanup script
@@ -344,11 +513,23 @@ goenv cache clean build --older-than 30d --force
 RUN goenv cache clean all --force
 ```
 
-Without `--force`, the command will fail in non-interactive mode with:
+**Why `GOENV_ASSUME_YES` is better for CI/CD:**
+- More explicit about intent (auto-confirming vs forcing)
+- Works globally for all goenv prompts
+- Self-documenting in CI/CD config files
+- Follows industry standards (like `DEBIAN_FRONTEND=noninteractive`)
+
+Without either option, you'll see helpful error messages with suggestions:
 
 ```
-Error: cannot prompt for confirmation in non-interactive mode
-Use --force to skip confirmation
+⚠️  Running in non-interactive mode (no TTY detected)
+
+This command requires confirmation. Options:
+  1. Add --force flag: goenv cache clean all --force
+  2. Use dry-run first: goenv cache clean all --dry-run
+  3. Set env var: GOENV_ASSUME_YES=1 goenv cache clean
+
+For CI/CD, we recommend: GOENV_ASSUME_YES=1
 ```
 
 **Examples:**
@@ -610,7 +791,7 @@ Configures goenv for optimal CI/CD usage with two-phase caching optimization.
   run: goenv use --auto
 ```
 
-See the [CI/CD Integration Guide](../CI_CD_GUIDE.md) for detailed examples and best practices.
+See the [CI/CD Integration Guide](../advanced/CI_CD_GUIDE.md) for detailed examples and best practices.
 
 ## `goenv commands`
 
@@ -629,6 +810,152 @@ Lists all available goenv commands.
 > goenv commands --no-sh
 ```
 
+## `goenv explore`
+
+Interactive command discovery tool that helps you find the right command by browsing commands organized by category and intent. Perfect when you know what you want to do but don't know which command to use.
+
+**Usage:**
+
+```shell
+# Interactive mode - browse all categories
+> goenv explore
+🧭 Explore goenv Commands
+
+Command Categories:
+
+  🚀 getting-started      → Setup and first-time use (3 commands)
+  📦 versions             → Install, switch, and manage Go versions (10 commands)
+  🔧 tools                → Manage Go tools and binaries (3 commands)
+  🐚 shell                → Configure your shell environment (2 commands)
+  🔍 diagnostics          → Troubleshoot and verify installation (2 commands)
+  🔌 integrations         → IDE and CI/CD setup (2 commands)
+  ⚡ advanced             → Power user commands (3 commands)
+
+Usage:
+  goenv explore                  → Browse all commands
+  goenv explore <category>       → Show commands in category
+  goenv <command> --help         → Get detailed help
+
+Quick Examples:
+  goenv explore versions         → List version management commands
+  goenv explore diagnostics      → Show diagnostic commands
+
+# Show commands in a specific category
+> goenv explore versions
+📖 Version Management
+
+  ● install
+    Download and install a Go version
+    Example: goenv install 1.21.5
+
+  ● uninstall
+    Remove an installed Go version
+    Example: goenv uninstall 1.20.0
+
+  ● list
+    Show all installed Go versions
+    Example: goenv list
+
+  ● info
+    Show detailed information about a version
+    Example: goenv info 1.21.5
+
+  ● compare
+    Compare two Go versions side-by-side
+    Example: goenv compare 1.20.5 1.21.5
+
+Tip: Use 'goenv <command> --help' for detailed information
+
+# Browse getting started commands
+> goenv explore getting-started
+📖 Getting Started
+
+  ● get-started
+    Interactive setup guide for new users
+    Example: goenv get-started
+
+  ● setup
+    Automatic shell and IDE configuration
+    Example: goenv setup
+
+  ● doctor
+    Check installation and diagnose issues
+    Example: goenv doctor
+```
+
+**Available Categories:**
+
+1. **getting-started** - Setup and first-time use
+   - `get-started` - Interactive beginner's guide
+   - `setup` - Automatic configuration wizard
+   - `doctor` - Installation diagnostics
+
+2. **versions** - Install, switch, and manage Go versions
+   - `install` - Download and install versions
+   - `uninstall` - Remove installed versions
+   - `list` - Show installed versions
+   - `global` - Set default version
+   - `local` - Set project-specific version
+   - `shell` - Set session-specific version
+   - `version` - Show current version
+   - `info` - Detailed version information
+   - `compare` - Compare two versions
+
+3. **tools** - Manage Go tools and binaries
+   - `tools install` - Install tools
+   - `tools list` - List installed tools
+   - `tools update` - Update tools
+
+4. **shell** - Configure your shell environment
+   - `init` - Initialize shell integration
+   - `rehash` - Rebuild shims
+
+5. **diagnostics** - Troubleshoot and verify installation
+   - `doctor` - Comprehensive diagnostics
+   - `status` - Quick health check
+
+6. **integrations** - IDE and CI/CD setup
+   - `vscode init` - Configure VS Code
+   - `ci-setup` - Set up for CI/CD
+
+7. **advanced** - Power user commands
+   - `which` - Show path to executable
+   - `whence` - List versions with executable
+   - `exec` - Execute with specific version
+
+**When to Use:**
+
+- **Don't know the command name**: Browse by what you want to do
+- **Learning goenv**: Discover available features
+- **Quick reference**: See command examples
+- **Category overview**: See all commands in a domain
+
+**Examples:**
+
+```shell
+# Find commands for managing versions
+> goenv explore versions
+
+# Find diagnostic commands
+> goenv explore diagnostics
+
+# Browse all categories
+> goenv explore
+
+# See getting started commands
+> goenv explore getting-started
+
+# Find tool management commands
+> goenv explore tools
+```
+
+**Related Commands:**
+
+- [`goenv commands`](#goenv-commands) - List all command names
+- [`goenv help`](#goenv-help) - Get help for specific command
+- [`goenv get-started`](#goenv-get-started) - Step-by-step guide for beginners
+- [`goenv --help`](#goenv---version) - General help
+
 ## `goenv completions`
 
 Provides auto-completion for itself and other commands by calling them with `--complete`.
@@ -639,9 +966,12 @@ Manage Go tools on a per-version basis. Ensures tools are properly isolated per 
 
 **Subcommands:**
 
-- `goenv tools install` - Install a tool for the current Go version
-- `goenv tools list` - List installed tools for the current version
+- `goenv tools install` - Install a tool for the current or all Go versions
+- `goenv tools uninstall` - Uninstall a tool from the current or all Go versions
+- `goenv tools list` - List installed tools for the current or all versions
 - `goenv tools update` - Update installed tools to latest versions
+- `goenv tools outdated` - Show which tools need updating across all versions
+- `goenv tools status` - View tool consistency across all Go versions
 - `goenv tools sync` - Copy tools from one version to another
 - `goenv tools default` - Manage automatic tool installation
 
@@ -651,11 +981,32 @@ Manage Go tools on a per-version basis. Ensures tools are properly isolated per 
 # Install a tool for current Go version
 goenv tools install golang.org/x/tools/cmd/goimports@latest
 
-# List tools
+# Install across ALL Go versions at once
+goenv tools install gopls@latest --all
+
+# Uninstall from current version
+goenv tools uninstall gopls
+
+# Uninstall from all versions
+goenv tools uninstall gopls --all
+
+# List tools for current version
 goenv tools list
 
-# Update all tools
+# List tools across all versions
+goenv tools list --all
+
+# Check which tools need updating
+goenv tools outdated
+
+# View tool consistency across versions
+goenv tools status
+
+# Update all tools in current version
 goenv tools update
+
+# Update tools across all versions
+goenv tools update --all
 
 # Sync tools from one version to another
 goenv tools sync 1.23.2 1.24.4
@@ -705,26 +1056,229 @@ tools:
   - github.com/go-delve/delve/cmd/dlv@latest
 ```
 
-## `goenv tools list`
+## `goenv tools install`
 
-List all Go tools installed for the currently active Go version. Tools are isolated per version in `$HOME/go/{version}/bin/`.
+Install Go tools for the current or all Go versions with proper version isolation.
 
 **Usage:**
 
 ```shell
-# List tools for current version (human-readable)
-> goenv tools list
-golang.org/x/tools/cmd/goimports
-golang.org/x/tools/gopls
-github.com/golangci/golangci-lint/cmd/golangci-lint
+# Install for current Go version
+goenv tools install golang.org/x/tools/gopls@latest
 
-# JSON output for automation
-> goenv tools list --json
+# Install across ALL Go versions at once
+goenv tools install gopls@latest --all
+
+# Install multiple tools at once
+goenv tools install gopls@latest staticcheck@latest golangci-lint@latest
+
+# Preview what would be installed without installing
+goenv tools install gopls@latest --all --dry-run
+
+# Verbose output
+goenv tools install gopls@latest --verbose
 ```
 
 **Options:**
 
+- `--all` - Install across all installed Go versions
+- `--dry-run` - Show what would be installed without installing
+- `--verbose`, `-v` - Show detailed output
+
+**Common Tools:**
+
+```shell
+# Go language server
+goenv tools install golang.org/x/tools/gopls@latest --all
+
+# Import formatting
+goenv tools install golang.org/x/tools/cmd/goimports@latest --all
+
+# Linting
+goenv tools install github.com/golangci/golangci-lint/cmd/golangci-lint@latest --all
+
+# Static analysis
+goenv tools install honnef.co/go/tools/cmd/staticcheck@latest --all
+
+# Debugger
+goenv tools install github.com/go-delve/delve/cmd/dlv@latest --all
+
+# Stricter gofmt
+goenv tools install mvdan.cc/gofumpt@latest --all
+```
+
+**Example Output:**
+
+```shell
+$ goenv tools install gopls@latest --all
+
+📦 Installation Plan
+
+Tools to install: gopls
+Target versions:  1.21.0, 1.22.0, 1.23.0
+Total operations: 3
+
+🔧 Installing Tools
+
+Go 1.21.0:
+  ✓ Installed gopls
+
+Go 1.22.0:
+  ✓ Installed gopls
+
+Go 1.23.0:
+  ✓ Installed gopls
+
+✅ Successfully installed 1 tool(s) across 3 version(s)
+```
+
+## `goenv tools uninstall`
+
+Uninstall Go tools from the current or all Go versions with proper cleanup.
+
+**Usage:**
+
+```shell
+# Uninstall from current Go version
+goenv tools uninstall gopls
+
+# Uninstall from ALL Go versions at once
+goenv tools uninstall gopls --all
+
+# Uninstall from global GOPATH
+goenv tools uninstall gopls --global
+
+# Uninstall multiple tools at once
+goenv tools uninstall gopls staticcheck golangci-lint
+
+# Preview what would be removed without removing
+goenv tools uninstall gopls --all --dry-run
+
+# Force removal without confirmation
+goenv tools uninstall gopls --force
+
+# Verbose output showing all files
+goenv tools uninstall gopls --verbose
+```
+
+**Options:**
+
+- `--all` - Uninstall from all installed Go versions
+- `--global` - Uninstall from global GOPATH/bin
+- `--force` - Skip confirmation prompts
+- `--dry-run` - Show what would be removed without actually removing
+- `--verbose`, `-v` - Show detailed output
+
+**Example Output:**
+
+```shell
+$ goenv tools uninstall gopls --all
+
+🗑️  Uninstall Plan
+
+Go 1.21.0: /Users/you/.goenv/versions/1.21.0/gopath/bin
+  ✗ gopls
+    (1 file(s))
+
+Go 1.22.0: /Users/you/.goenv/versions/1.22.0/gopath/bin
+  ✗ gopls
+    (1 file(s))
+
+Go 1.23.0: /Users/you/.goenv/versions/1.23.0/gopath/bin
+  ✗ gopls
+    (1 file(s))
+
+Total: 3 tool(s), 3 file(s)
+
+Remove 3 tool(s)? (y/N): y
+
+🗑️  Uninstalling Tools
+
+✓ Uninstalled gopls (Go 1.21.0)
+✓ Uninstalled gopls (Go 1.22.0)
+✓ Uninstalled gopls (Go 1.23.0)
+
+✅ Successfully uninstalled 3 tool(s)
+```
+
+**With --verbose flag:**
+
+```shell
+$ goenv tools uninstall gopls --all --verbose
+
+🗑️  Uninstall Plan
+
+Go 1.21.0: /Users/you/.goenv/versions/1.21.0/gopath/bin
+  ✗ gopls
+    → gopls
+    → gopls.exe
+
+Total: 1 tool(s), 2 file(s)
+```
+
+**Use Cases:**
+
+- **Clean up old tools**: Remove tools you no longer need
+- **Free up space**: Uninstall large tools like golangci-lint across all versions
+- **Version migration**: Remove tools before syncing from a different version
+- **Global cleanup**: Use `--global` to clean system GOPATH
+
+## `goenv tools list`
+
+List all Go tools installed for the currently active Go version or across all versions. Tools are isolated per version in `$HOME/.goenv/versions/{version}/gopath/bin/`.
+
+**Usage:**
+
+```shell
+# List tools for current version
+goenv tools list
+
+# List tools across ALL versions
+goenv tools list --all
+
+# JSON output for automation
+goenv tools list --json
+goenv tools list --all --json
+```
+
+**Options:**
+
+- `--all` - List tools across all installed Go versions
 - `--json` - Output in JSON format for CI/automation (machine-readable)
+
+**Example Output:**
+
+```shell
+$ goenv tools list
+
+🔧 Tools for Go 1.23.0
+
+  • gopls
+  • staticcheck
+  • gofmt
+
+Total: 3 tool(s)
+```
+
+```shell
+$ goenv tools list --all
+
+🔧 Tools Across All Versions
+
+Go 1.21.0: (2 tool(s))
+  • gopls
+  • staticcheck
+
+Go 1.22.0: (1 tool(s))
+  • gopls
+
+Go 1.23.0: (3 tool(s))
+  • gopls
+  • staticcheck
+  • gofmt
+
+Total: 3 tool(s) across 3 version(s)
+```
 
 **Output Format:**
 
@@ -782,6 +1336,121 @@ done
     goenv tools list --json | jq -e '.tools[] | select(.binary=="golangci-lint")'
 ```
 
+## `goenv tools outdated`
+
+Show which tools are outdated across all installed Go versions. Checks all tools in all Go versions and reports which ones have newer versions available.
+
+**Usage:**
+
+```shell
+# Show all outdated tools
+goenv tools outdated
+
+# JSON output for automation
+goenv tools outdated --json
+```
+
+**Options:**
+
+- `--json` - Output in JSON format for CI/automation
+
+**Example Output:**
+
+```shell
+$ goenv tools outdated
+
+📊 Outdated Tools
+
+Go 1.21.0: (2 outdated)
+  ⬆️  gopls v0.12.0 → v0.13.2 available
+  ⬆️  staticcheck v0.4.0 → v0.4.6 available
+
+Go 1.23.0: (1 outdated)
+  ⬆️  gopls v0.12.0 → v0.13.2 available
+
+Total: 3 outdated tool(s) across 2 version(s)
+
+💡 To update:
+  goenv tools update                  # Update current version
+  goenv tools update --all            # Update all versions
+```
+
+**When all tools are up to date:**
+
+```shell
+$ goenv tools outdated
+
+✅ All tools are up to date!
+```
+
+**Use Cases:**
+
+- Regular maintenance: Check which tools need updating before updates
+- CI/CD: Detect drift in tool versions across Go versions
+- Auditing: Ensure all versions have current security patches
+
+## `goenv tools status`
+
+Show tool installation consistency across all Go versions. Displays which tools are installed in which versions, helping maintain consistency.
+
+**Usage:**
+
+```shell
+# Show tool installation status
+goenv tools status
+
+# JSON output for automation
+goenv tools status --json
+```
+
+**Options:**
+
+- `--json` - Output in JSON format for CI/automation
+
+**Example Output:**
+
+```shell
+$ goenv tools status
+
+📊 Tool Installation Status
+
+Go versions: 3 installed
+
+✅ Consistent Tools (3/3 versions)
+  • gopls
+
+⚠️  Partially Installed Tools
+  • staticcheck → 2/3 versions (67%)
+    Missing in: [1.22.0]
+
+ℹ️  Version-Specific Tools
+  • golangci-lint → only in 1.23.0
+  • gofmt → only in 1.21.0
+
+📝 Summary:
+  Total tools: 4
+  Consistent:  1
+  Partial:     1
+  Specific:    2
+
+💡 Recommendations:
+  • Use 'goenv tools install <tool> --all' to install across all versions
+  • Use 'goenv tools sync <from> <to>' to copy tools between versions
+```
+
+**Tool Categories:**
+
+- **Consistent Tools**: Installed in all Go versions (100% consistency)
+- **Partially Installed**: Installed in some but not all versions
+- **Version-Specific**: Installed in only one version
+
+**Use Cases:**
+
+- **Onboarding**: Quickly see what tools are available and where
+- **Maintenance**: Identify inconsistencies across Go versions
+- **Migration**: Plan tool installation when adding new Go versions
+- **CI/CD**: Verify development environment consistency
+
 **Per-Version Isolation:**
 
 Tools are isolated per Go version to prevent conflicts:
@@ -810,13 +1479,16 @@ See [GOPATH Integration](../advanced/GOPATH_INTEGRATION.md) for complete details
 
 ## `goenv doctor`
 
-**First-class CI/CD feature** for validating goenv installation and configuration.
+**First-class CI/CD feature** for validating goenv installation and configuration, with **interactive fix mode** for automated repairs.
 
 ### Quick Usage
 
 ```shell
 # Human-readable output (default)
 goenv doctor
+
+# Interactive fix mode (automatically repair issues)
+goenv doctor --fix
 
 # CI/CD with JSON output (recommended)
 goenv doctor --json --fail-on=error
@@ -837,8 +1509,27 @@ The `doctor` command uses distinct exit codes for precise pipeline control:
 
 ### Flags
 
+- `--fix` - **Interactive repair mode** - automatically fix detected issues (new in v3.0)
 - `--json` - Output results in JSON format for CI/automation (machine-readable)
 - `--fail-on <level>` - Exit with non-zero status on `error` (default) or `warning`
+
+### Interactive Fix Mode
+
+The `--fix` flag enables automated repair of common issues:
+
+```shell
+goenv doctor --fix
+```
+
+**Supported fixes:**
+- Add missing shell initialization
+- Fix PATH configuration
+- Remove duplicate goenv installations
+- Fix profile sourcing issues
+- Clean stale cache
+- Repair shims directory
+
+Each fix is presented interactively with a prompt to confirm before applying. Safe to run multiple times.
 
 ### Example Output
 
@@ -1000,6 +1691,130 @@ goenv doctor --json | jq '.summary.warnings'
 # Check specific subsystem
 goenv doctor --json | jq '.checks[] | select(.id | startswith("cache-"))'
 ```
+
+## `goenv status`
+
+Quick installation health check showing goenv initialization status, current version, and installed versions count. Similar to `git status` - provides a snapshot of your goenv environment at a glance.
+
+**Usage:**
+
+```shell
+# Show current goenv status
+> goenv status
+📊 goenv Status
+
+✓ goenv is initialized
+  Shell: zsh
+  Root: /Users/user/.goenv
+
+Current version: 1.23.2 ✓
+  Set by: ~/.goenv/version
+
+Installed versions: 5
+→ 1.23.2
+  1.22.3
+  1.21.8
+  1.20.12
+  1.19.13
+
+Shims: 12 available
+
+Auto-rehash: ✓ enabled
+Auto-install: disabled
+
+Run 'goenv doctor' for detailed diagnostics
+```
+
+**What it Shows:**
+
+1. **Initialization Status**
+   - Whether goenv is properly initialized in your shell
+   - Current shell type (bash, zsh, fish, etc.)
+   - goenv root directory
+
+2. **Current Version**
+   - Active Go version
+   - Whether it's installed (✓) or missing (✗)
+   - Source file that set the version
+
+3. **Installed Versions**
+   - Count of installed Go versions
+   - List of up to 5 most recent versions
+   - Arrow (→) indicates current version
+
+4. **Shims Status**
+   - Number of available shims
+   - Reminder to run `goenv rehash` if needed
+
+5. **Configuration**
+   - Auto-rehash setting
+   - Auto-install setting
+
+**Examples:**
+
+```shell
+# Quick health check
+> goenv status
+📊 goenv Status
+
+✓ goenv is initialized
+  Shell: zsh
+
+Current version: 1.23.2 ✓
+  Set by: ~/.goenv/version
+
+Installed versions: 3
+→ 1.23.2
+  1.22.3
+  1.21.8
+
+# Check initialization in new shell
+> goenv status
+📊 goenv Status
+
+✗ goenv is not initialized in this shell
+  Run: eval "$(goenv init -)"
+
+# When no versions are installed
+> goenv status
+📊 goenv Status
+
+✓ goenv is initialized
+  Shell: bash
+
+Current version: none (not set)
+  Set with: goenv global <version>
+
+Installed versions: 0
+  Install with: goenv install
+
+# Use in scripts to check if initialized
+if goenv status | grep -q "initialized"; then
+  echo "goenv is ready"
+fi
+```
+
+**When to Use:**
+
+- **First time setup**: Verify goenv is properly configured
+- **Troubleshooting**: Quick check before diving into `goenv doctor`
+- **New shell sessions**: Confirm initialization is working
+- **CI/CD**: Verify goenv setup in pipelines
+- **Daily use**: Quick overview of your environment
+
+**Comparison with Related Commands:**
+
+- **`goenv status`**: Quick overview, minimal output, fast
+- **`goenv doctor`**: Comprehensive diagnostics, detailed checks, slower
+- **`goenv current`**: Shows only the active version
+- **`goenv list`**: Shows only installed versions
+
+**Related Commands:**
+
+- [`goenv doctor`](#goenv-doctor) - Comprehensive diagnostics and health checks
+- [`goenv current`](#goenv-current) - Show active Go version
+- [`goenv list`](#goenv-list) - List installed versions
+- [`goenv init`](#goenv-init) - Initialize goenv in shell
 
 ## `goenv use`
 
@@ -1249,9 +2064,190 @@ done
 
 **Backward compatibility**: The legacy `goenv versions` and `goenv installed` commands still work but are hidden from help output.
 
-- Common configuration problems
+## `goenv info`
 
-Use this command to troubleshoot issues with goenv.
+Show detailed information about a specific Go version, including installation status, release dates, support status, and upgrade recommendations.
+
+**Usage:**
+
+```shell
+# Show info for a specific version
+> goenv info 1.21.5
+ℹ️   Go 1.21.5
+
+  ✅ Status:       Installed
+  📁 Install path: /Users/user/.goenv/versions/1.21.5
+  💾 Size on disk: 487.3 MB
+
+  📅 Released:     2023-12-05
+  🟡 Support:      Near EOL (ends 2024-08-06)
+                   Security updates only
+
+  📖 Release notes: https://go.dev/doc/go1.21
+  📦 Downloads:     https://go.dev/dl/
+
+# Show info for current version
+> goenv info $(goenv current --bare)
+
+# Check if a version is EOL before installing
+> goenv info 1.20.0
+```
+
+**Options:**
+
+- `--json` - Output in JSON format for automation
+
+**JSON Output:**
+
+```json
+{
+  "version": "1.21.5",
+  "installed": true,
+  "install_path": "/Users/user/.goenv/versions/1.21.5",
+  "size_bytes": 510918656,
+  "size_human": "487.3 MB",
+  "release_date": "2023-12-05",
+  "eol_date": "2024-08-06",
+  "status": "near_eol",
+  "recommended": "1.22.0",
+  "release_url": "https://go.dev/doc/go1.21",
+  "download_url": "https://go.dev/dl/"
+}
+```
+
+**Support Status Indicators:**
+
+- **🟢 Current**: Fully supported with feature updates and bug fixes
+- **🟡 Near EOL**: Approaching end of life, security updates only
+- **🔴 EOL**: End of life, no longer receiving updates
+- **❓ Unknown**: Version information not available (possibly newer)
+
+**Examples:**
+
+```shell
+# Quick version check
+> goenv info 1.23.2
+ℹ️   Go 1.23.2
+
+  ✅ Status:       Installed
+  📁 Install path: /Users/user/.goenv/versions/1.23.2
+  💾 Size on disk: 512.1 MB
+
+  📅 Released:     2024-03-05
+  🟢 Support:      Current (fully supported)
+
+# Check before installing
+> goenv info 1.25.0
+ℹ️   Go 1.25.0
+
+  ❌ Status:       Not installed
+  💡 Install with: goenv install 1.25.0
+
+  📅 Released:     2025-02-06
+  🟢 Support:      Current (fully supported)
+
+# Use in scripts to check EOL status
+if goenv info 1.20.0 --json | jq -e '.status == "eol"' > /dev/null; then
+  echo "Version is EOL, upgrade recommended"
+fi
+```
+
+**Related Commands:**
+
+- [`goenv compare`](#goenv-compare) - Compare two versions side-by-side
+- [`goenv list`](#goenv-list) - List installed or available versions
+- [`goenv install`](#goenv-install) - Install a Go version
+
+## `goenv compare`
+
+Compare two Go versions side-by-side to help decide which version to use or whether to upgrade.
+
+**Usage:**
+
+```shell
+# Compare two versions
+> goenv compare 1.21.5 1.22.3
+⚖️   Comparing Go Versions
+
+  Version:      1.21.5  vs  1.22.3
+  Installed:    ✓ Installed  vs  ✓ Installed
+  Released:     2023-12-05  vs  2024-05-15
+  Age:          1y 2mo  vs  8mo
+  Support:      🟡 Near EOL  vs  🟢 Current
+  EOL Date:     2024-08-06  vs  2025-05-15
+  Size:         487.3 MB  vs  512.1 MB
+
+  📊 Size difference: +24.8 MB
+
+🔍 Version Analysis
+  📈 1 minor version newer (1.21 → 1.22)
+  📅 Released 5 months apart
+
+💡 Recommendations
+  • 1.21.5 approaching EOL - plan upgrade soon
+  • ✅ Upgrade to 1.22.3 recommended (current, supported)
+
+  📖 Release notes:
+     1.21.5: https://go.dev/doc/go1.21
+     1.22.3: https://go.dev/doc/go1.22
+
+# Compare current version with latest
+> goenv compare $(goenv current --bare) 1.23.0
+
+# Compare installed versions
+> goenv compare 1.20.5 1.21.13
+```
+
+**Comparison Details:**
+
+The command analyzes and displays:
+
+- **Installation status**: Whether each version is installed
+- **Release dates**: When each version was released
+- **Age**: How old each version is (years/months/days)
+- **Support status**: Current, Near EOL, or EOL
+- **EOL dates**: When support ends for each version
+- **Size**: Disk space used (if installed)
+- **Version difference**: Major, minor, or patch level changes
+- **Time gap**: Months between releases
+- **Recommendations**: Upgrade suggestions based on support status
+
+**Version Analysis Types:**
+
+- **Major version change**: Significant changes expected (e.g., 1.x → 2.x)
+- **Minor version**: New features and improvements (e.g., 1.20 → 1.21)
+- **Patch upgrade**: Bug fixes and security updates (e.g., 1.21.1 → 1.21.5)
+
+**Examples:**
+
+```shell
+# Check if upgrade is worth it
+> goenv compare 1.21.5 1.22.0
+⚖️   Comparing Go Versions
+
+  Version:      1.21.5  vs  1.22.0
+  Support:      🟡 Near EOL  vs  🟢 Current
+
+💡 Recommendations
+  • 1.21.5 approaching EOL - plan upgrade soon
+  • ✅ Upgrade to 1.22.0 recommended (current, supported)
+
+# Compare patch versions
+> goenv compare 1.22.0 1.22.3
+⚖️   Comparing Go Versions
+
+🔍 Version Analysis
+  🔧 Patch upgrade (+3) - bug fixes and security updates
+
+# Compare before installing
+> goenv compare $(goenv current --bare) $(goenv list --remote --stable | tail -1)
+```
+
+**Related Commands:**
+
+- [`goenv info`](#goenv-info) - Show detailed information about a single version
+- [`goenv list`](#goenv-list) - List available or installed versions
+- [`goenv use`](#goenv-use) - Switch to a different version
 
 ## `goenv exec`
 
@@ -1329,6 +2325,180 @@ Usually it boils down to adding to your `.bashrc` or `.zshrc` the following:
 ```
 eval "$(goenv init -)"
 ```
+
+## `goenv setup`
+
+Automatic first-time configuration wizard that detects your shell, adds goenv initialization to your profile, and optionally configures VS Code. Safe to run multiple times - won't duplicate configuration.
+
+**Usage:**
+
+```shell
+# Interactive setup with prompts
+> goenv setup
+🚀 Welcome to goenv setup!
+
+🐚 Configuring shell integration...
+  Detected shell: zsh
+  Profile file: ~/.zshrc
+
+  Add this to ~/.zshrc? [Y/n]:
+    eval "$(goenv init -)"
+
+  Created backup: .zshrc.goenv-backup.20241030-143025
+  ✓ Added goenv initialization
+
+💻 Checking for VS Code...
+  Set up VS Code integration for this directory? [y/N]: y
+  ✓ Configured VS Code to use environment variables
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 Setup Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Changes made:
+  • Backed up ~/.zshrc
+  • Added goenv init to ~/.zshrc
+  • Configured VS Code for current directory
+
+🎯 Next steps:
+  1. Restart your shell or run:
+     source ~/.zshrc
+  2. Install a Go version:
+     goenv install 1.23.2
+  3. Set it as your default:
+     goenv global 1.23.2
+
+🎉 Done! Run 'goenv doctor' to verify your setup.
+```
+
+**Options:**
+
+- `--yes`, `-y` - Auto-accept all prompts (non-interactive mode)
+- `--shell <name>` - Force specific shell (bash, zsh, fish, powershell, cmd)
+- `--skip-vscode` - Skip VS Code integration setup
+- `--skip-shell` - Skip shell profile setup
+- `--dry-run` - Show what would be done without making changes
+- `--non-interactive` - Disable all interactive prompts
+- `--verify` - Run `goenv doctor` after setup to verify configuration
+
+**What It Does:**
+
+1. **Shell Detection**
+   - Automatically detects your shell (bash, zsh, fish, PowerShell, cmd)
+   - Finds the appropriate profile file (`.bashrc`, `.zshrc`, `config.fish`, etc.)
+   - Shows you what will be added before making changes
+
+2. **Shell Profile Setup**
+   - Creates backup of your profile file
+   - Adds goenv initialization code
+   - Checks if already configured to avoid duplicates
+   - Safe to run multiple times
+
+3. **VS Code Integration** (optional)
+   - Detects if VS Code is being used (looks for `.vscode/` directory)
+   - Configures VS Code settings to use goenv
+   - Sets up `go.goroot`, `go.gopath`, and `go.toolsGopath`
+   - Prompts before making changes
+
+4. **Summary & Next Steps**
+   - Shows what was changed
+   - Provides clear next steps
+   - Optionally runs `goenv doctor` to verify
+
+**Examples:**
+
+```shell
+# Interactive setup (recommended for first-time users)
+> goenv setup
+
+# Quick setup with auto-accept
+> goenv setup --yes
+
+# Setup with verification
+> goenv setup --yes --verify
+
+# Setup for specific shell
+> goenv setup --shell bash
+
+# Dry run to see what would happen
+> goenv setup --dry-run
+
+# Skip VS Code setup
+> goenv setup --skip-vscode
+
+# CI/CD non-interactive setup
+> goenv setup --yes --skip-vscode --verify
+```
+
+**Shell-Specific Configuration:**
+
+The command automatically handles shell-specific syntax:
+
+- **bash/zsh**: Adds to `~/.bashrc` or `~/.zshrc`
+  ```bash
+  eval "$(goenv init -)"
+  ```
+
+- **fish**: Adds to `~/.config/fish/config.fish`
+  ```fish
+  status --is-interactive; and goenv init - | source
+  ```
+
+- **PowerShell**: Adds to `$PROFILE`
+  ```powershell
+  & goenv init - | Invoke-Expression
+  ```
+
+- **cmd**: Updates `AUTORUN` registry key (Windows)
+
+**Safety Features:**
+
+- **Backup Creation**: Always creates timestamped backup before modifying files
+- **Duplicate Detection**: Won't add initialization code if already present
+- **Dry Run Mode**: Preview changes without applying them
+- **Safe Re-runs**: Can be run multiple times without issues
+
+**Common Scenarios:**
+
+```shell
+# New installation - first time setup
+> goenv setup
+# Follow prompts to configure shell and VS Code
+
+# After installing on a new system
+> goenv setup --yes --verify
+# Quick setup with verification
+
+# Multiple shells - configure different shell
+> goenv setup --shell fish
+
+# Project-specific VS Code setup
+cd my-project
+goenv setup --skip-shell
+# Only configure VS Code for this project
+
+# CI/CD pipeline setup
+> goenv setup --yes --skip-vscode --non-interactive
+# Automated setup without prompts or VS Code
+```
+
+**Troubleshooting:**
+
+If setup doesn't work as expected:
+
+1. **Verify initialization**: Run `goenv status` to check
+2. **Source profile manually**: `source ~/.zshrc` (or your shell's profile)
+3. **Check for conflicts**: Look for other Go installations in PATH
+4. **Run diagnostics**: `goenv doctor --fix` for automated repairs
+5. **Re-run setup**: Safe to run `goenv setup` again
+
+**Related Commands:**
+
+- [`goenv init`](#goenv-init) - Manual shell initialization
+- [`goenv doctor`](#goenv-doctor) - Diagnose and fix configuration issues
+- [`goenv status`](#goenv-status) - Quick health check
+- [`goenv get-started`](#goenv-get-started) - Interactive beginner's guide
+- [`goenv vscode`](#goenv-vscode) - VS Code-specific configuration
 
 ## `goenv install`
 
@@ -1601,7 +2771,7 @@ Total: 1 Go version(s) installed
 - Vulnerability management
 - Change management documentation
 
-**For detailed compliance examples, see:** [Compliance Use Cases Guide](../COMPLIANCE_USE_CASES.md)
+**For detailed compliance examples, see:** [Compliance Use Cases Guide](../advanced/COMPLIANCE_USE_CASES.md)
 
 ## `goenv local`
 
@@ -2809,35 +3979,85 @@ Using GitHub token for higher rate limits
 
 ## `goenv tools update`
 
-Update installed Go tools to their latest versions.
+Update installed Go tools to their latest versions for the current or all Go versions.
 
 **Usage:**
 
 ```shell
 # Update all tools for current Go version
-> goenv tools update
+goenv tools update
+
+# Update tools across ALL Go versions
+goenv tools update --all
 
 # Check for updates without installing
-> goenv tools update --check
+goenv tools update --check
 
 # Update only a specific tool
-> goenv tools update --tool gopls
+goenv tools update --tool gopls
+
+# Update specific tool across all versions
+goenv tools update --tool gopls --all
 
 # Show what would be updated (dry run)
-> goenv tools update --dry-run
+goenv tools update --dry-run
 
 # Update to specific version (default: latest)
-> goenv tools update --version v1.2.3
+goenv tools update --version v1.2.3
 ```
 
-### Options
+**Options:**
 
-- `--check` - Check for updates without installing
-- `--tool <name>` - Update only the specified tool
-- `--dry-run` - Show what would be updated without actually updating
+- `--all` - Update tools across all installed Go versions
+- `--check`, `-c` - Check for updates without installing
+- `--tool <name>`, `-t` - Update only the specified tool
+- `--dry-run`, `-n` - Show what would be updated without actually updating
 - `--version <version>` - Target version (default: latest)
 
-This command updates tools installed with `go install` in your current Go version's GOPATH.
+**Example Output:**
+
+```shell
+$ goenv tools update
+
+🔄 Checking for tool updates in Go 1.23.0...
+
+Found 3 tool(s):
+
+  • gopls (v0.12.0) → v0.13.2 available ⬆️
+  • staticcheck (v0.4.6) - up to date ✅
+  • gofmt - up to date ✅
+
+📦 Updating tools...
+
+  Updating gopls... ✅
+
+✅ Updated 1 tool(s) successfully
+```
+
+**With --all flag:**
+
+```shell
+$ goenv tools update --all
+
+🔄 Checking for tool updates across 3 Go version(s)...
+
+Outdated tools found:
+  • gopls: 2 versions need updating
+  • staticcheck: 1 version needs updating
+
+📦 Updating tools...
+
+Go 1.21.0:
+  Updating gopls... ✅
+  Updating staticcheck... ✅
+
+Go 1.23.0:
+  Updating gopls... ✅
+
+✅ Updated 3 tool(s) across 2 version(s)
+```
+
+This command updates tools installed with `go install` in your Go version's GOPATH. Use `--all` to maintain consistency across all installed Go versions.
 
 ## `goenv vscode`
 

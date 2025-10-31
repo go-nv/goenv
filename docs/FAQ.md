@@ -40,7 +40,7 @@ Yes! goenv maintains backward compatibility:
 - Same configuration files (`.go-version`)
 - Legacy commands still supported
 
-[Migration Guide](./MIGRATION_GUIDE.md)
+[Migration Guide](./user-guide/MIGRATION_GUIDE.md)
 
 ### What platforms does goenv support?
 
@@ -50,7 +50,7 @@ Yes! goenv maintains backward compatibility:
 - **FreeBSD** - Full support
 - **Architectures** - AMD64, ARM64, ARMv6/7, 386, PPC64LE, S390X
 
-[Platform Support Matrix](./PLATFORM_SUPPORT.md)
+[Platform Support Matrix](./reference/PLATFORM_SUPPORT.md)
 
 ## Installation
 
@@ -65,7 +65,30 @@ curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
 iwr -useb https://raw.githubusercontent.com/go-nv/goenv/master/install.ps1 | iex
 ```
 
+After installation, run the setup wizard for automatic configuration:
+
+```bash
+goenv setup
+```
+
 [Complete Installation Guide](./user-guide/INSTALL.md)
+
+### What's the easiest way to get started with goenv?
+
+After installing goenv, use the interactive setup and beginner guide:
+
+```bash
+# Automatic shell configuration
+goenv setup
+
+# Interactive beginner guide
+goenv get-started
+
+# Quick health check
+goenv status
+```
+
+These commands guide you through first-time setup and teach you common tasks.
 
 ### Do I need Go installed to use goenv?
 
@@ -237,7 +260,7 @@ env | grep GO
 ```
 
 **See also:**
-- [System Go Coexistence Guide](./SYSTEM_GO_COEXISTENCE.md) - Complete guide to using both
+- [System Go Coexistence Guide](./user-guide/SYSTEM_GO_COEXISTENCE.md) - Complete guide to using both
 - [How It Works - Version Detection](./user-guide/HOW_IT_WORKS.md#version-detection)
 - [GOPATH Integration](./advanced/GOPATH_INTEGRATION.md)
 
@@ -283,7 +306,7 @@ goenv use 1.25.2 --global
 
 Use `goenv use` for new code.
 
-[Modern Commands Guide](./MODERN_COMMANDS.md)
+[Modern Commands Guide](./user-guide/MODERN_COMMANDS.md)
 
 ### How does goenv choose which Go version to use?
 
@@ -313,6 +336,55 @@ toolchain go1.25.2  // goenv will use this
 ```bash
 goenv current
 # Output: 1.25.2 (set by /path/to/project/.go-version)
+```
+
+### How do I get detailed information about a Go version?
+
+```bash
+goenv info 1.25.2
+# Shows: install status, release date, EOL status, size, recommendations
+```
+
+See also: `goenv info --json` for machine-readable output.
+
+### How do I compare two Go versions?
+
+```bash
+goenv compare 1.21.5 1.23.2
+# Shows: side-by-side comparison of release dates, support status, size diff
+```
+
+Useful for deciding whether to upgrade.
+
+### How do I check if my Go version is EOL (end-of-life)?
+
+```bash
+goenv info $(goenv current --bare)
+# Shows EOL status and upgrade recommendations
+```
+
+### How do I quickly check my goenv installation health?
+
+```bash
+# Quick overview
+goenv status
+
+# Comprehensive diagnostics
+goenv doctor
+
+# Interactive repair mode
+goenv doctor --fix
+```
+
+### How do I discover goenv commands by category?
+
+```bash
+goenv explore
+# Interactive browser showing commands grouped by:
+# - Getting Started
+# - Version Management
+# - Tools & Diagnostics
+# - etc.
 ```
 
 ### How do I list installed versions?
@@ -367,14 +439,67 @@ goenv default-tools
 
 This installs gopls, staticcheck, golangci-lint, and other common tools.
 
+### How do I install tools across all Go versions?
+
+Use the `--all` flag to install across all versions at once:
+
+```bash
+# Install gopls for all Go versions
+goenv tools install gopls@latest --all
+
+# Install multiple tools everywhere
+goenv tools install gopls@latest staticcheck@latest --all
+```
+
+### How do I uninstall tools across all Go versions?
+
+Use the `--all` flag with uninstall:
+
+```bash
+# Uninstall from all versions
+goenv tools uninstall gopls --all
+
+# Uninstall multiple tools from all versions
+goenv tools uninstall gopls staticcheck --all
+
+# Preview what would be removed (dry run)
+goenv tools uninstall gopls --all --dry-run
+```
+
+### How do I check tool consistency across versions?
+
+Use `goenv tools status` to see which tools are installed where:
+
+```bash
+goenv tools status
+```
+
+This shows:
+- **Consistent tools**: Installed in all versions
+- **Partial tools**: Installed in some versions
+- **Version-specific tools**: Only in one version
+
+### How do I check which tools need updating?
+
+```bash
+# Check for outdated tools across all versions
+goenv tools outdated
+
+# Update tools for current version
+goenv tools update
+
+# Update tools across all versions
+goenv tools update --all
+```
+
 ### How do I sync tools between Go versions?
 
 ```bash
 # Sync all tools from active version to another version
-goenv sync-tools --from 1.25.2 --to 1.24.0
+goenv tools sync 1.25.2 1.24.0
 
 # Auto-detect and sync
-goenv sync-tools
+goenv tools sync
 ```
 
 ### Why can't I find my tool after installing it?
@@ -388,12 +513,6 @@ tool --version  # Now works
 ```
 
 **Note:** `goenv use` automatically runs `goenv rehash`, but `go install` doesn't.
-
-### How do I update all my tools?
-
-```bash
-goenv tools update
-```
 
 ## VS Code Integration
 
@@ -680,7 +799,7 @@ goenv cache clean all --force
 goenv refresh
 ```
 
-[Complete Troubleshooting Guide](./CACHE_TROUBLESHOOTING.md)
+[Complete Troubleshooting Guide](./advanced/CACHE_TROUBLESHOOTING.md)
 
 ## CI/CD
 
@@ -701,7 +820,7 @@ steps:
       goenv use $(cat .go-version)
 ```
 
-[CI/CD Guide](./CI_CD_GUIDE.md)
+[CI/CD Guide](./advanced/CI_CD_GUIDE.md)
 
 ### Should I cache goenv in CI?
 
@@ -734,7 +853,7 @@ goenv current --json
 goenv inventory go --json
 ```
 
-[JSON Output Guide](./JSON_OUTPUT_GUIDE.md)
+[JSON Output Guide](./reference/JSON_OUTPUT_GUIDE.md)
 
 ## Hooks
 
@@ -752,7 +871,7 @@ hooks:
         message: "[{timestamp}] Installed Go {version}"
 ```
 
-[Hooks Quick Start](./HOOKS_QUICKSTART.md)
+[Hooks Quick Start](./reference/HOOKS_QUICKSTART.md)
 
 ### How do I enable hooks?
 
@@ -830,7 +949,7 @@ goenv inventory go --json --checksums > inventory.json
 # See Compliance Use Cases guide
 ```
 
-[Compliance Use Cases](./COMPLIANCE_USE_CASES.md)
+[Compliance Use Cases](./advanced/COMPLIANCE_USE_CASES.md)
 
 ### Is goenv SOC 2 compliant?
 
@@ -872,7 +991,7 @@ hooks:
 ## Related Documentation
 
 - [Quick Reference](./QUICK_REFERENCE.md) - One-page cheat sheet
-- [Modern Commands Guide](./MODERN_COMMANDS.md) - Recommended commands
-- [Platform Support](./PLATFORM_SUPPORT.md) - Platform compatibility
-- [Troubleshooting](./CACHE_TROUBLESHOOTING.md) - Detailed troubleshooting
+- [Modern Commands Guide](./user-guide/MODERN_COMMANDS.md) - Recommended commands
+- [Platform Support](./reference/PLATFORM_SUPPORT.md) - Platform compatibility
+- [Troubleshooting](./advanced/CACHE_TROUBLESHOOTING.md) - Detailed troubleshooting
 - [Complete Command Reference](./reference/COMMANDS.md) - All commands
