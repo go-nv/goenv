@@ -1957,7 +1957,11 @@ func checkGoenvShellFunction(shell shellutil.ShellType) bool {
 		// Bash stores functions as BASH_FUNC_name%%=...
 		// zsh/ksh don't export functions this way, but we can try
 		if strings.HasPrefix(key, "BASH_FUNC_goenv") {
-			return true
+			// Extract the value to check if it's actually set (not empty)
+			parts := strings.SplitN(key, "=", 2)
+			if len(parts) == 2 && parts[1] != "" {
+				return true
+			}
 		}
 	}
 
