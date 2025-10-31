@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // FileExists checks if a file exists and is not a directory
@@ -101,4 +102,39 @@ func FormatBytes(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// IsPathInPATH checks if a given directory path exists in the PATH environment variable.
+// On Windows, this performs case-insensitive comparison (matching default Windows behavior,
+// even though NTFS can support case-sensitivity in specific configurations like WSL).
+// On Unix, it's case-sensitive. It also normalizes path separators to handle both
+// forward and backslashes on Windows.
+func IsPathInPATH(dirPath, pathEnv string) bool {
+	if pathEnv == "" || dirPath == "" {
+		return false
+	}
+
+	// Normalize the directory path
+	normalizedDir := filepath.Clean(dirPath)
+
+	// Split PATH into individual directories
+	paths := filepath.SplitList(pathEnv)
+
+	for _, p := range paths {
+		// Normalize each path entry
+		normalizedPath := filepath.Clean(p)
+
+		// Compare paths (case-insensitive on Windows, case-sensitive on Unix)
+		if IsWindows() {
+			if strings.EqualFold(normalizedPath, normalizedDir) {
+				return true
+			}
+		} else {
+			if normalizedPath == normalizedDir {
+				return true
+			}
+		}
+	}
+
+	return false
 }

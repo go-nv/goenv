@@ -349,6 +349,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		} else if doctorFailOn == FailOnWarning && warningCount > 0 {
 			doctorExit(2) // Warnings exit with code 2 when --fail-on=warning
 		}
+		// On success (no issues or warnings with --fail-on=error), return normally (exit code 0)
 		return nil
 	}
 
@@ -405,8 +406,10 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		if doctorFailOn == FailOnWarning {
 			doctorExit(2) // Warnings exit with code 2 when --fail-on=warning
 		}
+		// On success with warnings but --fail-on=error, return normally (exit code 0)
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "\n%s%s\n", utils.Emoji("✅ "), utils.Green("Everything looks good!"))
+		// On success with no issues, return normally (exit code 0)
 	}
 
 	return nil
@@ -716,8 +719,8 @@ func checkShellEnvironment(cfg *config.Config) checkResult {
 	if pathEnv != "" {
 		// Only perform this check if shims directory exists
 		if _, err := os.Stat(shimsDir); err == nil {
-			// Shims dir exists, check if it's in PATH
-			if !strings.Contains(pathEnv, shimsDir) {
+			// Shims dir exists, check if it's in PATH (case-insensitive on Windows)
+			if !utils.IsPathInPATH(shimsDir, pathEnv) {
 				return checkResult{
 					id:        "shell-environment",
 					name:      "Shell environment",
@@ -751,7 +754,7 @@ func detectUndoSourcing(cfg *config.Config, currentShell shellutil.ShellType, go
 	// This check is NOT covered by existing logic which only looks at env var presence
 	if goenvShell != "" && pathEnv != "" {
 		if _, err := os.Stat(shimsDir); err == nil {
-			if !strings.Contains(pathEnv, shimsDir) {
+			if !utils.IsPathInPATH(shimsDir, pathEnv) {
 				return "GOENV_SHELL is set but shims directory not in PATH - likely caused by re-sourcing a profile that resets PATH without goenv init (e.g., 'source ~/.bashrc' or 'source ~/.zshrc')"
 			}
 		}
@@ -1029,7 +1032,7 @@ func checkProfileSourcingIssues(cfg *config.Config) checkResult {
 		pathEnv := os.Getenv(utils.EnvVarPath)
 
 		// If shims are in PATH but function doesn't work, it's been reset
-		if strings.Contains(pathEnv, shimsDir) {
+		if utils.IsPathInPATH(shimsDir, pathEnv) {
 			// Try to execute goenv via shell function
 			cmd := exec.Command(string(currentShell), "-c", "goenv --version 2>&1")
 			output, err := cmd.CombinedOutput()

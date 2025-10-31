@@ -1250,8 +1250,8 @@ func TestCheckShellEnvironment(t *testing.T) {
 
 			// Set up PATH with shims directory when GOENV_SHELL is set
 			if tt.goenvShell != "" {
-				// Create shims directory
-				shimsDir := filepath.Join(tmpDir, "shims")
+				// Create shims directory using cfg.ShimsDir() to ensure path consistency
+				shimsDir := cfg.ShimsDir()
 				if err := os.MkdirAll(shimsDir, 0755); err != nil {
 					t.Fatalf("Failed to create shims directory: %v", err)
 				}
@@ -1267,9 +1267,9 @@ func TestCheckShellEnvironment(t *testing.T) {
 					t.Fatalf("Failed to create fake goenv: %v", err)
 				}
 
-				// Add shims and bin to PATH
+				// Add shims and bin to PATH (use cfg.ShimsDir() for consistency)
 				oldPath := os.Getenv("PATH")
-				t.Setenv("PATH", binDir+string(os.PathListSeparator)+shimsDir+string(os.PathListSeparator)+oldPath)
+				t.Setenv("PATH", binDir+string(os.PathListSeparator)+cfg.ShimsDir()+string(os.PathListSeparator)+oldPath)
 			}
 
 			// Set environment variables

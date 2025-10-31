@@ -364,7 +364,7 @@ Options:
 	}
 
 	// Determine which installations to update
-	targets := []string{}
+	var targets []string
 	if updateAll {
 		targets = installations
 		log(fmt.Sprintf("Updating all %d installations...", len(installations)))
