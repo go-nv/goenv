@@ -1249,6 +1249,14 @@ func TestCheckShellEnvironment(t *testing.T) {
 			t.Setenv("HOME", tmpDir)
 			t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
 
+			// Force shell detection to bash by clearing Windows-specific variables
+			// This prevents DetectShell() from auto-detecting PowerShell on Windows
+			t.Setenv("PSModulePath", "")
+			t.Setenv("PSMODULEPATH", "")
+			t.Setenv("COMSPEC", "")
+			// Set SHELL to bash to ensure consistent shell detection across platforms
+			t.Setenv("SHELL", "/bin/bash")
+
 			// Set up PATH with shims directory when GOENV_SHELL is set
 			if tt.goenvShell != "" {
 				// Create shims directory using cfg.ShimsDir() to ensure path consistency
