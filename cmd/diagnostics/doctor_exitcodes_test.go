@@ -198,8 +198,7 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 
 			// Set HOME to tmpDir to avoid checking user's real profile files
 			t.Setenv("HOME", tmpDir)
-
-			// Clear GOENV_SHELL to skip shell initialization checks
+			t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME			// Clear GOENV_SHELL to skip shell initialization checks
 			t.Setenv("GOENV_SHELL", "")
 
 			// Set up environment based on test needs

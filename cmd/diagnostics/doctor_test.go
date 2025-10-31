@@ -1247,6 +1247,7 @@ func TestCheckShellEnvironment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set HOME to tmpDir to avoid checking user's real profile files
 			t.Setenv("HOME", tmpDir)
+			t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
 
 			// Set up PATH with shims directory when GOENV_SHELL is set
 			if tt.goenvShell != "" {
@@ -1282,12 +1283,14 @@ func TestCheckShellEnvironment(t *testing.T) {
 					t.Setenv("BASH_FUNC_goenv%%", "() { echo fake; }")
 				}
 			} else {
-				os.Unsetenv("GOENV_SHELL")
+				// Explicitly set to empty string to ensure it's not inherited from parent process
+				t.Setenv("GOENV_SHELL", "")
 			}
 			if tt.goenvRoot != "" {
 				t.Setenv("GOENV_ROOT", tt.goenvRoot)
 			} else {
-				os.Unsetenv("GOENV_ROOT")
+				// Explicitly set to empty string to ensure it's not inherited from parent process
+				t.Setenv("GOENV_ROOT", "")
 			}
 
 			result := checkShellEnvironment(cfg)

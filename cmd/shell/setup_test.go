@@ -15,6 +15,7 @@ func TestSetupCommand_DryRun(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
 	t.Setenv("SHELL", "/bin/bash")
 
 	// Set dry-run flag
@@ -52,6 +53,7 @@ func TestSetupCommand_AutoYes(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
 	t.Setenv("SHELL", "/bin/bash")
 
 	setupFlags.yes = true
@@ -81,6 +83,7 @@ func TestSetupCommand_AlreadyConfigured(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
 	t.Setenv("SHELL", "/bin/bash")
 	t.Setenv("GOENV_SHELL", "bash") // Already initialized
 
@@ -252,6 +255,7 @@ func TestSetupShellProfile_FilePermissions(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
 	t.Setenv("SHELL", "/bin/bash")
 
 	// Create a .bashrc WITHOUT goenv init (so it will be added)
@@ -301,6 +305,7 @@ func TestSetupShellProfile_BackupCreation(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
 	t.Setenv("SHELL", "/bin/bash")
 
 	bashrc := filepath.Join(tmpDir, ".bashrc")
@@ -353,6 +358,7 @@ func TestSetupCommand_NonInteractive(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("GOENV_ROOT", tmpDir)
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
 	t.Setenv("SHELL", "/bin/bash")
 
 	setupFlags.nonInteractive = true
