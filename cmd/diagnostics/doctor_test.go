@@ -1316,6 +1316,9 @@ func TestCheckShellEnvironment(t *testing.T) {
 }
 
 func TestOfferShellEnvironmentFix(t *testing.T) {
+	// Clear CI environment to ensure consistent test behavior
+	defer testutil.ClearCIEnvironment(t)()
+
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,

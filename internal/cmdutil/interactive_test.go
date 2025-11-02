@@ -5,10 +5,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
 func TestNewInteractiveContext(t *testing.T) {
+	// Clear CI environment to ensure consistent test behavior
+	defer testutil.ClearCIEnvironment(t)()
+
 	tests := []struct {
 		name          string
 		setupCmd      func() *cobra.Command

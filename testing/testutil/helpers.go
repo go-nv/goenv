@@ -77,3 +77,49 @@ func StripDeprecationWarning(output string) string {
 	// Only trim trailing whitespace to preserve formatting of the output
 	return strings.TrimRight(result, " \t\n\r")
 }
+
+// ClearCIEnvironment temporarily clears CI-related environment variables for testing.
+// This ensures tests behave consistently regardless of whether they run locally or in CI.
+//
+// The function saves all CI environment variables, unsets them, and returns a cleanup
+// function that should be deferred to restore the original state.
+//
+// Accepts testing.TB so it works with both *testing.T and *testing.B.
+//
+// Example:
+//
+//	func TestSomething(t *testing.T) {
+//	    cleanup := testutil.ClearCIEnvironment(t)
+//	    defer cleanup()
+//	    // Test code here will run in non-CI mode
+//	}
+func ClearCIEnvironment(tb testing.TB) func() {
+	tb.Helper()
+
+	ciEnvVars := []string{
+		"GITHUB_ACTIONS",
+		"CI",
+		"GITLAB_CI",
+		"CIRCLECI",
+		"TRAVIS",
+		"BUILD_ID",
+		"BUILDKITE",
+		"DRONE",
+		"TEAMCITY_VERSION",
+	}
+
+	savedEnv := make(map[string]string)
+	for _, envVar := range ciEnvVars {
+		savedEnv[envVar] = os.Getenv(envVar)
+		os.Unsetenv(envVar)
+	}
+
+	return func() {
+		tb.Helper()
+		for envVar, value := range savedEnv {
+			if value != "" {
+				os.Setenv(envVar, value)
+			}
+		}
+	}
+}
