@@ -70,8 +70,7 @@ var RootCmd = &cobra.Command{
 					WorkingDir:      cwd,
 					AdditionalFlags: additionalFlags,
 					VSCodeUpdate: func(version string) error {
-						gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
-						return vscode.UpdateSettingsForVersion(cwd, cfg.Root, version, gopathPrefix)
+						return vscode.UpdateSettingsForVersion(cwd, cfg.Root, version)
 					},
 					InstallCallback: func(version string) error {
 						// Find install command
@@ -122,8 +121,7 @@ var RootCmd = &cobra.Command{
 				Stdin:      os.Stdin,
 				WorkingDir: cwd,
 				VSCodeUpdate: func(version string) error {
-					gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
-					return vscode.UpdateSettingsForVersion(cwd, cfg.Root, version, gopathPrefix)
+					return vscode.UpdateSettingsForVersion(cwd, cfg.Root, version)
 				},
 			}
 

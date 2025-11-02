@@ -341,14 +341,8 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 		gorootAbs := filepath.Join(cfg.Root, "versions", version)
 		goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
-		// Build GOPATH respecting GOENV_GOPATH_PREFIX (same as exec.go and sh-rehash.go)
-		gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
-		var gopathAbs string
-		if gopathPrefix == "" {
-			gopathAbs = filepath.Join(homeDir, "go", version)
-		} else {
-			gopathAbs = filepath.Join(gopathPrefix, version)
-		}
+		// Build GOPATH: $HOME/go/{version}
+		gopathAbs := filepath.Join(homeDir, "go", version)
 		gopath := strings.Replace(gopathAbs, homeDir, homeEnvVar, 1)
 
 		settings["go.goroot"] = goroot
@@ -723,13 +717,7 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 	gorootAbs := filepath.Join(cfg.Root, "versions", version)
 	goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
-	gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
-	var gopathAbs string
-	if gopathPrefix == "" {
-		gopathAbs = filepath.Join(homeDir, "go", version)
-	} else {
-		gopathAbs = filepath.Join(gopathPrefix, version)
-	}
+	gopathAbs := filepath.Join(homeDir, "go", version)
 	gopath := strings.Replace(gopathAbs, homeDir, homeEnvVar, 1)
 
 	keysToUpdate := map[string]interface{}{

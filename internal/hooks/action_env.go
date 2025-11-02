@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // SetEnvAction sets environment variables during hook execution
@@ -114,7 +116,13 @@ func validateEnvVarName(name string) error {
 	}
 
 	// Check for reserved names (optional - can be expanded)
-	reserved := []string{"PATH", "HOME", "USER", "SHELL", "TERM"}
+	reserved := []string{
+		utils.EnvVarPath,
+		utils.EnvVarHome,
+		utils.EnvVarUser,
+		utils.EnvVarShell,
+		utils.EnvVarTerm,
+	}
 	for _, r := range reserved {
 		if strings.EqualFold(name, r) {
 			return fmt.Errorf("cannot override reserved variable: %s", r)

@@ -621,6 +621,48 @@ goenv cache clean all --older-than 30d
 goenv cache status
 ```
 
+### Can I share the module cache across Go versions to save disk space?
+
+**Yes! It's automatic.** In v3, goenv automatically shares the module cache across all Go versions, matching how native Go works (shared `~/go/pkg/mod`).
+
+**How it works:**
+
+```bash
+# Check where modules are cached
+$ goenv exec go env GOMODCACHE
+/Users/you/.goenv/shared/go-mod  # Shared across all versions!
+```
+
+**Why it's safe:** Module source code is version-agnostic. The same `golang.org/x/tools@v0.15.0` works identically with Go 1.21, 1.22, 1.23, and 1.24.
+
+**Compared to per-version GOPATH setups:**
+- Separate caches: 5.6 GB across 4 versions (if each version has own GOPATH)
+- Shared cache: 2.6 GB (matches Go's native behavior)
+- Potential savings: 3.0 GB (53% less duplication)
+
+**Custom location (optional):**
+
+```bash
+# Use your own location via Go's native environment variable
+export GOMODCACHE=/custom/path
+
+# Or configure it permanently
+go env -w GOMODCACHE=/custom/path
+```
+- **Saved: 3 GB (54%)**
+
+**When to use:**
+- ✅ Single developer machine
+- ✅ Multiple Go versions installed
+- ✅ Limited disk space
+
+**When NOT to use:**
+- ❌ NFS/network filesystems
+- ❌ Multi-user systems
+- ❌ Parallel CI builds with file locking
+
+See [Shared Module Cache](./advanced/SMART_CACHING.md#shared-module-cache-opt-in) for complete guide.
+
 ### Why is my version list stale?
 
 Cache is older than 7 days. Refresh it:

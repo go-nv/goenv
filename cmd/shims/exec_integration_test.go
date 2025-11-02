@@ -92,10 +92,6 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	mockContent := []byte("#!/bin/sh\necho 'test tool'\n")
 	testutil.WriteTestFile(t, mockToolPath, mockContent, utils.PermFileExecutable)
 
-	// Set GOENV_GOPATH_PREFIX to our test GOPATH
-	utils.GoenvEnvVarGopathPrefix.Set(filepath.Join(tempRoot, "go"))
-	defer os.Unsetenv("GOENV_GOPATH_PREFIX")
-
 	// Verify tool exists
 	if utils.FileNotExists(mockToolPath) {
 		t.Fatalf("Mock tool not created: %v", err)

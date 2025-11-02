@@ -295,6 +295,22 @@ func GetCacheStatus(goenvRoot string, fast bool) (*CacheStatus, error) {
 		}
 	}
 
+	// Check for shared module cache (v3+)
+	sharedModCachePath := filepath.Join(goenvRoot, "shared", "go-mod")
+	if utils.DirExists(sharedModCachePath) {
+		cacheInfo, err := GetCacheInfo(sharedModCachePath, CacheKindMod, fast)
+		if err == nil {
+			cacheInfo.GoVersion = "shared" // Mark as shared across versions
+			status.ModCaches = append(status.ModCaches, *cacheInfo)
+			status.TotalSize += cacheInfo.SizeBytes
+			if status.TotalFiles >= 0 && cacheInfo.Files >= 0 {
+				status.TotalFiles += cacheInfo.Files
+			} else {
+				status.TotalFiles = -1 // Mark as approximate
+			}
+		}
+	}
+
 	return status, nil
 }
 

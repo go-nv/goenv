@@ -36,9 +36,13 @@ var cacheCmd = &cobra.Command{
 	Long: `Manage build and module caches for installed Go versions.
 
 Subcommands:
-  status    Show cache sizes and locations
-  clean     Clean build or module caches to reclaim disk space
-  migrate   Migrate old format caches to architecture-aware format
+  status   Show cache sizes and locations
+  clean    Clean build or module caches to reclaim disk space
+  migrate  Migrate old format caches to architecture-aware format
+  info     Show CGO toolchain information for caches
+
+Note: Module caches are automatically shared across all Go versions
+(at $GOENV_ROOT/shared/go-mod)
 
 Use "goenv cache <command> --help" for more information about a command.`,
 }

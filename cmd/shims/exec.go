@@ -93,7 +93,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		expanded := pathutil.ExpandPath(gopath)
 		if expanded != gopath {
 			gopath = expanded
-			env = setEnvVar(env, "GOPATH", expanded)
+			env = setEnvVar(env, utils.EnvVarGopath, expanded)
 		}
 	}
 
@@ -107,48 +107,42 @@ func runExec(cmd *cobra.Command, args []string) error {
 		goBinPath := filepath.Join(versionPath, "bin")
 
 		// Set GOROOT
-		env = setEnvVar(env, "GOROOT", versionPath)
+		env = setEnvVar(env, utils.EnvVarGoroot, versionPath)
 
 		// Prepend to PATH
 		env = prependToPath(env, goBinPath)
 
 		// Set GOPATH if not disabled
 		if utils.GoenvEnvVarDisableGopath.UnsafeValue() != "1" {
-			// Check environment variables for GOPATH control
-			gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
-			appendGopath := utils.GoenvEnvVarAppendGopath.UnsafeValue() == "1"
-			prependGopath := utils.GoenvEnvVarPrependGopath.UnsafeValue() == "1"
+			// Build version-specific GOPATH: $HOME/go/{version}
+			homeDir, _ := os.UserHomeDir()
+			versionGopath := filepath.Join(homeDir, "go", currentVersion)
 
-			// Build version-specific GOPATH
-			var versionGopath string
-			if gopathPrefix == "" {
-				homeDir, _ := os.UserHomeDir()
-				versionGopath = filepath.Join(homeDir, "go", currentVersion)
-			} else {
-				versionGopath = filepath.Join(gopathPrefix, currentVersion)
-			}
-
-			// Handle GOPATH appending/prepending
-			if gopath != "" && appendGopath {
+			// Preserve existing GOPATH by prepending version-specific path.
+			// This allows users to keep source code in existing locations while
+			// giving priority to version-specific installed tools/packages.
+			// See: https://github.com/go-nv/goenv/issues/147
+			if gopath != "" {
 				versionGopath = versionGopath + string(os.PathListSeparator) + gopath
-			} else if gopath != "" && prependGopath {
-				versionGopath = gopath + string(os.PathListSeparator) + versionGopath
 			}
 
-			env = setEnvVar(env, "GOPATH", versionGopath)
+			env = setEnvVar(env, utils.EnvVarGopath, versionGopath)
 		}
 
-		// Set version AND architecture-specific GOCACHE to prevent conflicts
+		// Set per-version and per-architecture GOCACHE
 		//
-		// This prevents two types of "exec format error":
+		// Prevents two types of "exec format error":
 		// 1. Version conflicts: Go 1.23 binaries incompatible with Go 1.24
-		// 2. Architecture conflicts: Cross-compile tool binaries (staticcheck, generators)
-		//    built for linux/amd64 accidentally executed on darwin/arm64
+		// 2. Architecture conflicts: Cross-compile binaries built for different arch
 		//
-		// By isolating caches per version+GOOS+GOARCH, we ensure:
-		// - Native builds use: go-build-host-host
-		// - Cross-compiles use: go-build-{GOOS}-{GOARCH}
-		// - Tool binaries stay architecture-appropriate
+		// Cache format: go-build-{GOOS}-{GOARCH}[-cgo]
+		// Examples:
+		//   - go-build-darwin-arm64      (native, no CGO)
+		//   - go-build-darwin-arm64-cgo  (native, with CGO)
+		//   - go-build-linux-amd64       (cross-compile)
+		//
+		// Simplified vs v2: Removed over-engineered ABI variants, GOEXPERIMENT,
+		// and CGO hash suffixes that caused cache proliferation.
 		if !utils.GoenvEnvVarDisableGocache.IsTrue() {
 			customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
 			var versionGocache string
@@ -177,49 +171,36 @@ func runExec(cmd *cobra.Command, args []string) error {
 				// Use GOENV_ROOT/versions/{version}/go-build-{GOOS}-{GOARCH} as default GOCACHE
 				versionGocache = filepath.Join(versionPath, cacheSuffix)
 			}
-			env = setEnvVar(env, "GOCACHE", versionGocache)
+			env = setEnvVar(env, utils.EnvVarGocache, versionGocache)
 
-			// Write build.info file to record CGO toolchain configuration
-			// This helps diagnose cache issues and ensures cache transparency
-			// Use atomic writer to prevent corruption from concurrent processes
+			// Write build.info file for CGO builds (diagnostic data)
+			// Non-blocking - failures don't affect execution
 			if cgo.IsCGOEnabled(env) {
 				buildInfo := cgo.GetBuildInfo(env)
-
-				// Try to acquire lock for writing (non-blocking)
-				// If cache is locked by another process, skip writing (it's just diagnostic data)
-				if writer, err := cache.TryNewAtomicWriter(versionGocache); err != nil {
-					if cfg.Debug {
-						fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Failed to create atomic writer: %v\n", err)
-					}
-				} else if writer != nil {
+				if writer, err := cache.TryNewAtomicWriter(versionGocache); err == nil && writer != nil {
 					defer writer.Close()
-
-					// Marshal build info and write atomically via the writer
-					buildInfoJSON, err := json.MarshalIndent(buildInfo, "", "  ")
-					if err != nil && cfg.Debug {
-						fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Failed to marshal build.info: %v\n", err)
-					} else {
+					if buildInfoJSON, err := json.MarshalIndent(buildInfo, "", "  "); err == nil {
 						buildInfoPath := filepath.Join(versionGocache, "build.info")
-						if err := writer.WriteFile(buildInfoPath, buildInfoJSON, utils.PermFileDefault); err != nil && cfg.Debug {
-							fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Failed to write build.info: %v\n", err)
-						}
+						_ = writer.WriteFile(buildInfoPath, buildInfoJSON, utils.PermFileDefault)
 					}
 				}
 			}
 		}
 
-		// Set version-specific GOMODCACHE to prevent module conflicts
-		if !utils.GoenvEnvVarDisableGomodcache.IsTrue() {
-			customGomodcacheDir := utils.GoenvEnvVarGomodcacheDir.UnsafeValue()
-			var versionGomodcache string
-			if customGomodcacheDir != "" {
-				// Use custom GOMODCACHE directory if specified
-				versionGomodcache = filepath.Join(customGomodcacheDir, currentVersion)
-			} else {
-				// Use GOENV_ROOT/versions/{version}/go-mod as default GOMODCACHE
-				versionGomodcache = filepath.Join(versionPath, "go-mod")
-			}
-			env = setEnvVar(env, "GOMODCACHE", versionGomodcache)
+		// Set shared GOMODCACHE across all Go versions
+		//
+		// Module source code is version-agnostic and contains no compiled artifacts.
+		// Sharing GOMODCACHE:
+		// - Matches Go's native behavior (~/go/pkg/mod by default)
+		// - Simpler than per-version GOPATH management
+		// - Works safely for all use cases
+		//
+		// Location: $GOENV_ROOT/shared/go-mod
+		//
+		// Respects existing GOMODCACHE if already set (via go env -w or environment)
+		if os.Getenv(utils.EnvVarGomodcache) == "" {
+			versionGomodcache := filepath.Join(cfg.Root, "shared", "go-mod")
+			env = setEnvVar(env, utils.EnvVarGomodcache, versionGomodcache)
 		}
 	}
 

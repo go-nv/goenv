@@ -807,36 +807,135 @@ $ goenv exec go env GOMODCACHE
 /Users/username/.goenv/versions/1.24.4/go-mod
 ```
 
-### Configuration
+#### Shared Module Cache (Automatic)
 
-#### Disable Cache Isolation
+**New in v3:** Module caches are now automatically shared across all Go versions!
 
-If you prefer to use Go's default shared cache:
+Module source code is Go-version-agnostic—the same `golang.org/x/tools@v0.15.0` download works identically with Go 1.21, 1.22, 1.23, and 1.24. Sharing the module cache is safe and matches Go's native behavior.
+
+**Default behavior:**
+
+goenv automatically uses a shared module cache at `$GOENV_ROOT/shared/go-mod` for all Go versions. No configuration needed!
+
+**Benefits:**
+- ✅ **Matches Go's default** - how `~/go/pkg/mod` works natively
+- ✅ **Faster version switching** - modules already cached
+- ✅ **Reduced network bandwidth** - download each module once
+- ✅ **Safe by design** - module source is version-agnostic
+- ✅ **Simpler than per-version GOPATH management** - no complex GOPATH configuration needed
+
+**Disk usage comparison:**
+
+Sharing the module cache eliminates redundant downloads of the same modules across different Go versions:
 
 ```bash
-# Disable build cache isolation
+# WITHOUT shared cache (if each version had separate module caches):
+$ du -sh ~/.goenv/versions/*/pkg/mod
+1.2G  ~/.goenv/versions/1.22.8/pkg/mod
+58M   ~/.goenv/versions/1.23.2/pkg/mod
+2.5G  ~/.goenv/versions/1.24.4/pkg/mod
+1.8G  ~/.goenv/versions/1.25.2/pkg/mod
+Total: 5.58 GB (each version downloads same modules separately)
+
+# WITH shared cache (v3 behavior):
+$ du -sh ~/.goenv/shared/go-mod
+2.6G  ~/.goenv/shared/go-mod
+Disk saved: 2.98 GB (53% reduction from avoided duplication)
+```
+
+This is the same way native Go works - a single `~/go/pkg/mod` shared across all Go versions on your system.
+
+**Custom location (optional):**
+
+goenv respects any `GOMODCACHE` you've already configured:
+
+```bash
+# Set your own location
+export GOMODCACHE=/mnt/fast-ssd/go-cache
+
+# goenv respects your setting
+$ goenv exec go env GOMODCACHE
+/mnt/fast-ssd/go-cache
+
+# Or use go env -w (persistent)
+go env -w GOMODCACHE=/custom/path
+```
+
+**When automatic sharing works great:**
+- ✅ Single developer machine
+- ✅ Multiple Go versions for same projects
+- ✅ CI/CD with sequential builds
+- ✅ Limited disk space
+
+**When to use custom location:**
+- 📁 Specific directory requirements (fast SSD, separate partition)
+- 🔒 Multi-user environments with permission concerns
+- 🌐 Multiple machines via NFS/network drives (file locking considerations)
+
+**Verification:**
+
+```bash
+# Check cache status
+$ goenv cache status
+📦 Module Cache (Shared):
+  Location: ~/.goenv/shared/go-mod
+  Size: 2.6 GB
+  Modules: 9,215 unique modules
+  Shared across: all Go versions
+
+# Verify with doctor
+$ goenv doctor
+✓ Module cache (shared)
+  Location: ~/.goenv/shared/go-mod
+  Automatically shared across all Go versions
+```
+
+**Migration from v2:**
+
+If you're upgrading from an older version of goenv that used per-version module caches:
+
+```bash
+# Check for old caches
+$ goenv doctor
+⚠ Old module caches
+  Found old per-version module caches in 4 version(s) (using 5.58 GB)
+  Advice: v3 shares module cache automatically. Run 'goenv cache clean mod' to reclaim disk space
+
+# Clean them up to reclaim disk space
+$ goenv cache clean mod
+# Or use doctor's auto-fix
+$ goenv doctor --fix
+```
+
+### Configuration
+
+#### Disable Build Cache Isolation
+
+If you prefer to use Go's default shared build cache:
+
+```bash
+# Disable per-version build cache isolation
 export GOENV_DISABLE_GOCACHE=1
 
-# Disable module cache isolation
-export GOENV_DISABLE_GOMODCACHE=1
-
-# Now uses Go's default shared caches
+# Now uses Go's default shared build cache
 $ goenv exec go env GOCACHE
 /Users/username/Library/Caches/go-build
 ```
 
+Note: Module cache is always shared by default (see above).
+
 #### Custom Cache Locations
 
-You can specify custom base directories for caches:
+You can customize cache locations:
 
 ```bash
-# Custom GOCACHE base directory
+# Custom GOCACHE base directory (per-version build caches)
 export GOENV_GOCACHE_DIR=/custom/path/gocache
-# Results in: /custom/path/gocache/1.23.2
+# Results in: /custom/path/gocache/1.23.2/go-build-darwin-arm64
 
-# Custom GOMODCACHE base directory
-export GOENV_GOMODCACHE_DIR=/custom/path/gomodcache
-# Results in: /custom/path/gomodcache/1.23.2
+# Custom GOMODCACHE (shared module cache)
+export GOMODCACHE=/custom/path/gomodcache
+# Results in: /custom/path/gomodcache (used by all versions)
 ```
 
 ### Diagnosing Cache Issues

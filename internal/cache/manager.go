@@ -12,7 +12,6 @@ import (
 	"github.com/go-nv/goenv/internal/cgo"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
-	"github.com/go-nv/goenv/internal/goenv"
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 )
@@ -475,82 +474,38 @@ func (m *Manager) ValidateCaches() ([]string, error) {
 	return warnings, nil
 }
 
-// BuildCacheSuffix constructs a cache directory suffix that includes ABI variants.
-// ABI variants (GOAMD64, GOARM, etc.) affect binary compatibility even when GOOS/GOARCH match.
-// Uses auto-discovery via 'go env -json' to future-proof against new ABI variables.
+// BuildCacheSuffix constructs a simplified cache directory suffix.
 //
-// This function consolidates cache naming logic used by exec and doctor commands.
-// The suffix format is: go-build-{GOOS}-{GOARCH}[-{ABI}][-exp-{GOEXPERIMENT}][-cgo-{HASH}]
+// Simplified approach (pre-release simplification):
+//   - Per-version isolation (prevents version mismatch errors)
+//   - Per-architecture isolation (prevents exec format errors)
+//   - Optional CGO marker (not hash - prevents proliferation)
+//
+// Format: go-build-{GOOS}-{GOARCH}[-cgo]
+//
+// Examples:
+//   - go-build-darwin-arm64
+//   - go-build-linux-amd64-cgo
+//   - go-build-windows-amd64
 //
 // Parameters:
-//   - goBinaryPath: Path to the Go binary (for ABI discovery)
+//   - goBinaryPath: Path to the Go binary (unused in simplified version)
 //   - goos, goarch: Target OS and architecture
-//   - env: Environment variables (for GOEXPERIMENT, CGO_*, etc.)
+//   - env: Environment variables (for CGO_ENABLED check)
 //
-// Returns: Cache directory name like "go-build-darwin-arm64" or "go-build-linux-amd64-v3-cgo-a1b2c3d4"
+// Returns: Cache directory name like "go-build-darwin-arm64" or "go-build-linux-amd64-cgo"
 func BuildCacheSuffix(goBinaryPath, goos, goarch string, env []string) string {
-	// Import dependencies at package level to avoid circular imports
-	// These are safe because cache package is lower-level than goenv/cgo packages
-	return buildCacheSuffixImpl(goBinaryPath, goos, goarch, env)
-}
-
-// buildCacheSuffixImpl is the implementation of BuildCacheSuffix
-// Kept separate to allow testing without external dependencies
-func buildCacheSuffixImpl(goBinaryPath, goos, goarch string, env []string) string {
 	// Start with OS-arch
 	suffix := fmt.Sprintf("go-build-%s-%s", goos, goarch)
 
-	// Add ABI variants using auto-discovery from Go binary
-	// This dynamically discovers GOAMD64, GOARM, GO386, GOMIPS*, GOPPC64, GORISCV64, etc.
-	// and future-proofs against new ABI variants (e.g., GOAMD64v5, GOLOONG64)
-
-	// Note: This function needs to call goenv.BuildABISuffix and cgo functions
-	// We'll add these imports at the top of the file
-
-	// For now, return base suffix - will be completed in next edit
-	suffix += buildABISuffixHelper(goBinaryPath, goarch, env)
-	suffix += buildGoExperimentSuffix(env)
-	suffix += buildCGOHashSuffix(env)
+	// Add -cgo marker if CGO is enabled
+	// This provides a basic separation between native and CGO builds
+	// without the cache proliferation caused by hashing CGO toolchain details
+	if cgo.IsCGOEnabled(env) {
+		suffix += "-cgo"
+	}
 
 	return suffix
-}
-
-// Helper functions for building cache suffix components
-// These will be implemented to avoid circular dependencies
-
-func buildABISuffixHelper(goBinaryPath, goarch string, env []string) string {
-	// Add ABI variants using auto-discovery from Go binary
-	// This dynamically discovers GOAMD64, GOARM, GO386, GOMIPS*, GOPPC64, GORISCV64, etc.
-	// and future-proofs against new ABI variants (e.g., GOAMD64v5, GOLOONG64)
-	return goenv.BuildABISuffix(goBinaryPath, goarch, env)
-}
-
-func buildGoExperimentSuffix(env []string) string {
-	// Add GOEXPERIMENT if set (affects runtime behavior)
-	for _, e := range env {
-		if len(e) > 13 && e[:13] == "GOEXPERIMENT=" {
-			goexp := e[13:]
-			if goexp != "" {
-				// Sanitize GOEXPERIMENT for use in filename (replace , with -)
-				goexp = strings.ReplaceAll(goexp, ",", "-")
-				return "-exp-" + goexp
-			}
-		}
-	}
-	return ""
-}
-
-func buildCGOHashSuffix(env []string) string {
-	// Add CGO toolchain hash if CGO is enabled
-	// This prevents cache conflicts when swapping C compilers/headers/flags
-	if cgo.IsCGOEnabled(env) {
-		cgoHash := cgo.ComputeToolchainHash(env)
-		if cgoHash != "" {
-			// Use first 8 chars of hash for brevity
-			return "-cgo-" + cgoHash[:8]
-		}
-	}
-	return ""
 }
 
 // CachePathForVersion returns the expected build cache path for a version and architecture.

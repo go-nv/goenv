@@ -332,6 +332,46 @@ func main() {
 
 ## Breaking Changes
 
+### Removed Environment Variables
+
+v3 removes several environment variables that are no longer needed:
+
+#### Module Cache Management
+
+- **`GOENV_DISABLE_GOMODCACHE`**: Removed
+  - v3 automatically shares module cache at `$GOENV_ROOT/shared/go-mod` (matches Go's native behavior)
+  - Module source code is version-agnostic, so sharing is safe and efficient
+  - To use a custom location, set `GOMODCACHE` env var directly (e.g., `export GOMODCACHE=/custom/path`)
+  - goenv respects any existing `GOMODCACHE` setting
+  
+- **`GOENV_GOMODCACHE_DIR`**: Removed
+  - Not needed - use standard `GOMODCACHE` env var for custom locations
+
+#### GOPATH Append/Prepend
+
+- **`GOENV_PREPEND_GOPATH`**: Removed
+- **`GOENV_APPEND_GOPATH`**: Removed
+- **`GOENV_GOPATH_PREFIX`**: Removed
+  - v3 automatically preserves your existing `GOPATH` if set
+  - Version-specific GOPATH is always `$HOME/go/{version}`
+  - If you need custom GOPATH location, set `GOPATH` directly
+
+**Migration:**
+```bash
+# v2: Used GOENV_GOPATH_PREFIX for custom location
+export GOENV_GOPATH_PREFIX=/data/go
+
+# v3: Set GOPATH directly (goenv preserves it)
+export GOPATH=/data/go/1.23.2
+# Or if you want version-specific:
+export GOPATH=$HOME/go/$(goenv version-name)
+
+# Clean old variables
+unset GOENV_PREPEND_GOPATH
+unset GOENV_APPEND_GOPATH
+unset GOENV_GOPATH_PREFIX
+```
+
 ### None for Most Users
 
 The Go implementation maintains full backward compatibility. However, be aware of:

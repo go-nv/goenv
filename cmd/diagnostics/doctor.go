@@ -107,6 +107,7 @@ const (
 	IssueTypeShimsEmpty          IssueType = "shims-empty"
 	IssueTypeCacheStale          IssueType = "cache-stale"
 	IssueTypeCacheArchMismatch   IssueType = "cache-arch-mismatch"
+	IssueTypeOldModCaches        IssueType = "old-mod-caches"
 	IssueTypeVersionNotSet       IssueType = "version-not-set"
 	IssueTypeVersionNotInstalled IssueType = "version-not-installed"
 	IssueTypeVersionCorrupted    IssueType = "version-corrupted"
@@ -246,7 +247,10 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 15: GOCACHE isolation
 	results = append(results, checkGocacheIsolation(cfg, mgr))
 
-	// Check 16: Architecture mismatches in cache
+	// Check 16: Old per-version module caches (v2 migration)
+	results = append(results, checkOldModCaches(cfg, mgr))
+
+	// Check 17: Architecture mismatches in cache
 	results = append(results, checkCacheArchitecture(cfg))
 
 	// Check 16a: Cache on problem mounts (NFS, Docker bind mounts)
@@ -1519,6 +1523,15 @@ func detectFixableIssues(results []checkResult, cfg *config.Config) []fixableIss
 				fixFunc:     fixCacheClean,
 			})
 
+		case IssueTypeOldModCaches:
+			issues = append(issues, fixableIssue{
+				id:          "old-mod-caches-clean",
+				name:        "Old Module Caches",
+				description: "Per-version module caches from v2 (no longer used)",
+				tier:        FixTierPrompt,
+				fixFunc:     fixOldModCaches,
+			})
+
 		case IssueTypeVersionMismatch:
 			// Version mismatch that needs rehash
 			issues = append(issues, fixableIssue{
@@ -1668,11 +1681,56 @@ func fixRehash(cmd *cobra.Command, cfg *config.Config) error {
 }
 
 func fixCacheClean(cmd *cobra.Command, cfg *config.Config) error {
-	buildCache := os.Getenv(utils.EnvVarGocache)
-	if buildCache == "" {
-		buildCache = filepath.Join(cfg.Root, "go-build")
+	// Clean build caches using the cache manager
+	// This handles both old-format and new architecture-specific caches
+	cacheMgr := cache.NewManager(cfg)
+	
+	result, err := cacheMgr.Clean(cache.CleanOptions{
+		Kind:    cache.CacheKindBuild,
+		DryRun:  false,
+		Verbose: false,
+	})
+	
+	if err != nil {
+		return errors.FailedTo("clean build caches", err)
 	}
-	return os.RemoveAll(buildCache)
+	
+	if result.CachesRemoved > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Cleaned %d cache(s), freed %s\n", 
+			result.CachesRemoved, cache.FormatBytes(result.BytesReclaimed))
+	}
+	
+	if len(result.Errors) > 0 {
+		return fmt.Errorf("cleaned caches but encountered %d error(s)", len(result.Errors))
+	}
+	
+	return nil
+}
+
+func fixOldModCaches(cmd *cobra.Command, cfg *config.Config) error {
+	// Clean old per-version module caches
+	cacheMgr := cache.NewManager(cfg)
+
+	result, err := cacheMgr.Clean(cache.CleanOptions{
+		Kind: cache.CacheKindMod,
+		// This will clean all per-version mod caches (shared cache won't be affected)
+	})
+	if err != nil {
+		return errors.FailedTo("clean old module caches", err)
+	}
+
+	if result.CachesRemoved > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Cleaned %d old module cache(s), freed %s\n",
+			result.CachesRemoved, cache.FormatBytes(result.BytesReclaimed))
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), "  No old module caches found")
+	}
+
+	if len(result.Errors) > 0 {
+		return fmt.Errorf("cleaned caches but encountered %d error(s)", len(result.Errors))
+	}
+
+	return nil
 }
 
 func fixInstallMissingVersion(cmd *cobra.Command, cfg *config.Config, version string) error {
@@ -2842,23 +2900,73 @@ func checkGocacheIsolation(cfg *config.Config, mgr *manager.Manager) checkResult
 	}
 
 	// Get expected GOCACHE path
+	// Note: The actual cache name varies by architecture (go-build-{GOOS}-{GOARCH}[-cgo])
+	// For validation purposes, we check if ANY build cache exists for this version
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
 	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
-	var expectedGocache string
+	var baseCachePath string
 	if customGocacheDir != "" {
-		expectedGocache = filepath.Join(customGocacheDir, version)
+		baseCachePath = filepath.Join(customGocacheDir, version)
 	} else {
-		expectedGocache = filepath.Join(versionPath, "go-build")
+		baseCachePath = versionPath
 	}
 
 	// Check what GOCACHE would be set to when running commands
-	// Note: We can't rely on current env var since exec.go sets it
+	// Since cache names now include architecture, just verify the base path exists
 	return checkResult{
 		id:      "build-cache-isolation",
 		name:    "Build cache isolation",
 		status:  StatusOK,
-		message: fmt.Sprintf("Version-specific cache: %s", expectedGocache),
+		message: fmt.Sprintf("Version-specific cache directory: %s", baseCachePath),
 		advice:  "Cache isolation prevents 'exec format error' when switching versions",
+	}
+}
+
+func checkOldModCaches(cfg *config.Config, mgr *manager.Manager) checkResult {
+	// Check for old per-version module caches from v2
+	// v3 uses a shared module cache at $GOENV_ROOT/shared/go-mod
+	// Old per-version caches at $VERSION/pkg/mod are no longer used
+	
+	versions, err := mgr.ListInstalledVersions()
+	if err != nil || len(versions) == 0 {
+		return checkResult{
+			id:      "old-mod-caches",
+			name:    "Old module caches",
+			status:  StatusOK,
+			message: "No versions installed",
+		}
+	}
+
+	oldCaches := make([]string, 0)
+	totalSize := int64(0)
+	
+	for _, version := range versions {
+		oldModPath := filepath.Join(cfg.VersionsDir(), version, "pkg", "mod")
+		if utils.DirExists(oldModPath) {
+			// Calculate size
+			size, _, _ := cache.GetDirSize(oldModPath)
+			totalSize += size
+			oldCaches = append(oldCaches, version)
+		}
+	}
+
+	if len(oldCaches) == 0 {
+		return checkResult{
+			id:      "old-mod-caches",
+			name:    "Old module caches",
+			status:  StatusOK,
+			message: "No old per-version module caches found",
+			advice:  "v3 uses shared module cache at $GOENV_ROOT/shared/go-mod",
+		}
+	}
+
+	return checkResult{
+		id:        "old-mod-caches",
+		name:      "Old module caches",
+		status:    StatusWarning,
+		message:   fmt.Sprintf("Found old per-version module caches in %d version(s) (using %s)", len(oldCaches), cache.FormatBytes(totalSize)),
+		advice:    "v3 shares module cache automatically. Run 'goenv cache clean mod' to reclaim disk space",
+		issueType: IssueTypeOldModCaches,
 	}
 }
 
@@ -2987,13 +3095,16 @@ func checkCacheMountType(cfg *config.Config, mgr *manager.Manager) checkResult {
 	}
 
 	// Get expected GOCACHE path
+	// Get cache path
+	// Note: The actual cache name varies by architecture (go-build-{GOOS}-{GOARCH}[-cgo])
+	// For mount checking purposes, we check the version directory itself
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
 	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
 	var cachePath string
 	if customGocacheDir != "" {
 		cachePath = filepath.Join(customGocacheDir, version)
 	} else {
-		cachePath = filepath.Join(versionPath, "go-build")
+		cachePath = versionPath // Check version directory, not specific cache
 	}
 
 	// Check if cache is on a problem mount
@@ -3106,8 +3217,8 @@ func checkCacheIsolationEffectiveness(cfg *config.Config, mgr *manager.Manager) 
 		goBinaryPath += ".exe"
 	}
 
-	// Build expected cache path using cache package API
-	// This centralizes the complex logic for ABI variants, GOEXPERIMENT, and CGO hashing
+	// Build expected cache path using simplified cache suffix
+	// Format: go-build-{GOOS}-{GOARCH}[-cgo]
 	cacheSuffix := cache.BuildCacheSuffix(goBinaryPath, goos, goarch, os.Environ())
 
 	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()

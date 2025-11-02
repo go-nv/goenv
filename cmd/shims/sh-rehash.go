@@ -67,28 +67,21 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	// Check environment variables for disabling GOROOT/GOPATH
 	disableGoroot := utils.GoenvEnvVarDisableGoroot.UnsafeValue() == "1"
 	disableGopath := utils.GoenvEnvVarDisableGopath.UnsafeValue() == "1"
-	gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
-	appendGopath := utils.GoenvEnvVarAppendGopath.UnsafeValue() == "1"
-	prependGopath := utils.GoenvEnvVarPrependGopath.UnsafeValue() == "1"
-	existingGopath := os.Getenv(utils.EnvVarGopath)
 
-	// Build GOPATH value
-	var gopathValue string
-	if gopathPrefix == "" {
-		home, err := os.UserHomeDir()
-		if err != nil || home == "" {
-			home = os.Getenv(utils.EnvVarHome) // Fallback
-		}
-		gopathValue = filepath.Join(home, "go", currentVersion)
-	} else {
-		gopathValue = filepath.Join(gopathPrefix, currentVersion)
+	// Build GOPATH value: $HOME/go/{version}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.Getenv(utils.EnvVarHome) // Fallback
 	}
+	gopathValue := filepath.Join(home, "go", currentVersion)
 
-	// Handle GOPATH appending/prepending
-	if existingGopath != "" && appendGopath {
+	// Preserve existing GOPATH by prepending version-specific path.
+	// This allows users to keep source code in existing locations while
+	// giving priority to version-specific installed tools/packages.
+	// See: https://github.com/go-nv/goenv/issues/147
+	existingGopath := os.Getenv(utils.EnvVarGopath)
+	if existingGopath != "" {
 		gopathValue = gopathValue + string(os.PathListSeparator) + existingGopath
-	} else if existingGopath != "" && prependGopath {
-		gopathValue = existingGopath + string(os.PathListSeparator) + gopathValue
 	}
 
 	// Build GOROOT value (version install path)

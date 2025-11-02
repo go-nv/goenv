@@ -158,40 +158,21 @@ func TestShRehashCommand(t *testing.T) {
 			expectedOutput: "export GOROOT=",
 		},
 		{
-			name: "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_APPEND_GOPATH' is 1, shell is 'bash', it echoes GOPATH with append",
+			name: "preserves existing GOPATH when already set",
 			args: []string{"--only-manage-paths"},
 			envVars: map[string]string{
 				"GOENV_VERSION":        "1.12.0",
 				"GOENV_SHELL":          "bash",
 				"GOENV_DISABLE_GOROOT": "0",
 				"GOENV_DISABLE_GOPATH": "0",
-				"GOENV_APPEND_GOPATH":  "1",
-				"GOPATH":               "/fake-gopath",
+				"GOPATH":               "/custom/gopath",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
 				err = utils.EnsureDirWithContext(versionDir, "create test directory")
 				require.NoError(t, err, "Failed to create version directory")
 			},
-			expectedOutput: ":/fake-gopath",
-		},
-		{
-			name: "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 0, 'GOENV_DISABLE_GOPATH' is 0, 'GOENV_PREPEND_GOPATH' is 1, shell is 'bash', it echoes GOPATH with prepend",
-			args: []string{"--only-manage-paths"},
-			envVars: map[string]string{
-				"GOENV_VERSION":        "1.12.0",
-				"GOENV_SHELL":          "bash",
-				"GOENV_DISABLE_GOROOT": "0",
-				"GOENV_DISABLE_GOPATH": "0",
-				"GOENV_PREPEND_GOPATH": "1",
-				"GOPATH":               "/fake-gopath",
-			},
-			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
-			},
-			expectedOutput: "/fake-gopath:",
+			expectedOutput: "export GOPATH=",
 		},
 	}
 

@@ -107,7 +107,13 @@ func expandEnvVars(path string) string {
 	result := path
 
 	// Common environment variables in VS Code settings
-	envVars := []string{"HOME", "USERPROFILE", utils.GoenvEnvVarRoot.String(), "GOPATH", "GOROOT"}
+	envVars := []string{
+		utils.EnvVarHome,
+		utils.EnvVarUserProfile,
+		utils.GoenvEnvVarRoot.String(),
+		utils.EnvVarGopath,
+		utils.EnvVarGoroot,
+	}
 
 	for _, envVar := range envVars {
 		placeholder := fmt.Sprintf("${env:%s}", envVar)
@@ -449,7 +455,7 @@ func ConvertToWorkspacePaths(settings map[string]any, workspaceRoot string) map[
 // UpdateSettingsForVersion updates VS Code settings for a specific Go version
 // This function is designed to be called from workflows and automation without cobra dependencies
 // Returns nil if successful, error otherwise
-func UpdateSettingsForVersion(workingDir string, goenvRoot string, version string, gopathPrefix string) error {
+func UpdateSettingsForVersion(workingDir string, goenvRoot string, version string) error {
 	if workingDir == "" {
 		var err error
 		workingDir, err = os.Getwd()
@@ -500,12 +506,7 @@ func UpdateSettingsForVersion(workingDir string, goenvRoot string, version strin
 	gorootAbs := filepath.Join(goenvRoot, "versions", version)
 	goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
-	var gopathAbs string
-	if gopathPrefix == "" {
-		gopathAbs = filepath.Join(homeDir, "go", version)
-	} else {
-		gopathAbs = filepath.Join(gopathPrefix, version)
-	}
+	gopathAbs := filepath.Join(homeDir, "go", version)
 	gopath := strings.Replace(gopathAbs, homeDir, homeEnvVar, 1)
 
 	keysToUpdate := map[string]interface{}{

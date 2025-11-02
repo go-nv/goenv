@@ -453,9 +453,15 @@ func (u *Updater) updateTool(tool toolspkg.Tool, version, goVersion string, verb
 	// Run go install
 	cmd := exec.Command(goBin, "install", packagePath)
 	cmd.Env = append(os.Environ(),
-		"GOROOT="+goRoot,
-		"GOPATH="+gopath,
+		utils.EnvVarGoroot+"="+goRoot,
+		utils.EnvVarGopath+"="+gopath,
 	)
+
+	// Set shared GOMODCACHE if not already set (matches exec.go behavior)
+	if os.Getenv(utils.EnvVarGomodcache) == "" {
+		sharedGomodcache := filepath.Join(u.cfg.Root, "shared", "go-mod")
+		cmd.Env = append(cmd.Env, utils.EnvVarGomodcache+"="+sharedGomodcache)
+	}
 
 	if verbose {
 		cmd.Stdout = os.Stdout
