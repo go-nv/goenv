@@ -26,8 +26,8 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 	for _, version := range versions {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
-		// Create go binary directory (tools manager expects versionPath/go/bin/go)
-		goBinDir := filepath.Join(versionPath, "go", "bin")
+		// Create go binary directory
+		goBinDir := filepath.Join(versionPath, "bin")
 		err = utils.EnsureDirWithContext(goBinDir, "create test directory")
 		require.NoError(t, err, "Failed to create go bin directory")
 

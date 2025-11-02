@@ -436,7 +436,7 @@ func (u *Updater) updateTool(tool toolspkg.Tool, version, goVersion string, verb
 
 	// Set up paths
 	versionPath := filepath.Join(u.cfg.Root, "versions", goVersion)
-	goRoot := filepath.Join(versionPath, "go")
+	goRoot := versionPath
 	goBin := filepath.Join(goRoot, "bin", "go")
 	gopath := filepath.Join(versionPath, "gopath")
 

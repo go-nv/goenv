@@ -105,7 +105,7 @@ func (m *Manager) Install(opts InstallOptions) (*InstallResult, error) {
 // For batch installation, use Install() instead.
 func (m *Manager) InstallSingleTool(version, packagePath string, verbose bool) error {
 	versionPath := filepath.Join(m.cfg.Root, "versions", version)
-	goRoot := filepath.Join(versionPath, "go")
+	goRoot := versionPath
 	goBinDir := filepath.Join(goRoot, "bin")
 	gopath := filepath.Join(versionPath, "gopath")
 

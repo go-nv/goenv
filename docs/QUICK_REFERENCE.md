@@ -186,7 +186,7 @@ goenv tools update
 goenv tools update --all
 
 # Sync tools between specific versions
-goenv tools sync 1.21.0 1.23.0
+goenv tools sync-tools 1.21.0 1.23.0
 
 # Manage default tools (auto-installed with new Go versions)
 goenv tools default list

@@ -235,7 +235,7 @@ func runStatus(cmd *cobra.Command, jsonOutput bool) error {
 		fmt.Fprintln(cmd.OutOrStdout())
 		fmt.Fprintf(cmd.OutOrStdout(), "%sRecommendations:\n", utils.Emoji("💡 "))
 		fmt.Fprintln(cmd.OutOrStdout(), "  • Use 'goenv tools install <tool> --all' to install across all versions")
-		fmt.Fprintln(cmd.OutOrStdout(), "  • Use 'goenv tools sync <from> <to>' to copy tools between versions")
+		fmt.Fprintln(cmd.OutOrStdout(), "  • Use 'goenv tools sync-tools <from> <to>' to copy tools between versions")
 	}
 
 	return nil

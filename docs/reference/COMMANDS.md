@@ -108,7 +108,7 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv inventory`](#goenv-inventory)
   - [`goenv local`](#goenv-local)
     - [`goenv local` (advanced)](#goenv-local-advanced)
-  - [`goenv tools sync`](#goenv-tools-sync)
+  - [`goenv tools sync-tools`](#goenv-tools-sync-tools)
     - [Options](#options-1)
   - [`goenv prefix`](#goenv-prefix)
   - [`goenv refresh`](#goenv-refresh)
@@ -972,7 +972,7 @@ Manage Go tools on a per-version basis. Ensures tools are properly isolated per 
 - `goenv tools update` - Update installed tools to latest versions
 - `goenv tools outdated` - Show which tools need updating across all versions
 - `goenv tools status` - View tool consistency across all Go versions
-- `goenv tools sync` - Copy tools from one version to another
+- `goenv tools sync-tools` - Copy tools from one version to another
 - `goenv tools default` - Manage automatic tool installation
 
 **Quick Start:**
@@ -1009,7 +1009,7 @@ goenv tools update
 goenv tools update --all
 
 # Sync tools from one version to another
-goenv tools sync 1.23.2 1.24.4
+goenv tools sync-tools 1.23.2 1.24.4
 ```
 
 See the detailed sections below for each subcommand.
@@ -1435,7 +1435,7 @@ Go versions: 3 installed
 
 💡 Recommendations:
   • Use 'goenv tools install <tool> --all' to install across all versions
-  • Use 'goenv tools sync <from> <to>' to copy tools between versions
+  • Use 'goenv tools sync-tools <from> <to>' to copy tools between versions
 ```
 
 **Tool Categories:**
@@ -2890,7 +2890,7 @@ You can use a shorthand syntax to set the local version by specifying the versio
 
 This shorthand automatically routes to the `local` command, making it faster to switch versions in your current directory.
 
-## `goenv tools sync`
+## `goenv tools sync-tools`
 
 Sync/replicate installed Go tools from one Go version to another.
 
@@ -2906,22 +2906,22 @@ This command discovers tools in the source version and reinstalls them (from sou
 
 ```shell
 # Auto-sync: finds best source, syncs to current version
-> goenv tools sync
+> goenv tools sync-tools
 
 # Sync from specific version to current version
-> goenv tools sync 1.24.1
+> goenv tools sync-tools 1.24.1
 
 # Explicit source and target
-> goenv tools sync 1.24.1 1.25.2
+> goenv tools sync-tools 1.24.1 1.25.2
 
 # Preview auto-sync
-> goenv tools sync --dry-run
+> goenv tools sync-tools --dry-run
 
 # Sync only specific tools
-> goenv tools sync 1.24.1 --select gopls,delve
+> goenv tools sync-tools 1.24.1 --select gopls,delve
 
 # Exclude certain tools
-> goenv tools sync 1.24.1 --exclude staticcheck
+> goenv tools sync-tools 1.24.1 --exclude staticcheck
 ```
 
 ### Options

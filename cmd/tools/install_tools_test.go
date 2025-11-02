@@ -75,15 +75,15 @@ func TestInstallCommand_DryRun(t *testing.T) {
 	// Create a Go version
 	version := "1.23.0"
 	versionPath := filepath.Join(tmpDir, "versions", version)
-	goRoot := filepath.Join(versionPath, "go", "bin")
+	goBinDir := filepath.Join(versionPath, "bin")
 	gopath := filepath.Join(versionPath, "gopath", "bin")
-	err = utils.EnsureDirWithContext(goRoot, "create test directory")
+	err = utils.EnsureDirWithContext(goBinDir, "create test directory")
 	require.NoError(t, err)
 	err = utils.EnsureDirWithContext(gopath, "create test directory")
 	require.NoError(t, err)
 
 	// Create fake go binary
-	goBin := filepath.Join(goRoot, "go")
+	goBin := filepath.Join(goBinDir, "go")
 	testutil.WriteTestFile(t, goBin, []byte("#!/bin/sh\nexit 0"), utils.PermFileExecutable)
 
 	// Create .go-version file to set current version

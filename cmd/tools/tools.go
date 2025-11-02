@@ -30,7 +30,7 @@ Tool Management:
   update       Update installed tools to latest versions
 
 Version Sync:
-  sync         Copy tools from one version to another
+  sync-tools   Copy tools from one version to another
   default      Set default tool installation behavior
 
 Examples:

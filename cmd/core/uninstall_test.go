@@ -94,9 +94,8 @@ func TestUninstallCommand(t *testing.T) {
 			// Setup versions
 			for _, version := range tt.setupVersions {
 				versionPath := filepath.Join(tmpDir, "versions", version)
-				goPath := filepath.Join(versionPath, "go")
 
-				err = utils.EnsureDirWithContext(goPath, "create test directory")
+				err = utils.EnsureDirWithContext(versionPath, "create test directory")
 				require.NoError(t, err, "Failed to create version directory")
 
 				// Create a marker file to verify existence

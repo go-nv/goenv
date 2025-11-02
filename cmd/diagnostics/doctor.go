@@ -1722,7 +1722,7 @@ func fixVSCodeSync(cmd *cobra.Command, cfg *config.Config) error {
 }
 
 func fixToolSync(cmd *cobra.Command, cfg *config.Config) error {
-	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv tools sync\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv tools sync-tools\n")
 	return errors.PleaseRunManually()
 }
 
@@ -2795,7 +2795,7 @@ func checkToolMigration(cfg *config.Config, mgr *manager.Manager) checkResult {
 			name:      "Tool sync",
 			status:    StatusWarning,
 			message:   fmt.Sprintf("Current Go %s has no tools, but Go %s has %d tool(s)", currentVersion, bestSourceVersion, maxToolCount),
-			advice:    fmt.Sprintf("Sync tools with: goenv tools sync (or: goenv tools sync %s)", bestSourceVersion),
+			advice:    fmt.Sprintf("Sync tools with: goenv tools sync-tools (or: goenv tools sync-tools %s)", bestSourceVersion),
 			issueType: IssueTypeToolsMissing,
 		}
 	}
@@ -2806,7 +2806,7 @@ func checkToolMigration(cfg *config.Config, mgr *manager.Manager) checkResult {
 		name:      "Tool sync",
 		status:    StatusWarning,
 		message:   fmt.Sprintf("Current Go %s has no tools, but %d other version(s) have tools (e.g., Go %s has %d tool(s))", currentVersion, len(versionsWithTools), bestSourceVersion, maxToolCount),
-		advice:    fmt.Sprintf("Sync tools from best source: goenv tools sync (will auto-select Go %s)", bestSourceVersion),
+		advice:    fmt.Sprintf("Sync tools from best source: goenv tools sync-tools (will auto-select Go %s)", bestSourceVersion),
 		issueType: IssueTypeToolsMissing,
 	}
 }

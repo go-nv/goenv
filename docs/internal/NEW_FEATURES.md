@@ -551,7 +551,7 @@ echo "Installed and rehashed all versions"
 **Environment Variable:**
 
 - `GOENV_NO_AUTO_REHASH=1` - Disable auto-rehash globally
-- Applies to: `goenv install`, `goenv exec go install`, `goenv tools sync`
+- Applies to: `goenv install`, `goenv exec go install`, `goenv tools sync-tools`
 
 ### When to Use
 

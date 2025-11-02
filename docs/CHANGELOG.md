@@ -110,7 +110,7 @@ Change line format:
   - `goenv tools uninstall --all` - Uninstall tools from current or all Go versions
   - `goenv tools list --all` - List tools across all versions
   - `goenv tools update --all` - Update tools across all versions
-  - `goenv tools sync <from> <to>` - Copy tools from one Go version to another
+  - `goenv tools sync-tools <from> <to>` - Copy tools from one Go version to another
   - `goenv tools outdated` - Check which tools need updating across versions
   - `goenv tools status` - View tool consistency and identify gaps across versions
   - `goenv tools default` - Manage automatic tool installation for new Go versions

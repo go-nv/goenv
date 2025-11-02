@@ -40,7 +40,7 @@ func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shou
 	if shouldCreateVersion && version != "" && version != manager.SystemVersion {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
-		goBinDir := filepath.Join(versionPath, "go", "bin")
+		goBinDir := filepath.Join(versionPath, "bin")
 		err = utils.EnsureDirWithContext(goBinDir, "create test directory")
 		require.NoError(t, err, "Failed to create go bin directory")
 

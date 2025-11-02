@@ -34,13 +34,13 @@ This is useful when upgrading Go versions and wanting to maintain your tool
 environment across versions.
 
 Examples:
-  goenv tools sync                         # Auto: best source → current version
-  goenv tools sync 1.24.1                  # From 1.24.1 → current version
-  goenv tools sync 1.24.1 1.25.2           # From 1.24.1 → 1.25.2 (explicit)
-  goenv tools sync --dry-run               # Preview auto-sync
-  goenv tools sync 1.24.1 --dry-run        # Preview sync from 1.24.1
-  goenv tools sync --select gopls,delve    # Only sync specific tools
-  goenv tools sync --exclude staticcheck   # Exclude certain tools`,
+  goenv tools sync-tools                         # Auto: best source → current version
+  goenv tools sync-tools 1.24.1                  # From 1.24.1 → current version
+  goenv tools sync-tools 1.24.1 1.25.2           # From 1.24.1 → 1.25.2 (explicit)
+  goenv tools sync-tools --dry-run               # Preview auto-sync
+  goenv tools sync-tools 1.24.1 --dry-run        # Preview sync from 1.24.1
+  goenv tools sync-tools --select gopls,delve    # Only sync specific tools
+  goenv tools sync-tools --exclude staticcheck   # Exclude certain tools`,
 	Args: cobra.MaximumNArgs(2),
 	RunE: runSyncTools,
 }

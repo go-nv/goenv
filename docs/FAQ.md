@@ -496,10 +496,10 @@ goenv tools update --all
 
 ```bash
 # Sync all tools from active version to another version
-goenv tools sync 1.25.2 1.24.0
+goenv tools sync-tools 1.25.2 1.24.0
 
 # Auto-detect and sync
-goenv tools sync
+goenv tools sync-tools
 ```
 
 ### Why can't I find my tool after installing it?
