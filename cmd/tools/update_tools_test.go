@@ -56,14 +56,7 @@ func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shou
 		}
 
 		for _, tool := range tools {
-			toolPath := filepath.Join(gopathBin, tool.name)
-			mockContent := "mock tool binary"
-			if utils.IsWindows() {
-				toolPath += ".bat"
-				mockContent = "@echo off\necho mock tool binary\n"
-			}
-
-			testutil.WriteTestFile(t, toolPath, []byte(mockContent), utils.PermFileExecutable)
+			cmdtest.CreateToolExecutable(t, gopathBin, tool.name)
 		}
 	}
 

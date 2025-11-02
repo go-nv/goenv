@@ -161,6 +161,12 @@ func TestGetStartedCommand_FishShell(t *testing.T) {
 }
 
 func TestGetStartedCommand_UnknownShell(t *testing.T) {
+	// On Windows, shell detection always defaults to PowerShell
+	// This test is for Unix where unknown shells fall back to bash
+	if utils.IsWindows() {
+		t.Skip("Skipping unknown shell test on Windows - defaults to PowerShell")
+	}
+
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarShell.String(), "")

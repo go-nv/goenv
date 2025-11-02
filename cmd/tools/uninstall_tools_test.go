@@ -115,11 +115,10 @@ func TestFindCurrentVersionToolTargets(t *testing.T) {
 	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
 	binPath := cfg.VersionGopathBin(version)
 
-	// Create test tools
+	// Create test tools using helper (handles .bat on Windows)
 	tools := []string{"gopls", "staticcheck"}
 	for _, tool := range tools {
-		toolPath := filepath.Join(binPath, tool)
-		testutil.WriteTestFile(t, toolPath, []byte("fake"), utils.PermFileExecutable)
+		cmdtest.CreateToolExecutable(t, binPath, tool)
 	}
 
 	// Set current version

@@ -166,11 +166,10 @@ func TestStatusCommand_Categorization(t *testing.T) {
 		// Create version with tool directory
 		cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
 
-		// Create individual tool binaries
+		// Create individual tool binaries using helper (handles .bat on Windows)
 		binPath := cfg.VersionGopathBin(version)
 		for _, tool := range tools {
-			toolPath := filepath.Join(binPath, tool)
-			testutil.WriteTestFile(t, toolPath, []byte("fake"), utils.PermFileExecutable)
+			cmdtest.CreateToolExecutable(t, binPath, tool)
 		}
 	}
 

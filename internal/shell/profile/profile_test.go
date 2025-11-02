@@ -58,6 +58,11 @@ func TestHasGoenvInit(t *testing.T) {
 }
 
 func TestGetProfile(t *testing.T) {
+	// This test is Unix-specific (tests .bashrc)
+	if utils.IsWindows() {
+		t.Skip("Skipping Unix shell profile test on Windows")
+	}
+
 	// Create temporary test directory
 	tmpDir := t.TempDir()
 	home := filepath.Join(tmpDir, "home")
@@ -147,6 +152,11 @@ func TestDetectPathResets(t *testing.T) {
 }
 
 func TestGetAllProfiles(t *testing.T) {
+	// This test is Unix-specific (tests .zshrc, .zprofile)
+	if utils.IsWindows() {
+		t.Skip("Skipping Unix shell profile test on Windows")
+	}
+
 	// Create temporary test directory
 	tmpDir := t.TempDir()
 	home := filepath.Join(tmpDir, "home")

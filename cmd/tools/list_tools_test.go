@@ -3,9 +3,10 @@ package tools
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/go-nv/goenv/internal/utils"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
@@ -32,13 +33,12 @@ func TestListCommand_AllFlag(t *testing.T) {
 		// Create version with tool directory
 		cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
 
-		// Create individual tool binaries
+		// Create individual tool binaries using helper (handles .bat on Windows)
 		cfg := &config.Config{Root: tmpDir}
 		binPath := cfg.VersionGopathBin(version)
 
 		for _, tool := range tools {
-			toolPath := filepath.Join(binPath, tool)
-			testutil.WriteTestFile(t, toolPath, []byte("fake"), utils.PermFileExecutable)
+			cmdtest.CreateToolExecutable(t, binPath, tool)
 		}
 	}
 
@@ -104,8 +104,7 @@ func TestListCommand_JSONOutput(t *testing.T) {
 
 	tools := []string{"gopls", "staticcheck"}
 	for _, tool := range tools {
-		toolPath := filepath.Join(binPath, tool)
-		testutil.WriteTestFile(t, toolPath, []byte("fake"), utils.PermFileExecutable)
+		cmdtest.CreateToolExecutable(t, binPath, tool)
 	}
 
 	// Enable JSON output
@@ -205,8 +204,8 @@ func TestListCommand_HiddenFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create regular and hidden files
-	testutil.WriteTestFile(t, filepath.Join(binPath, "gopls"), []byte("fake"), utils.PermFileExecutable)
+	// Create regular and hidden files (use helper for gopls to handle .bat on Windows)
+	cmdtest.CreateToolExecutable(t, binPath, "gopls")
 	testutil.WriteTestFile(t, filepath.Join(binPath, ".hidden"), []byte("fake"), utils.PermFileExecutable)
 
 	toolList, err := toolspkg.ListForVersion(cfg, version)
@@ -282,8 +281,7 @@ func TestListCommand_RunE(t *testing.T) {
 
 	tools := []string{"gopls", "staticcheck"}
 	for _, tool := range tools {
-		toolPath := filepath.Join(binPath, tool)
-		testutil.WriteTestFile(t, toolPath, []byte("fake"), utils.PermFileExecutable)
+		cmdtest.CreateToolExecutable(t, binPath, tool)
 	}
 
 	// Create .go-version to set current version
@@ -322,22 +320,16 @@ func TestListCommand_MultipleVersions(t *testing.T) {
 	// Create multiple versions
 	versions := []string{"1.21.0", "1.22.0", "1.23.0"}
 	for _, v := range versions {
-		// Create Go binary for version (required by ListInstalledVersions)
+		// Create Go binary for version using helper (handles .bat on Windows)
 		goBinDir := filepath.Join(tmpDir, "versions", v, "bin")
-		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
-			t.Fatal(err)
-		}
-		goBin := filepath.Join(goBinDir, "go")
-		testutil.WriteTestFile(t, goBin, []byte("#!/bin/sh\necho go version"), utils.PermFileExecutable)
+		cmdtest.CreateTestBinary(t, tmpDir, v, "go")
 
-		// Create tools
+		// Create tools using helper (handles .bat on Windows)
 		binPath := filepath.Join(tmpDir, "versions", v, "gopath", "bin")
 		if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
 			t.Fatal(err)
 		}
-
-		// Each version has gopls
-		testutil.WriteTestFile(t, filepath.Join(binPath, "gopls"), []byte("fake"), utils.PermFileExecutable)
+		cmdtest.CreateToolExecutable(t, binPath, "gopls")
 	}
 
 	// Get all versions

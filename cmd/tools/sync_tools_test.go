@@ -47,16 +47,10 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 			t.Fatalf("Failed to create GOPATH/bin: %v", err)
 		}
 
-		// Create tools for this version
+		// Create tools for this version using helper (handles .bat on Windows)
 		if versionTools, ok := tools[version]; ok {
 			for _, tool := range versionTools {
-				toolPath := filepath.Join(gopathBin, tool)
-				content := "mock tool"
-				if utils.IsWindows() {
-					toolPath += ".bat"
-					content = "@echo off\necho mock tool\n"
-				}
-				testutil.WriteTestFile(t, toolPath, []byte(content), utils.PermFileExecutable)
+				cmdtest.CreateToolExecutable(t, gopathBin, tool)
 			}
 		}
 	}

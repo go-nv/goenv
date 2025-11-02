@@ -39,17 +39,30 @@ func TestFixtureWithVersions(t *testing.T) {
 	defer f.Cleanup()
 
 	// Add versions using method chaining
-	f.WithVersions("1.21.0", "1.22.0")
+	f.WithVersions("1.21.0", "1.22.0", "1.23.0")
 
-	// Verify versions were created
-	v1Path := filepath.Join(f.Root, "versions", "1.21.0", "bin", "go")
-	v2Path := filepath.Join(f.Root, "versions", "1.22.0", "bin", "go")
-
-	if utils.FileNotExists(v1Path) {
-		t.Errorf("Version 1.21.0 binary not created at %s", v1Path)
+	// Verify versions were created using ListInstalledVersions
+	versions, err := f.Manager.ListInstalledVersions()
+	if err != nil {
+		t.Fatalf("Failed to list installed versions: %v", err)
 	}
-	if utils.FileNotExists(v2Path) {
-		t.Errorf("Version 1.22.0 binary not created at %s", v2Path)
+
+	expectedVersions := []string{"1.21.0", "1.22.0", "1.23.0"}
+	if len(versions) != len(expectedVersions) {
+		t.Errorf("Expected %d versions, got %d", len(expectedVersions), len(versions))
+	}
+
+	for _, expected := range expectedVersions {
+		found := false
+		for _, v := range versions {
+			if v == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected version %s not found in installed versions", expected)
+		}
 	}
 }
 
@@ -60,16 +73,16 @@ func TestFixtureWithTools(t *testing.T) {
 	f.WithVersions("1.21.0").
 		WithTools("1.21.0", "gopls", "staticcheck")
 
-	// Verify tools were created
+	// Verify tools were created using FindExecutable (handles .bat/.exe on Windows)
 	toolDir := filepath.Join(f.Root, "versions", "1.21.0", "gopath", "bin")
-	goplsPath := filepath.Join(toolDir, "gopls")
-	staticcheckPath := filepath.Join(toolDir, "staticcheck")
 
-	if utils.FileNotExists(goplsPath) {
-		t.Errorf("gopls not created at %s", goplsPath)
+	goplsPath := filepath.Join(toolDir, "gopls")
+	if _, err := utils.FindExecutable(toolDir, "gopls"); err != nil {
+		t.Errorf("gopls not found in %s: %v", toolDir, err)
 	}
-	if utils.FileNotExists(staticcheckPath) {
-		t.Errorf("staticcheck not created at %s", staticcheckPath)
+
+	if _, err := utils.FindExecutable(toolDir, "staticcheck"); err != nil {
+		t.Errorf("staticcheck not found in %s: %v", toolDir, err)
 	}
 }
 
@@ -184,12 +197,13 @@ func TestToolScenario(t *testing.T) {
 	// Verify version and tools
 	f.AssertVersionInstalled("1.21.0")
 
+	// Verify tools were created using FindExecutable (handles .bat/.exe on Windows)
 	toolDir := filepath.Join(f.Root, "versions", "1.21.0", "gopath", "bin")
-	if utils.FileNotExists(filepath.Join(toolDir, "gopls")) {
-		t.Error("gopls not created in ToolScenario")
+	if _, err := utils.FindExecutable(toolDir, "gopls"); err != nil {
+		t.Errorf("gopls not created in ToolScenario: %v", err)
 	}
-	if utils.FileNotExists(filepath.Join(toolDir, "staticcheck")) {
-		t.Error("staticcheck not created in ToolScenario")
+	if _, err := utils.FindExecutable(toolDir, "staticcheck"); err != nil {
+		t.Errorf("staticcheck not created in ToolScenario: %v", err)
 	}
 }
 
@@ -247,19 +261,19 @@ func TestVersionBuilder(t *testing.T) {
 		WithGoMod().
 		Build()
 
-	// Verify binaries
+	// Verify binaries using FindExecutable (handles .bat/.exe on Windows)
 	binDir := filepath.Join(f.Root, "versions", "1.21.0", "bin")
-	if utils.FileNotExists(filepath.Join(binDir, "go")) {
-		t.Error("go binary not created")
+	if _, err := utils.FindExecutable(binDir, "go"); err != nil {
+		t.Errorf("go binary not created: %v", err)
 	}
-	if utils.FileNotExists(filepath.Join(binDir, "gofmt")) {
-		t.Error("gofmt binary not created")
+	if _, err := utils.FindExecutable(binDir, "gofmt"); err != nil {
+		t.Errorf("gofmt binary not created: %v", err)
 	}
 
-	// Verify tools
+	// Verify tools using FindExecutable (handles .bat/.exe on Windows)
 	toolDir := filepath.Join(f.Root, "versions", "1.21.0", "gopath", "bin")
-	if utils.FileNotExists(filepath.Join(toolDir, "gopls")) {
-		t.Error("gopls tool not created")
+	if _, err := utils.FindExecutable(toolDir, "gopls"); err != nil {
+		t.Errorf("gopls tool not created: %v", err)
 	}
 
 	// Verify pkg directory
@@ -291,14 +305,14 @@ func TestScenarioBuilder(t *testing.T) {
 	// Local should override global
 	f.AssertCurrentVersion("1.22.0")
 
-	// Verify tools
+	// Verify tools using FindExecutable (handles .bat/.exe on Windows)
 	toolDir1 := filepath.Join(f.Root, "versions", "1.21.0", "gopath", "bin")
-	if utils.FileNotExists(filepath.Join(toolDir1, "gopls")) {
-		t.Error("gopls not created for 1.21.0")
+	if _, err := utils.FindExecutable(toolDir1, "gopls"); err != nil {
+		t.Errorf("gopls not created for 1.21.0: %v", err)
 	}
 
 	toolDir2 := filepath.Join(f.Root, "versions", "1.22.0", "gopath", "bin")
-	if utils.FileNotExists(filepath.Join(toolDir2, "staticcheck")) {
-		t.Error("staticcheck not created for 1.22.0")
+	if _, err := utils.FindExecutable(toolDir2, "staticcheck"); err != nil {
+		t.Errorf("staticcheck not created for 1.22.0: %v", err)
 	}
 }
