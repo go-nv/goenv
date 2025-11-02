@@ -6,13 +6,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-nv/goenv/internal/utils"
-
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	toolspkg "github.com/go-nv/goenv/internal/tools"
-	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestStatusCommand_NoVersions(t *testing.T) {
@@ -255,14 +253,8 @@ func TestStatusCommand_EmptyTools(t *testing.T) {
 	// Create versions but no tools
 	versions := []string{"1.21.0", "1.22.0", "1.23.0"}
 	for _, v := range versions {
-		versionPath := filepath.Join(tmpDir, "versions", v)
-		// Create Go binary (required by ListInstalledVersions)
-		goBinDir := filepath.Join(versionPath, "bin")
-		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
-			t.Fatal(err)
-		}
-		goBin := filepath.Join(goBinDir, "go")
-		testutil.WriteTestFile(t, goBin, []byte("#!/bin/sh\necho go version"), utils.PermFileExecutable)
+		// Create Go binary using helper (handles .bat on Windows)
+		cmdtest.CreateTestBinary(t, tmpDir, v, "go")
 	}
 
 	mgr := manager.NewManager(cfg)

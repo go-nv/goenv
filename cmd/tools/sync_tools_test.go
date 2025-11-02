@@ -23,23 +23,14 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 	for _, version := range versions {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
-		// Create go binary directory (manager expects versionPath/go/bin/go)
+		// Create go binary directory (tools manager expects versionPath/go/bin/go)
 		goBinDir := filepath.Join(versionPath, "go", "bin")
 		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
 			t.Fatalf("Failed to create go bin directory: %v", err)
 		}
 
-		// Create mock go binary
-		goBinary := filepath.Join(goBinDir, "go")
-		var content string
-		if utils.IsWindows() {
-			goBinary += ".bat"
-			content = "@echo off\necho 'mock go'\n"
-		} else {
-			content = "#!/bin/sh\necho 'mock go'\n"
-		}
-
-		testutil.WriteTestFile(t, goBinary, []byte(content), utils.PermFileExecutable)
+		// Create mock go binary using helper (handles .bat on Windows)
+		cmdtest.CreateToolExecutable(t, goBinDir, "go")
 
 		// Create GOPATH/bin directory
 		gopathBin := filepath.Join(versionPath, "gopath", "bin")
