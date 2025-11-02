@@ -106,11 +106,12 @@ func (m *Manager) Install(opts InstallOptions) (*InstallResult, error) {
 func (m *Manager) InstallSingleTool(version, packagePath string, verbose bool) error {
 	versionPath := filepath.Join(m.cfg.Root, "versions", version)
 	goRoot := filepath.Join(versionPath, "go")
-	goBin := filepath.Join(goRoot, "bin", "go")
+	goBinDir := filepath.Join(goRoot, "bin")
 	gopath := filepath.Join(versionPath, "gopath")
 
-	// Check if Go binary exists
-	if utils.FileNotExists(goBin) {
+	// Check if Go binary exists (handles .bat/.exe on Windows)
+	goBin, err := utils.FindExecutable(goBinDir, "go")
+	if err != nil {
 		return fmt.Errorf("go binary not found for version %s", version)
 	}
 

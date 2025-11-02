@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
-	"github.com/go-nv/goenv/testing/testutil"
 )
 
 // TestMultiVersionToolManagement is a comprehensive integration test
@@ -26,20 +26,15 @@ func TestMultiVersionToolManagement(t *testing.T) {
 	// Create 3 Go versions
 	versions := []string{"1.21.0", "1.22.0", "1.23.0"}
 	for _, v := range versions {
+		// Create Go binary using helper (handles .bat on Windows)
+		cmdtest.CreateTestBinary(t, tmpDir, v, "go")
+
+		// Create GOPATH/bin directory
 		versionPath := filepath.Join(tmpDir, "versions", v)
-		// Create Go binary (required by ListInstalledVersions)
-		goBinDir := filepath.Join(versionPath, "bin")
 		gopath := filepath.Join(versionPath, "gopath", "bin")
-		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
 		if err := utils.EnsureDirWithContext(gopath, "create test directory"); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-
-		// Create Go binary
-		goBin := filepath.Join(goBinDir, "go")
-		testutil.WriteTestFile(t, goBin, []byte("#!/bin/sh\necho go version"), utils.PermFileExecutable)
 	}
 
 	// Install different tools in different versions
@@ -52,7 +47,7 @@ func TestMultiVersionToolManagement(t *testing.T) {
 	for version, tools := range toolInstallations {
 		binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
 		for _, tool := range tools {
-			testutil.WriteTestFile(t, filepath.Join(binPath, tool), []byte("fake binary"), utils.PermFileExecutable, "unexpected error")
+			cmdtest.CreateToolExecutable(t, binPath, tool)
 		}
 	}
 
