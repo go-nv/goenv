@@ -321,7 +321,6 @@ func TestListCommand_MultipleVersions(t *testing.T) {
 	versions := []string{"1.21.0", "1.22.0", "1.23.0"}
 	for _, v := range versions {
 		// Create Go binary for version using helper (handles .bat on Windows)
-		goBinDir := filepath.Join(tmpDir, "versions", v, "bin")
 		cmdtest.CreateTestBinary(t, tmpDir, v, "go")
 
 		// Create tools using helper (handles .bat on Windows)

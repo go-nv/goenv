@@ -76,7 +76,6 @@ func TestFixtureWithTools(t *testing.T) {
 	// Verify tools were created using FindExecutable (handles .bat/.exe on Windows)
 	toolDir := filepath.Join(f.Root, "versions", "1.21.0", "gopath", "bin")
 
-	goplsPath := filepath.Join(toolDir, "gopls")
 	if _, err := utils.FindExecutable(toolDir, "gopls"); err != nil {
 		t.Errorf("gopls not found in %s: %v", toolDir, err)
 	}
