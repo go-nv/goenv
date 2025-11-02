@@ -7,28 +7,30 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestDoctorCommand_JSONOutput(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Clear GOENV_VERSION to avoid picking up .go-version from repo
-	t.Setenv("GOENV_VERSION", "system")
+	t.Setenv(utils.GoenvEnvVarVersion.String(), "system")
 
 	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
-	oldPath := os.Getenv("PATH")
-	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+	oldPath := os.Getenv(utils.EnvVarPath)
+	t.Setenv(utils.EnvVarPath, filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
 
 	// Create basic directory structure
-	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(tmpDir, "versions"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 
@@ -193,43 +195,43 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			t.Setenv("GOENV_ROOT", tmpDir)
-			t.Setenv("GOENV_DIR", tmpDir)
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Set HOME to tmpDir to avoid checking user's real profile files
-			t.Setenv("HOME", tmpDir)
-			t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME			// Clear GOENV_SHELL to skip shell initialization checks
-			t.Setenv("GOENV_SHELL", "")
+			t.Setenv(utils.EnvVarHome, tmpDir)
+			t.Setenv(utils.EnvVarUserProfile, tmpDir) // Windows uses USERPROFILE instead of HOME			// Clear GOENV_SHELL to skip shell initialization checks
+			t.Setenv(utils.GoenvEnvVarShell.String(), "")
 
 			// Set up environment based on test needs
 			if tt.forceError {
 				// Create error conditions:
 				// 1. Set GOENV_VERSION to a non-existent version (causes "version not installed" error)
-				t.Setenv("GOENV_VERSION", "999.999.999")
+				t.Setenv(utils.GoenvEnvVarVersion.String(), "999.999.999")
 				// 2. Don't add bin to PATH (causes "PATH not configured" error)
 				// Keep PATH as-is
 			} else {
 				// Clear GOENV_VERSION to avoid picking up .go-version from repo
-				t.Setenv("GOENV_VERSION", "system")
+				t.Setenv(utils.GoenvEnvVarVersion.String(), "system")
 				// Add both GOENV_ROOT/bin and shims to PATH to avoid PATH configuration errors
-				oldPath := os.Getenv("PATH")
+				oldPath := os.Getenv(utils.EnvVarPath)
 				shimsPath := filepath.Join(tmpDir, "shims")
 				binPath := filepath.Join(tmpDir, "bin")
-				t.Setenv("PATH", shimsPath+string(os.PathListSeparator)+binPath+string(os.PathListSeparator)+oldPath)
+				t.Setenv(utils.EnvVarPath, shimsPath+string(os.PathListSeparator)+binPath+string(os.PathListSeparator)+oldPath)
 			}
 
 			// Create directories for non-error tests
 			if !tt.forceError {
-				if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+				if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
 					t.Fatalf("Failed to create bin directory: %v", err)
 				}
-				if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
+				if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
 					t.Fatalf("Failed to create shims directory: %v", err)
 				}
 				// Only create versions directory if not forcing warnings
 				// (empty versions directory triggers "no versions installed" warning)
 				if !tt.forceWarning {
-					if err := os.MkdirAll(filepath.Join(tmpDir, "versions"), 0755); err != nil {
+					if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
 						t.Fatalf("Failed to create versions directory: %v", err)
 					}
 				}
@@ -289,24 +291,24 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 
 func TestDoctorCommand_CheckIDsConsistent(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Clear GOENV_VERSION to avoid picking up .go-version from repo
-	t.Setenv("GOENV_VERSION", "system")
+	t.Setenv(utils.GoenvEnvVarVersion.String(), "system")
 
 	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
-	oldPath := os.Getenv("PATH")
-	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+	oldPath := os.Getenv(utils.EnvVarPath)
+	t.Setenv(utils.EnvVarPath, filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
 
 	// Create basic structure
-	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(tmpDir, "versions"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 
@@ -380,24 +382,24 @@ func isValidCheckID(id string) bool {
 
 func TestDoctorCommand_HumanReadableOutput(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Clear GOENV_VERSION to avoid picking up .go-version from repo
-	t.Setenv("GOENV_VERSION", "system")
+	t.Setenv(utils.GoenvEnvVarVersion.String(), "system")
 
 	// Add GOENV_ROOT/bin to PATH to avoid PATH configuration errors
-	oldPath := os.Getenv("PATH")
-	t.Setenv("PATH", filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
+	oldPath := os.Getenv(utils.EnvVarPath)
+	t.Setenv(utils.EnvVarPath, filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
 
 	// Create directory structure
-	if err := os.MkdirAll(filepath.Join(tmpDir, "bin"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(tmpDir, "shims"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(tmpDir, "versions"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 

@@ -1,15 +1,12 @@
 package core
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/lifecycle"
-	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -47,8 +44,7 @@ func init() {
 
 func runInfo(cmd *cobra.Command, args []string) error {
 	version := args[0]
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Resolve version spec (handles aliases, "latest", etc.)
 	resolvedVersion, err := mgr.ResolveVersionSpec(version)
@@ -63,7 +59,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	var sizeOnDisk int64
 
 	if isInstalled {
-		installPath = filepath.Join(cfg.VersionsDir(), resolvedVersion)
+		installPath = cfg.VersionDir(resolvedVersion)
 		// Calculate size
 		sizeOnDisk, _ = calculateDirSize(installPath)
 	}
@@ -181,9 +177,7 @@ func outputJSON(version string, installed bool, path string, size int64, info li
 		out.Recommended = info.Recommended
 	}
 
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(out)
+	return cmdutil.OutputJSON(os.Stdout, out)
 }
 
 // calculateDirSize recursively calculates the total size of a directory

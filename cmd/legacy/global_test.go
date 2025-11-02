@@ -1,12 +1,15 @@
 package legacy
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -62,12 +65,9 @@ func TestGlobalCommand(t *testing.T) {
 			}
 
 			// Set initial global version if specified
-			if tt.globalVersion != "" && tt.globalVersion != "system" {
+			if tt.globalVersion != "" && tt.globalVersion != manager.SystemVersion {
 				globalFile := filepath.Join(testRoot, "version")
-				err := os.WriteFile(globalFile, []byte(tt.globalVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set initial global version: %v", err)
-				}
+				testutil.WriteTestFile(t, globalFile, []byte(tt.globalVersion), utils.PermFileDefault, "Failed to set initial global version")
 			}
 
 			// Create and execute command
@@ -168,10 +168,7 @@ func TestGlobalWithLocalOverride(t *testing.T) {
 
 	// Set global version
 	globalFile := filepath.Join(testRoot, "version")
-	err := os.WriteFile(globalFile, []byte("1.21.5"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to set global version: %v", err)
-	}
+	testutil.WriteTestFile(t, globalFile, []byte("1.21.5"), utils.PermFileDefault, "Failed to set global version")
 
 	// Create local version file in current directory
 	tempDir, err := os.MkdirTemp("", "goenv_local_test_")
@@ -181,10 +178,7 @@ func TestGlobalWithLocalOverride(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	localFile := filepath.Join(tempDir, ".go-version")
-	err = os.WriteFile(localFile, []byte("1.22.2"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create local version file: %v", err)
-	}
+	testutil.WriteTestFile(t, localFile, []byte("1.22.2"), utils.PermFileDefault)
 
 	// Change to the directory with local version
 	oldDir, _ := os.Getwd()

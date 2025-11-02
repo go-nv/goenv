@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -126,8 +124,8 @@ func WriteBuildInfo(cacheDir string, info *BuildInfo) error {
 	infoPath := filepath.Join(cacheDir, "build.info")
 
 	// Create cache directory if it doesn't exist
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		return fmt.Errorf("failed to create cache directory: %w", err)
+	if err := utils.EnsureDirWithContext(cacheDir, "create cache directory"); err != nil {
+		return err
 	}
 
 	data, err := json.MarshalIndent(info, "", "  ")
@@ -135,7 +133,7 @@ func WriteBuildInfo(cacheDir string, info *BuildInfo) error {
 		return fmt.Errorf("failed to marshal build info: %w", err)
 	}
 
-	if err := os.WriteFile(infoPath, data, 0644); err != nil {
+	if err := utils.WriteFileWithContext(infoPath, data, utils.PermFileDefault, "write build info"); err != nil {
 		return fmt.Errorf("failed to write build info: %w", err)
 	}
 
@@ -146,13 +144,8 @@ func WriteBuildInfo(cacheDir string, info *BuildInfo) error {
 func ReadBuildInfo(cacheDir string) (*BuildInfo, error) {
 	infoPath := filepath.Join(cacheDir, "build.info")
 
-	data, err := os.ReadFile(infoPath)
-	if err != nil {
-		return nil, err
-	}
-
 	var info BuildInfo
-	if err := json.Unmarshal(data, &info); err != nil {
+	if err := utils.UnmarshalJSONFile(infoPath, &info); err != nil {
 		return nil, err
 	}
 
@@ -176,19 +169,18 @@ func getCompilerVersion(compilerPath string) string {
 	}
 
 	// Run compiler --version
-	cmd := exec.Command(actualCompiler, "--version")
-	output, err := cmd.Output()
+	output, err := utils.RunCommandOutput(actualCompiler, "--version")
 	if err != nil {
 		// Try -v for some compilers (like clang on macOS)
-		cmd = exec.Command(actualCompiler, "-v")
-		output, err = cmd.CombinedOutput()
+		// Note: -v often writes to stderr, so we need combined output
+		output, err = utils.RunCommandCombinedOutput(actualCompiler, "-v")
 		if err != nil {
 			return ""
 		}
 	}
 
 	// Extract first line which usually contains version
-	lines := strings.Split(string(output), "\n")
+	lines := strings.Split(output, "\n")
 	if len(lines) > 0 {
 		version := strings.TrimSpace(lines[0])
 		// Limit length to avoid huge version strings

@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
-	"github.com/go-nv/goenv/internal/utils"
-
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
-	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
+
 	"github.com/spf13/cobra"
 )
 
@@ -114,17 +115,14 @@ func TestVersionsCommand(t *testing.T) {
 			// Set global version if specified
 			if tt.globalVersion != "" {
 				globalFile := filepath.Join(testRoot, "version")
-				err := os.WriteFile(globalFile, []byte(tt.globalVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set global version: %v", err)
-				}
+				testutil.WriteTestFile(t, globalFile, []byte(tt.globalVersion), utils.PermFileDefault, "Failed to set global version")
 			}
 
 			// Setup system go if needed
 			if tt.expectSystemGo {
 				// Create a mock system go in PATH
 				systemBinDir := filepath.Join(testRoot, "system_bin")
-				os.MkdirAll(systemBinDir, 0755)
+				_ = utils.EnsureDirWithContext(systemBinDir, "create test directory")
 				systemGo := filepath.Join(systemBinDir, "go")
 				var content string
 				if utils.IsWindows() {
@@ -134,16 +132,13 @@ func TestVersionsCommand(t *testing.T) {
 					content = "#!/bin/sh\necho go version go1.20.1 linux/amd64\n"
 				}
 
-				err := os.WriteFile(systemGo, []byte(content), 0755)
-				if err != nil {
-					t.Fatalf("Failed to create system go: %v", err)
-				}
+				testutil.WriteTestFile(t, systemGo, []byte(content), utils.PermFileExecutable, "Failed to create system go")
 
 				// Add to PATH temporarily
-				oldPath := os.Getenv("PATH")
+				oldPath := os.Getenv(utils.EnvVarPath)
 				pathSep := string(os.PathListSeparator)
-				os.Setenv("PATH", systemBinDir+pathSep+oldPath)
-				defer os.Setenv("PATH", oldPath)
+				os.Setenv(utils.EnvVarPath, systemBinDir+pathSep+oldPath)
+				defer os.Setenv(utils.EnvVarPath, oldPath)
 			}
 
 			// Reset global flags before each test
@@ -239,10 +234,7 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 
 	// Set global version
 	globalFile := filepath.Join(testRoot, "version")
-	err := os.WriteFile(globalFile, []byte("1.21.5"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to set global version: %v", err)
-	}
+	testutil.WriteTestFile(t, globalFile, []byte("1.21.5"), utils.PermFileDefault, "Failed to set global version")
 
 	// Create local version file in current directory
 	tempDir, err := os.MkdirTemp("", "goenv_local_test_")
@@ -252,10 +244,7 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	localFile := filepath.Join(tempDir, ".go-version")
-	err = os.WriteFile(localFile, []byte("1.22.2"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create local version file: %v", err)
-	}
+	testutil.WriteTestFile(t, localFile, []byte("1.22.2"), utils.PermFileDefault)
 
 	// Change to the directory with local version
 	oldDir, _ := os.Getwd()
@@ -388,7 +377,7 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 
 	// Create system go but no installed versions
 	systemBinDir := filepath.Join(testRoot, "system_bin")
-	os.MkdirAll(systemBinDir, 0755)
+	_ = utils.EnsureDirWithContext(systemBinDir, "create test directory")
 	systemGo := filepath.Join(systemBinDir, "go")
 	var content string
 	if utils.IsWindows() {
@@ -398,16 +387,13 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 		content = "#!/bin/sh\necho go version go1.20.1 linux/amd64\n"
 	}
 
-	err := os.WriteFile(systemGo, []byte(content), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create system go: %v", err)
-	}
+	testutil.WriteTestFile(t, systemGo, []byte(content), utils.PermFileExecutable, "Failed to create system go")
 
 	// Add to PATH temporarily
-	oldPath := os.Getenv("PATH")
+	oldPath := os.Getenv(utils.EnvVarPath)
 	pathSep := string(os.PathListSeparator)
-	os.Setenv("PATH", systemBinDir+pathSep+oldPath)
-	defer os.Setenv("PATH", oldPath)
+	os.Setenv(utils.EnvVarPath, systemBinDir+pathSep+oldPath)
+	defer os.Setenv(utils.EnvVarPath, oldPath)
 
 	// Create and execute command
 	cmd := &cobra.Command{
@@ -427,7 +413,7 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 	cmd.SetOut(output)
 	cmd.SetArgs([]string{})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -443,8 +429,7 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 // hasSystemGoInTest checks if system Go is available during test execution
 // This is needed because CI/macOS systems may have Go installed in PATH
 func hasSystemGoInTest() bool {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 	return mgr.HasSystemGo()
 }
 
@@ -458,22 +443,18 @@ func TestVersionsUsedFlag(t *testing.T) {
 
 	// Project 1: .go-version
 	proj1 := filepath.Join(tmpDir, "proj1")
-	if err := os.MkdirAll(proj1, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(proj1, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), utils.PermFileDefault)
 
 	// Project 2: go.mod
 	proj2 := filepath.Join(tmpDir, "proj2")
-	if err := os.MkdirAll(proj2, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(proj2, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 	gomodContent := "module test\n\ngo 1.22.3\n"
-	if err := os.WriteFile(filepath.Join(proj2, "go.mod"), []byte(gomodContent), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, filepath.Join(proj2, "go.mod"), []byte(gomodContent), utils.PermFileDefault)
 
 	// Setup test environment with installed versions
 	cfg := &config.Config{
@@ -481,27 +462,12 @@ func TestVersionsUsedFlag(t *testing.T) {
 	}
 
 	// Create mock installed versions
-	versionsDir := filepath.Join(cfg.Root, "versions")
 	for _, ver := range []string{"1.21.5", "1.22.3", "1.23.2"} {
-		versionPath := filepath.Join(versionsDir, ver, "bin")
-		if err := os.MkdirAll(versionPath, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		// Create mock go binary
-		goBinary := filepath.Join(versionPath, "go")
-		if utils.IsWindows() {
-			goBinary += ".exe"
-		}
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\necho go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		cmdtest.CreateMockGoVersion(t, cfg.Root, ver)
 	}
 
 	// Set environment to use test root
-	oldRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", oldRoot)
-	os.Setenv("GOENV_ROOT", cfg.Root)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), cfg.Root)
 
 	// Change to tmp directory for scanning
 	oldWd, _ := os.Getwd()
@@ -573,33 +539,24 @@ func TestVersionsUsedDepthFlag(t *testing.T) {
 
 	// Project at depth 1
 	proj1 := filepath.Join(tmpDir, "proj1")
-	os.MkdirAll(proj1, 0755)
-	os.WriteFile(filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), 0644)
+	_ = utils.EnsureDirWithContext(proj1, "create test directory")
+	testutil.WriteTestFile(t, filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), utils.PermFileDefault)
 
 	// Project at depth 3
 	proj2 := filepath.Join(tmpDir, "a", "b", "proj2")
-	os.MkdirAll(proj2, 0755)
-	os.WriteFile(filepath.Join(proj2, ".go-version"), []byte("1.22.3\n"), 0644)
+	_ = utils.EnsureDirWithContext(proj2, "create test directory")
+	testutil.WriteTestFile(t, filepath.Join(proj2, ".go-version"), []byte("1.22.3\n"), utils.PermFileDefault)
 
 	// Setup mock environment
 	cfg := &config.Config{
 		Root: t.TempDir(),
 	}
 
-	versionsDir := filepath.Join(cfg.Root, "versions")
 	for _, ver := range []string{"1.21.5", "1.22.3"} {
-		versionPath := filepath.Join(versionsDir, ver, "bin")
-		os.MkdirAll(versionPath, 0755)
-		goBinary := filepath.Join(versionPath, "go")
-		if utils.IsWindows() {
-			goBinary += ".exe"
-		}
-		os.WriteFile(goBinary, []byte("#!/bin/sh\necho go\n"), 0755)
+		cmdtest.CreateMockGoVersion(t, cfg.Root, ver)
 	}
 
-	oldRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", oldRoot)
-	os.Setenv("GOENV_ROOT", cfg.Root)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), cfg.Root)
 
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)

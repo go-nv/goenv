@@ -5,7 +5,7 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/spf13/cobra"
 )
@@ -19,15 +19,19 @@ var toolsCmd = &cobra.Command{
 This ensures tools are properly isolated per Go version and prevents
 accidental global installations.
 
-Subcommands:
+Tool Installation:
   install      Install tools for current or all Go versions
-  uninstall    Uninstall tools from current or all Go versions
+  uninstall    Remove tools from current or all Go versions
   list         List installed tools (supports --all)
-  update       Update installed tools to latest versions
-  outdated     Show which tools need updating
+
+Tool Management:
   status       View tool consistency across versions
+  outdated     Check for tool updates
+  update       Update installed tools to latest versions
+
+Version Sync:
   sync         Copy tools from one version to another
-  default      Manage automatic tool installation
+  default      Set default tool installation behavior
 
 Examples:
   # Install across all versions
@@ -57,7 +61,7 @@ func init() {
 	toolsCmd.AddCommand(defaultToolsCmd) // from default_tools.go
 
 	// Add uninstall command
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 	toolsCmd.AddCommand(NewUninstallCommand(cfg)) // from uninstall_tools.go
 
 	// Add new subcommands

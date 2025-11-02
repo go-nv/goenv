@@ -1,11 +1,13 @@
 package integrations
 
 import (
+	"github.com/go-nv/goenv/internal/utils"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/vscode"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 // TestVSCodeTemplatesUsePlatformEnvVars verifies that templates use platform-specific environment variables
@@ -218,9 +220,7 @@ func TestReadExistingExtensions(t *testing.T) {
 	]
 }`
 
-	if err := os.WriteFile(extensionsFile, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to write test file: %v", err)
-	}
+	testutil.WriteTestFile(t, extensionsFile, []byte(content), utils.PermFileDefault)
 
 	extensions, err := vscode.ReadExistingExtensions(extensionsFile)
 	if err != nil {
@@ -261,9 +261,7 @@ func TestReadExistingExtensionsWithComments(t *testing.T) {
 	]
 }`
 
-	if err := os.WriteFile(extensionsFile, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to write test file: %v", err)
-	}
+	testutil.WriteTestFile(t, extensionsFile, []byte(content), utils.PermFileDefault)
 
 	extensions, err := vscode.ReadExistingExtensions(extensionsFile)
 	if err != nil {
@@ -278,7 +276,7 @@ func TestReadExistingExtensionsWithComments(t *testing.T) {
 // TestExtensionsMerging verifies that golang.go is added to existing recommendations
 func TestExtensionsMerging(t *testing.T) {
 	// Test case 1: No existing extensions
-	var recommendations []string
+	recommendations := []string{}
 	goExtension := "golang.go"
 
 	hasGoExtension := false
@@ -343,7 +341,7 @@ func TestVSCodeInitPreservesExtensions(t *testing.T) {
 	extensionsFile := vscodeDir + "/extensions.json"
 
 	// Create .vscode directory
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .vscode directory: %v", err)
 	}
 
@@ -354,9 +352,7 @@ func TestVSCodeInitPreservesExtensions(t *testing.T) {
 		"dbaeumer.vscode-eslint"
 	]
 }`
-	if err := os.WriteFile(extensionsFile, []byte(initialContent), 0644); err != nil {
-		t.Fatalf("Failed to write initial extensions.json: %v", err)
-	}
+	testutil.WriteTestFile(t, extensionsFile, []byte(initialContent), utils.PermFileDefault)
 
 	// Read the file and verify initial state
 	initialExtensions, err := vscode.ReadExistingExtensions(extensionsFile)
@@ -457,7 +453,7 @@ func TestVSCodeInit_NoBackupWhenNoChanges(t *testing.T) {
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .vscode directory: %v", err)
 	}
 
@@ -513,7 +509,7 @@ func TestVSCodeInit_NoBackupWhenNoChanges(t *testing.T) {
 	}
 
 	// Verify no backup file exists
-	if _, err := os.Stat(backupFile); err == nil {
+	if utils.PathExists(backupFile) {
 		t.Error("Backup file should not exist when no changes are made")
 	}
 
@@ -525,7 +521,7 @@ func TestVSCodeInit_BackupCreatedWhenChangesNeeded(t *testing.T) {
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .vscode directory: %v", err)
 	}
 
@@ -576,7 +572,7 @@ func TestVSCodeInit_BackupCreatedWhenChangesNeeded(t *testing.T) {
 		}
 
 		// Verify backup file exists
-		if _, err := os.Stat(backupFile); err != nil {
+		if utils.FileNotExists(backupFile) {
 			t.Error("Backup file should exist when changes are made")
 		}
 
@@ -603,7 +599,7 @@ func TestVSCodeSync_NoBackupWhenAlreadySynced(t *testing.T) {
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .vscode directory: %v", err)
 	}
 
@@ -650,7 +646,7 @@ func TestVSCodeSync_NoBackupWhenAlreadySynced(t *testing.T) {
 	}
 
 	// Verify no backup file exists
-	if _, err := os.Stat(backupFile); err == nil {
+	if utils.PathExists(backupFile) {
 		t.Error("Backup file should not exist when sync is not needed")
 	}
 
@@ -662,7 +658,7 @@ func TestVSCodeSync_BackupCreatedWhenOutOfSync(t *testing.T) {
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .vscode directory: %v", err)
 	}
 
@@ -716,7 +712,7 @@ func TestVSCodeSync_BackupCreatedWhenOutOfSync(t *testing.T) {
 		}
 
 		// Verify backup file exists
-		if _, err := os.Stat(backupFile); err != nil {
+		if utils.FileNotExists(backupFile) {
 			t.Error("Backup file should exist when sync needs to update settings")
 		}
 

@@ -40,8 +40,8 @@ func ExpandPath(path string) string {
 func FindExecutable(basePath string) (string, error) {
 	if !utils.IsWindows() {
 		// On Unix, just check if the file exists
-		if _, err := os.Stat(basePath); err != nil {
-			return "", err
+		if !utils.PathExists(basePath) {
+			return "", os.ErrNotExist
 		}
 		return basePath, nil
 	}
@@ -49,12 +49,11 @@ func FindExecutable(basePath string) (string, error) {
 	// On Windows, try common executable extensions from utils
 	for _, ext := range utils.WindowsExecutableExtensions() {
 		extPath := basePath + ext
-		if _, err := os.Stat(extPath); err == nil {
+		if utils.PathExists(extPath) {
 			return extPath, nil
 		}
 	}
 
 	// None found, return error for .exe (expected in production)
-	_, err := os.Stat(basePath + ".exe")
-	return "", err
+	return "", os.ErrNotExist
 }

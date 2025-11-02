@@ -1,12 +1,13 @@
 package binarycheck
 
 import (
-	"os"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/osinfo"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestGetPlatformInfo(t *testing.T) {
@@ -16,12 +17,12 @@ func TestGetPlatformInfo(t *testing.T) {
 		t.Fatal("GetPlatformInfo returned nil")
 	}
 
-	if info.OS != runtime.GOOS {
-		t.Errorf("Expected OS %s, got %s", runtime.GOOS, info.OS)
+	if info.OS != osinfo.OS() {
+		t.Errorf("Expected OS %s, got %s", osinfo.OS(), info.OS)
 	}
 
-	if info.Arch != runtime.GOARCH {
-		t.Errorf("Expected Arch %s, got %s", runtime.GOARCH, info.Arch)
+	if info.Arch != osinfo.Arch() {
+		t.Errorf("Expected Arch %s, got %s", osinfo.Arch(), info.Arch)
 	}
 
 	if info.Details == nil {
@@ -35,7 +36,7 @@ func TestGetPlatformInfo(t *testing.T) {
 }
 
 func TestCheckMacOSDeploymentTarget(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("macOS deployment target check only works on macOS")
 	}
 
@@ -114,7 +115,7 @@ func TestCheckWindowsARM64(t *testing.T) {
 }
 
 func TestCheckLinuxKernelVersion(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		t.Skip("Linux kernel check only works on Linux")
 	}
 
@@ -154,9 +155,7 @@ func TestCheckWindowsScriptShims(t *testing.T) {
 
 	// Write a bash script
 	scriptContent := "#!/bin/bash\necho 'Hello World'\n"
-	if err := writeFile(tmpFile, []byte(scriptContent)); err != nil {
-		t.Fatalf("Failed to create test script: %v", err)
-	}
+	writeFile(t, tmpFile, []byte(scriptContent))
 
 	issues := CheckWindowsScriptShims(tmpFile)
 
@@ -224,7 +223,7 @@ func TestSuggestGlibcCompatibility(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Skip on non-Linux
-			if runtime.GOOS != "linux" {
+			if !osinfo.IsLinux() {
 				t.Skip("glibc compatibility check only works on Linux")
 			}
 
@@ -244,7 +243,7 @@ func TestSuggestGlibcCompatibility(t *testing.T) {
 				// Should suggest container-based build
 				foundContainerSuggestion := false
 				for _, issue := range issues {
-					if issue.Severity == "error" && contains(issue.Hint, "container") {
+					if issue.Severity == "error" && strings.Contains(issue.Hint, "container") {
 						foundContainerSuggestion = true
 					}
 					t.Logf("[%s] %s: %s", issue.Severity, issue.Message, issue.Hint)
@@ -340,20 +339,10 @@ func findGoBinary() (string, error) {
 }
 
 func fileExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
+	exists := utils.PathExists(path)
+	return exists, nil
 }
 
-func writeFile(path string, data []byte) error {
-	return os.WriteFile(path, data, 0755)
-}
-
-func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) > len(substr) && strings.Contains(s, substr))
+func writeFile(t *testing.T, path string, data []byte) {
+	testutil.WriteTestFile(t, path, data, utils.PermFileExecutable)
 }

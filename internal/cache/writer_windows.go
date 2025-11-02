@@ -4,10 +4,11 @@
 package cache
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/go-nv/goenv/internal/errors"
 )
 
 var (
@@ -45,7 +46,7 @@ func acquireLock(file *os.File) error {
 	)
 
 	if r1 == 0 {
-		return fmt.Errorf("failed to acquire lock: %w", err)
+		return errors.FailedTo("acquire lock", err)
 	}
 
 	return nil
@@ -71,7 +72,7 @@ func releaseLock(file *os.File) error {
 	)
 
 	if r1 == 0 {
-		return fmt.Errorf("failed to release lock: %w", err)
+		return errors.FailedTo("release lock", err)
 	}
 
 	return nil

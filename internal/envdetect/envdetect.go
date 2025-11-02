@@ -2,9 +2,9 @@ package envdetect
 
 import (
 	"fmt"
+	"github.com/go-nv/goenv/internal/osinfo"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/utils"
@@ -52,7 +52,7 @@ func Detect() *EnvironmentInfo {
 	}
 
 	// Check for WSL
-	if runtime.GOOS == "linux" {
+	if osinfo.IsLinux() {
 		if wslVersion, distro := detectWSL(); wslVersion != "" {
 			info.IsWSL = true
 			info.Type = EnvTypeWSL
@@ -84,11 +84,11 @@ func DetectFilesystem(path string) *EnvironmentInfo {
 	info := Detect()
 	info.FilesystemPath = path
 
-	if runtime.GOOS == "linux" {
+	if osinfo.IsLinux() {
 		info.FilesystemType = detectLinuxFilesystem(path)
-	} else if runtime.GOOS == "darwin" {
+	} else if osinfo.IsMacOS() {
 		info.FilesystemType = detectDarwinFilesystem(path)
-	} else if utils.IsWindows() {
+	} else if osinfo.IsWindows() {
 		info.FilesystemType = detectWindowsFilesystem(path)
 	} else {
 		info.FilesystemType = FSTypeLocal
@@ -141,7 +141,7 @@ func detectWSL() (version string, distro string) {
 	}
 
 	// Alternative: Check for WSL_DISTRO_NAME environment variable
-	if distroName := os.Getenv("WSL_DISTRO_NAME"); distroName != "" {
+	if distroName := os.Getenv(utils.EnvVarWSLDistroName); distroName != "" {
 		// WSL_DISTRO_NAME is set in WSL 2
 		return "2", distroName
 	}
@@ -160,7 +160,7 @@ func detectWSL() (version string, distro string) {
 // detectContainer checks if running in a container
 func detectContainer() string {
 	// Check for /.dockerenv file (Docker)
-	if _, err := os.Stat("/.dockerenv"); err == nil {
+	if utils.PathExists("/.dockerenv") {
 		return "docker"
 	}
 
@@ -182,23 +182,23 @@ func detectContainer() string {
 	}
 
 	// Check for container environment variables
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+	if os.Getenv(utils.EnvVarKubernetesServiceHost) != "" {
 		return "kubernetes"
 	}
-	if os.Getenv("container") == "podman" {
+	if os.Getenv(utils.EnvVarContainer) == "podman" {
 		return "podman"
 	}
-	if os.Getenv("CONTAINER") == "podman" {
+	if os.Getenv(utils.EnvVarContainerUpper) == "podman" {
 		return "podman"
 	}
 
 	// Check /run/.containerenv (Podman)
-	if _, err := os.Stat("/run/.containerenv"); err == nil {
+	if utils.PathExists("/run/.containerenv") {
 		return "podman"
 	}
 
 	// Check for buildkit
-	if os.Getenv("BUILDKIT_SANDBOX_HOSTNAME") != "" {
+	if os.Getenv(utils.EnvVarBuildkitSandboxHostname) != "" {
 		return "buildkit"
 	}
 

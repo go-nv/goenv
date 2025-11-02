@@ -3,12 +3,13 @@ package integrations
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/shims"
@@ -82,7 +83,7 @@ func init() {
 }
 
 func runCISetup(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 
 	// Two-phase installation mode
 	if ciInstall {
@@ -239,18 +240,18 @@ func outputGitHubActions(cmd *cobra.Command, cfg *config.Config) {
 	out := cmd.OutOrStdout()
 
 	// GitHub Actions uses special syntax
-	fmt.Fprintf(out, "echo \"GOENV_ROOT=%s\" >> $GITHUB_ENV\n", cfg.Root)
+	fmt.Fprintf(out, "echo \"%s=%s\" >> $GITHUB_ENV\n", utils.GoenvEnvVarRoot.String(), cfg.Root)
 	fmt.Fprintf(out, "echo \"%s/bin\" >> $GITHUB_PATH\n", cfg.Root)
 	fmt.Fprintf(out, "echo \"%s/shims\" >> $GITHUB_PATH\n", cfg.Root)
 	fmt.Fprintln(out, "echo \"GOTOOLCHAIN=local\" >> $GITHUB_ENV")
-	fmt.Fprintln(out, "echo \"GOENV_DISABLE_GOPATH=1\" >> $GITHUB_ENV")
+	fmt.Fprintf(out, "echo \"%s=1\" >> $GITHUB_ENV\n", utils.GoenvEnvVarDisableGopath.String())
 
 	// Also export for current step - use platform-appropriate separator
 	pathSep := string(os.PathListSeparator)
-	fmt.Fprintf(out, "export GOENV_ROOT=%s\n", cfg.Root)
+	fmt.Fprintf(out, "export %s=%s\n", utils.GoenvEnvVarRoot.String(), cfg.Root)
 	fmt.Fprintf(out, "export PATH=\"%s/bin%s%s/shims%s$PATH\"\n", cfg.Root, pathSep, cfg.Root, pathSep)
 	fmt.Fprintln(out, "export GOTOOLCHAIN=local")
-	fmt.Fprintln(out, "export GOENV_DISABLE_GOPATH=1")
+	fmt.Fprintf(out, "export %s=1\n", utils.GoenvEnvVarDisableGopath.String())
 }
 
 func outputGitLabCI(cmd *cobra.Command, cfg *config.Config) {
@@ -281,7 +282,7 @@ func runCIInstallPhase(cmd *cobra.Command, args []string, cfg *config.Config) er
 		// Read versions from .go-version, .tool-versions, or go.mod
 		discoveredVersions, err := discoverVersionsFromFiles()
 		if err != nil {
-			return fmt.Errorf("failed to discover versions from files: %w", err)
+			return errors.FailedTo("discover versions from files", err)
 		}
 		if len(discoveredVersions) == 0 {
 			return fmt.Errorf("no versions found in .go-version, .tool-versions, or go.mod")
@@ -297,7 +298,7 @@ func runCIInstallPhase(cmd *cobra.Command, args []string, cfg *config.Config) er
 
 	// Ensure directories exist
 	if err := cfg.EnsureDirectories(); err != nil {
-		return fmt.Errorf("failed to create directories: %w", err)
+		return errors.FailedTo("create directories", err)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "%sCI Setup: Installing %d Go version(s) for caching\n", utils.Emoji("🚀 "), len(versions))
@@ -315,8 +316,7 @@ func runCIInstallPhase(cmd *cobra.Command, args []string, cfg *config.Config) er
 		fmt.Fprintf(cmd.OutOrStdout(), "[%d/%d] Installing Go %s...\n", i+1, len(versions), version)
 
 		// Check if already installed
-		versionPath := filepath.Join(cfg.VersionsDir(), version)
-		if _, err := os.Stat(versionPath); err == nil {
+		if cfg.IsVersionInstalled(version) {
 			fmt.Fprintf(cmd.OutOrStdout(), "  %sAlready installed (cached)\n", utils.Emoji("✅ "))
 			skippedCount++
 			continue
@@ -368,43 +368,26 @@ func runCIInstallPhase(cmd *cobra.Command, args []string, cfg *config.Config) er
 }
 
 // discoverVersionsFromFiles reads version requirements from common files
+// Uses manager API for consistent version file parsing across all formats
 func discoverVersionsFromFiles() ([]string, error) {
 	versions := make(map[string]bool) // Use map to deduplicate
+	cfg, mgr := cmdutil.SetupContext()
+	_ = cfg // unused but required by SetupContext
 
-	// Check .go-version
-	if data, err := os.ReadFile(".go-version"); err == nil {
-		version := strings.TrimSpace(string(data))
-		if version != "" {
-			versions[version] = true
-		}
-	}
+	// Check for version files in priority order
+	versionFiles := []string{config.VersionFileName, config.ToolVersionsFileName, config.GoModFileName}
 
-	// Check .tool-versions (asdf format)
-	if data, err := os.ReadFile(".tool-versions"); err == nil {
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "golang ") {
-				version := strings.TrimSpace(strings.TrimPrefix(line, "golang "))
-				if version != "" {
-					versions[version] = true
-				}
-			}
-		}
-	}
-
-	// Check go.mod for go directive
-	if data, err := os.ReadFile("go.mod"); err == nil {
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "go ") {
-				// Extract version like "go 1.23.2" or "go 1.23"
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					version := parts[1]
-					// go.mod might have versions like "1.23" - we'll use them as-is
-					versions[version] = true
+	for _, filename := range versionFiles {
+		if utils.FileExists(filename) {
+			// File exists, try to read version using manager API
+			if version, err := mgr.ReadVersionFile(filename); err == nil && version != "" {
+				// Manager returns colon-separated versions for multi-line files
+				// Split them and add each one
+				for _, v := range strings.Split(version, ":") {
+					v = strings.TrimSpace(v)
+					if v != "" {
+						versions[v] = true
+					}
 				}
 				break // Only first go directive matters
 			}

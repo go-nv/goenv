@@ -2,58 +2,50 @@ package diagnostics
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestRefreshCommand(t *testing.T) {
 	// Create a temporary directory for test
 	tmpDir := t.TempDir()
-	originalRoot := os.Getenv("GOENV_ROOT")
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Setenv("GOENV_ROOT", originalRoot)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Reload config to pick up new GOENV_ROOT
 	config.Load()
 
 	tests := []struct {
 		name          string
-		setup         func() error
+		setup         func()
 		expectRemoved int
 		expectError   bool
 	}{
 		{
 			name: "remove existing caches",
-			setup: func() error {
+			setup: func() {
 				// Create dummy cache files
-				if err := os.WriteFile(filepath.Join(tmpDir, "versions-cache.json"), []byte("{}"), 0644); err != nil {
-					return err
-				}
-				if err := os.WriteFile(filepath.Join(tmpDir, "releases-cache.json"), []byte("{}"), 0644); err != nil {
-					return err
-				}
-				return nil
+				testutil.WriteTestFile(t, filepath.Join(tmpDir, "versions-cache.json"), []byte("{}"), utils.PermFileDefault)
+				testutil.WriteTestFile(t, filepath.Join(tmpDir, "releases-cache.json"), []byte("{}"), utils.PermFileDefault)
 			},
 			expectRemoved: 2,
 			expectError:   false,
 		},
 		{
 			name: "no cache files exist",
-			setup: func() error {
-				// Don't create any files
-				return nil
+			setup: func() {
 			},
 			expectRemoved: 0,
 			expectError:   false,
 		},
 		{
 			name: "only one cache file exists",
-			setup: func() error {
+			setup: func() {
 				// Create only one cache file
-				return os.WriteFile(filepath.Join(tmpDir, "versions-cache.json"), []byte("{}"), 0644)
+				testutil.WriteTestFile(t, filepath.Join(tmpDir, "versions-cache.json"), []byte("{}"), utils.PermFileDefault)
 			},
 			expectRemoved: 1,
 			expectError:   false,
@@ -63,9 +55,7 @@ func TestRefreshCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			if err := tt.setup(); err != nil {
-				t.Fatalf("setup failed: %v", err)
-			}
+			tt.setup()
 
 			// Run command
 			cmd := refreshCmd
@@ -91,7 +81,7 @@ func TestRefreshCommand(t *testing.T) {
 			}
 
 			for _, cacheFile := range cacheFiles {
-				if _, err := os.Stat(cacheFile); err == nil {
+				if utils.PathExists(cacheFile) {
 					if tt.expectRemoved > 0 {
 						t.Errorf("cache file still exists: %s", cacheFile)
 					}
@@ -103,15 +93,11 @@ func TestRefreshCommand(t *testing.T) {
 
 func TestRefreshVerboseFlag(t *testing.T) {
 	tmpDir := t.TempDir()
-	originalRoot := os.Getenv("GOENV_ROOT")
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Setenv("GOENV_ROOT", originalRoot)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Create a cache file
 	cacheFile := filepath.Join(tmpDir, "versions-cache.json")
-	if err := os.WriteFile(cacheFile, []byte("{}"), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, cacheFile, []byte("{}"), utils.PermFileDefault)
 
 	// Run with verbose flag
 	refreshFlags.verbose = true

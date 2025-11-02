@@ -2,9 +2,11 @@ package tools
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -42,16 +44,16 @@ type toolStatus struct {
 }
 
 func runStatus(cmd *cobra.Command, jsonOutput bool) error {
-	cfg := config.Load()
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Get all installed Go versions
-	versions, err := getInstalledVersions(cfg)
+	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		return err
 	}
 
 	if len(versions) == 0 {
-		return fmt.Errorf("no Go versions installed")
+		return errors.NoVersionsInstalled()
 	}
 
 	// Collect all tools across all versions
@@ -59,13 +61,18 @@ func runStatus(cmd *cobra.Command, jsonOutput bool) error {
 	allToolNames := make(map[string]bool)
 
 	for _, version := range versions {
-		tools, err := getToolsForVersion(cfg, version)
+		tools, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
 			continue
 		}
-		toolsByVersion[version] = tools
+		// Extract tool names
+		var toolNames []string
 		for _, tool := range tools {
-			allToolNames[tool] = true
+			toolNames = append(toolNames, tool.Name)
+		}
+		toolsByVersion[version] = toolNames
+		for _, name := range toolNames {
+			allToolNames[name] = true
 		}
 	}
 
@@ -77,7 +84,7 @@ func runStatus(cmd *cobra.Command, jsonOutput bool) error {
 		installedCount := 0
 
 		for _, version := range versions {
-			isInstalled := contains(toolsByVersion[version], toolName)
+			isInstalled := slices.Contains(toolsByVersion[version], toolName)
 			presence[version] = isInstalled
 			if isInstalled {
 				installedCount++
@@ -96,11 +103,19 @@ func runStatus(cmd *cobra.Command, jsonOutput bool) error {
 	}
 
 	// Sort by consistency (least consistent first)
-	sort.Slice(toolStatuses, func(i, j int) bool {
-		if toolStatuses[i].ConsistencyScore == toolStatuses[j].ConsistencyScore {
-			return toolStatuses[i].Name < toolStatuses[j].Name
+	slices.SortFunc(toolStatuses, func(a, b toolStatus) int {
+		if a.ConsistencyScore != b.ConsistencyScore {
+			if a.ConsistencyScore < b.ConsistencyScore {
+				return -1
+			}
+			return 1
 		}
-		return toolStatuses[i].ConsistencyScore < toolStatuses[j].ConsistencyScore
+		if a.Name < b.Name {
+			return -1
+		} else if a.Name > b.Name {
+			return 1
+		}
+		return 0
 	})
 
 	// Handle JSON output

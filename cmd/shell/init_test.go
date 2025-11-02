@@ -1,12 +1,12 @@
 package shell
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +38,7 @@ func TestInitCommand(t *testing.T) {
 			args: []string{"bash"},
 			expectedOutput: []string{
 				"# Load goenv automatically by appending",
-				"# the following to ~/.bash_profile:",
+				"# the following to ~/.bashrc or ~/.bash_profile:",
 				"eval \"$(goenv init -)\"",
 			},
 		},
@@ -65,7 +65,7 @@ func TestInitCommand(t *testing.T) {
 			args: []string{"ksh"},
 			expectedOutput: []string{
 				"# Load goenv automatically by appending",
-				"# the following to ~/.profile:",
+				"# the following to your shell profile:",
 				"eval \"$(goenv init -)\"",
 			},
 		},
@@ -74,7 +74,7 @@ func TestInitCommand(t *testing.T) {
 			args: []string{"magicalshell"},
 			expectedOutput: []string{
 				"# Load goenv automatically by appending",
-				"# the following to <unknown shell: magicalshell, replace with your profile path>:",
+				"# the following to your shell profile:",
 				"eval \"$(goenv init -)\"",
 			},
 		},
@@ -175,8 +175,9 @@ func TestInitCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Run setup function if provided
 			if tt.setupFunc != nil {
@@ -244,7 +245,7 @@ func TestInitCommand(t *testing.T) {
 			// Check directories were created
 			for _, dir := range tt.checkDirs {
 				dirPath := filepath.Join(tmpDir, dir)
-				if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+				if utils.FileNotExists(dirPath) {
 					t.Errorf("Expected directory %q to exist, but it doesn't", dir)
 				}
 			}

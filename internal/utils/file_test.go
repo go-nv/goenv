@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestCopyFile(t *testing.T) {
@@ -19,15 +21,11 @@ func TestCopyFile(t *testing.T) {
 	if IsWindows() {
 		// Windows doesn't support Unix-style permissions
 		expectedMode = 0666
-		if err := os.WriteFile(srcPath, content, expectedMode); err != nil {
-			t.Fatalf("Failed to create source file: %v", err)
-		}
+		testutil.WriteTestFile(t, srcPath, content, expectedMode, "Failed to create source file")
 	} else {
 		// Unix: test with executable permissions
-		expectedMode = 0755
-		if err := os.WriteFile(srcPath, content, expectedMode); err != nil {
-			t.Fatalf("Failed to create source file: %v", err)
-		}
+		expectedMode = PermFileExecutable
+		testutil.WriteTestFile(t, srcPath, content, expectedMode, "Failed to create source file")
 	}
 
 	// Copy the file
@@ -37,8 +35,8 @@ func TestCopyFile(t *testing.T) {
 	}
 
 	// Verify destination exists
-	if _, err := os.Stat(dstPath); err != nil {
-		t.Fatalf("Destination file does not exist: %v", err)
+	if FileNotExists(dstPath) {
+		t.Fatalf("Destination file does not exist")
 	}
 
 	// Verify content matches
@@ -80,9 +78,7 @@ func TestCopyFile_DestinationDirNotExist(t *testing.T) {
 	srcPath := filepath.Join(tmpDir, "source.txt")
 
 	// Create source file
-	if err := os.WriteFile(srcPath, []byte("test"), 0644); err != nil {
-		t.Fatalf("Failed to create source file: %v", err)
-	}
+	testutil.WriteTestFile(t, srcPath, []byte("test"), PermFileDefault, "Failed to create source file")
 
 	// Try to copy to non-existent directory
 	dstPath := filepath.Join(tmpDir, "nonexistent", "destination.txt")
@@ -102,9 +98,7 @@ func TestCopyFile_ExecutablePreserved(t *testing.T) {
 	// Create an executable file
 	srcPath := filepath.Join(tmpDir, "script.sh")
 	content := []byte("#!/bin/bash\necho 'test'\n")
-	if err := os.WriteFile(srcPath, content, 0755); err != nil {
-		t.Fatalf("Failed to create source file: %v", err)
-	}
+	testutil.WriteTestFile(t, srcPath, content, PermFileExecutable, "Failed to create source file")
 
 	// Copy it
 	dstPath := filepath.Join(tmpDir, "script-copy.sh")
@@ -134,9 +128,7 @@ func TestFileExists(t *testing.T) {
 
 	// Create a file
 	filePath := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(filePath, []byte("test"), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, filePath, []byte("test"), PermFileDefault, "Failed to create test file")
 
 	// Test existing file
 	if !FileExists(filePath) {
@@ -145,7 +137,7 @@ func TestFileExists(t *testing.T) {
 
 	// Test directory (should return false)
 	dirPath := filepath.Join(tmpDir, "testdir")
-	if err := os.Mkdir(dirPath, 0755); err != nil {
+	if err := os.Mkdir(dirPath, PermFileExecutable); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -165,7 +157,7 @@ func TestDirExists(t *testing.T) {
 
 	// Create a directory
 	dirPath := filepath.Join(tmpDir, "testdir")
-	if err := os.Mkdir(dirPath, 0755); err != nil {
+	if err := os.Mkdir(dirPath, PermFileExecutable); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -176,9 +168,7 @@ func TestDirExists(t *testing.T) {
 
 	// Test file (should return false)
 	filePath := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(filePath, []byte("test"), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, filePath, []byte("test"), PermFileDefault, "Failed to create test file")
 
 	if DirExists(filePath) {
 		t.Error("DirExists returned true for file")
@@ -196,9 +186,7 @@ func TestPathExists(t *testing.T) {
 
 	// Create a file
 	filePath := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(filePath, []byte("test"), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, filePath, []byte("test"), PermFileDefault, "Failed to create test file")
 
 	// Test existing file
 	if !PathExists(filePath) {
@@ -207,7 +195,7 @@ func TestPathExists(t *testing.T) {
 
 	// Create a directory
 	dirPath := filepath.Join(tmpDir, "testdir")
-	if err := os.Mkdir(dirPath, 0755); err != nil {
+	if err := os.Mkdir(dirPath, PermFileExecutable); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -233,9 +221,7 @@ func TestGetFileInfo(t *testing.T) {
 	// Create a file
 	filePath := filepath.Join(tmpDir, "test.txt")
 	content := []byte("test content")
-	if err := os.WriteFile(filePath, content, 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, filePath, content, PermFileDefault, "Failed to create test file")
 
 	// Test existing file
 	info, exists = GetFileInfo(filePath)
@@ -256,7 +242,7 @@ func TestGetFileInfo(t *testing.T) {
 
 	// Test directory
 	dirPath := filepath.Join(tmpDir, "testdir")
-	if err := os.Mkdir(dirPath, 0755); err != nil {
+	if err := os.Mkdir(dirPath, PermFileExecutable); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -269,5 +255,82 @@ func TestGetFileInfo(t *testing.T) {
 	}
 	if !info.IsDir() {
 		t.Error("FileInfo.IsDir() returned false for directory")
+	}
+}
+
+func TestIsExecutableFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Test non-existent file
+	nonExistent := filepath.Join(tmpDir, "nonexistent")
+	if IsExecutableFile(nonExistent) {
+		t.Error("IsExecutableFile returned true for non-existent file")
+	}
+
+	// Test directory
+	dirPath := filepath.Join(tmpDir, "testdir")
+	if err := os.Mkdir(dirPath, PermFileExecutable); err != nil {
+		t.Fatalf("Failed to create test directory: %v", err)
+	}
+	if IsExecutableFile(dirPath) {
+		t.Error("IsExecutableFile returned true for directory")
+	}
+
+	// Test regular file (non-executable on Unix)
+	regularFile := filepath.Join(tmpDir, "regular.txt")
+	testutil.WriteTestFile(t, regularFile, []byte("test"), PermFileDefault, "Failed to create regular file")
+
+	if IsWindows() {
+		// On Windows, all files are considered executable if they exist
+		if !IsExecutableFile(regularFile) {
+			t.Error("IsExecutableFile returned false for regular file on Windows")
+		}
+	} else {
+		// On Unix, non-executable files should return false
+		if IsExecutableFile(regularFile) {
+			t.Error("IsExecutableFile returned true for non-executable file on Unix")
+		}
+	}
+
+	// Test executable file (Unix only)
+	if !IsWindows() {
+		execFile := filepath.Join(tmpDir, "executable.sh")
+		testutil.WriteTestFile(t, execFile, []byte("#!/bin/bash\necho test"), PermFileExecutable, "Failed to create executable file")
+
+		if !IsExecutableFile(execFile) {
+			t.Error("IsExecutableFile returned false for executable file on Unix")
+		}
+	}
+}
+
+func TestStatWithExistence(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Test non-existent path
+	nonExistent := filepath.Join(tmpDir, "nonexistent.txt")
+	info, exists, err := StatWithExistence(nonExistent)
+	if exists {
+		t.Error("StatWithExistence returned exists=true for non-existent file")
+	}
+	if err != nil {
+		t.Errorf("StatWithExistence returned error for non-existent file: %v", err)
+	}
+	if info != nil {
+		t.Error("StatWithExistence returned non-nil info for non-existent file")
+	}
+
+	// Test existing file
+	filePath := filepath.Join(tmpDir, "test.txt")
+	testutil.WriteTestFile(t, filePath, []byte("test"), PermFileDefault, "Failed to create test file")
+
+	info, exists, err = StatWithExistence(filePath)
+	if !exists {
+		t.Error("StatWithExistence returned exists=false for existing file")
+	}
+	if err != nil {
+		t.Errorf("StatWithExistence returned error for existing file: %v", err)
+	}
+	if info == nil {
+		t.Error("StatWithExistence returned nil info for existing file")
 	}
 }

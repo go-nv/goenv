@@ -53,7 +53,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -70,7 +70,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -87,7 +87,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -104,7 +104,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -121,7 +121,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -138,7 +138,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -155,7 +155,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -174,7 +174,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -193,7 +193,7 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},

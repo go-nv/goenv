@@ -1,12 +1,12 @@
 package defaulttools
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -92,7 +92,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	}
 
 	// Verify file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if utils.FileNotExists(configPath) {
 		t.Fatal("Config file was not created")
 	}
 
@@ -130,12 +130,9 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "invalid.yaml")
 
 	// Write invalid YAML
-	err := os.WriteFile(configPath, []byte("not: valid: yaml: content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write invalid YAML: %v", err)
-	}
+	testutil.WriteTestFile(t, configPath, []byte("not: valid: yaml: content"), utils.PermFileDefault, "Failed to write invalid YAML")
 
-	_, err = LoadConfig(configPath)
+	_, err := LoadConfig(configPath)
 	if err == nil {
 		t.Error("Expected error for invalid YAML, got nil")
 	}
@@ -218,10 +215,10 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 	goBinDir := filepath.Join(versionPath, "bin")
 	gopathBin := filepath.Join(versionPath, "gopath", "bin")
 
-	if err := os.MkdirAll(goBinDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create go bin directory: %v", err)
 	}
-	if err := os.MkdirAll(gopathBin, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
 		t.Fatalf("Failed to create gopath bin directory: %v", err)
 	}
 
@@ -232,9 +229,7 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 		goBinary += ".bat"
 		mockScript = "@echo off\nexit 0"
 	}
-	if err := os.WriteFile(goBinary, []byte(mockScript), 0755); err != nil {
-		t.Fatalf("Failed to create go binary: %v", err)
-	}
+	testutil.WriteTestFile(t, goBinary, []byte(mockScript), utils.PermFileExecutable, "Failed to create go binary")
 
 	config := &Config{
 		Enabled: true,
@@ -264,7 +259,7 @@ func TestInstallTools_Failure(t *testing.T) {
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
 	goBinDir := filepath.Join(versionPath, "bin")
 
-	if err := os.MkdirAll(goBinDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create go bin directory: %v", err)
 	}
 
@@ -275,9 +270,7 @@ func TestInstallTools_Failure(t *testing.T) {
 		goBinary += ".bat"
 		mockScript = "@echo off\nexit 1"
 	}
-	if err := os.WriteFile(goBinary, []byte(mockScript), 0755); err != nil {
-		t.Fatalf("Failed to create go binary: %v", err)
-	}
+	testutil.WriteTestFile(t, goBinary, []byte(mockScript), utils.PermFileExecutable, "Failed to create go binary")
 
 	config := &Config{
 		Enabled: true,
@@ -308,7 +301,7 @@ func TestVerifyTools(t *testing.T) {
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
 	gopathBin := filepath.Join(versionPath, "gopath", "bin")
 
-	if err := os.MkdirAll(gopathBin, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
 		t.Fatalf("Failed to create gopath bin directory: %v", err)
 	}
 
@@ -320,12 +313,8 @@ func TestVerifyTools(t *testing.T) {
 		tool2Binary += ".exe"
 	}
 
-	if err := os.WriteFile(tool1Binary, []byte("mock binary"), 0755); err != nil {
-		t.Fatalf("Failed to create tool1 binary: %v", err)
-	}
-	if err := os.WriteFile(tool2Binary, []byte("mock binary"), 0755); err != nil {
-		t.Fatalf("Failed to create tool2 binary: %v", err)
-	}
+	testutil.WriteTestFile(t, tool1Binary, []byte("mock binary"), utils.PermFileExecutable, "Failed to create tool1 binary")
+	testutil.WriteTestFile(t, tool2Binary, []byte("mock binary"), utils.PermFileExecutable, "Failed to create tool2 binary")
 
 	config := &Config{
 		Tools: []Tool{
@@ -374,7 +363,7 @@ func TestVerifyTools_NoBinaryName(t *testing.T) {
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
 	gopathBin := filepath.Join(versionPath, "gopath", "bin")
 
-	if err := os.MkdirAll(gopathBin, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
 		t.Fatalf("Failed to create gopath bin directory: %v", err)
 	}
 
@@ -384,9 +373,7 @@ func TestVerifyTools_NoBinaryName(t *testing.T) {
 		toolBinary += ".exe"
 	}
 
-	if err := os.WriteFile(toolBinary, []byte("mock binary"), 0755); err != nil {
-		t.Fatalf("Failed to create tool binary: %v", err)
-	}
+	testutil.WriteTestFile(t, toolBinary, []byte("mock binary"), utils.PermFileExecutable, "Failed to create tool binary")
 
 	config := &Config{
 		Tools: []Tool{

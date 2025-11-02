@@ -2,16 +2,16 @@ package tools
 
 import (
 	"fmt"
-	"github.com/go-nv/goenv/cmd/shims"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/go-nv/goenv/cmd/shims"
+
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
-	"github.com/go-nv/goenv/internal/pathutil"
-	"github.com/go-nv/goenv/internal/tooldetect"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -59,8 +59,8 @@ func init() {
 }
 
 func runSyncTools(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
+	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	var sourceVersion, targetVersion string
 	var err error
@@ -82,7 +82,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 		if err != nil || targetVersion == "" {
 			return fmt.Errorf("cannot determine current Go version: use 'goenv local' or 'goenv global' to set one")
 		}
-		if targetVersion == "system" {
+		if targetVersion == manager.SystemVersion {
 			return fmt.Errorf("cannot sync tools to 'system' version")
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "%sSyncing from Go %s → current Go %s\n", utils.Emoji("📦 "), sourceVersion, targetVersion)
@@ -100,21 +100,21 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 
 	// Check if source version exists
 	sourcePath := filepath.Join(cfg.Root, "versions", sourceVersion)
-	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-		return fmt.Errorf("source Go version %s is not installed", sourceVersion)
+	if utils.FileNotExists(sourcePath) {
+		return errors.VersionNotInstalled(sourceVersion, "source")
 	}
 
 	// Check if target version exists
 	targetPath := filepath.Join(cfg.Root, "versions", targetVersion)
-	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-		return fmt.Errorf("target Go version %s is not installed", targetVersion)
+	if utils.FileNotExists(targetPath) {
+		return errors.VersionNotInstalled(targetVersion, "target")
 	}
 
 	// Discover tools in source version
 	fmt.Fprintf(cmd.OutOrStdout(), "%sDiscovering tools in Go %s...\n", utils.Emoji("🔍 "), sourceVersion)
-	sourceTools, err := tooldetect.ListInstalledTools(cfg.Root, sourceVersion)
+	sourceTools, err := toolspkg.ListForVersion(cfg, sourceVersion)
 	if err != nil {
-		return fmt.Errorf("failed to list tools in source version: %w", err)
+		return errors.FailedTo("list tools in source version", err)
 	}
 
 	if len(sourceTools) == 0 {
@@ -165,32 +165,8 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 			packagePath = fmt.Sprintf("%s@latest", tool.PackagePath)
 		}
 
-		// Use target version's go binary
-		// The version directory IS the GOROOT (no extra 'go' subdirectory)
-		goBinaryBase := filepath.Join(targetPath, "bin", "go")
-
-		// Find the executable (handles .exe and .bat on Windows)
-		goBinary, err := pathutil.FindExecutable(goBinaryBase)
-		if err != nil {
-			return fmt.Errorf("go binary not found in target version: %w", err)
-		}
-
-		// Set GOPATH for target version
-		targetGOPATH := filepath.Join(targetPath, "gopath")
-		if err := os.MkdirAll(targetGOPATH, 0755); err != nil {
-			return fmt.Errorf("failed to create GOPATH directory: %w", err)
-		}
-
-		// Run go install
-		installCmd := exec.Command(goBinary, "install", packagePath)
-		installCmd.Env = append(os.Environ(),
-			fmt.Sprintf("GOPATH=%s", targetGOPATH),
-			fmt.Sprintf("GOBIN=%s", filepath.Join(targetGOPATH, "bin")),
-		)
-		installCmd.Stdout = os.Stdout
-		installCmd.Stderr = os.Stderr
-
-		if err := installCmd.Run(); err != nil {
+		// Install using manager API
+		if err := toolsMgr.InstallSingleTool(targetVersion, packagePath, true); err != nil {
 			fmt.Fprintf(cmd.OutOrStdout(), "  %sFailed to install %s: %v\n", utils.Emoji("❌ "), tool.Name, err)
 			failCount++
 			continue
@@ -220,7 +196,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 }
 
 // filterTools applies --select and --exclude filters to the tool list
-func filterTools(tools []tooldetect.Tool) []tooldetect.Tool {
+func filterTools(toolList []toolspkg.Tool) []toolspkg.Tool {
 	// Build set of selected tools
 	var selectSet map[string]bool
 	if syncToolsFlags.select_ != "" {
@@ -240,8 +216,8 @@ func filterTools(tools []tooldetect.Tool) []tooldetect.Tool {
 	}
 
 	// Filter tools
-	var filtered []tooldetect.Tool
-	for _, tool := range tools {
+	var filtered []toolspkg.Tool
+	for _, tool := range toolList {
 		// If select is specified, only include selected tools
 		if selectSet != nil && !selectSet[tool.Name] {
 			continue
@@ -266,14 +242,14 @@ func autoDetectVersions(cfg *config.Config, mgr *manager.Manager) (source, targe
 		return "", "", fmt.Errorf("cannot determine current Go version: use 'goenv local' or 'goenv global' to set one")
 	}
 
-	if currentVersion == "system" {
+	if currentVersion == manager.SystemVersion {
 		return "", "", fmt.Errorf("cannot sync tools to 'system' version")
 	}
 
 	// Get all installed versions
 	installedVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to list installed versions: %w", err)
+		return "", "", errors.FailedTo("list installed versions", err)
 	}
 
 	if len(installedVersions) < 2 {
@@ -289,7 +265,7 @@ func autoDetectVersions(cfg *config.Config, mgr *manager.Manager) (source, targe
 			continue
 		}
 
-		tools, err := tooldetect.ListInstalledTools(cfg.Root, version)
+		tools, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
 			continue
 		}

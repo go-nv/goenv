@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"syscall"
 	"unsafe"
+
+	"github.com/go-nv/goenv/internal/errors"
 )
 
 var (
@@ -33,7 +35,7 @@ func getDiskSpace(path string) (freeMB, totalMB int64, err error) {
 	)
 
 	if r1 == 0 {
-		return 0, 0, fmt.Errorf("failed to get disk space: %w", err)
+		return 0, 0, errors.FailedTo("get disk space", err)
 	}
 
 	// Convert to MB

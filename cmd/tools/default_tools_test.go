@@ -2,20 +2,20 @@ package tools
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/defaulttools"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
 func TestDefaultToolsList_NoConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	buf := new(bytes.Buffer)
 	defaultToolsListCmd.SetOut(buf)
@@ -37,8 +37,8 @@ func TestDefaultToolsList_NoConfig(t *testing.T) {
 
 func TestDefaultToolsList_WithConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -75,8 +75,8 @@ func TestDefaultToolsList_WithConfig(t *testing.T) {
 
 func TestDefaultToolsInit(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	buf := new(bytes.Buffer)
 	defaultToolsInitCmd.SetOut(buf)
@@ -94,7 +94,7 @@ func TestDefaultToolsInit(t *testing.T) {
 
 	// Verify config file was created
 	configPath := defaulttools.ConfigPath(tmpDir)
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if utils.FileNotExists(configPath) {
 		t.Errorf("Config file was not created at %s", configPath)
 	}
 
@@ -113,8 +113,8 @@ func TestDefaultToolsInit(t *testing.T) {
 
 func TestDefaultToolsInit_AlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config first
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -140,8 +140,8 @@ func TestDefaultToolsInit_AlreadyExists(t *testing.T) {
 
 func TestDefaultToolsEnable(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create disabled config
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -177,8 +177,8 @@ func TestDefaultToolsEnable(t *testing.T) {
 
 func TestDefaultToolsEnable_AlreadyEnabled(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create enabled config
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -205,8 +205,8 @@ func TestDefaultToolsEnable_AlreadyEnabled(t *testing.T) {
 
 func TestDefaultToolsDisable(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create enabled config
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -245,8 +245,8 @@ func TestDefaultToolsDisable(t *testing.T) {
 
 func TestDefaultToolsDisable_AlreadyDisabled(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create disabled config
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -273,32 +273,57 @@ func TestDefaultToolsDisable_AlreadyDisabled(t *testing.T) {
 
 func TestDefaultToolsInstall_NoConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	buf := new(bytes.Buffer)
-	installToolsCmd.SetOut(buf)
-	installToolsCmd.SetErr(buf)
+	installDefaultToolsCmd.SetOut(buf)
+	installDefaultToolsCmd.SetErr(buf)
 
-	err := installToolsCmd.RunE(installToolsCmd, []string{"1.21.0"})
+	err := installDefaultToolsCmd.RunE(installDefaultToolsCmd, []string{"1.21.0"})
 	if err == nil {
 		t.Fatal("Expected error when config doesn't exist")
 	}
 }
 
 func TestDefaultToolsInstall_EmptyToolsList(t *testing.T) {
-	t.Skip("TODO: This test needs to be redesigned - installToolsCmd requires package arguments, not version numbers")
+	tmpDir := t.TempDir()
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+
+	// Create config with empty tools list
+	configPath := defaulttools.ConfigPath(tmpDir)
+	config := &defaulttools.Config{
+		Enabled: true,
+		Tools:   []defaulttools.Tool{}, // Empty tools list
+	}
+	if err := defaulttools.SaveConfig(configPath, config); err != nil {
+		t.Fatalf("Failed to create config: %v", err)
+	}
+
+	buf := new(bytes.Buffer)
+	installDefaultToolsCmd.SetOut(buf)
+	installDefaultToolsCmd.SetErr(buf)
+
+	// Should not error, but should show message about no tools configured
+	err := installDefaultToolsCmd.RunE(installDefaultToolsCmd, []string{"1.21.0"})
+	if err != nil {
+		t.Fatalf("Unexpected error with empty tools list: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "No tools configured") {
+		t.Errorf("Expected 'No tools configured' message, got: %s", output)
+	}
 }
 
 func TestDefaultToolsInstall_DisabledConfig(t *testing.T) {
-	t.Skip("TODO: This test needs to be redesigned - installToolsCmd requires package arguments, not version numbers")
-
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Set GOENV_VERSION to explicitly use the test version
-	t.Setenv("GOENV_VERSION", "1.21.0")
+	t.Setenv(utils.GoenvEnvVarVersion.String(), "1.21.0")
 
 	// Create disabled config with tools
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -311,7 +336,7 @@ func TestDefaultToolsInstall_DisabledConfig(t *testing.T) {
 	// Create a fake Go version directory structure
 	versionDir := filepath.Join(tmpDir, "versions", "1.21.0")
 	binDir := filepath.Join(versionDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
 
@@ -324,16 +349,14 @@ func TestDefaultToolsInstall_DisabledConfig(t *testing.T) {
 	} else {
 		content = "#!/bin/bash\necho 1.21.0\n"
 	}
-	if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create mock go binary: %v", err)
-	}
+	testutil.WriteTestFile(t, goBinary, []byte(content), utils.PermFileExecutable)
 
 	buf := new(bytes.Buffer)
-	installToolsCmd.SetOut(buf)
-	installToolsCmd.SetErr(buf)
+	installDefaultToolsCmd.SetOut(buf)
+	installDefaultToolsCmd.SetErr(buf)
 
 	// This should show warning but proceed (note: actual install will fail without real Go)
-	_ = installToolsCmd.RunE(installToolsCmd, []string{"1.21.0"})
+	_ = installDefaultToolsCmd.RunE(installDefaultToolsCmd, []string{"1.21.0"})
 
 	// We expect this to fail because we don't have a real Go installation
 	// but we want to verify the warning message appears
@@ -345,13 +368,13 @@ func TestDefaultToolsInstall_DisabledConfig(t *testing.T) {
 
 func TestDefaultToolsVerify_NoConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create version directory (otherwise verify will fail for other reasons)
 	versionDir := filepath.Join(tmpDir, "versions", "1.21.0")
 	binDir := filepath.Join(versionDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
 
@@ -374,8 +397,8 @@ func TestDefaultToolsVerify_NoConfig(t *testing.T) {
 
 func TestDefaultToolsVerify_EmptyToolsList(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config with no tools
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -404,8 +427,8 @@ func TestDefaultToolsVerify_EmptyToolsList(t *testing.T) {
 
 func TestDefaultToolsVerify_WithTools(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config
 	configPath := defaulttools.ConfigPath(tmpDir)
@@ -417,7 +440,7 @@ func TestDefaultToolsVerify_WithTools(t *testing.T) {
 	// Create version directory structure
 	versionDir := filepath.Join(tmpDir, "versions", "1.21.0")
 	binDir := filepath.Join(versionDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
 
@@ -430,9 +453,7 @@ func TestDefaultToolsVerify_WithTools(t *testing.T) {
 	} else {
 		content = "#!/bin/bash\necho gopls\n"
 	}
-	if err := os.WriteFile(toolBinary, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create mock tool binary: %v", err)
-	}
+	testutil.WriteTestFile(t, toolBinary, []byte(content), utils.PermFileExecutable)
 
 	buf := new(bytes.Buffer)
 	verifyCmd.SetOut(buf)

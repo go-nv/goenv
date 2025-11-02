@@ -3,22 +3,20 @@ package diagnostics
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
-	"sort"
-	"strconv"
+	"slices"
 	"strings"
 	"time"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cache"
 	"github.com/go-nv/goenv/internal/cgo"
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/envdetect"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
-	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -240,25 +238,13 @@ type cacheTotals struct {
 	Entries   int   `json:"entries"`
 }
 
-// Internal struct for rendering human-readable output
-type cacheInfo struct {
-	path      string
-	sizeGB    float64
-	sizeBytes int64
-	files     int
-	version   string
-	arch      string // e.g., "darwin-arm64" or "host-host"
-	modTime   time.Time
-}
-
 func runCacheStatus(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
-	// Get installed versions
+	// Get installed versions (for validation)
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return fmt.Errorf("cannot list installed versions: %w", err)
+		return errors.FailedTo("list installed versions", err)
 	}
 
 	if len(versions) == 0 {
@@ -271,8 +257,8 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 					Version: cmdpkg.AppVersion,
 				},
 				Host: hostInfo{
-					GOOS:      runtime.GOOS,
-					GOARCH:    runtime.GOARCH,
+					GOOS:      platform.OS(),
+					GOARCH:    platform.Arch(),
 					Rosetta:   envdetect.IsRosetta(),
 					WSL:       envdetect.IsWSL(),
 					Container: envdetect.IsInContainer(),
@@ -284,148 +270,37 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 					Entries:   0,
 				},
 			}
-			encoder := json.NewEncoder(cmd.OutOrStdout())
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(result)
+			return cmdutil.OutputJSON(cmd.OutOrStdout(), result)
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), "No Go versions installed.")
 		return nil
 	}
 
-	// Auto-detect if user should use --fast mode for better performance
-	if !statusFast && !statusJSON {
-		shouldSuggestFast := false
-		estimatedTotalFiles := 0
+	// Create cache manager
+	cacheMgr := cache.NewManager(cfg)
 
-		// Quick sample: check first few caches to estimate total file count
-		sampleCount := 0
-		for _, version := range versions {
-			if sampleCount >= 3 { // Sample first 3 versions
-				break
-			}
-
-			versionPath := filepath.Join(cfg.VersionsDir(), version)
-			entries, err := os.ReadDir(versionPath)
-			if err != nil {
-				continue
-			}
-
-			for _, entry := range entries {
-				if !entry.IsDir() {
-					continue
-				}
-				name := entry.Name()
-				if strings.HasPrefix(name, "go-build-") || name == "go-build" {
-					cachePath := filepath.Join(versionPath, name)
-					// Quick sample with very short timeout
-					_, sampleFiles := getDirSizeWithOptions(cachePath, false, 50*time.Millisecond)
-					if sampleFiles > 0 {
-						estimatedTotalFiles += sampleFiles
-						sampleCount++
-					}
-					break // One cache per version for sampling
-				}
-			}
-		}
-
-		// If sample suggests >5000 files total, recommend --fast
-		// Extrapolate: if 3 versions have N files, estimate total
-		if sampleCount > 0 {
-			estimatedTotal := (estimatedTotalFiles * len(versions)) / sampleCount
-			if estimatedTotal > 5000 {
-				shouldSuggestFast = true
-			}
-		}
-
-		if shouldSuggestFast {
-			fmt.Fprintf(cmd.OutOrStdout(),
-				"%s Large cache detected (estimated %s+ files). "+
-					"Use --fast for 5-10x faster scanning.\n\n",
-				utils.Emoji("💡"), formatNumber(estimatedTotalFiles))
-		}
+	// Get cache status using the cache package
+	status, err := cacheMgr.GetStatus(statusFast)
+	if err != nil {
+		return errors.FailedTo("get cache status", err)
 	}
 
-	// Collect all cache entries for JSON output
-	var cacheEntries []cacheEntry
-	var totalSize int64
-	var totalEntries int
-
-	// Collect build caches
-	for _, version := range versions {
-		versionPath := filepath.Join(cfg.VersionsDir(), version)
-
-		// Check for architecture-specific caches
-		entries, err := os.ReadDir(versionPath)
-		if err != nil {
-			continue
-		}
-
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-
-			name := entry.Name()
-			// Look for go-build-* directories
-			if strings.HasPrefix(name, "go-build-") || name == "go-build" {
-				cachePath := filepath.Join(versionPath, name)
-				size, files := getDirSizeWithOptions(cachePath, statusFast, 10*time.Second)
-
-				// Parse ABI information from cache name
-				goos, goarch, abi := parseABIFromCacheName(name)
-				isOldFormat := name == "go-build"
-
-				var target *targetInfo
-				if !isOldFormat && goos != "" && goarch != "" {
-					target = &targetInfo{
-						GOOS:   goos,
-						GOARCH: goarch,
-					}
-				}
-
-				cacheEntries = append(cacheEntries, cacheEntry{
-					Kind:      "build",
-					Path:      cachePath,
-					GoVersion: version,
-					Target:    target,
-					ABI:       abi,
-					SizeBytes: size,
-					Entries:   files,
-					Exists:    true,
-					OldFormat: isOldFormat,
-				})
-
-				totalSize += size
-				totalEntries += files
+	// Check if we should suggest --fast mode
+	if !statusFast && !statusJSON && len(status.BuildCaches) > 3 {
+		// Estimate if user should use --fast
+		avgFiles := 0
+		if len(status.BuildCaches) > 0 && status.TotalFiles > 0 {
+			avgFiles = status.TotalFiles / len(status.BuildCaches)
+			if avgFiles > 1000 {
+				fmt.Fprintf(cmd.OutOrStdout(),
+					"%s Large cache detected (%s+ files). "+
+						"Use --fast for 5-10x faster scanning.\n\n",
+					utils.Emoji("💡"), cache.FormatNumber(status.TotalFiles))
 			}
 		}
 	}
 
-	// Collect module caches
-	for _, version := range versions {
-		versionPath := filepath.Join(cfg.VersionsDir(), version)
-		modCachePath := filepath.Join(versionPath, "go-mod")
-
-		if stat, err := os.Stat(modCachePath); err == nil && stat.IsDir() {
-			size, files := getDirSizeWithOptions(modCachePath, statusFast, 10*time.Second)
-
-			cacheEntries = append(cacheEntries, cacheEntry{
-				Kind:      "mod",
-				Path:      modCachePath,
-				GoVersion: version,
-				Target:    nil, // Module caches don't have target info
-				SizeBytes: size,
-				Entries:   files,
-				Exists:    true,
-				OldFormat: false,
-			})
-
-			totalSize += size
-			totalEntries += files
-		}
-	}
-
-	// If JSON output requested, marshal and output
+	// Convert to JSON format if requested
 	if statusJSON {
 		result := cacheStatusJSON{
 			SchemaVersion: "1",
@@ -434,187 +309,165 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 				Version: cmdpkg.AppVersion,
 			},
 			Host: hostInfo{
-				GOOS:      runtime.GOOS,
-				GOARCH:    runtime.GOARCH,
+				GOOS:      platform.OS(),
+				GOARCH:    platform.Arch(),
 				Rosetta:   envdetect.IsRosetta(),
 				WSL:       envdetect.IsWSL(),
 				Container: envdetect.IsInContainer(),
 			},
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Caches:    cacheEntries,
+			Caches:    make([]cacheEntry, 0),
 			Totals: cacheTotals{
-				SizeBytes: totalSize,
-				Entries:   totalEntries,
+				SizeBytes: status.TotalSize,
+				Entries:   status.TotalFiles,
 			},
 		}
 
-		encoder := json.NewEncoder(cmd.OutOrStdout())
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(result)
+		// Convert cache.CacheInfo to cacheEntry
+		for _, c := range append(status.BuildCaches, status.ModCaches...) {
+			entry := cacheEntry{
+				Kind:      c.Kind.String(),
+				Path:      c.Path,
+				GoVersion: c.GoVersion,
+				SizeBytes: c.SizeBytes,
+				Entries:   c.Files,
+				Exists:    true,
+				OldFormat: c.OldFormat,
+			}
+
+			if c.Target != nil {
+				entry.Target = &targetInfo{
+					GOOS:   c.Target.GOOS,
+					GOARCH: c.Target.GOARCH,
+				}
+				entry.ABI = c.Target.ABI
+			}
+
+			result.Caches = append(result.Caches, entry)
+		}
+
+		return cmdutil.OutputJSON(cmd.OutOrStdout(), result)
 	}
 
 	// Human-readable output
-	fmt.Fprintf(cmd.OutOrStdout(), "%sCache Status\n", utils.Emoji("📊 "))
-	fmt.Fprintln(cmd.OutOrStdout())
+	out := cmd.OutOrStdout()
 
-	// Display build caches
-	var buildCaches []cacheInfo
-	var totalBuildSize float64
-	var totalBuildFiles int
-	hasApproximateBuildFiles := false
+	// Group by version for display
+	if len(status.ByVersion) == 0 {
+		fmt.Fprintln(out, "No caches found.")
+		return nil
+	}
 
-	for _, entry := range cacheEntries {
-		if entry.Kind == "build" {
-			sizeGB := float64(entry.SizeBytes) / (1024 * 1024 * 1024)
-			arch := "(old format)"
-			if entry.Target != nil {
-				arch = fmt.Sprintf("%s-%s", entry.Target.GOOS, entry.Target.GOARCH)
-				if len(entry.ABI) > 0 {
-					// Add ABI info to arch string
-					for key, val := range entry.ABI {
-						arch += fmt.Sprintf("-%s:%s", key, val)
+	// Sort versions for consistent output
+	sortedVersions := make([]string, 0, len(status.ByVersion))
+	for v := range status.ByVersion {
+		sortedVersions = append(sortedVersions, v)
+	}
+	slices.Sort(sortedVersions)
+
+	for _, version := range sortedVersions {
+		versionCaches := status.ByVersion[version]
+		fmt.Fprintf(out, "%s Go %s │ (%s)\n",
+			utils.Emoji("📦"),
+			version,
+			cache.FormatBytes(versionCaches.TotalSize))
+
+		// Display build caches
+		for _, c := range versionCaches.BuildCaches {
+			archLabel := "unknown"
+			if c.OldFormat {
+				archLabel = "(old format)"
+			} else if c.Target != nil {
+				archLabel = fmt.Sprintf("%s-%s", c.Target.GOOS, c.Target.GOARCH)
+				if len(c.Target.ABI) > 0 {
+					// Add ABI details
+					for k, v := range c.Target.ABI {
+						archLabel += fmt.Sprintf(" %s=%s", strings.ToLower(strings.TrimPrefix(k, "GO")), v)
 					}
 				}
 			}
 
-			buildCaches = append(buildCaches, cacheInfo{
-				path:    entry.Path,
-				sizeGB:  sizeGB,
-				files:   entry.Entries,
-				version: entry.GoVersion,
-				arch:    arch,
-			})
+			fileCount := cache.FormatFileCount(c.Files, c.Files < 0)
+			fmt.Fprintf(out, "  %s Build %s: %s [%s] (%s files)\n",
+				utils.Emoji("🔨"),
+				archLabel,
+				cache.FormatBytes(c.SizeBytes),
+				filepath.Base(c.Path),
+				fileCount)
+		}
 
-			totalBuildSize += sizeGB
-			// Track if any entry has approximate count
-			if entry.Entries < 0 {
-				hasApproximateBuildFiles = true
-			} else if !hasApproximateBuildFiles {
-				totalBuildFiles += entry.Entries
+		// Display module cache
+		if versionCaches.ModCache != nil {
+			c := versionCaches.ModCache
+			fileCount := cache.FormatFileCount(c.Files, c.Files < 0)
+			fmt.Fprintf(out, "  %s Modules: %s [%s] (%s files)\n",
+				utils.Emoji("📚"),
+				cache.FormatBytes(c.SizeBytes),
+				filepath.Base(c.Path),
+				fileCount)
+		}
+
+		fmt.Fprintln(out)
+	}
+
+	// Display totals
+	totalFileCount := cache.FormatFileCount(status.TotalFiles, status.TotalFiles < 0)
+	fmt.Fprintf(out, "%s Total: %s (%s files)\n",
+		utils.Emoji("💾"),
+		cache.FormatBytes(status.TotalSize),
+		totalFileCount)
+
+	// Show tips
+	if len(status.BuildCaches) > 0 {
+		hasOldFormat := false
+		for _, c := range status.BuildCaches {
+			if c.OldFormat {
+				hasOldFormat = true
+				break
 			}
 		}
-	}
 
-	// If any cache has approximate count, mark total as approximate
-	if hasApproximateBuildFiles {
-		totalBuildFiles = -1
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "%sBuild Caches:\n", utils.Emoji("🔨 "))
-	if len(buildCaches) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "  No build caches found")
-	} else {
-		// Sort by version, then arch
-		sort.Slice(buildCaches, func(i, j int) bool {
-			if buildCaches[i].version != buildCaches[j].version {
-				return buildCaches[i].version < buildCaches[j].version
-			}
-			return buildCaches[i].arch < buildCaches[j].arch
-		})
-
-		for _, cache := range buildCaches {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Go %-8s (%s): %.2f GB, %s files\n",
-				cache.version, cache.arch, cache.sizeGB, formatFileCount(cache.files))
-		}
-	}
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	// Display module caches
-	var modCaches []cacheInfo
-	var totalModSize float64
-	var totalModFiles int
-	hasApproximateModFiles := false
-
-	for _, entry := range cacheEntries {
-		if entry.Kind == "mod" {
-			sizeGB := float64(entry.SizeBytes) / (1024 * 1024 * 1024)
-
-			modCaches = append(modCaches, cacheInfo{
-				path:    entry.Path,
-				sizeGB:  sizeGB,
-				files:   entry.Entries,
-				version: entry.GoVersion,
-			})
-
-			totalModSize += sizeGB
-			// Track if any entry has approximate count
-			if entry.Entries < 0 {
-				hasApproximateModFiles = true
-			} else if !hasApproximateModFiles {
-				totalModFiles += entry.Entries
-			}
+		if hasOldFormat {
+			fmt.Fprintf(out, "\n%s Tip: Run 'goenv cache migrate' to convert old format caches to architecture-aware format.\n",
+				utils.Emoji("💡"))
 		}
 	}
 
-	// If any cache has approximate count, mark total as approximate
-	if hasApproximateModFiles {
-		totalModFiles = -1
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "%sModule Caches:\n", utils.Emoji("📦 "))
-	if len(modCaches) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "  No module caches found")
-	} else {
-		sort.Slice(modCaches, func(i, j int) bool {
-			return modCaches[i].version < modCaches[j].version
-		})
-
-		for _, cache := range modCaches {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Go %-8s: %.2f GB, %s modules/files\n",
-				cache.version, cache.sizeGB, formatFileCount(cache.files))
-		}
-	}
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	// Summary
-	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Fprintf(cmd.OutOrStdout(), "Total Build Cache:  %.2f GB (%s files)\n", totalBuildSize, formatFileCount(totalBuildFiles))
-	fmt.Fprintf(cmd.OutOrStdout(), "Total Module Cache: %.2f GB (%s items)\n", totalModSize, formatFileCount(totalModFiles))
-	fmt.Fprintf(cmd.OutOrStdout(), "Total:              %.2f GB\n", totalBuildSize+totalModSize)
-	if totalBuildFiles < 0 || totalModFiles < 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "Note: ~ indicates approximate file count (fast mode or large cache)\n")
-	}
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	// Show cache locations
-	fmt.Fprintln(cmd.OutOrStdout(), "📍 Cache Locations:")
-	fmt.Fprintf(cmd.OutOrStdout(), "  GOENV_ROOT: %s\n", cfg.Root)
-	fmt.Fprintf(cmd.OutOrStdout(), "  Versions:   %s\n", cfg.VersionsDir())
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	// Helpful tips
-	fmt.Fprintf(cmd.OutOrStdout(), "%sTips:\n", utils.Emoji("💡 "))
-	fmt.Fprintln(cmd.OutOrStdout(), "  • Clean build caches:  goenv cache clean build")
-	fmt.Fprintln(cmd.OutOrStdout(), "  • Clean module caches: goenv cache clean mod")
-	fmt.Fprintln(cmd.OutOrStdout(), "  • Clean all caches:    goenv cache clean all")
-	for _, cache := range buildCaches {
-		if cache.arch == "(old format)" {
-			fmt.Fprintln(cmd.OutOrStdout(), "  • Old format caches detected - consider migrating them")
-			break
-		}
+	if status.TotalSize > 5*1024*1024*1024 { // > 5GB
+		fmt.Fprintf(out, "\n%s Tip: Run 'goenv cache clean' to free up disk space.\n",
+			utils.Emoji("💡"))
 	}
 
 	return nil
 }
 
 func runCacheClean(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.NewInteractiveContext(cmd)
 
-	// Default to 'build' if no argument provided (matching old 'goenv clean' behavior)
+	// Default to 'build' if no argument provided
 	cleanType := "build"
 	if len(args) > 0 {
 		cleanType = args[0]
 	}
 
-	if cleanType != "build" && cleanType != "mod" && cleanType != "all" {
+	// Validate cache type
+	var kind cache.CacheKind
+	switch cleanType {
+	case "build":
+		kind = cache.CacheKindBuild
+	case "mod", "module", "modules":
+		kind = cache.CacheKindMod
+	case "all":
+		kind = "" // Empty means all
+	default:
 		return fmt.Errorf("invalid type: %s (must be 'build', 'mod', or 'all')", cleanType)
 	}
 
-	// Get installed versions
+	// Get installed versions (for validation)
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return fmt.Errorf("cannot list installed versions: %w", err)
+		return errors.FailedTo("list installed versions", err)
 	}
 
 	if len(versions) == 0 {
@@ -622,7 +475,7 @@ func runCacheClean(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Filter versions if --version specified
+	// Validate version flag if specified
 	if cleanVersion != "" {
 		found := false
 		for _, v := range versions {
@@ -634,361 +487,152 @@ func runCacheClean(cmd *cobra.Command, args []string) error {
 		if !found {
 			return fmt.Errorf("version %s is not installed", cleanVersion)
 		}
-		versions = []string{cleanVersion}
 	}
 
-	// Collect caches to clean
-	var cachesToClean []cacheInfo
-	var totalSize float64
-	var totalFiles int
-
-	for _, version := range versions {
-		versionPath := filepath.Join(cfg.VersionsDir(), version)
-
-		// Collect build caches
-		if cleanType == "build" || cleanType == "all" {
-			entries, err := os.ReadDir(versionPath)
-			if err != nil {
-				continue
-			}
-
-			for _, entry := range entries {
-				if !entry.IsDir() {
-					continue
-				}
-
-				name := entry.Name()
-				if strings.HasPrefix(name, "go-build-") || name == "go-build" {
-					isOldFormat := name == "go-build"
-
-					// Filter by old-format flag if specified
-					if cleanOldFormat && !isOldFormat {
-						continue
-					}
-
-					cachePath := filepath.Join(versionPath, name)
-					size, files := getDirSize(cachePath)
-					sizeGB := float64(size) / (1024 * 1024 * 1024)
-
-					// Determine architecture label
-					var arch string
-					if isOldFormat {
-						arch = "(old format)"
-					} else {
-						arch = strings.TrimPrefix(name, "go-build-")
-					}
-
-					// Get modification time
-					modTime, err := getCacheModTime(cachePath)
-					if err != nil {
-						// If we can't get mod time, use zero time (will be oldest)
-						modTime = time.Time{}
-					}
-
-					cachesToClean = append(cachesToClean, cacheInfo{
-						path:      cachePath,
-						sizeGB:    sizeGB,
-						sizeBytes: size,
-						files:     files,
-						version:   version,
-						arch:      arch,
-						modTime:   modTime,
-					})
-
-					totalSize += sizeGB
-					totalFiles += files
-				}
-			}
+	// Parse flags
+	var maxBytes int64
+	if cleanMaxBytes != "" {
+		parsed, err := cache.ParseByteSize(cleanMaxBytes)
+		if err != nil {
+			return fmt.Errorf("invalid --max-bytes value: %w", err)
 		}
-
-		// Collect module caches
-		if cleanType == "mod" || cleanType == "all" {
-			modCachePath := filepath.Join(versionPath, "go-mod")
-			if stat, err := os.Stat(modCachePath); err == nil && stat.IsDir() {
-				size, files := getDirSize(modCachePath)
-				sizeGB := float64(size) / (1024 * 1024 * 1024)
-
-				// Get modification time
-				modTime, err := getCacheModTime(modCachePath)
-				if err != nil {
-					// If we can't get mod time, use zero time (will be oldest)
-					modTime = time.Time{}
-				}
-
-				cachesToClean = append(cachesToClean, cacheInfo{
-					path:      modCachePath,
-					sizeGB:    sizeGB,
-					sizeBytes: size,
-					files:     files,
-					version:   version,
-					arch:      "modules",
-					modTime:   modTime,
-				})
-
-				totalSize += sizeGB
-				totalFiles += files
-			}
-		}
+		maxBytes = parsed
 	}
 
-	if len(cachesToClean) == 0 {
+	var olderThan time.Duration
+	if cleanOlderThan != "" {
+		parsed, err := cache.ParseDuration(cleanOlderThan)
+		if err != nil {
+			return fmt.Errorf("invalid --older-than value: %w", err)
+		}
+		olderThan = parsed
+	}
+
+	// Create cache manager
+	cacheMgr := cache.NewManager(cfg)
+
+	// Build clean options
+	opts := cache.CleanOptions{
+		Kind:      kind,
+		Version:   cleanVersion,
+		OldFormat: cleanOldFormat,
+		MaxBytes:  maxBytes,
+		OlderThan: olderThan,
+		DryRun:    cleanDryRun,
+		Verbose:   cleanVerbose,
+	}
+
+	// Preview what will be cleaned
+	previewCaches, err := cacheMgr.List()
+	if err != nil {
+		return errors.FailedTo("list caches", err)
+	}
+
+	// Apply filters to get actual list
+	actualCaches := previewCaches
+	if kind != "" {
+		filtered := make([]cache.CacheInfo, 0)
+		for _, c := range actualCaches {
+			if c.Kind == kind {
+				filtered = append(filtered, c)
+			}
+		}
+		actualCaches = filtered
+	}
+	if cleanVersion != "" {
+		filtered := make([]cache.CacheInfo, 0)
+		for _, c := range actualCaches {
+			if c.GoVersion == cleanVersion {
+				filtered = append(filtered, c)
+			}
+		}
+		actualCaches = filtered
+	}
+	if cleanOldFormat {
+		filtered := make([]cache.CacheInfo, 0)
+		for _, c := range actualCaches {
+			if c.OldFormat {
+				filtered = append(filtered, c)
+			}
+		}
+		actualCaches = filtered
+	}
+	if olderThan > 0 {
+		cutoff := time.Now().Add(-olderThan)
+		filtered := make([]cache.CacheInfo, 0)
+		for _, c := range actualCaches {
+			if c.ModTime.Before(cutoff) {
+				filtered = append(filtered, c)
+			}
+		}
+		actualCaches = filtered
+	}
+
+	if len(actualCaches) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "No caches found to clean.")
 		return nil
 	}
 
-	// Apply pruning filters
-	originalCount := len(cachesToClean)
-	var prunedByAge, prunedBySize int
-
-	// Filter by age first (--older-than)
-	if cleanOlderThan != "" {
-		maxAge, err := parseDurationWithUnits(cleanOlderThan)
-		if err != nil {
-			return fmt.Errorf("invalid --older-than value: %w", err)
-		}
-
-		cutoff := time.Now().Add(-maxAge)
-		var filtered []cacheInfo
-		for _, cache := range cachesToClean {
-			if cache.modTime.Before(cutoff) {
-				filtered = append(filtered, cache)
-			}
-		}
-
-		prunedByAge = originalCount - len(filtered)
-		cachesToClean = filtered
-		totalSize = 0
-		totalFiles = 0
-		for _, cache := range cachesToClean {
-			totalSize += cache.sizeGB
-			totalFiles += cache.files
-		}
-
-		if len(cachesToClean) == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "No caches older than %s found.\n", cleanOlderThan)
-			return nil
-		}
-	}
-
-	// Filter by size (--max-bytes) - keep newest, delete oldest
-	if cleanMaxBytes != "" {
-		maxBytes, err := parseByteSize(cleanMaxBytes)
-		if err != nil {
-			return fmt.Errorf("invalid --max-bytes value: %w", err)
-		}
-
-		// Sort by modification time (newest first)
-		sort.Slice(cachesToClean, func(i, j int) bool {
-			return cachesToClean[i].modTime.After(cachesToClean[j].modTime)
-		})
-
-		// Keep caches until we exceed maxBytes
-		var kept []cacheInfo
-		var keptSize int64
-		var toDelete []cacheInfo
-
-		for _, cache := range cachesToClean {
-			if keptSize+cache.sizeBytes <= maxBytes {
-				kept = append(kept, cache)
-				keptSize += cache.sizeBytes
-			} else {
-				toDelete = append(toDelete, cache)
-			}
-		}
-
-		// Only delete the excess caches
-		cachesToClean = toDelete
-		prunedBySize = len(kept)
-
-		totalSize = 0
-		totalFiles = 0
-		for _, cache := range cachesToClean {
-			totalSize += cache.sizeGB
-			totalFiles += cache.files
-		}
-
-		if len(cachesToClean) == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "All caches are within the %s limit (%.2f GB kept).\n",
-				cleanMaxBytes, float64(keptSize)/(1024*1024*1024))
-			return nil
-		}
-	}
-
-	// Show pruning summary if filters were applied
-	if cleanOlderThan != "" || cleanMaxBytes != "" {
-		fmt.Fprintf(cmd.OutOrStdout(), "%sPruning Summary:\n", utils.Emoji("🔍 "))
-		if cleanOlderThan != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "   • Keeping %d cache(s) (newer than %s)\n", prunedByAge, cleanOlderThan)
-			fmt.Fprintf(cmd.OutOrStdout(), "   • Deleting %d cache(s) (older than %s)\n", len(cachesToClean), cleanOlderThan)
-		}
-		if cleanMaxBytes != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "   • Keeping %d cache(s) (newest caches within %s limit)\n", prunedBySize, cleanMaxBytes)
-			fmt.Fprintf(cmd.OutOrStdout(), "   • Deleting %d cache(s) (oldest caches exceeding limit)\n", len(cachesToClean))
-		}
-		fmt.Fprintln(cmd.OutOrStdout())
-	}
-
 	// Show what will be cleaned
-	fmt.Fprintf(cmd.OutOrStdout(), "%sCaches to clean:\n", utils.Emoji("🧹 "))
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	sort.Slice(cachesToClean, func(i, j int) bool {
-		if cachesToClean[i].version != cachesToClean[j].version {
-			return cachesToClean[i].version < cachesToClean[j].version
-		}
-		return cachesToClean[i].arch < cachesToClean[j].arch
-	})
-
-	for _, cache := range cachesToClean {
-		if cache.arch == "modules" {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Go %-8s [modules]:  %.2f GB (%s files)\n",
-				cache.version, cache.sizeGB, formatNumber(cache.files))
-		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Go %-8s [%s]:  %.2f GB (%s files)\n",
-				cache.version, cache.arch, cache.sizeGB, formatNumber(cache.files))
-		}
+	totalSize := int64(0)
+	for _, c := range actualCaches {
+		totalSize += c.SizeBytes
 	}
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintf(cmd.OutOrStdout(), "Total to clean: %.2f GB (%s files)\n", totalSize, formatNumber(totalFiles))
-	fmt.Fprintln(cmd.OutOrStdout())
 
-	// If dry-run, stop here
+	out := cmd.OutOrStdout()
 	if cleanDryRun {
-		fmt.Fprintf(cmd.OutOrStdout(), "%sDry-run mode: No caches were actually deleted.\n", utils.Emoji("🔍 "))
-		fmt.Fprintf(cmd.OutOrStdout(), "%sRun without --dry-run to perform the cleanup.\n", utils.Emoji("💡 "))
-		return nil
+		fmt.Fprintf(out, "%s Dry run - showing what would be cleaned:\n\n", utils.Emoji("🔍"))
+	} else if !cleanForce {
+		fmt.Fprintf(out, "%s About to clean %d cache(s), freeing %s:\n\n",
+			utils.Emoji("⚠️"), len(actualCaches), cache.FormatBytes(totalSize))
 	}
 
-	// Confirm deletion using enhanced prompt with helpful non-interactive guidance
-	confirmed := utils.PromptYesNo(utils.PromptConfig{
-		Question: "Proceed with cleaning?",
-		NonInteractiveError: fmt.Sprintf(
-			"%sRunning in non-interactive mode (no TTY detected)",
-			utils.Emoji("⚠️  ")),
-		NonInteractiveHelp: []string{
-			"",
-			"This command requires confirmation. Options:",
-			fmt.Sprintf("  1. Add --force flag: goenv cache clean %s --force", cleanType),
-			fmt.Sprintf("  2. Use dry-run first: goenv cache clean %s --dry-run", cleanType),
-			"  3. Set env var: GOENV_ASSUME_YES=1 goenv cache clean",
-			"",
-			"For CI/CD, we recommend: GOENV_ASSUME_YES=1",
-		},
-		AutoConfirm: cleanForce,
-		Writer:      cmd.OutOrStdout(),
-		ErrWriter:   cmd.ErrOrStderr(),
-	})
-	if !confirmed {
-		fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
-		return nil
-	}
-
-	// Clean caches
-	fmt.Fprintln(cmd.OutOrStdout(), "Cleaning...")
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	var cleaned int
-	var cleanedSize float64
-	var cleanedFiles int
-	var failed int
-
-	// Separate build caches from module caches
-	var buildCaches []cacheInfo
-	var modCachesByVersion = make(map[string]cacheInfo)
-
-	for _, cache := range cachesToClean {
-		if cache.arch == "modules" {
-			modCachesByVersion[cache.version] = cache
-		} else {
-			buildCaches = append(buildCaches, cache)
+	if !cleanDryRun && !cleanForce && len(actualCaches) > 0 {
+		// Ask for confirmation using InteractiveContext
+		prompt := fmt.Sprintf("About to clean %d cache(s), freeing %s. Continue?", len(actualCaches), cache.FormatBytes(totalSize))
+		if !ctx.Confirm(prompt, false) {
+			fmt.Fprintln(out, "Cancelled.")
+			return nil
 		}
 	}
 
-	// Clean build caches (direct removal is fine - no read-only files)
-	if len(buildCaches) > 0 && cleanVerbose {
-		fmt.Fprintln(cmd.OutOrStdout(), "→ Cleaning build caches...")
-	}
-	for _, cache := range buildCaches {
-		if cleanVerbose {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Removing %s...\n", cache.path)
-		}
-		err := os.RemoveAll(cache.path)
-		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "  ✗ Failed to clean %s: %v\n", cache.path, err)
-			failed++
-		} else {
-			if cleanVerbose {
-				fmt.Fprintf(cmd.OutOrStdout(), "  ✓ Cleaned Go %s [%s] (%.2f GB, %s files)\n",
-					cache.version, cache.arch, cache.sizeGB, formatNumber(cache.files))
-			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "  ✓ Cleaned Go %s [%s]\n", cache.version, cache.arch)
-			}
-			cleaned++
-			cleanedSize += cache.sizeGB
-			cleanedFiles += cache.files
-		}
+	// Perform clean
+	result, err := cacheMgr.Clean(opts)
+	if err != nil {
+		return errors.FailedTo("clean cache", err)
 	}
 
-	// Clean module caches (use 'go clean -modcache' to handle read-only files)
-	if len(modCachesByVersion) > 0 && cleanVerbose {
-		fmt.Fprintln(cmd.OutOrStdout(), "→ Cleaning module caches...")
-	}
-	for version, cache := range modCachesByVersion {
-		if cleanVerbose {
-			fmt.Fprintf(cmd.OutOrStdout(), "  Running 'go clean -modcache' for Go %s...\n", version)
-		}
-		// Use goenv exec to run 'go clean -modcache' with proper version and GOMODCACHE set
-		// Explicitly set GOMODCACHE to ensure we clean the version-specific isolated cache
-		// (cache.path is the modCachePath: GOENV_ROOT/versions/{version}/go-mod)
-		cleanCmd := exec.Command("goenv", "exec", "go", "clean", "-modcache")
-		cleanCmd.Env = append(os.Environ(),
-			fmt.Sprintf("GOENV_VERSION=%s", version),
-			fmt.Sprintf("GOMODCACHE=%s", cache.path))
-
-		// Show output only in verbose mode
-		if cleanVerbose {
-			cleanCmd.Stdout = cmd.OutOrStdout()
-			cleanCmd.Stderr = cmd.ErrOrStderr()
-		} else {
-			cleanCmd.Stdout = nil
-			cleanCmd.Stderr = nil
-		}
-
-		if err := cleanCmd.Run(); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "  ✗ Failed to clean Go %s [modules]: %v\n", version, err)
-			failed++
-		} else {
-			if cleanVerbose {
-				fmt.Fprintf(cmd.OutOrStdout(), "  ✓ Cleaned Go %s [modules] (%.2f GB, %s files)\n",
-					version, cache.sizeGB, formatNumber(cache.files))
-			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "  ✓ Cleaned Go %s [modules]\n", version)
-			}
-			cleaned++
-			cleanedSize += cache.sizeGB
-			cleanedFiles += cache.files
-		}
+	// Report results
+	if cleanDryRun {
+		fmt.Fprintf(out, "\n%s Would remove %d cache(s), freeing %s\n",
+			utils.Emoji("✓"),
+			result.CachesRemoved,
+			cache.FormatBytes(result.BytesReclaimed))
+	} else {
+		fmt.Fprintf(out, "\n%s Removed %d cache(s), freed %s\n",
+			utils.Emoji("✓"),
+			result.CachesRemoved,
+			cache.FormatBytes(result.BytesReclaimed))
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Fprintf(cmd.OutOrStdout(), "%sCleaned %d cache(s)\n", utils.Emoji("✅ "), cleaned)
-	fmt.Fprintf(cmd.OutOrStdout(), "%sReclaimed: %.2f GB (%s files)\n", utils.Emoji("💾 "), cleanedSize, formatNumber(cleanedFiles))
-	if failed > 0 {
-		fmt.Fprintf(cmd.ErrOrStderr(), "%sFailed: %d cache(s)\n", utils.Emoji("❌ "), failed)
+	if len(result.Errors) > 0 {
+		fmt.Fprintf(out, "\n%s Encountered %d error(s):\n", utils.Emoji("⚠️"), len(result.Errors))
+		for _, err := range result.Errors {
+			fmt.Fprintf(out, "  - %v\n", err)
+		}
 	}
 
 	return nil
 }
 
 func runCacheMigrate(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.NewInteractiveContext(cmd)
 
 	// Get installed versions
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return fmt.Errorf("cannot list installed versions: %w", err)
+		return errors.FailedTo("list installed versions", err)
 	}
 
 	if len(versions) == 0 {
@@ -996,334 +640,77 @@ func runCacheMigrate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Detect current system architecture
-	// Use runtime.GOOS/GOARCH (not GOOS/GOARCH env vars which may be set for cross-compilation)
-	// This ensures we migrate caches to the correct host architecture
-	currentGOOS := runtime.GOOS
-	currentGOARCH := runtime.GOARCH
-	targetArch := fmt.Sprintf("%s-%s", currentGOOS, currentGOARCH)
+	// Create cache manager
+	cacheMgr := cache.NewManager(cfg)
 
-	// Find old format caches
-	type migrationTask struct {
-		oldPath string
-		newPath string
-		version string
-		sizeGB  float64
-		files   int
+	// Detect old format caches
+	oldCaches, err := cacheMgr.DetectOldFormatCaches()
+	if err != nil {
+		return errors.FailedTo("detect old format caches", err)
 	}
 
-	var migrations []migrationTask
+	if len(oldCaches) == 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s No old format caches found. All caches are already architecture-aware.\n",
+			utils.Emoji("✓"))
+		return nil
+	}
 
-	for _, version := range versions {
-		versionPath := filepath.Join(cfg.VersionsDir(), version)
-		oldCachePath := filepath.Join(versionPath, "go-build")
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "%s Found %d old format cache(s) to migrate:\n\n", utils.Emoji("🔄"), len(oldCaches))
 
-		// Check if old format cache exists
-		if stat, err := os.Stat(oldCachePath); err == nil && stat.IsDir() {
-			size, files := getDirSize(oldCachePath)
-			sizeGB := float64(size) / (1024 * 1024 * 1024)
+	for _, c := range oldCaches {
+		fmt.Fprintf(out, "  %s: %s (Go %s)\n",
+			filepath.Base(c.Path),
+			cache.FormatBytes(c.SizeBytes),
+			c.GoVersion)
+	}
 
-			newCachePath := filepath.Join(versionPath, fmt.Sprintf("go-build-%s", targetArch))
+	targetArch := fmt.Sprintf("%s-%s", platform.OS(), platform.Arch())
+	fmt.Fprintf(out, "\nTarget architecture: %s\n", targetArch)
 
-			migrations = append(migrations, migrationTask{
-				oldPath: oldCachePath,
-				newPath: newCachePath,
-				version: version,
-				sizeGB:  sizeGB,
-				files:   files,
-			})
+	// Ask for confirmation unless --force
+	if !migrateForce {
+		prompt := "Migrate caches to target architecture?"
+		if !ctx.Confirm(prompt, false) {
+			fmt.Fprintln(out, "Cancelled.")
+			return nil
 		}
-	}
-
-	if len(migrations) == 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "%sNo old format caches found. All caches are already using the new architecture-aware format.\n", utils.Emoji("✅ "))
-		return nil
-	}
-
-	// Show what will be migrated
-	fmt.Fprintf(cmd.OutOrStdout(), "%sCache Migration\n", utils.Emoji("🔄 "))
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintf(cmd.OutOrStdout(), "Target architecture: %s\n", targetArch)
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "Old format caches to migrate:")
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	var totalSize float64
-	var totalFiles int
-
-	for _, m := range migrations {
-		fmt.Fprintf(cmd.OutOrStdout(), "  Go %-8s: %.2f GB (%s files)\n",
-			m.version, m.sizeGB, formatNumber(m.files))
-		totalSize += m.sizeGB
-		totalFiles += m.files
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintf(cmd.OutOrStdout(), "Total: %.2f GB (%s files)\n", totalSize, formatNumber(totalFiles))
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	// Show what migration will do
-	fmt.Fprintln(cmd.OutOrStdout(), "This will:")
-	fmt.Fprintln(cmd.OutOrStdout(), "  1. Move old format caches to architecture-specific directories")
-	fmt.Fprintln(cmd.OutOrStdout(), "  2. Preserve all cached build artifacts")
-	fmt.Fprintln(cmd.OutOrStdout(), "  3. Enable proper cache isolation")
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	// Confirm migration using enhanced prompt with helpful non-interactive guidance
-	confirmed := utils.PromptYesNo(utils.PromptConfig{
-		Question: "Proceed with migration?",
-		NonInteractiveError: fmt.Sprintf(
-			"%sRunning in non-interactive mode (no TTY detected)",
-			utils.Emoji("⚠️  ")),
-		NonInteractiveHelp: []string{
-			"",
-			"This command requires confirmation. Options:",
-			"  1. Add --force flag: goenv cache migrate --force",
-			"  2. Set env var: GOENV_ASSUME_YES=1 goenv cache migrate",
-			"",
-			"For CI/CD, we recommend: GOENV_ASSUME_YES=1",
-		},
-		AutoConfirm: migrateForce,
-		Writer:      cmd.OutOrStdout(),
-		ErrWriter:   cmd.ErrOrStderr(),
-	})
-	if !confirmed {
-		fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
-		return nil
 	}
 
 	// Perform migration
-	fmt.Fprintln(cmd.OutOrStdout(), "Migrating...")
-	fmt.Fprintln(cmd.OutOrStdout())
-
-	var migrated int
-	var migratedSize float64
-	var migratedFiles int
-	var failed int
-
-	for _, m := range migrations {
-		// Check if target already exists
-		if stat, err := os.Stat(m.newPath); err == nil && stat.IsDir() {
-			fmt.Fprintf(cmd.OutOrStdout(), "  %sGo %s: Target cache already exists, skipping\n", utils.Emoji("⚠️  "), m.version)
-			continue
-		}
-
-		// Rename old cache to new cache
-		err := os.Rename(m.oldPath, m.newPath)
-		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "  ✗ Go %s: Failed to migrate: %v\n", m.version, err)
-			failed++
-		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "  ✓ Go %s: Migrated to %s\n", m.version, targetArch)
-			migrated++
-			migratedSize += m.sizeGB
-			migratedFiles += m.files
-		}
+	result, err := cacheMgr.Migrate(cache.MigrateOptions{
+		TargetGOOS:   platform.OS(),
+		TargetGOARCH: platform.Arch(),
+		Force:        migrateForce,
+		DryRun:       false,
+		Verbose:      true,
+	})
+	if err != nil {
+		return errors.CacheMigrationFailed(err)
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Fprintf(cmd.OutOrStdout(), "%sMigrated %d cache(s)\n", utils.Emoji("✅ "), migrated)
-	fmt.Fprintf(cmd.OutOrStdout(), "%sSize: %.2f GB (%s files)\n", utils.Emoji("📦 "), migratedSize, formatNumber(migratedFiles))
-	if failed > 0 {
-		fmt.Fprintf(cmd.ErrOrStderr(), "%sFailed: %d cache(s)\n", utils.Emoji("❌ "), failed)
+	// Report results
+	fmt.Fprintf(out, "\n%s Migrated %d cache(s)\n",
+		utils.Emoji("✓"),
+		result.CachesMigrated)
+
+	if len(result.Errors) > 0 {
+		fmt.Fprintf(out, "\n%s Encountered %d error(s):\n", utils.Emoji("⚠️"), len(result.Errors))
+		for _, err := range result.Errors {
+			fmt.Fprintf(out, "  - %v\n", err)
+		}
 	}
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintf(cmd.OutOrStdout(), "%sNext steps:\n", utils.Emoji("💡 "))
-	fmt.Fprintln(cmd.OutOrStdout(), "  • Run 'goenv cache status' to verify the migration")
-	fmt.Fprintln(cmd.OutOrStdout(), "  • Run 'goenv doctor' to check for any issues")
 
 	return nil
 }
 
-// getDirSize calculates total size and file count of a directory recursively
-// Uses filepath.WalkDir (Go 1.16+) which is more efficient than filepath.Walk
-// because it avoids calling os.Stat on every entry.
-func getDirSize(path string) (size int64, files int) {
-	return getDirSizeWithOptions(path, false, 10*time.Second)
-}
-
-// getDirSizeWithOptions calculates directory size with performance options
-// - fast: if true, skips file counting (returns -1 for files)
-// - timeout: if walk exceeds this duration, returns approximate results
-func getDirSizeWithOptions(path string, fast bool, timeout time.Duration) (size int64, files int) {
-	startTime := time.Now()
-	timedOut := false
-
-	err := filepath.WalkDir(path, func(filePath string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil // Skip errors
-		}
-
-		// Check timeout budget every 1000 files to avoid excessive time.Now() calls
-		if !timedOut && files%1000 == 0 && time.Since(startTime) > timeout {
-			timedOut = true
-			// Don't return error - continue with what we have
-		}
-
-		if !d.IsDir() {
-			info, err := d.Info()
-			if err != nil {
-				return nil // Skip if we can't get file info
-			}
-			size += info.Size()
-
-			// In fast mode, skip counting files (or timeout)
-			if !fast && !timedOut {
-				files++
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return 0, 0
-	}
-
-	// Return -1 for files if in fast mode or timed out (indicates approximate)
-	if fast || timedOut {
-		return size, -1
-	}
-
-	return size, files
-}
-
-// formatNumber formats a number with thousand separators
-func formatNumber(n int) string {
-	s := fmt.Sprintf("%d", n)
-	if len(s) <= 3 {
-		return s
-	}
-
-	// Add commas
-	var result []rune
-	for i, digit := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			result = append(result, ',')
-		}
-		result = append(result, digit)
-	}
-
-	return string(result)
-}
-
-// formatFileCount formats file count, handling -1 for approximate/unknown counts
-func formatFileCount(n int) string {
-	if n < 0 {
-		return "~"
-	}
-	return formatNumber(n)
-}
-
-// parseABIFromCacheName extracts GOOS, GOARCH, and ABI variants from cache directory name
-// Examples:
-//
-//	"go-build-linux-amd64-v3" -> goos="linux", goarch="amd64", abi={"GOAMD64":"v3"}
-//	"go-build-darwin-arm64" -> goos="darwin", goarch="arm64", abi=nil
-//	"go-build" -> goos="", goarch="", abi=nil (old format)
-func parseABIFromCacheName(cacheName string) (goos, goarch string, abi map[string]string) {
-	if cacheName == "go-build" {
-		return "", "", nil
-	}
-
-	// Remove "go-build-" prefix
-	suffix := strings.TrimPrefix(cacheName, "go-build-")
-	if suffix == cacheName {
-		return "", "", nil // Invalid format
-	}
-
-	// Split by '-' to get components
-	parts := strings.Split(suffix, "-")
-	if len(parts) < 2 {
-		return "", "", nil
-	}
-
-	goos = parts[0]
-	goarch = parts[1]
-
-	// Check for ABI variants in remaining parts
-	if len(parts) > 2 {
-		abi = make(map[string]string)
-		remaining := parts[2:]
-
-		// Process remaining parts for ABI variants, experiments, and CGO hash
-		i := 0
-		for i < len(remaining) {
-			part := remaining[i]
-
-			// Check for CGO hash (format: "cgo-<hash>")
-			if part == "cgo" && i+1 < len(remaining) {
-				abi["CGO_HASH"] = remaining[i+1]
-				i += 2 // Skip both "cgo" and hash
-				continue
-			}
-
-			// Check for GOEXPERIMENT (format: "exp-<experiments>")
-			if part == "exp" && i+1 < len(remaining) {
-				expValue := strings.ReplaceAll(remaining[i+1], "-", ",")
-				abi["GOEXPERIMENT"] = expValue
-				i += 2 // Skip both "exp" and value
-				continue
-			}
-
-			// Check for architecture-specific ABI variants
-			switch goarch {
-			case "amd64":
-				if strings.HasPrefix(part, "v") {
-					abi["GOAMD64"] = part
-				}
-			case "arm":
-				// Accept both "v6", "v7" and "6", "7" formats
-				if strings.HasPrefix(part, "v") {
-					abi["GOARM"] = strings.TrimPrefix(part, "v")
-				} else if len(part) == 1 && part >= "5" && part <= "7" {
-					// Accept bare digits 5-7 for ARM variants
-					abi["GOARM"] = part
-				}
-			case "386":
-				if part == "sse2" || part == "softfloat" {
-					abi["GO386"] = part
-				}
-			case "mips", "mipsle":
-				if part == "hardfloat" || part == "softfloat" {
-					abi["GOMIPS"] = part
-				}
-			case "mips64", "mips64le":
-				if part == "hardfloat" || part == "softfloat" {
-					abi["GOMIPS64"] = part
-				}
-			case "ppc64", "ppc64le":
-				if part == "power8" || part == "power9" || part == "power10" {
-					abi["GOPPC64"] = part
-				}
-			case "riscv64":
-				abi["GORISCV64"] = part
-			case "wasm":
-				abi["GOWASM"] = part
-			}
-
-			i++
-		}
-	}
-
-	return goos, goarch, abi
-}
-
-// runCacheInfo shows CGO toolchain information for build caches
 func runCacheInfo(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
-	// Determine which versions to show
-	var versions []string
-	if len(args) > 0 {
-		versions = []string{args[0]}
-	} else {
-		var err error
-		versions, err = mgr.ListInstalledVersions()
-		if err != nil {
-			return fmt.Errorf("cannot list installed versions: %w", err)
-		}
+	// Get installed versions
+	versions, err := mgr.ListInstalledVersions()
+	if err != nil {
+		return errors.FailedTo("list installed versions", err)
 	}
 
 	if len(versions) == 0 {
@@ -1331,228 +718,133 @@ func runCacheInfo(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Collect cache information
-	type cacheInfoResult struct {
-		Version   string         `json:"version"`
-		CacheDir  string         `json:"cache_dir"`
-		BuildInfo *cgo.BuildInfo `json:"build_info,omitempty"`
-		Error     string         `json:"error,omitempty"`
+	// Filter to specific version if requested
+	if len(args) > 0 {
+		requestedVersion := args[0]
+		found := false
+		for _, v := range versions {
+			if v == requestedVersion {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("version %s is not installed", requestedVersion)
+		}
+		versions = []string{requestedVersion}
 	}
 
-	var results []cacheInfoResult
+	// Create cache manager
+	cacheMgr := cache.NewManager(cfg)
 
+	out := cmd.OutOrStdout()
+
+	// JSON output
+	if infoJSON {
+		type cgoInfoJSON struct {
+			Version   string            `json:"version"`
+			BuildInfo *cgo.BuildInfo    `json:"build_info,omitempty"`
+			Caches    []cache.CacheInfo `json:"caches"`
+		}
+
+		results := make([]cgoInfoJSON, 0)
+
+		for _, version := range versions {
+			versionCaches, err := cacheMgr.GetVersionCaches(version)
+			if err != nil {
+				continue
+			}
+
+			info := cgoInfoJSON{
+				Version: version,
+				Caches:  versionCaches,
+			}
+
+			// Try to get CGO build info
+			for _, c := range versionCaches {
+				if c.Kind == cache.CacheKindBuild {
+					buildInfo, err := cgo.ReadBuildInfo(c.Path)
+					if err == nil && buildInfo.CC != "" {
+						info.BuildInfo = buildInfo
+						break
+					}
+				}
+			}
+
+			results = append(results, info)
+		}
+
+		encoder := json.NewEncoder(out)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(results)
+	}
+
+	// Human-readable output
 	for _, version := range versions {
-		versionPath := filepath.Join(cfg.VersionsDir(), version)
+		fmt.Fprintf(out, "%s Go %s\n\n", utils.Emoji("📦"), version)
 
-		// Find all build cache directories
-		entries, err := os.ReadDir(versionPath)
+		versionCaches, err := cacheMgr.GetVersionCaches(version)
 		if err != nil {
+			fmt.Fprintf(out, "  Error: %v\n\n", err)
 			continue
 		}
 
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-
-			name := entry.Name()
-			// Look for go-build-* directories
-			if !strings.HasPrefix(name, "go-build-") {
-				continue
-			}
-
-			cachePath := filepath.Join(versionPath, name)
-			result := cacheInfoResult{
-				Version:  version,
-				CacheDir: name,
-			}
-
-			// Try to read build.info
-			buildInfo, err := cgo.ReadBuildInfo(cachePath)
-			if err == nil {
-				result.BuildInfo = buildInfo
-			} else if !os.IsNotExist(err) {
-				result.Error = fmt.Sprintf("failed to read build.info: %v", err)
-			}
-
-			results = append(results, result)
-		}
-	}
-
-	// Output results
-	if infoJSON {
-		// JSON output
-		encoder := json.NewEncoder(cmd.OutOrStdout())
-		encoder.SetIndent("", "  ")
-		if err := encoder.Encode(results); err != nil {
-			return fmt.Errorf("failed to encode JSON: %w", err)
-		}
-	} else {
-		// Human-readable output
-		if len(results) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "No build caches with CGO information found.")
-			fmt.Fprintln(cmd.OutOrStdout())
-			fmt.Fprintf(cmd.OutOrStdout(), "%sBuild caches with CGO enabled will automatically record toolchain information.\n", utils.Emoji("💡 "))
-			return nil
+		if len(versionCaches) == 0 {
+			fmt.Fprintln(out, "  No caches found.")
+			continue
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "%sCGO Toolchain Information\n", utils.Emoji("🔧 "))
-		fmt.Fprintln(cmd.OutOrStdout())
+		// Display each cache
+		for _, c := range versionCaches {
+			archLabel := "unknown"
+			if c.Kind == cache.CacheKindBuild {
+				if c.OldFormat {
+					archLabel = "(old format)"
+				} else if c.Target != nil {
+					archLabel = fmt.Sprintf("%s-%s", c.Target.GOOS, c.Target.GOARCH)
+				}
 
-		for _, result := range results {
-			fmt.Fprintf(cmd.OutOrStdout(), "Version: %s\n", result.Version)
-			fmt.Fprintf(cmd.OutOrStdout(), "Cache:   %s\n", result.CacheDir)
+				fmt.Fprintf(out, "  %s Build cache [%s]:\n", utils.Emoji("🔨"), archLabel)
+				fmt.Fprintf(out, "    Path: %s\n", c.Path)
+				fmt.Fprintf(out, "    Size: %s\n", cache.FormatBytes(c.SizeBytes))
 
-			if result.Error != "" {
-				fmt.Fprintf(cmd.OutOrStdout(), "Error:   %s\n", result.Error)
-			} else if result.BuildInfo != nil {
-				info := result.BuildInfo
-				fmt.Fprintf(cmd.OutOrStdout(), "Created: %s\n", info.Created.Format(time.RFC3339))
-
-				if info.CC != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "CC:      %s\n", info.CC)
-					if info.CCVersion != "" {
-						fmt.Fprintf(cmd.OutOrStdout(), "         %s\n", info.CCVersion)
+				// Try to get CGO info
+				buildInfo, err := cgo.ReadBuildInfo(c.Path)
+				if err == nil && buildInfo.CC != "" {
+					fmt.Fprintln(out, "    CGO Toolchain:")
+					if buildInfo.CC != "" {
+						fmt.Fprintf(out, "      CC:      %s\n", buildInfo.CC)
+						if buildInfo.CCVersion != "" {
+							fmt.Fprintf(out, "               %s\n", buildInfo.CCVersion)
+						}
 					}
-				}
-
-				if info.CXX != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "CXX:     %s\n", info.CXX)
-					if info.CXXVersion != "" {
-						fmt.Fprintf(cmd.OutOrStdout(), "         %s\n", info.CXXVersion)
+					if buildInfo.CXX != "" {
+						fmt.Fprintf(out, "      CXX:     %s\n", buildInfo.CXX)
+						if buildInfo.CXXVersion != "" {
+							fmt.Fprintf(out, "               %s\n", buildInfo.CXXVersion)
+						}
 					}
-				}
-
-				if info.CFLAGS != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "CFLAGS:  %s\n", info.CFLAGS)
-				}
-
-				if info.LDFLAGS != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "LDFLAGS: %s\n", info.LDFLAGS)
-				}
-
-				if info.PKGConfig != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "PKG_CONFIG: %s\n", info.PKGConfig)
-				}
-
-				if info.PKGConfigPath != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "PKG_CONFIG_PATH: %s\n", info.PKGConfigPath)
-				}
-
-				if info.ToolchainHash != "" {
-					fmt.Fprintf(cmd.OutOrStdout(), "Hash:    %s\n", info.ToolchainHash[:16]+"...")
+					if buildInfo.CFLAGS != "" {
+						fmt.Fprintf(out, "      CFLAGS:  %s\n", buildInfo.CFLAGS)
+					}
+					if buildInfo.LDFLAGS != "" {
+						fmt.Fprintf(out, "      LDFLAGS: %s\n", buildInfo.LDFLAGS)
+					}
+					if buildInfo.ToolchainHash != "" {
+						fmt.Fprintf(out, "      Hash:    %s...\n", buildInfo.ToolchainHash[:16])
+					}
+				} else {
+					fmt.Fprintln(out, "    CGO: Not used (or no build.info file)")
 				}
 			} else {
-				fmt.Fprintln(cmd.OutOrStdout(), "         (No CGO toolchain info - cache created without CGO)")
+				fmt.Fprintf(out, "  %s Module cache:\n", utils.Emoji("📚"))
+				fmt.Fprintf(out, "    Path: %s\n", c.Path)
+				fmt.Fprintf(out, "    Size: %s\n", cache.FormatBytes(c.SizeBytes))
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(out)
 		}
 	}
 
 	return nil
-}
-
-// parseByteSize parses byte size strings like "1GB", "500MB", "1.5GB" to bytes
-func parseByteSize(s string) (int64, error) {
-	s = strings.TrimSpace(strings.ToUpper(s))
-	if s == "" {
-		return 0, fmt.Errorf("empty byte size")
-	}
-
-	// Extract numeric part and unit
-	var numStr string
-	var unit string
-
-	for i, c := range s {
-		if (c >= '0' && c <= '9') || c == '.' {
-			numStr += string(c)
-		} else {
-			unit = s[i:]
-			break
-		}
-	}
-
-	if numStr == "" {
-		return 0, fmt.Errorf("invalid byte size format: %s", s)
-	}
-
-	// Parse the number
-	num, err := strconv.ParseFloat(numStr, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid number in byte size: %w", err)
-	}
-
-	// Parse the unit
-	var multiplier float64
-	switch unit {
-	case "B", "":
-		multiplier = 1
-	case "KB", "K":
-		multiplier = 1024
-	case "MB", "M":
-		multiplier = 1024 * 1024
-	case "GB", "G":
-		multiplier = 1024 * 1024 * 1024
-	case "TB", "T":
-		multiplier = 1024 * 1024 * 1024 * 1024
-	default:
-		return 0, fmt.Errorf("unknown unit in byte size: %s (valid units: B, KB, MB, GB, TB)", unit)
-	}
-
-	return int64(num * multiplier), nil
-}
-
-// parseDurationWithUnits parses duration strings like "30d", "1w", "24h"
-// Supports: d (days), w (weeks), h (hours), m (minutes), s (seconds)
-func parseDurationWithUnits(s string) (time.Duration, error) {
-	s = strings.TrimSpace(strings.ToLower(s))
-	if s == "" {
-		return 0, fmt.Errorf("empty duration")
-	}
-
-	// Try standard time.ParseDuration first (handles h, m, s, ms, us, ns)
-	if d, err := time.ParseDuration(s); err == nil {
-		return d, nil
-	}
-
-	// Handle custom units: d (days), w (weeks)
-	var numStr string
-	var unit string
-
-	for i, c := range s {
-		if (c >= '0' && c <= '9') || c == '.' {
-			numStr += string(c)
-		} else {
-			unit = s[i:]
-			break
-		}
-	}
-
-	if numStr == "" {
-		return 0, fmt.Errorf("invalid duration format: %s", s)
-	}
-
-	num, err := strconv.ParseFloat(numStr, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid number in duration: %w", err)
-	}
-
-	switch unit {
-	case "d", "day", "days":
-		return time.Duration(num * float64(24*time.Hour)), nil
-	case "w", "week", "weeks":
-		return time.Duration(num * float64(7*24*time.Hour)), nil
-	default:
-		return 0, fmt.Errorf("unknown unit in duration: %s (valid units: s, m, h, d, w)", unit)
-	}
-}
-
-// getCacheModTime returns the last modification time of a cache directory
-func getCacheModTime(path string) (time.Time, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return info.ModTime(), nil
 }

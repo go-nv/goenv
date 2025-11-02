@@ -1,12 +1,13 @@
 package shims
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -111,11 +112,11 @@ func TestWhichCommand(t *testing.T) {
 
 			// Set environment version if specified
 			if tt.envVersion != "" {
-				oldEnv := os.Getenv("GOENV_VERSION")
-				os.Setenv("GOENV_VERSION", tt.envVersion)
+				oldEnv := os.Getenv(utils.GoenvEnvVarVersion.String())
+				os.Setenv(utils.GoenvEnvVarVersion.String(), tt.envVersion)
 				defer func() {
 					if oldEnv != "" {
-						os.Setenv("GOENV_VERSION", oldEnv)
+						os.Setenv(utils.GoenvEnvVarVersion.String(), oldEnv)
 					} else {
 						os.Unsetenv("GOENV_VERSION")
 					}

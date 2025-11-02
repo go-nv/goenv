@@ -1,12 +1,12 @@
 package version
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -184,14 +184,13 @@ require (
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			goenvRoot, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Create go.mod file
-			gomodPath := filepath.Join(goenvRoot, "go.mod")
-			if err := os.WriteFile(gomodPath, []byte(tt.fileContent), 0644); err != nil {
-				t.Fatalf("Failed to write go.mod: %v", err)
-			}
+			gomodPath := filepath.Join(tmpDir, "go.mod")
+			testutil.WriteTestFile(t, gomodPath, []byte(tt.fileContent), utils.PermFileDefault)
 
 			// Execute command
 			cmd := &cobra.Command{
@@ -246,13 +245,12 @@ require (
 replace github.com/old/pkg => github.com/new/pkg v1.0.0
 `
 
-	goenvRoot, cleanup := cmdtest.SetupTestEnv(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
-	gomodPath := filepath.Join(goenvRoot, "go.mod")
-	if err := os.WriteFile(gomodPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to write go.mod: %v", err)
-	}
+	gomodPath := filepath.Join(tmpDir, "go.mod")
+	testutil.WriteTestFile(t, gomodPath, []byte(content), utils.PermFileDefault)
 
 	// Execute command
 	cmd := &cobra.Command{
@@ -309,13 +307,12 @@ go 1.22`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			goenvRoot, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
-			gomodPath := filepath.Join(goenvRoot, "go.mod")
-			if err := os.WriteFile(gomodPath, []byte(tt.fileContent), 0644); err != nil {
-				t.Fatalf("Failed to write go.mod: %v", err)
-			}
+			gomodPath := filepath.Join(tmpDir, "go.mod")
+			testutil.WriteTestFile(t, gomodPath, []byte(tt.fileContent), utils.PermFileDefault)
 
 			// Execute command
 			cmd := &cobra.Command{

@@ -5,7 +5,7 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
@@ -32,12 +32,11 @@ func init() {
 // RunPrefix executes the prefix command logic. Exported for testing.
 func RunPrefix(cmd *cobra.Command, args []string) error {
 	// Validate: prefix command takes 0 or 1 argument
-	if len(args) > 1 {
+	if err := cmdutil.ValidateMaxArgs(args, 1, "at most one version"); err != nil {
 		return fmt.Errorf("usage: goenv prefix [version]")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	// Handle completion mode
 	if PrefixFlags.Complete {
@@ -72,32 +71,33 @@ func RunPrefix(cmd *cobra.Command, args []string) error {
 	resolvedVersion, err := mgr.ResolveVersionSpec(version)
 	if err != nil {
 		// If resolution fails, provide helpful error
-		if version == "system" {
+		if version == manager.SystemVersion {
 			// Special handling for system version
 			if !mgr.HasSystemGo() {
-				return fmt.Errorf("goenv: system version not found in PATH")
+				return errors.SystemVersionNotFound()
 			}
 			// Return directory containing system go
 			systemGoDir, err := mgr.GetSystemGoDir()
 			if err != nil {
-				return fmt.Errorf("goenv: system version not found in PATH")
+				return errors.SystemVersionNotFound()
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), systemGoDir)
 			return nil
 		}
 
 		// Check if it's an exact version that's not installed
-		return errors.VersionNotInstalledDetailed(version, source, mgr)
+		installed, _ := mgr.ListInstalledVersions()
+		return errors.VersionNotInstalledDetailed(version, source, installed)
 	}
 
 	// Handle system version
-	if resolvedVersion == "system" {
+	if resolvedVersion == manager.SystemVersion {
 		if !mgr.HasSystemGo() {
-			return fmt.Errorf("goenv: system version not found in PATH")
+			return errors.SystemVersionNotFound()
 		}
 		systemGoDir, err := mgr.GetSystemGoDir()
 		if err != nil {
-			return fmt.Errorf("goenv: system version not found in PATH")
+			return errors.SystemVersionNotFound()
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), systemGoDir)
 		return nil
@@ -106,7 +106,8 @@ func RunPrefix(cmd *cobra.Command, args []string) error {
 	// Get version path
 	versionPath, err := mgr.GetVersionPath(resolvedVersion)
 	if err != nil {
-		return errors.VersionNotInstalledDetailed(resolvedVersion, source, mgr)
+		installed, _ := mgr.ListInstalledVersions()
+		return errors.VersionNotInstalledDetailed(resolvedVersion, source, installed)
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout(), versionPath)

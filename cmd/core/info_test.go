@@ -7,40 +7,23 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
 func TestInfoCommand(t *testing.T) {
 	// Create temporary test directory
 	tmpDir := t.TempDir()
-	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
-		t.Fatalf("Failed to create test versions dir: %v", err)
-	}
 
 	// Create a fake installed version
 	installedVersion := "1.23.2"
-	versionDir := filepath.Join(versionsDir, installedVersion)
-	if err := os.MkdirAll(versionDir, 0755); err != nil {
-		t.Fatalf("Failed to create version dir: %v", err)
-	}
-
-	// Create some fake files to simulate installation
-	binDir := filepath.Join(versionDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		t.Fatalf("Failed to create bin dir: %v", err)
-	}
-	testFile := filepath.Join(binDir, "go")
-	if err := os.WriteFile(testFile, []byte("fake go binary"), 0755); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	cmdtest.CreateMockGoVersion(t, tmpDir, installedVersion)
 
 	// Set up test config
-	originalHome := os.Getenv("GOENV_ROOT")
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Setenv("GOENV_ROOT", originalHome)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	tests := []struct {
 		name        string
@@ -110,24 +93,15 @@ func TestInfoCommand(t *testing.T) {
 func TestInfoJSONOutput(t *testing.T) {
 	// Create temporary test directory
 	tmpDir := t.TempDir()
-	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
-		t.Fatalf("Failed to create test versions dir: %v", err)
-	}
 
 	// Create a fake installed version
 	installedVersion := "1.23.2"
-	versionDir := filepath.Join(versionsDir, installedVersion)
-	if err := os.MkdirAll(versionDir, 0755); err != nil {
-		t.Fatalf("Failed to create version dir: %v", err)
-	}
+	cmdtest.CreateMockGoVersion(t, tmpDir, installedVersion)
 
 	// Set up test config
-	originalHome := os.Getenv("GOENV_ROOT")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	originalStdout := os.Stdout
-	os.Setenv("GOENV_ROOT", tmpDir)
 	defer func() {
-		os.Setenv("GOENV_ROOT", originalHome)
 		os.Stdout = originalStdout
 	}()
 
@@ -194,13 +168,11 @@ func TestCalculateDirSize(t *testing.T) {
 	expectedSize := int64(0)
 	for _, tf := range testFiles {
 		path := filepath.Join(tmpDir, tf.name)
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := utils.EnsureDirWithContext(filepath.Dir(path), "create test directory"); err != nil {
 			t.Fatalf("Failed to create dir: %v", err)
 		}
 		data := make([]byte, tf.size)
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			t.Fatalf("Failed to create file: %v", err)
-		}
+		testutil.WriteTestFile(t, path, data, utils.PermFileDefault)
 		expectedSize += tf.size
 	}
 
@@ -269,9 +241,7 @@ func TestExtractMajorMinor(t *testing.T) {
 func TestInfoCommandWithConfig(t *testing.T) {
 	// This test ensures the command works with the config system
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("GOENV_ROOT")
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Setenv("GOENV_ROOT", originalHome)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Load config
 	cfg := config.Load()
@@ -291,8 +261,8 @@ func BenchmarkCalculateDirSize(b *testing.B) {
 	tmpDir := b.TempDir()
 	for i := 0; i < 100; i++ {
 		path := filepath.Join(tmpDir, "file", string(rune(i)))
-		os.MkdirAll(filepath.Dir(path), 0755)
-		os.WriteFile(path, make([]byte, 1024), 0644)
+		_ = utils.EnsureDirWithContext(filepath.Dir(path), "create test directory")
+		testutil.WriteTestFile(b, path, make([]byte, 1024), utils.PermFileDefault)
 	}
 
 	b.ResetTimer()

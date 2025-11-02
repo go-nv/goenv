@@ -5,7 +5,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
@@ -30,12 +31,11 @@ func init() {
 
 func runInstalled(cmd *cobra.Command, args []string) error {
 	// Validate: installed command takes 0 or 1 argument
-	if len(args) > 1 {
+	if err := cmdutil.ValidateMaxArgs(args, 1, "at most one version"); err != nil {
 		return fmt.Errorf("usage: goenv installed [version]")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	// Handle completion
 	if installedFlags.complete {
@@ -64,13 +64,13 @@ func runInstalled(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle "system" version
-	if versionSpec == "system" {
+	if versionSpec == manager.SystemVersion {
 		// Check if system go exists
 		if mgr.HasSystemGo() {
 			fmt.Fprintln(cmd.OutOrStdout(), "system")
 			return nil
 		}
-		return fmt.Errorf("goenv: system version not found in PATH")
+		return errors.SystemVersionNotFound()
 	}
 
 	// Ensure we have installed versions for resolution

@@ -1,7 +1,6 @@
 package version
 
 import (
-	"os"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
@@ -9,8 +8,7 @@ import (
 
 func TestOfflineMode(t *testing.T) {
 	// Set offline mode
-	utils.GoenvEnvVarOffline.Set("1")
-	defer os.Unsetenv("GOENV_OFFLINE")
+	t.Setenv(utils.GoenvEnvVarOffline.String(), "1")
 
 	// Create a fetcher
 	fetcher := NewFetcher()
@@ -41,8 +39,7 @@ func TestOfflineMode(t *testing.T) {
 
 func TestOfflineModeFetchWithFallback(t *testing.T) {
 	// Set offline mode
-	utils.GoenvEnvVarOffline.Set("1")
-	defer os.Unsetenv("GOENV_OFFLINE")
+	t.Setenv(utils.GoenvEnvVarOffline.String(), "1")
 
 	// Create a fetcher
 	fetcher := NewFetcher()
@@ -66,7 +63,7 @@ func TestOfflineModeFetchWithFallback(t *testing.T) {
 
 func TestNormalModeStillWorks(t *testing.T) {
 	// Ensure offline mode is NOT set
-	os.Unsetenv("GOENV_OFFLINE")
+	t.Setenv(utils.GoenvEnvVarOffline.String(), "")
 
 	// Create a fetcher without cache (will try network, may fail, that's OK)
 	fetcher := NewFetcher()

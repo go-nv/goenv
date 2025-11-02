@@ -1,20 +1,15 @@
 package compliance
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
-	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -60,12 +55,11 @@ func init() {
 }
 
 func runInventoryGo(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return fmt.Errorf("failed to list versions: %w", err)
+		return errors.FailedTo("list versions", err)
 	}
 
 	if len(versions) == 0 {
@@ -102,28 +96,21 @@ type goInstallation struct {
 }
 
 func collectGoInstallation(cfg *config.Config, version string, includeChecksum bool) goInstallation {
-	versionPath := filepath.Join(cfg.VersionsDir(), version)
-	goBinary := filepath.Join(versionPath, "bin", "go")
-	if utils.IsWindows() {
-		goBinary += ".exe"
-	}
+	versionPath := cfg.VersionDir(version)
+	goBinary, _ := cfg.FindVersionGoBinary(version)
 
 	install := goInstallation{
-		Version:    version,
-		Path:       versionPath,
-		BinaryPath: goBinary,
-		OS:         runtime.GOOS,
-		Arch:       runtime.GOARCH,
-	}
-
-	// Get installation time from directory modification time
-	if info, err := os.Stat(versionPath); err == nil {
-		install.InstalledAt = info.ModTime()
+		Version:     version,
+		Path:        versionPath,
+		BinaryPath:  goBinary,
+		OS:          platform.OS(),
+		Arch:        platform.Arch(),
+		InstalledAt: utils.GetFileModTime(versionPath),
 	}
 
 	// Compute checksum if requested
 	if includeChecksum {
-		if checksum, err := computeSHA256(goBinary); err == nil {
+		if checksum, err := utils.SHA256File(goBinary); err == nil {
 			install.SHA256 = checksum
 		}
 	}
@@ -132,9 +119,7 @@ func collectGoInstallation(cfg *config.Config, version string, includeChecksum b
 }
 
 func outputInventoryJSON(cmd *cobra.Command, inventory []goInstallation) error {
-	encoder := json.NewEncoder(cmd.OutOrStdout())
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(inventory)
+	return cmdutil.OutputJSON(cmd.OutOrStdout(), inventory)
 }
 
 func outputInventoryText(cmd *cobra.Command, inventory []goInstallation) error {
@@ -165,19 +150,4 @@ func outputInventoryText(cmd *cobra.Command, inventory []goInstallation) error {
 	fmt.Fprintln(cmd.OutOrStdout(), "═══════════════════════════════════════════════════════════════")
 
 	return nil
-}
-
-func computeSHA256(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(h.Sum(nil)), nil
 }

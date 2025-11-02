@@ -6,7 +6,7 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -46,7 +46,7 @@ type commandInfo struct {
 }
 
 func runExplore(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 
 	// Define command catalog organized by user intent
 	catalog := map[string][]commandInfo{

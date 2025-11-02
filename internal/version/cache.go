@@ -1,14 +1,12 @@
 package version
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -43,13 +41,8 @@ func (c *Cache) Get() (*CachedData, error) {
 		}
 	}
 
-	data, err := os.ReadFile(c.cachePath)
-	if err != nil {
-		return nil, err
-	}
-
 	var cached CachedData
-	if err := json.Unmarshal(data, &cached); err != nil {
+	if err := utils.UnmarshalJSONFile(c.cachePath, &cached); err != nil {
 		return nil, err
 	}
 
@@ -68,11 +61,10 @@ func (c *Cache) verifySHA256(cached *CachedData) error {
 	// Compute SHA256 of releases data
 	releasesJSON, err := json.Marshal(cached.Releases)
 	if err != nil {
-		return fmt.Errorf("failed to marshal releases for verification: %w", err)
+		return errors.FailedTo("marshal releases for verification", err)
 	}
 
-	hash := sha256.Sum256(releasesJSON)
-	computed := hex.EncodeToString(hash[:])
+	computed := utils.SHA256Bytes(releasesJSON)
 
 	if computed != cached.SHA256 {
 		return fmt.Errorf("SHA256 mismatch: expected %s, got %s", cached.SHA256, computed)
@@ -92,20 +84,19 @@ func (c *Cache) Set(releases []GoRelease) error {
 
 // SetWithETag stores version data in cache with ETag support
 func (c *Cache) SetWithETag(releases []GoRelease, etag string) error {
-	// Ensure cache directory exists with secure permissions (0700)
+	// Ensure cache directory exists with secure permissions (utils.PermDirSecure)
 	cacheDir := filepath.Dir(c.cachePath)
-	if err := os.MkdirAll(cacheDir, 0700); err != nil {
-		return fmt.Errorf("failed to create cache directory: %w", err)
+	if err := utils.EnsureDirWithContext(cacheDir, "create cache directory"); err != nil {
+		return err
 	}
 
 	// Compute SHA256 hash of releases data for integrity
 	releasesJSON, err := json.Marshal(releases)
 	if err != nil {
-		return fmt.Errorf("failed to marshal releases for hashing: %w", err)
+		return errors.FailedTo("marshal releases for hashing", err)
 	}
 
-	hash := sha256.Sum256(releasesJSON)
-	sha256Hash := hex.EncodeToString(hash[:])
+	sha256Hash := utils.SHA256Bytes(releasesJSON)
 
 	cached := CachedData{
 		LastUpdated: time.Now(),
@@ -116,12 +107,12 @@ func (c *Cache) SetWithETag(releases []GoRelease, etag string) error {
 
 	data, err := json.MarshalIndent(cached, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal cache data: %w", err)
+		return errors.FailedTo("marshal cache data", err)
 	}
 
-	// Write with secure permissions (0600)
-	if err := os.WriteFile(c.cachePath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write cache file: %w", err)
+	// Write with secure permissions (utils.PermFileSecure)
+	if err := utils.WriteFileWithContext(c.cachePath, data, utils.PermFileSecure, "write cache file"); err != nil {
+		return err
 	}
 
 	// Verify permissions were set correctly

@@ -2,11 +2,11 @@ package aliases
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
@@ -35,8 +35,7 @@ func init() {
 }
 
 func runAlias(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	switch len(args) {
 	case 0:
@@ -69,7 +68,7 @@ func listAliases(cmd *cobra.Command, mgr *manager.Manager) error {
 	for name := range aliases {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 
 	// Print aliases
 	for _, name := range names {

@@ -2,19 +2,20 @@ package meta
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestGetStartedCommand_NotInitialized(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Unset GOENV_SHELL to simulate not initialized
-	os.Unsetenv("GOENV_SHELL")
-	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv(utils.GoenvEnvVarShell.String(), "")
+	t.Setenv(utils.EnvVarShell, "/bin/bash")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
@@ -35,12 +36,12 @@ func TestGetStartedCommand_NotInitialized(t *testing.T) {
 
 func TestGetStartedCommand_Initialized(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	// Create versions directory (empty)
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 
@@ -63,13 +64,13 @@ func TestGetStartedCommand_Initialized(t *testing.T) {
 
 func TestGetStartedCommand_WithInstalledVersions(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	// Create versions directory with an installed version
 	versionsDir := filepath.Join(tmpDir, "versions")
 	versionDir := filepath.Join(versionsDir, "1.21.5")
-	if err := os.MkdirAll(filepath.Join(versionDir, "bin"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(versionDir, "bin")); err != nil {
 		t.Fatalf("Failed to create version directory: %v", err)
 	}
 
@@ -92,9 +93,9 @@ func TestGetStartedCommand_WithInstalledVersions(t *testing.T) {
 
 func TestGetStartedCommand_BashShell(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	os.Unsetenv("GOENV_SHELL")
-	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "")
+	t.Setenv(utils.EnvVarShell, "/bin/bash")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
@@ -115,9 +116,9 @@ func TestGetStartedCommand_BashShell(t *testing.T) {
 
 func TestGetStartedCommand_ZshShell(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	os.Unsetenv("GOENV_SHELL")
-	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "")
+	t.Setenv(utils.EnvVarShell, "/bin/zsh")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
@@ -138,9 +139,9 @@ func TestGetStartedCommand_ZshShell(t *testing.T) {
 
 func TestGetStartedCommand_FishShell(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	os.Unsetenv("GOENV_SHELL")
-	t.Setenv("SHELL", "/usr/bin/fish")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "")
+	t.Setenv(utils.EnvVarShell, "/usr/bin/fish")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
@@ -161,9 +162,9 @@ func TestGetStartedCommand_FishShell(t *testing.T) {
 
 func TestGetStartedCommand_UnknownShell(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	os.Unsetenv("GOENV_SHELL")
-	t.Setenv("SHELL", "/usr/bin/unknown-shell")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "")
+	t.Setenv(utils.EnvVarShell, "/usr/bin/unknown-shell")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
@@ -207,8 +208,8 @@ func TestGetStartedHelp(t *testing.T) {
 
 func TestGetStartedCommand_ShowsHelpfulLinks(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
@@ -237,8 +238,8 @@ func TestGetStartedCommand_ShowsHelpfulLinks(t *testing.T) {
 
 func TestGetStartedCommand_FormattingAndStructure(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
@@ -269,7 +270,7 @@ func TestGetStartedCommand_FormattingAndStructure(t *testing.T) {
 
 func TestGetStartedCommand_EmptyOutput(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
@@ -304,8 +305,8 @@ func TestGetStartedCommand_AdaptiveContent(t *testing.T) {
 		{
 			name: "not initialized",
 			setupEnv: func(t *testing.T, tmpDir string) {
-				t.Setenv("GOENV_ROOT", tmpDir)
-				os.Unsetenv("GOENV_SHELL")
+				t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+				t.Setenv(utils.GoenvEnvVarShell.String(), "")
 			},
 			expectText:   "init",
 			unexpectText: "",
@@ -313,9 +314,9 @@ func TestGetStartedCommand_AdaptiveContent(t *testing.T) {
 		{
 			name: "initialized but no versions",
 			setupEnv: func(t *testing.T, tmpDir string) {
-				t.Setenv("GOENV_ROOT", tmpDir)
-				t.Setenv("GOENV_SHELL", "bash")
-				os.MkdirAll(filepath.Join(tmpDir, "versions"), 0755)
+				t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+				t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
+				utils.EnsureDir(filepath.Join(tmpDir, "versions"))
 			},
 			expectText:   "install",
 			unexpectText: "",

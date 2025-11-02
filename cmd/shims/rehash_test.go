@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -227,7 +228,7 @@ func TestRehashCommand(t *testing.T) {
 
 			// Setup existing shims
 			if len(tt.existingShims) > 0 {
-				os.MkdirAll(shimsDir, 0755)
+				_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
 				for _, shim := range tt.existingShims {
 					shimPath := filepath.Join(shimsDir, shim)
 					var shimContent string
@@ -237,15 +238,15 @@ func TestRehashCommand(t *testing.T) {
 					} else {
 						shimContent = "#!/bin/bash\necho old shim\n"
 					}
-					os.WriteFile(shimPath, []byte(shimContent), 0755)
+					testutil.WriteTestFile(t, shimPath, []byte(shimContent), utils.PermFileExecutable)
 				}
 			}
 
 			// Setup lock file if requested
 			if tt.lockFile {
-				os.MkdirAll(shimsDir, 0755)
+				_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
 				lockPath := filepath.Join(shimsDir, ".goenv-shim")
-				os.WriteFile(lockPath, []byte(""), 0644)
+				testutil.WriteTestFile(t, lockPath, []byte(""), utils.PermFileDefault)
 			}
 
 			// Setup permissions if specified
@@ -253,12 +254,12 @@ func TestRehashCommand(t *testing.T) {
 				if utils.IsWindows() {
 					t.Skip("skipping permission test on Windows")
 				}
-				os.MkdirAll(shimsDir, 0755)
+				_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
 				if err := os.Chmod(shimsDir, os.FileMode(tt.shimsDirPerms)); err != nil {
 					t.Fatalf("Failed to change shims directory permissions: %v", err)
 				}
 				// Ensure cleanup restores permissions
-				defer os.Chmod(shimsDir, 0755)
+				defer os.Chmod(shimsDir, utils.PermFileExecutable)
 			}
 
 			// Create and execute command
@@ -333,13 +334,9 @@ func TestRehashCommand(t *testing.T) {
 
 				// Check that shim is executable (Unix only)
 				if !utils.IsWindows() {
-					info, err := os.Stat(shimPath)
-					if err != nil {
-						t.Errorf("Failed to stat shim %q: %v", expectedShim, err)
+					if !utils.IsExecutableFile(shimPath) {
+						t.Errorf("Expected shim %q to be executable", expectedShim)
 						continue
-					}
-					if !utils.HasExecutableBit(info) {
-						t.Errorf("Expected shim %q to be executable but it isn't (mode: %o)", expectedShim, info.Mode())
 					}
 				}
 
@@ -398,7 +395,7 @@ func TestRehashCommand(t *testing.T) {
 					}
 				}
 				if !found {
-					if _, err := os.Stat(shimPath); !os.IsNotExist(err) {
+					if utils.PathExists(shimPath) {
 						t.Errorf("Expected old shim %q to be removed but it still exists", oldShim)
 					}
 				}

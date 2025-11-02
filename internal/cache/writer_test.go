@@ -4,14 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestNewAtomicWriter(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "goenv-cache-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	t.Run("creates cache directory", func(t *testing.T) {
 		cacheDir := filepath.Join(tmpDir, "cache")
@@ -22,19 +20,19 @@ func TestNewAtomicWriter(t *testing.T) {
 		defer writer.Close()
 
 		// Verify cache directory was created
-		if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		if utils.FileNotExists(cacheDir) {
 			t.Error("Cache directory was not created")
 		}
 
 		// Verify lock file was created
 		lockPath := filepath.Join(cacheDir, ".goenv-cache.lock")
-		if _, err := os.Stat(lockPath); os.IsNotExist(err) {
+		if utils.FileNotExists(lockPath) {
 			t.Error("Lock file was not created")
 		}
 
 		// Verify temp directory was created
 		tmpPath := filepath.Join(cacheDir, ".tmp")
-		if _, err := os.Stat(tmpPath); os.IsNotExist(err) {
+		if utils.FileNotExists(tmpPath) {
 			t.Error("Temp directory was not created")
 		}
 	})
@@ -61,11 +59,7 @@ func TestNewAtomicWriter(t *testing.T) {
 }
 
 func TestAtomicWriter_WriteFile(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "goenv-cache-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	cacheDir := filepath.Join(tmpDir, "cache")
 	writer, err := NewAtomicWriter(cacheDir)
@@ -78,7 +72,7 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 		targetPath := filepath.Join(cacheDir, "test.txt")
 		data := []byte("test data")
 
-		err := writer.WriteFile(targetPath, data, 0644)
+		err := writer.WriteFile(targetPath, data, utils.PermFileDefault)
 		if err != nil {
 			t.Fatalf("Failed to write file: %v", err)
 		}
@@ -98,13 +92,13 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 		targetPath := filepath.Join(cacheDir, "subdir", "nested", "test.txt")
 		data := []byte("nested data")
 
-		err := writer.WriteFile(targetPath, data, 0644)
+		err := writer.WriteFile(targetPath, data, utils.PermFileDefault)
 		if err != nil {
 			t.Fatalf("Failed to write file: %v", err)
 		}
 
 		// Verify nested directories were created
-		if _, err := os.Stat(filepath.Dir(targetPath)); os.IsNotExist(err) {
+		if utils.FileNotExists(filepath.Dir(targetPath)) {
 			t.Error("Target directory was not created")
 		}
 
@@ -124,14 +118,14 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 
 		// Write initial data
 		initialData := []byte("initial")
-		err := writer.WriteFile(targetPath, initialData, 0644)
+		err := writer.WriteFile(targetPath, initialData, utils.PermFileDefault)
 		if err != nil {
 			t.Fatalf("Failed to write initial file: %v", err)
 		}
 
 		// Overwrite with new data
 		newData := []byte("overwritten")
-		err = writer.WriteFile(targetPath, newData, 0644)
+		err = writer.WriteFile(targetPath, newData, utils.PermFileDefault)
 		if err != nil {
 			t.Fatalf("Failed to overwrite file: %v", err)
 		}
@@ -157,7 +151,7 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 				targetPath := filepath.Join(cacheDir, "concurrent", "file.txt")
 				data := []byte("concurrent write")
 
-				err := writer.WriteFile(targetPath, data, 0644)
+				err := writer.WriteFile(targetPath, data, utils.PermFileDefault)
 				if err != nil {
 					errors <- err
 				}
@@ -181,11 +175,7 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 }
 
 func TestAtomicWriter_CreateDirectory(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "goenv-cache-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	cacheDir := filepath.Join(tmpDir, "cache")
 	writer, err := NewAtomicWriter(cacheDir)
@@ -196,47 +186,33 @@ func TestAtomicWriter_CreateDirectory(t *testing.T) {
 
 	t.Run("creates directory", func(t *testing.T) {
 		dirPath := filepath.Join(cacheDir, "testdir")
-		err := writer.CreateDirectory(dirPath, 0755)
+		err := writer.CreateDirectory(dirPath, utils.PermFileExecutable)
 		if err != nil {
 			t.Fatalf("Failed to create directory: %v", err)
 		}
 
 		// Verify directory was created
-		info, err := os.Stat(dirPath)
-		if err != nil {
-			t.Fatalf("Directory was not created: %v", err)
-		}
-
-		if !info.IsDir() {
-			t.Error("Path is not a directory")
+		if !utils.DirExists(dirPath) {
+			t.Fatal("Directory was not created")
 		}
 	})
 
 	t.Run("creates nested directories", func(t *testing.T) {
 		dirPath := filepath.Join(cacheDir, "nested", "sub", "dir")
-		err := writer.CreateDirectory(dirPath, 0755)
+		err := writer.CreateDirectory(dirPath, utils.PermFileExecutable)
 		if err != nil {
 			t.Fatalf("Failed to create nested directory: %v", err)
 		}
 
 		// Verify directory was created
-		info, err := os.Stat(dirPath)
-		if err != nil {
-			t.Fatalf("Nested directory was not created: %v", err)
-		}
-
-		if !info.IsDir() {
-			t.Error("Path is not a directory")
+		if !utils.DirExists(dirPath) {
+			t.Fatal("Nested directory was not created")
 		}
 	})
 }
 
 func TestAtomicWriter_Close(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "goenv-cache-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	cacheDir := filepath.Join(tmpDir, "cache")
 	writer, err := NewAtomicWriter(cacheDir)
@@ -263,11 +239,7 @@ func TestAtomicWriter_Close(t *testing.T) {
 }
 
 func TestTryNewAtomicWriter(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "goenv-cache-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	t.Run("succeeds when cache is available", func(t *testing.T) {
 		cacheDir := filepath.Join(tmpDir, "cache-try")
@@ -325,66 +297,6 @@ func Test_isLockError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isLockError(tt.err); got != tt.want {
 				t.Errorf("isLockError() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_contains(t *testing.T) {
-	tests := []struct {
-		name   string
-		s      string
-		substr string
-		want   bool
-	}{
-		{
-			name:   "exact match",
-			s:      "locked by another process",
-			substr: "locked by another process",
-			want:   true,
-		},
-		{
-			name:   "substring present",
-			s:      "error: locked by another process",
-			substr: "locked by another process",
-			want:   true,
-		},
-		{
-			name:   "substring at start",
-			s:      "locked at the beginning",
-			substr: "locked",
-			want:   true,
-		},
-		{
-			name:   "substring at end",
-			s:      "this is locked",
-			substr: "locked",
-			want:   true,
-		},
-		{
-			name:   "substring not present",
-			s:      "some other error",
-			substr: "locked",
-			want:   false,
-		},
-		{
-			name:   "empty substring",
-			s:      "any string",
-			substr: "",
-			want:   true,
-		},
-		{
-			name:   "empty string",
-			s:      "",
-			substr: "locked",
-			want:   false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := contains(tt.s, tt.substr); got != tt.want {
-				t.Errorf("contains() = %v, want %v", got, tt.want)
 			}
 		})
 	}

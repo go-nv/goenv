@@ -10,6 +10,7 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
@@ -116,11 +117,11 @@ func init() {
 
 func RunRehash(cmd *cobra.Command, args []string) error {
 	// Validate: rehash command takes no arguments
-	if len(args) > 0 {
+	if err := cmdutil.ValidateExactArgs(args, 0, ""); err != nil {
 		return fmt.Errorf("usage: goenv rehash")
 	}
 
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 	shimMgr := shims.NewShimManager(cfg)
 
 	if cfg.Debug {
@@ -132,12 +133,12 @@ func RunRehash(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintln(cmd.OutOrStdout(), "Rehashing...")
 	if err := shimMgr.Rehash(); err != nil {
-		return fmt.Errorf("failed to rehash shims: %w", err)
+		return errors.FailedTo("rehash shims", err)
 	}
 
 	shimList, err := shimMgr.ListShims()
 	if err != nil {
-		return fmt.Errorf("failed to list shims: %w", err)
+		return errors.FailedTo("list shims", err)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Rehashed %d shims\n", len(shimList))
@@ -156,16 +157,16 @@ func runShims(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate: shims command takes no positional arguments (only --short flag)
-	if len(args) > 0 {
+	if err := cmdutil.ValidateExactArgs(args, 0, ""); err != nil {
 		return fmt.Errorf("usage: goenv shims [--short]")
 	}
 
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 	shimMgr := shims.NewShimManager(cfg)
 
 	shimList, err := shimMgr.ListShims()
 	if err != nil {
-		return fmt.Errorf("failed to list shims: %w", err)
+		return errors.FailedTo("list shims", err)
 	}
 
 	for _, shim := range shimList {
@@ -190,7 +191,7 @@ func runWhich(cmd *cobra.Command, args []string) error {
 	}
 
 	commandName := args[0]
-	cfg := config.Load()
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Try using shim manager first (if available)
 	shimMgr := shims.NewShimManager(cfg)
@@ -201,7 +202,7 @@ func runWhich(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fallback: implement manual search for testing compatibility
-	return runWhichManual(cmd, commandName, cfg)
+	return runWhichManual(cmd, commandName, cfg, mgr)
 }
 
 func runWhence(cmd *cobra.Command, args []string) error {
@@ -216,7 +217,7 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	}
 
 	commandName := args[0]
-	cfg := config.Load()
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Try using shim manager first
 	shimMgr := shims.NewShimManager(cfg)
@@ -225,7 +226,7 @@ func runWhence(cmd *cobra.Command, args []string) error {
 		for _, version := range versions {
 			if whenceFlags.path {
 				// Build the path without extension first
-				versionPath := filepath.Join(cfg.VersionsDir(), version, "bin", commandName)
+				versionPath := filepath.Join(cfg.VersionBinDir(version), commandName)
 				// On Windows, try to find the actual file with extension
 				if utils.IsWindows() {
 					if foundPath, err := findExecutable(versionPath); err == nil {
@@ -249,7 +250,7 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fallback: manual search
-	return runWhenceManual(cmd, commandName, cfg)
+	return runWhenceManual(cmd, commandName, cfg, mgr)
 }
 
 // findExecutable looks for an executable file, handling Windows extensions
@@ -258,21 +259,24 @@ func findExecutable(basePath string) (string, error) {
 	if utils.IsWindows() {
 		for _, ext := range utils.WindowsExecutableExtensions() {
 			path := basePath + ext
-			if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			if utils.FileExists(path) {
 				return path, nil
 			}
 		}
 		// Also try without extension
-		if info, err := os.Stat(basePath); err == nil && !info.IsDir() {
+		if utils.FileExists(basePath) {
 			return basePath, nil
 		}
 		return "", fmt.Errorf("executable not found")
 	}
 
 	// On Unix, check if file exists and is executable
-	info, err := os.Stat(basePath)
-	if err != nil {
-		return "", err
+	info, exists, err := utils.StatWithExistence(basePath)
+	if !exists {
+		if err != nil {
+			return "", err
+		}
+		return "", os.ErrNotExist
 	}
 	if info.IsDir() {
 		return "", fmt.Errorf("is a directory")
@@ -285,9 +289,7 @@ func findExecutable(basePath string) (string, error) {
 }
 
 // runWhichManual implements which command logic manually for testing/fallback
-func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) error {
-	mgr := manager.NewManager(cfg)
-
+func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config, mgr *manager.Manager) error {
 	// Get current version(s)
 	versionSpec, source, err := mgr.GetCurrentVersion()
 	if err != nil {
@@ -308,13 +310,13 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 	// Try to find command in each version
 	for _, version := range versions {
 		// Check if version is installed
-		if version != "system" && !mgr.IsVersionInstalled(version) {
+		if version != manager.SystemVersion && !mgr.IsVersionInstalled(version) {
 			missingVersions = append(missingVersions, version)
 			continue
 		}
 
 		// Handle system version
-		if version == "system" {
+		if version == manager.SystemVersion {
 			// Look for command in PATH, excluding GOENV_ROOT/shims
 			commandPath, err := findInSystemPath(commandName, cfg.Root)
 			if err == nil {
@@ -340,7 +342,8 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config) 
 	// If there are missing versions, return error immediately
 	if len(missingVersions) > 0 {
 		// Use enhanced error message for the first missing version
-		return errors.VersionNotInstalledDetailed(missingVersions[0], source, mgr)
+		installed, _ := mgr.ListInstalledVersions()
+		return errors.VersionNotInstalledDetailed(missingVersions[0], source, installed)
 	}
 
 	// Command not found - check if it exists in other versions
@@ -424,9 +427,7 @@ func findInSystemPath(commandName string, goenvRoot string) (string, error) {
 }
 
 // runWhenceManual implements whence command logic manually for testing/fallback
-func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config) error {
-	mgr := manager.NewManager(cfg)
-
+func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config, mgr *manager.Manager) error {
 	// Get all installed versions
 	allVersions, err := mgr.ListInstalledVersions()
 	if err != nil {

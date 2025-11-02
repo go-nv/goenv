@@ -66,7 +66,7 @@ func TestPromptYesNo_EnvironmentVariable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable
 			if tt.envVal != "" {
-				t.Setenv("GOENV_ASSUME_YES", tt.envVal)
+				t.Setenv(GoenvEnvVarAssumeYes.String(), tt.envVal)
 			}
 
 			reader := strings.NewReader("n\n") // Input "no", but env var should take precedence
@@ -97,7 +97,7 @@ func TestPromptYesNo_EnvironmentVariable(t *testing.T) {
 
 func TestPromptYesNo_AutoConfirmFieldTakesPrecedence(t *testing.T) {
 	// AutoConfirm flag should take precedence over environment variable
-	t.Setenv("GOENV_ASSUME_YES", "0") // Try to disable via env var
+	t.Setenv(GoenvEnvVarAssumeYes.String(), "0") // Try to disable via env var
 
 	reader := strings.NewReader("n\n")
 	writer := &bytes.Buffer{}
@@ -147,7 +147,7 @@ func TestPromptYesNo_EnvironmentVariableInvalidValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable
-			t.Setenv("GOENV_ASSUME_YES", tt.envVal)
+			t.Setenv(GoenvEnvVarAssumeYes.String(), tt.envVal)
 
 			reader := strings.NewReader(tt.inputAnswer)
 			writer := &bytes.Buffer{}
@@ -201,7 +201,7 @@ func TestPromptYesNo_DefaultYesIgnoredWhenAutoConfirm(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				t.Setenv("GOENV_ASSUME_YES", tt.envValue)
+				t.Setenv(GoenvEnvVarAssumeYes.String(), tt.envValue)
 			}
 
 			reader := strings.NewReader("") // No input needed
@@ -262,7 +262,7 @@ func TestPromptYesNo_EnvVarOnlyWhenFieldNotSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				t.Setenv("GOENV_ASSUME_YES", tt.envValue)
+				t.Setenv(GoenvEnvVarAssumeYes.String(), tt.envValue)
 			}
 
 			reader := strings.NewReader(tt.inputAnswer)
@@ -303,7 +303,7 @@ func TestPromptYesNo_CompleteEnvVarPrecedenceRules(t *testing.T) {
 	// 3. Normal prompting with DefaultYes behavior
 
 	t.Run("Precedence level 1: AutoConfirm field", func(t *testing.T) {
-		t.Setenv("GOENV_ASSUME_YES", "0") // Try to disable
+		t.Setenv(GoenvEnvVarAssumeYes.String(), "0") // Try to disable
 
 		config := PromptConfig{
 			Question:    "Test?",
@@ -320,7 +320,7 @@ func TestPromptYesNo_CompleteEnvVarPrecedenceRules(t *testing.T) {
 	})
 
 	t.Run("Precedence level 2: GOENV_ASSUME_YES env var", func(t *testing.T) {
-		t.Setenv("GOENV_ASSUME_YES", "1")
+		t.Setenv(GoenvEnvVarAssumeYes.String(), "1")
 
 		config := PromptConfig{
 			Question:    "Test?",

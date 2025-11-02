@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestWindowsExecutableExtensions(t *testing.T) {
@@ -67,14 +69,11 @@ func TestFindExecutable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			filePath := filepath.Join(tmpDir, tt.createFile)
-			err := os.WriteFile(filePath, []byte("test"), 0644)
-			if err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			testutil.WriteTestFile(t, filePath, []byte("test"), PermFileDefault)
 
 			// Make executable on Unix if needed
 			if tt.makeExec && !IsWindows() {
-				err = os.Chmod(filePath, 0755)
+				err := os.Chmod(filePath, PermFileExecutable)
 				if err != nil {
 					t.Fatalf("Failed to chmod file: %v", err)
 				}
@@ -146,14 +145,11 @@ func TestIsExecutable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := filepath.Join(tmpDir, tt.filename)
-			err := os.WriteFile(filePath, []byte("test"), 0644)
-			if err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			testutil.WriteTestFile(t, filePath, []byte("test"), PermFileDefault)
 			defer os.Remove(filePath)
 
 			if tt.makeExec && !IsWindows() {
-				err = os.Chmod(filePath, 0755)
+				err := os.Chmod(filePath, PermFileExecutable)
 				if err != nil {
 					t.Fatalf("Failed to chmod file: %v", err)
 				}

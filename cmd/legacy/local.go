@@ -9,9 +9,10 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
-	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -19,7 +20,7 @@ import (
 
 var localCmd = &cobra.Command{
 	Use:   "local [version]",
-	Short: "Set or show the local Go version for this directory",
+	Short: "Set or show the local Go version for this directory (deprecated: use 'goenv use')",
 	Long:  "Set a local Go version for the current directory by creating a .go-version file",
 	Example: `  # Show current local version
   goenv local
@@ -35,8 +36,8 @@ var localCmd = &cobra.Command{
 
   # Set and configure VS Code
   goenv local 1.21.5 --vscode`,
-	RunE:   RunLocal,
-	Hidden: true, // Legacy command - use 'goenv use <version>' instead
+	RunE:    RunLocal,
+	GroupID: string(cmdpkg.GroupLegacy),
 }
 
 var localFlags struct {
@@ -65,8 +66,7 @@ func init() {
 func RunLocal(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if localFlags.complete {
-		cfg := config.Load()
-		mgr := manager.NewManager(cfg)
+		_, mgr := cmdutil.SetupContext()
 		versions, err := mgr.ListInstalledVersions()
 		if err == nil {
 			for _, v := range versions {
@@ -91,8 +91,7 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--from-gomod flag cannot be used with a version argument")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	if localFlags.unset {
 		if len(args) > 0 {
@@ -133,7 +132,7 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 				// Execute install
 				installCmd.SetArgs([]string{version})
 				if err := installCmd.Execute(); err != nil {
-					return fmt.Errorf("installation failed: %w", err)
+					return errors.FailedTo("install version", err)
 				}
 			} else {
 				fmt.Fprintf(cmd.OutOrStdout(), "%sGo %s is installed\n", utils.Emoji("✓ "), version)
@@ -152,54 +151,34 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 	// If --from-gomod flag is set, try to read version from go.mod
 	if localFlags.fromGoMod {
 		cwd, _ := os.Getwd()
-		gomodPath := filepath.Join(cwd, "go.mod")
+		gomodPath := filepath.Join(cwd, config.GoModFileName)
 
-		if _, err := os.Stat(gomodPath); os.IsNotExist(err) {
+		if utils.FileNotExists(gomodPath) {
 			return fmt.Errorf("--from-gomod specified but no go.mod file found in current directory")
 		}
 
 		versionFromGoMod, err := manager.ParseGoModVersion(gomodPath)
 		if err != nil {
-			return fmt.Errorf("failed to read version from go.mod: %w", err)
+			return errors.FailedTo("read version from go.mod", err)
 		}
 
 		spec = versionFromGoMod
 		resolvedVersion = spec
 
-		// Check installation status
-		status, err := mgr.CheckVersionStatus(resolvedVersion)
+		// Handle installation/reinstallation using consolidated helper
+		// Note: Quiet is true to maintain legacy command's silent behavior
+		_, err = manager.HandleVersionInstallation(manager.InstallOptions{
+			Config:      cfg,
+			Manager:     mgr,
+			Version:     resolvedVersion,
+			AutoInstall: false,
+			Force:       false,
+			Quiet:       true,
+			Reason:      "Setting local version from go.mod",
+			Writer:      cmd.OutOrStdout(),
+		})
 		if err != nil {
-			return fmt.Errorf("failed to check version status: %w", err)
-		}
-
-		if !status.Installed {
-			fmt.Fprintf(cmd.OutOrStdout(), "Go %s (from go.mod) is not installed\n\n", resolvedVersion)
-
-			// Prompt for installation
-			if manager.PromptForInstall(resolvedVersion, "Setting local version from go.mod") {
-				fmt.Fprintf(cmd.OutOrStdout(), "\n%sInstalling Go %s...\n", utils.Emoji("📦 "), resolvedVersion)
-
-				installer := install.NewInstaller(cfg)
-				if err := installer.Install(resolvedVersion, false); err != nil {
-					return fmt.Errorf("installation failed: %w", err)
-				}
-
-				fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
-			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "\nTo install later:\n")
-				fmt.Fprintf(cmd.OutOrStdout(), "  goenv install %s && goenv local %s\n", resolvedVersion, resolvedVersion)
-				return fmt.Errorf("installation cancelled")
-			}
-		} else if status.Corrupted {
-			if manager.PromptForReinstall(resolvedVersion) {
-				installer := install.NewInstaller(cfg)
-				if err := installer.Install(resolvedVersion, true); err != nil {
-					return fmt.Errorf("reinstallation failed: %w", err)
-				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%sReinstallation complete\n\n", utils.Emoji("✅ "))
-			} else {
-				return fmt.Errorf("corrupted installation - reinstall cancelled")
-			}
+			return err
 		}
 	} else {
 		if len(args) == 0 {
@@ -214,39 +193,20 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		// Check installation status
-		status, err := mgr.CheckVersionStatus(resolvedVersion)
+		// Handle installation/reinstallation using consolidated helper
+		// Note: Quiet is true to maintain legacy command's silent behavior
+		_, err = manager.HandleVersionInstallation(manager.InstallOptions{
+			Config:      cfg,
+			Manager:     mgr,
+			Version:     resolvedVersion,
+			AutoInstall: false,
+			Force:       false,
+			Quiet:       true,
+			Reason:      fmt.Sprintf("Setting local version to %s", resolvedVersion),
+			Writer:      cmd.OutOrStdout(),
+		})
 		if err != nil {
-			return fmt.Errorf("failed to check version status: %w", err)
-		}
-
-		if !status.Installed {
-			fmt.Fprintf(cmd.OutOrStdout(), "Go %s is not installed\n\n", resolvedVersion)
-
-			// Prompt for installation
-			if manager.PromptForInstall(resolvedVersion, fmt.Sprintf("Setting local version to %s", resolvedVersion)) {
-				fmt.Fprintf(cmd.OutOrStdout(), "\n%sInstalling Go %s...\n", utils.Emoji("📦 "), resolvedVersion)
-
-				installer := install.NewInstaller(cfg)
-				if err := installer.Install(resolvedVersion, false); err != nil {
-					return fmt.Errorf("installation failed: %w", err)
-				}
-
-				fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
-			} else {
-				fmt.Fprint(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "local"))
-				return fmt.Errorf("installation cancelled")
-			}
-		} else if status.Corrupted {
-			if manager.PromptForReinstall(resolvedVersion) {
-				installer := install.NewInstaller(cfg)
-				if err := installer.Install(resolvedVersion, true); err != nil {
-					return fmt.Errorf("reinstallation failed: %w", err)
-				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%sReinstallation complete\n\n", utils.Emoji("✅ "))
-			} else {
-				return fmt.Errorf("corrupted installation - reinstall cancelled")
-			}
+			return err
 		}
 	}
 
@@ -263,8 +223,8 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 
 	// Check if go.mod exists and warn about version mismatch
 	cwd, _ := os.Getwd()
-	gomodPath := filepath.Join(cwd, "go.mod")
-	if _, err := os.Stat(gomodPath); err == nil {
+	gomodPath := filepath.Join(cwd, config.GoModFileName)
+	if utils.FileExists(gomodPath) {
 		// go.mod exists, check version compatibility
 		requiredVersion, err := manager.ParseGoModVersion(gomodPath)
 		if err == nil {

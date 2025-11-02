@@ -98,11 +98,7 @@ func TestLogToFileAction_Validate(t *testing.T) {
 
 func TestLogToFileAction_Execute(t *testing.T) {
 	// Create temp directory for test files
-	tempDir, err := os.MkdirTemp("", "goenv-log-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	tests := []struct {
 		name           string
@@ -218,11 +214,7 @@ func TestLogToFileAction_Execute(t *testing.T) {
 
 func TestLogToFileAction_ExecuteAppendMode(t *testing.T) {
 	// Create temp directory
-	tempDir, err := os.MkdirTemp("", "goenv-log-append-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	action := &LogToFileAction{}
 	logFile := filepath.Join(tempDir, "append.log")
@@ -272,11 +264,7 @@ func TestLogToFileAction_ExecuteAppendMode(t *testing.T) {
 
 func TestLogToFileAction_ExecuteTruncateMode(t *testing.T) {
 	// Create temp directory
-	tempDir, err := os.MkdirTemp("", "goenv-log-truncate-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	action := &LogToFileAction{}
 	logFile := filepath.Join(tempDir, "truncate.log")
@@ -326,11 +314,7 @@ func TestLogToFileAction_ExecuteTruncateMode(t *testing.T) {
 
 func TestLogToFileAction_ExecuteTimestamp(t *testing.T) {
 	// Create temp directory
-	tempDir, err := os.MkdirTemp("", "goenv-log-timestamp-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	action := &LogToFileAction{}
 	logFile := filepath.Join(tempDir, "timestamp.log")

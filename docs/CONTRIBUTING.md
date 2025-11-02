@@ -265,6 +265,227 @@ We especially welcome contributions in:
 - Ensure tests are deterministic (no flaky tests)
 - Run `go test ./...` before submitting
 
+## Coding Best Practices
+
+### Use Helper Functions from `internal/utils`
+
+goenv provides consolidated helper functions for common operations. Always use these instead of direct stdlib calls to maintain consistency and reduce boilerplate.
+
+#### File Operations
+
+**✅ Preferred - Use helpers:**
+
+```go
+// File existence checks
+if utils.FileExists(path) { ... }           // Check if file exists (not directory)
+if utils.DirExists(dir) { ... }             // Check if directory exists
+if utils.PathExists(path) { ... }           // Check if path exists (file or dir)
+if utils.FileNotExists(path) { ... }        // Inverted check (clearer than !FileExists)
+
+// Executable checks (cross-platform)
+if utils.IsExecutableFile(path) { ... }     // Checks existence + executable bit
+
+// When you need FileInfo
+info, exists, err := utils.StatWithExistence(path)
+if !exists { ... }
+```
+
+**❌ Avoid - Direct os.Stat calls:**
+
+```go
+// Don't do this (unless you specifically need FileInfo for metadata)
+if _, err := os.Stat(path); os.IsNotExist(err) { ... }
+if info, err := os.Stat(path); err == nil && !info.IsDir() { ... }
+```
+
+**Exception:** Use `os.Stat` directly only when you need `FileInfo` for metadata (ModTime, Size, Mode).
+
+```go
+// OK - Need ModTime for cache validation
+info, err := os.Stat(cachePath)
+if err == nil {
+    age := time.Since(info.ModTime())
+    if age < ttl { ... }
+}
+```
+
+#### Directory Creation
+
+**✅ Preferred:**
+
+```go
+// With contextual error messages
+if err := utils.EnsureDirWithContext(dir, "create cache directory"); err != nil {
+    return err  // Error will be "failed to create cache directory: <underlying error>"
+}
+
+// Simple case
+if err := utils.EnsureDir(dir); err != nil { ... }
+
+// For file's parent directory
+if err := utils.EnsureDirForFile(filePath); err != nil { ... }
+```
+
+**❌ Avoid:**
+
+```go
+// Manual error wrapping (redundant)
+if err := os.MkdirAll(dir, 0755); err != nil {
+    return errors.FailedTo("create cache directory", err)
+}
+```
+
+#### JSON Operations
+
+**✅ Preferred - Standard JSON:**
+
+```go
+// Reading JSON from file
+var config Config
+if err := utils.UnmarshalJSONFile(path, &config); err != nil { ... }
+
+// Writing JSON to file
+if err := utils.MarshalJSONFile(path, config); err != nil { ... }
+
+// Pretty-printing JSON to string
+jsonStr, err := utils.MarshalJSONPretty(data)
+
+// Compact JSON to string
+jsonStr, err := utils.MarshalJSONCompact(data)
+```
+
+**✅ OK - Special cases (document why):**
+
+```go
+// Example 1: JSONC (VS Code settings need comment stripping)
+data, err := os.ReadFile(settingsPath)
+if err != nil { ... }
+data = jsonc.ToJSON(data)  // Strip comments
+if err := json.Unmarshal(data, &settings); err != nil { ... }
+
+// Example 2: Security-sensitive permissions
+data, err := json.MarshalIndent(cache, "", "  ")
+if err != nil { ... }
+// Cache file needs 0600 permissions for security
+if err := utils.WriteFileWithContext(path, data, 0600, "write cache"); err != nil { ... }
+```
+
+#### Command Execution
+
+**✅ Preferred - Use helpers when possible:**
+
+```go
+// Simple execution
+if err := utils.RunCommand("git", "add", "."); err != nil { ... }
+
+// Get output
+output, err := utils.RunCommandOutput("git", "rev-parse", "HEAD")
+
+// Run in directory
+err := utils.RunCommandInDir(dir, "git", "pull")
+
+// With custom I/O
+err := utils.RunCommandWithIO("git", []string{"pull"}, os.Stdout, os.Stderr)
+```
+
+**✅ OK - Direct exec.Command for special cases:**
+
+```go
+// Shell-specific checks (need "-c" flag)
+cmd := exec.Command(shell, "-c", "declare -F goenv")
+output, err := cmd.CombinedOutput()
+
+// Context-aware execution
+cmd := exec.CommandContext(ctx, "go", "build")
+```
+
+#### HTTP Operations
+
+**✅ Preferred:**
+
+```go
+// Create clients with timeouts
+client := utils.NewHTTPClient(30 * time.Second)
+client := utils.NewHTTPClientDefault()  // 30s timeout
+client := utils.NewHTTPClientForDownloads()  // 10min timeout
+
+// Fetch and parse JSON
+var result MyStruct
+if err := utils.FetchJSON(ctx, url, &result); err != nil { ... }
+
+// With timeout
+if err := utils.FetchJSONWithTimeout(url, &result, 30*time.Second); err != nil { ... }
+```
+
+### Error Handling
+
+**✅ Use consistent error wrapping:**
+
+```go
+// For operations that might fail
+if err := someOperation(); err != nil {
+    return errors.FailedTo("operation description", err)
+}
+
+// For validation errors
+if !isValid {
+    return errors.New("validation failed: reason")
+}
+```
+
+**❌ Avoid bare errors:**
+
+```go
+// Don't do this - no context
+if err != nil {
+    return err
+}
+```
+
+### Helper Function Reference
+
+| Category | Location | Key Functions |
+|----------|----------|---------------|
+| **File operations** | `internal/utils/file.go` | FileExists, DirExists, PathExists, IsExecutableFile, StatWithExistence |
+| **Directory creation** | `internal/utils/file.go` | EnsureDir, EnsureDirWithContext, EnsureDirForFile |
+| **JSON** | `internal/utils/json.go` | UnmarshalJSONFile, MarshalJSONFile, MarshalJSONPretty |
+| **Commands** | `internal/utils/command.go` | RunCommand, RunCommandOutput, RunCommandInDir, RunCommandWithIO |
+| **HTTP** | `internal/utils/http.go` | NewHTTPClient, FetchJSON, FetchJSONWithTimeout |
+| **Errors** | `internal/errors/errors.go` | FailedTo, New |
+
+### When NOT to Use Helpers
+
+Document your reasoning when you need to use direct stdlib calls:
+
+```go
+// OK - Need FileInfo for metadata
+// We need the modification time for cache validation, so using os.Stat directly
+info, err := os.Stat(cachePath)
+if err != nil { ... }
+age := time.Since(info.ModTime())
+
+// OK - JSONC format requires comment stripping
+// VS Code settings use JSONC format, need to strip comments before parsing
+data = jsonc.ToJSON(data)
+json.Unmarshal(data, &settings)
+
+// OK - Shell-specific execution
+// Need to run shell-specific command with -c flag
+cmd := exec.Command(shell, "-c", "declare -F goenv")
+```
+
+### Code Review Checklist
+
+When reviewing code, check for:
+
+- [ ] File operations use helpers (FileExists, DirExists, etc.)
+- [ ] Directory creation uses EnsureDirWithContext
+- [ ] JSON operations use helpers (unless special case documented)
+- [ ] Commands use helpers when appropriate
+- [ ] HTTP clients have timeouts
+- [ ] Errors are wrapped with context
+- [ ] Special cases are documented with comments
+
 ## Documentation Contributions
 
 Good documentation is just as important as good code! We welcome contributions to improve our documentation.

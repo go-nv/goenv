@@ -5,9 +5,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/helptext"
-	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
 
@@ -27,8 +26,7 @@ func init() {
 }
 
 func runVersionFile(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	var targetDir string
 	if len(args) > 0 {

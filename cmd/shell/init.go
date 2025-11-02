@@ -3,7 +3,6 @@ package shell
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,7 +10,9 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
@@ -24,12 +25,16 @@ var initCmd = &cobra.Command{
 	GroupID: string(cmdpkg.GroupShell),
 	Long: `Configure the shell environment for goenv.
 
-The shell type is auto-detected from your environment. You can optionally 
+For first-time setup, use 'goenv setup' instead (interactive wizard).
+This command is for advanced users who want manual control.
+
+The shell type is auto-detected from your environment. You can optionally
 specify it explicitly: bash, zsh, fish, ksh, powershell, or cmd.
 
 Usage:
-  eval "$(goenv init -)"            # Auto-detects your shell
-  
+  eval "$(goenv init -)"            # Outputs shell initialization script
+  goenv init                        # Checks if shell is initialized (no dash)
+
   Or add it to your shell's startup file (.bashrc, .zshrc, etc.)
 
 This sets up:
@@ -38,7 +43,7 @@ This sets up:
   - Completion scripts (if available)
 
 After setup, you can:
-  - Run 'goenv init' to check initialization status
+  - Run 'goenv init' (without dash) to check initialization status
   - Run 'goenv shell 1.21.0' to switch versions in current shell
   - Run 'goenv rehash' to rebuild shims
 
@@ -47,7 +52,9 @@ Shell auto-detection:
   - Detects parent shell process (with -)
   - Falls back to $SHELL or platform defaults
 
-Tip: Use 'goenv setup' for interactive configuration.`,
+Difference from 'goenv setup':
+  init  - Outputs shell code or checks status (manual, advanced)
+  setup - Interactive wizard that modifies your profile (automated, beginner-friendly)`,
 	RunE: runInit,
 }
 
@@ -64,7 +71,7 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 
 	if initFlags.complete {
 		for _, option := range []string{"-", "--no-rehash", "bash", "fish", "ksh", "zsh", "powershell", "cmd"} {
@@ -105,13 +112,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(cmd.OutOrStdout(), "%s goenv is NOT initialized in this shell\n\n", utils.Emoji("⚠️  "))
 			fmt.Fprintln(cmd.OutOrStdout(), "To initialize goenv in your current shell session, run:")
 			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", getEvalCommand(shell))
-			fmt.Fprint(cmd.OutOrStdout(), renderUsageSnippet(shell, explicitShell))
+			fmt.Fprint(cmd.OutOrStdout(), renderUsageSnippet(shell))
 		}
 		return nil
 	}
 
 	if err := cfg.EnsureDirectories(); err != nil {
-		return fmt.Errorf("failed to prepare goenv directories: %w", err)
+		return errors.FailedTo("prepare goenv directories", err)
 	}
 
 	fmt.Fprint(cmd.OutOrStdout(), renderInitScript(shell, cfg, initFlags.noRehash))
@@ -158,19 +165,22 @@ func detectEnvShell() shellutil.ShellType {
 }
 
 func detectParentShell() shellutil.ShellType {
-	// On Windows, ps command doesn't exist - rely on detectEnvShell instead
-	if utils.IsWindows() {
+	// On Windows (native), ps command doesn't exist - rely on detectEnvShell instead
+	if utils.IsWindows() && !utils.IsMinGW() {
 		return shellutil.ShellTypeUnknown
+	}
+
+	// In MinGW/Git Bash, assume bash since that's what Git Bash uses
+	// and ps may not be available or reliable
+	if utils.IsMinGW() {
+		return shellutil.ShellTypeBash
 	}
 
 	ppid := os.Getppid()
-	cmd := exec.Command("ps", "-p", strconv.Itoa(ppid), "-o", "args=")
-	output, err := cmd.Output()
+	line, err := utils.RunCommandOutput("ps", "-p", strconv.Itoa(ppid), "-o", "args=")
 	if err != nil {
 		return shellutil.ShellTypeUnknown
 	}
-
-	line := strings.TrimSpace(string(output))
 	if line == "" {
 		return shellutil.ShellTypeUnknown
 	}
@@ -188,8 +198,9 @@ func detectParentShell() shellutil.ShellType {
 	return shellutil.ParseShellType(filepath.Base(shell))
 }
 
-func renderUsageSnippet(shell shellutil.ShellType, originalShell string) string {
-	profile := determineProfilePath(shell, originalShell)
+func renderUsageSnippet(shell shellutil.ShellType) string {
+	// Use centralized profile path function from shellutil
+	profile := shellutil.GetProfilePathDisplay(shell)
 
 	var builder strings.Builder
 	builder.WriteString("# Load goenv automatically by appending\n")
@@ -208,43 +219,6 @@ func renderUsageSnippet(shell shellutil.ShellType, originalShell string) string 
 
 	builder.WriteString("\n")
 	return builder.String()
-}
-
-func determineProfilePath(shell shellutil.ShellType, originalShell string) string {
-	switch shell {
-	case shellutil.ShellTypeBash:
-		home, err := os.UserHomeDir()
-		if err != nil || home == "" {
-			home = os.Getenv(utils.EnvVarHome) // Fallback
-		}
-		if home != "" {
-			bashrc := filepath.Join(home, ".bashrc")
-			bashProfile := filepath.Join(home, ".bash_profile")
-			if _, err := os.Stat(bashrc); err == nil {
-				if _, err := os.Stat(bashProfile); err != nil {
-					return "~/.bashrc"
-				}
-			}
-		}
-		return "~/.bash_profile"
-	case shellutil.ShellTypeZsh:
-		return "~/.zshrc"
-	case shellutil.ShellTypeKsh:
-		return "~/.profile"
-	case shellutil.ShellTypeFish:
-		return "~/.config/fish/config.fish"
-	case shellutil.ShellTypePowerShell:
-		return "$PROFILE"
-	case shellutil.ShellTypeCmd:
-		return "%USERPROFILE%\\autorun.cmd"
-	default:
-		// Use originalShell if provided, otherwise use the shell type string
-		shellName := originalShell
-		if shellName == "" {
-			shellName = shell.String()
-		}
-		return fmt.Sprintf("<unknown shell: %s, replace with your profile path>", shellName)
-	}
 }
 
 func renderInitScript(shell shellutil.ShellType, cfg *config.Config, noRehash bool) string {
@@ -340,6 +314,11 @@ func renderInitScript(shell shellutil.ShellType, cfg *config.Config, noRehash bo
 	}
 
 	builder.WriteString(renderShellFunction(shell))
+
+	// Add prompt helper functions if enabled
+	if shouldIncludePromptHelper() {
+		builder.WriteString(renderPromptHelper(shell))
+	}
 
 	return builder.String()
 }
@@ -542,7 +521,7 @@ func findCompletionPath(shell shellutil.ShellType) string {
 	}
 
 	completion := filepath.Join(root, "completions", fmt.Sprintf("goenv.%s", shell))
-	if _, err := os.Stat(completion); err == nil {
+	if utils.FileExists(completion) {
 		return completion
 	}
 
@@ -571,7 +550,7 @@ func getInstallRoot() string {
 			candidate := filepath.Clean(filepath.Join(dir, ".."))
 
 			// Verify this looks like a goenv installation by checking for completions
-			if _, err := os.Stat(filepath.Join(candidate, "completions")); err == nil {
+			if utils.DirExists(filepath.Join(candidate, "completions")) {
 				installRoot = candidate
 				return
 			}
@@ -598,14 +577,13 @@ func init() {
 }
 
 func runShShell(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Handle completion request
 	if len(args) == 1 && args[0] == "--complete" {
 		fmt.Fprintln(cmd.OutOrStdout(), "--unset")
 		fmt.Fprintln(cmd.OutOrStdout(), "system")
 		// Print all installed versions
-		mgr := manager.NewManager(cfg)
 		versions, _ := mgr.ListInstalledVersions()
 		for _, v := range versions {
 			fmt.Fprintln(cmd.OutOrStdout(), v)
@@ -640,11 +618,11 @@ func runShShell(cmd *cobra.Command, args []string) error {
 	versionStr := strings.Join(args, ":")
 
 	// Check if version exists (unless it's "system")
-	if versionStr != "system" {
+	if versionStr != manager.SystemVersion {
 		versions := strings.Split(versionStr, ":")
 		for _, v := range versions {
 			versionPath := filepath.Join(cfg.Root, "versions", v)
-			if _, err := os.Stat(versionPath); os.IsNotExist(err) {
+			if utils.FileNotExists(versionPath) {
 				fmt.Fprintf(cmd.ErrOrStderr(), "goenv: version '%s' not installed\n", v)
 				fmt.Fprintln(cmd.OutOrStdout(), "false")
 				return fmt.Errorf("version not installed")
@@ -701,4 +679,70 @@ func getEvalCommand(shell shellutil.ShellType) string {
 	default:
 		return "eval \"$(goenv init -)\""
 	}
+}
+
+// shouldIncludePromptHelper checks if prompt helper should be included
+func shouldIncludePromptHelper() bool {
+	// Include by default, unless disabled
+	return !utils.GoenvEnvVarDisablePromptHelper.IsTrue()
+}
+
+// renderPromptHelper renders shell-specific prompt helper functions
+func renderPromptHelper(shell shellutil.ShellType) string {
+	var builder strings.Builder
+
+	builder.WriteString("\n# Prompt helper function\n")
+	builder.WriteString("# To show Go version in your prompt, see examples below\n")
+
+	switch shell {
+	case shellutil.ShellTypeBash, shellutil.ShellTypeZsh:
+		builder.WriteString("goenv_prompt_info() {\n")
+		builder.WriteString("  goenv prompt 2>/dev/null\n")
+		builder.WriteString("}\n")
+		builder.WriteString("\n# Usage examples:\n")
+		builder.WriteString("# export PS1='$(goenv_prompt_info) '\"$PS1\"\n")
+		builder.WriteString("# export PS1='$(goenv prompt --prefix \"(\" --suffix \") \") '\"$PS1\"\n")
+		builder.WriteString("# export PS1='$(goenv prompt --format \"go:%s\" --short) '\"$PS1\"\n")
+		builder.WriteString("# export PS1='$(goenv prompt --go-project-only) '\"$PS1\"\n")
+
+	case shellutil.ShellTypeFish:
+		builder.WriteString("function goenv_prompt_info\n")
+		builder.WriteString("  goenv prompt 2>/dev/null\n")
+		builder.WriteString("end\n")
+		builder.WriteString("\n# Usage examples:\n")
+		builder.WriteString("# Add to fish_prompt:\n")
+		builder.WriteString("#   set -l goenv_version (goenv_prompt_info)\n")
+		builder.WriteString("#   test -n \"$goenv_version\"; and echo -n \"($goenv_version) \"\n")
+		builder.WriteString("#\n")
+		builder.WriteString("# Or with colors:\n")
+		builder.WriteString("#   set -l goenv_version (goenv_prompt_info)\n")
+		builder.WriteString("#   if test -n \"$goenv_version\"\n")
+		builder.WriteString("#     set_color cyan\n")
+		builder.WriteString("#     echo -n \"($goenv_version) \"\n")
+		builder.WriteString("#     set_color normal\n")
+		builder.WriteString("#   end\n")
+
+	case shellutil.ShellTypePowerShell:
+		builder.WriteString("function Get-GoenvPromptInfo {\n")
+		builder.WriteString("  $ErrorActionPreference = 'SilentlyContinue'\n")
+		builder.WriteString("  goenv prompt 2>$null\n")
+		builder.WriteString("}\n")
+		builder.WriteString("\n# Usage example:\n")
+		builder.WriteString("# Add to your prompt function in $PROFILE:\n")
+		builder.WriteString("#   function prompt {\n")
+		builder.WriteString("#     $goenvVersion = Get-GoenvPromptInfo\n")
+		builder.WriteString("#     if ($goenvVersion) {\n")
+		builder.WriteString("#       Write-Host \"($goenvVersion) \" -NoNewline -ForegroundColor Cyan\n")
+		builder.WriteString("#     }\n")
+		builder.WriteString("#     \"PS $($PWD.Path)> \"\n")
+		builder.WriteString("#   }\n")
+
+	case shellutil.ShellTypeCmd:
+		// cmd.exe has limited prompt support, so we'll provide basic guidance
+		builder.WriteString("REM cmd.exe has limited prompt customization\n")
+		builder.WriteString("REM To show Go version manually, use: goenv prompt\n")
+		builder.WriteString("REM Consider upgrading to PowerShell for better prompt support\n")
+	}
+
+	return builder.String()
 }

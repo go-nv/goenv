@@ -1,8 +1,10 @@
 package hooks
 
 import (
-	"errors"
+	stderrors "errors"
 	"fmt"
+
+	"github.com/go-nv/goenv/internal/errors"
 )
 
 // CheckDiskSpaceAction validates that sufficient disk space is available
@@ -73,7 +75,7 @@ func (a *CheckDiskSpaceAction) Execute(ctx *HookContext, params map[string]inter
 	// Check disk space
 	freeMB, totalMB, err := getDiskSpace(path)
 	if err != nil {
-		return fmt.Errorf("failed to check disk space: %w", err)
+		return errors.FailedTo("check disk space", err)
 	}
 
 	// Check if we have enough space
@@ -82,7 +84,7 @@ func (a *CheckDiskSpaceAction) Execute(ctx *HookContext, params map[string]inter
 			freeMB, minFreeMB, totalMB, path)
 
 		if action == "error" {
-			return errors.New(msg)
+			return stderrors.New(msg)
 		}
 		// For "warn", we just log but don't fail
 		fmt.Printf("Warning: %s\n", msg)

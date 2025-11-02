@@ -1,13 +1,16 @@
 package shims
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 
 	"github.com/spf13/cobra"
 )
@@ -100,13 +103,8 @@ func TestExecCommand(t *testing.T) {
 			defer cleanup()
 
 			// Clear GOENV_VERSION to avoid interference from outer environment
-			oldGoenvVersion := os.Getenv("GOENV_VERSION")
+			t.Setenv(utils.GoenvEnvVarVersion.String(), "")
 			os.Unsetenv("GOENV_VERSION")
-			defer func() {
-				if oldGoenvVersion != "" {
-					os.Setenv("GOENV_VERSION", oldGoenvVersion)
-				}
-			}()
 
 			// Setup test versions
 			for _, version := range tt.setupVersions {
@@ -125,20 +123,14 @@ func TestExecCommand(t *testing.T) {
 						content = strings.ReplaceAll(content, `echo "`, `echo `)
 						content = strings.ReplaceAll(content, `"`+"\n", "\n")
 					}
-					err := os.WriteFile(binPath, []byte(content), 0755)
-					if err != nil {
-						t.Fatalf("Failed to create custom binary for version %s: %v", version, err)
-					}
+					testutil.WriteTestFile(t, binPath, []byte(content), utils.PermFileExecutable, fmt.Sprintf("Failed to create custom binary for version %s", version))
 				}
 			}
 
 			// Set global version if specified
 			if tt.globalVersion != "" {
 				globalFile := filepath.Join(testRoot, "version")
-				err := os.WriteFile(globalFile, []byte(tt.globalVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set global version: %v", err)
-				}
+				testutil.WriteTestFile(t, globalFile, []byte(tt.globalVersion), utils.PermFileDefault, "Failed to set global version")
 			}
 
 			// Setup local version if specified
@@ -152,10 +144,7 @@ func TestExecCommand(t *testing.T) {
 				defer os.RemoveAll(tempDir)
 
 				localFile := filepath.Join(tempDir, ".go-version")
-				err = os.WriteFile(localFile, []byte(tt.localVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to create local version file: %v", err)
-				}
+				testutil.WriteTestFile(t, localFile, []byte(tt.localVersion), utils.PermFileDefault)
 
 				// Change to the directory with local version
 				oldDir, _ := os.Getwd()
@@ -165,15 +154,13 @@ func TestExecCommand(t *testing.T) {
 
 			// Setup environment version if specified
 			if tt.envVersion != "" {
-				oldEnvVersion := os.Getenv("GOENV_VERSION")
-				os.Setenv("GOENV_VERSION", tt.envVersion)
-				defer os.Setenv("GOENV_VERSION", oldEnvVersion)
+				t.Setenv(utils.GoenvEnvVarVersion.String(), tt.envVersion)
 			}
 
 			// Setup system go for system version test
-			if tt.globalVersion == "system" {
+			if tt.globalVersion == manager.SystemVersion {
 				systemBinDir := filepath.Join(testRoot, "system_bin")
-				os.MkdirAll(systemBinDir, 0755)
+				_ = utils.EnsureDirWithContext(systemBinDir, "create test directory")
 				systemGo := filepath.Join(systemBinDir, "go")
 				var content string
 				if utils.IsWindows() {
@@ -183,16 +170,13 @@ func TestExecCommand(t *testing.T) {
 					content = "#!/bin/sh\necho system go version\n"
 				}
 
-				err := os.WriteFile(systemGo, []byte(content), 0755)
-				if err != nil {
-					t.Fatalf("Failed to create system go: %v", err)
-				}
+				testutil.WriteTestFile(t, systemGo, []byte(content), utils.PermFileExecutable, "Failed to create system go")
 
 				// Add to PATH temporarily
-				oldPath := os.Getenv("PATH")
+				oldPath := os.Getenv(utils.EnvVarPath)
 				pathSep := string(os.PathListSeparator)
-				os.Setenv("PATH", systemBinDir+pathSep+oldPath)
-				defer os.Setenv("PATH", oldPath)
+				os.Setenv(utils.EnvVarPath, systemBinDir+pathSep+oldPath)
+				defer os.Setenv(utils.EnvVarPath, oldPath)
 			}
 
 			// Create and execute command
@@ -282,17 +266,11 @@ func TestExecEnvironmentVariables(t *testing.T) {
 		content = "#!/bin/sh\necho \"GOROOT=$GOROOT\"\necho \"GOPATH=$GOPATH\"\n"
 	}
 
-	err := os.WriteFile(binPath, []byte(content), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create env-test binary: %v", err)
-	}
+	testutil.WriteTestFile(t, binPath, []byte(content), utils.PermFileExecutable, "Failed to create env-test binary")
 
 	// Set global version
 	globalFile := filepath.Join(testRoot, "version")
-	err = os.WriteFile(globalFile, []byte(version), 0644)
-	if err != nil {
-		t.Fatalf("Failed to set global version: %v", err)
-	}
+	testutil.WriteTestFile(t, globalFile, []byte(version), utils.PermFileDefault, "Failed to set global version")
 
 	// Create and execute command
 	cmd := &cobra.Command{
@@ -306,7 +284,7 @@ func TestExecEnvironmentVariables(t *testing.T) {
 	cmd.SetOut(output)
 	cmd.SetArgs([]string{"env-test"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("Exec command failed: %v", err)
 	}
@@ -330,14 +308,11 @@ func TestExecWithShims(t *testing.T) {
 
 	// Set global version
 	globalFile := filepath.Join(testRoot, "version")
-	err := os.WriteFile(globalFile, []byte(version), 0644)
-	if err != nil {
-		t.Fatalf("Failed to set global version: %v", err)
-	}
+	testutil.WriteTestFile(t, globalFile, []byte(version), utils.PermFileDefault, "Failed to set global version")
 
 	// Create shims directory and shim
 	shimsDir := filepath.Join(testRoot, "shims")
-	err = os.MkdirAll(shimsDir, 0755)
+	err := utils.EnsureDirWithContext(shimsDir, "create test directory")
 	if err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
@@ -350,10 +325,7 @@ func TestExecWithShims(t *testing.T) {
 	} else {
 		shimContent = "#!/usr/bin/env bash\nexec goenv exec \"$(basename \"$0\")\" \"$@\"\n"
 	}
-	err = os.WriteFile(shimPath, []byte(shimContent), 0755)
-	if err != nil {
-		t.Fatalf("Failed to create shim: %v", err)
-	}
+	testutil.WriteTestFile(t, shimPath, []byte(shimContent), utils.PermFileExecutable)
 
 	// Create and execute command - should work even when called via shim path
 	cmd := &cobra.Command{

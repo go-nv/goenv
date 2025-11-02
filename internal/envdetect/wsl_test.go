@@ -1,15 +1,18 @@
 package envdetect
 
 import (
-	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/osinfo"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestIsWSL(t *testing.T) {
 	// This test can only run meaningfully on Linux
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		t.Skip("WSL detection only works on Linux")
 	}
 
@@ -63,9 +66,7 @@ func TestIsWindowsBinary(t *testing.T) {
 			tmpDir := t.TempDir()
 			tmpFile := filepath.Join(tmpDir, "testbinary")
 
-			if err := os.WriteFile(tmpFile, tt.content, 0644); err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			testutil.WriteTestFile(t, tmpFile, tt.content, utils.PermFileDefault, "Failed to create test file")
 
 			result := IsWindowsBinary(tmpFile)
 			if result != tt.expected {
@@ -83,7 +84,7 @@ func TestIsWindowsBinary_NonExistentFile(t *testing.T) {
 }
 
 func TestCheckWSLCrossExecution(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		// On non-Linux systems, should always return empty
 		result := CheckWSLCrossExecution("/any/path")
 		if result != "" {
@@ -99,9 +100,7 @@ func TestCheckWSLCrossExecution(t *testing.T) {
 
 	// Create an ELF binary
 	elfBinary := []byte{0x7f, 'E', 'L', 'F', 0x01, 0x01, 0x01, 0x00}
-	if err := os.WriteFile(tmpFile, elfBinary, 0755); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, tmpFile, elfBinary, utils.PermFileExecutable, "Failed to create test file")
 
 	result := CheckWSLCrossExecution(tmpFile)
 	// On regular Linux (not WSL), this should return empty
@@ -110,7 +109,7 @@ func TestCheckWSLCrossExecution(t *testing.T) {
 }
 
 func TestCheckWSLCrossExecution_WindowsBinary(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		t.Skip("This test only runs on Linux")
 	}
 
@@ -119,9 +118,7 @@ func TestCheckWSLCrossExecution_WindowsBinary(t *testing.T) {
 
 	// Create a Windows PE binary
 	peBinary := []byte{'M', 'Z', 0x90, 0x00}
-	if err := os.WriteFile(tmpFile, peBinary, 0755); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, tmpFile, peBinary, utils.PermFileExecutable, "Failed to create test file")
 
 	result := CheckWSLCrossExecution(tmpFile)
 
@@ -132,11 +129,11 @@ func TestCheckWSLCrossExecution_WindowsBinary(t *testing.T) {
 			t.Error("Expected warning when running Windows binary in WSL")
 		}
 		// Verify the warning includes the actual host architecture
-		if !contains(result, runtime.GOARCH) {
-			t.Errorf("Warning message should include host architecture %q, but got: %q", runtime.GOARCH, result)
+		if !strings.Contains(result, osinfo.Arch()) {
+			t.Errorf("Warning message should include host architecture %q, but got: %q", osinfo.Arch(), result)
 		}
 		// Verify it suggests the correct GOOS
-		if !contains(result, "GOOS=linux") {
+		if !strings.Contains(result, "GOOS=linux") {
 			t.Errorf("Warning message should suggest GOOS=linux, but got: %q", result)
 		}
 		t.Logf("WSL warning message: %s", result)
@@ -145,18 +142,4 @@ func TestCheckWSLCrossExecution_WindowsBinary(t *testing.T) {
 	if !IsWSL() && result != "" {
 		t.Error("Should not warn about Windows binary on regular Linux (not WSL)")
 	}
-}
-
-// Helper function for substring checking
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && findSubstring(s, substr)
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

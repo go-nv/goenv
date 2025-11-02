@@ -7,7 +7,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +42,7 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv refresh [--verbose]")
 	}
 
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 
 	cacheFiles := []string{
 		filepath.Join(cfg.Root, "versions-cache.json"),
@@ -53,24 +54,21 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 	permissionFixed := 0
 
 	for _, cacheFile := range cacheFiles {
-		if _, err := os.Stat(cacheFile); err == nil {
+		if utils.PathExists(cacheFile) {
 			// File exists, remove it
 			if err := os.Remove(cacheFile); err != nil {
-				return fmt.Errorf("failed to remove %s: %w", filepath.Base(cacheFile), err)
+				return errors.FailedTo(fmt.Sprintf("remove %s", filepath.Base(cacheFile)), err)
 			}
 			removed++
 			if refreshFlags.verbose {
 				fmt.Fprintf(cmd.OutOrStdout(), "%sRemoved %s\n", utils.Emoji("✓ "), filepath.Base(cacheFile))
 			}
-		} else if os.IsNotExist(err) {
+		} else if utils.FileNotExists(cacheFile) {
 			// File doesn't exist
 			notFound++
 			if refreshFlags.verbose {
 				fmt.Fprintf(cmd.OutOrStdout(), "• %s not found (already clean)\n", filepath.Base(cacheFile))
 			}
-		} else {
-			// Other error (permissions, etc.)
-			return fmt.Errorf("failed to check %s: %w", filepath.Base(cacheFile), err)
 		}
 	}
 
@@ -94,7 +92,7 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// ensureCacheDirPermissions ensures the cache directory has secure permissions (0700)
+// ensureCacheDirPermissions ensures the cache directory has secure permissions (utils.PermDirSecure)
 func ensureCacheDirPermissions(cacheDir string, cmd *cobra.Command) error {
 	// Skip permission checks on Windows (uses ACLs instead of POSIX permissions)
 	if utils.IsWindows() {
@@ -102,21 +100,21 @@ func ensureCacheDirPermissions(cacheDir string, cmd *cobra.Command) error {
 	}
 
 	// Check if directory exists
-	info, err := os.Stat(cacheDir)
+	info, exists, err := utils.StatWithExistence(cacheDir)
+	if !exists {
+		// Directory doesn't exist, create it with secure permissions
+		return utils.EnsureDirWithContext(cacheDir, "create cache directory")
+	}
 	if err != nil {
-		if os.IsNotExist(err) {
-			// Directory doesn't exist, create it with secure permissions
-			return os.MkdirAll(cacheDir, 0700)
-		}
-		return fmt.Errorf("failed to check cache directory: %w", err)
+		return errors.FailedTo("check cache directory", err)
 	}
 
 	// Check permissions
 	mode := info.Mode()
-	if mode.Perm() != 0700 {
+	if mode.Perm() != utils.PermDirSecure {
 		// Fix permissions
-		if err := os.Chmod(cacheDir, 0700); err != nil {
-			return fmt.Errorf("failed to fix cache directory permissions: %w", err)
+		if err := os.Chmod(cacheDir, utils.PermDirSecure); err != nil {
+			return errors.FailedTo("fix cache directory permissions", err)
 		}
 	}
 

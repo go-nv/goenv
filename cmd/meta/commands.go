@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -47,7 +47,7 @@ func runCommands(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 	commands := []string{}
 
 	// Add installed versions
@@ -91,12 +91,9 @@ func runCommands(cmd *cobra.Command, args []string) error {
 						cmdName := strings.TrimPrefix(name, "goenv-")
 						// Check if executable
 						fullPath := filepath.Join(dir, name)
-						if info, err := os.Stat(fullPath); err == nil {
-							// On Windows, all files are "executable"; on Unix, check the executable bit
-							if utils.IsWindows() || utils.HasExecutableBit(info) {
-								commands = append(commands, cmdName)
-								commandPaths[cmdName] = append(commandPaths[cmdName], fullPath)
-							}
+						if utils.IsExecutableFile(fullPath) {
+							commands = append(commands, cmdName)
+							commandPaths[cmdName] = append(commandPaths[cmdName], fullPath)
 						}
 					}
 				}
@@ -133,7 +130,7 @@ func runCommands(cmd *cobra.Command, args []string) error {
 	for c := range commandSet {
 		commands = append(commands, c)
 	}
-	sort.Strings(commands)
+	slices.Sort(commands)
 
 	// Filter based on flags
 	// In bash version, --sh filters commands that have goenv-sh-* executables

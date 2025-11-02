@@ -1,7 +1,6 @@
 package integrations
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,9 +10,10 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
-	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
@@ -23,13 +23,22 @@ var vscodeCmd = &cobra.Command{
 	Use:     "vscode",
 	Short:   "Manage VS Code integration",
 	GroupID: string(cmdpkg.GroupIntegrations),
-	Long:    "Commands to configure and manage Visual Studio Code integration with goenv",
+	Long: `Commands to configure and manage Visual Studio Code integration with goenv.
+
+Quick Start:
+  goenv vscode setup    Complete setup (recommended for first-time users)
+  goenv vscode status   Check current integration status
+  goenv vscode doctor   Diagnose and fix issues
+
+The 'setup' command combines initialization, syncing, and validation in one step.`,
 }
 
 var vscodeInitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize VS Code workspace for goenv",
 	Long: `Initialize VS Code workspace with goenv configuration.
+
+Note: For first-time setup, use 'goenv vscode setup' instead (combines init + sync + doctor).
 
 This command creates or updates .vscode/settings.json and .vscode/extensions.json
 in the current directory to ensure VS Code uses the correct Go version from goenv.
@@ -59,6 +68,8 @@ var vscodeSyncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync VS Code settings with current Go version",
 	Long: `Sync VS Code settings with the current Go version.
+
+Note: For complete setup and validation, use 'goenv vscode setup' instead.
 
 This command updates .vscode/settings.json to point to the currently active
 Go version from goenv. Use this after switching Go versions to keep VS Code
@@ -262,7 +273,7 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 	// Get current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return errors.FailedTo("get current directory", err)
 	}
 
 	vscodeDir := filepath.Join(cwd, ".vscode")
@@ -270,8 +281,8 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 	extensionsFile := filepath.Join(vscodeDir, "extensions.json")
 
 	// Create .vscode directory if it doesn't exist
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
-		return fmt.Errorf("failed to create .vscode directory: %w", err)
+	if err := utils.EnsureDirWithContext(vscodeDir, "create .vscode directory"); err != nil {
+		return err
 	}
 
 	// Use basic template for automatic initialization
@@ -281,7 +292,7 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 	// Auto-detect monorepo (go.work file) if template not explicitly set
 	if VSCodeInitFlags.Template == "" || VSCodeInitFlags.Template == "basic" {
 		goWorkPath := filepath.Join(cwd, "go.work")
-		if _, err := os.Stat(goWorkPath); err == nil {
+		if utils.FileExists(goWorkPath) {
 			template = "monorepo"
 			fmt.Fprintf(cmd.OutOrStdout(), "%sDetected go.work file - using monorepo template\n", utils.Emoji("ℹ️  "))
 		}
@@ -301,21 +312,20 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 
 	// Convert to explicit paths if requested (using platform-specific env vars for portability)
 	if useAbsolutePaths {
-		cfg := config.Load()
-		mgr := manager.NewManager(cfg)
+		cfg, mgr := cmdutil.SetupContext()
 
 		// Get Go version - use provided version or current active version
 		if version == "" {
 			version, _, err = mgr.GetCurrentVersion()
 			if err != nil {
-				return fmt.Errorf("failed to get current Go version: %w", err)
+				return errors.FailedTo("get current Go version", err)
 			}
 		}
 
 		// Get home directory (cross-platform)
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return fmt.Errorf("failed to get home directory: %w", err)
+			return errors.FailedTo("get home directory", err)
 		}
 
 		// Use platform-specific environment variables for portability
@@ -369,7 +379,7 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 	// Handle existing settings
 	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to read existing settings: %w", err)
+		return errors.FailedTo("read existing settings", err)
 	}
 
 	// Prepare keys to update
@@ -456,11 +466,11 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 
 			// Backup before modifying
 			if err := vscode.BackupFile(settingsFile); err != nil {
-				return fmt.Errorf("failed to create backup: %w", err)
+				return errors.FailedTo("create backup", err)
 			}
 
 			if err := vscode.UpdateJSONKeys(settingsFile, keysToUpdate); err != nil {
-				return fmt.Errorf("failed to update settings.json: %w", err)
+				return errors.FailedTo("update settings.json", err)
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "✓ Updated %s\n", settingsFile)
@@ -468,7 +478,7 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 	} else {
 		// No existing file or force mode - create new file
 		if err := vscode.WriteJSONFile(settingsFile, settings); err != nil {
-			return fmt.Errorf("failed to write settings.json: %w", err)
+			return errors.FailedTo("write settings.json", err)
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "✓ Created %s\n", settingsFile)
 	}
@@ -500,7 +510,7 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 	}
 
 	if err := vscode.WriteJSONFile(extensionsFile, extensions); err != nil {
-		return fmt.Errorf("failed to write extensions.json: %w", err)
+		return errors.FailedTo("write extensions.json", err)
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "✓ Created/updated %s\n", extensionsFile)
 
@@ -659,29 +669,28 @@ func mergeSettingsWithOverride(existing, new VSCodeSettings, overrideKeys []stri
 func runVSCodeSync(cmd *cobra.Command, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return errors.FailedTo("get current directory", err)
 	}
 
 	vscodeDir := filepath.Join(cwd, ".vscode")
 	settingsFile := filepath.Join(vscodeDir, "settings.json")
 
 	// Check if settings file exists
-	if _, err := os.Stat(settingsFile); os.IsNotExist(err) {
+	if !utils.FileExists(settingsFile) {
 		return fmt.Errorf("no VS Code settings found. Run 'goenv vscode init' first")
 	}
 
 	// Get current Go version
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 	version, _, err := mgr.GetCurrentVersion()
 	if err != nil {
-		return fmt.Errorf("failed to get current Go version: %w", err)
+		return errors.FailedTo("get current Go version", err)
 	}
 
 	// Read existing settings
 	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
 	if err != nil {
-		return fmt.Errorf("failed to read existing settings: %w", err)
+		return errors.FailedTo("read existing settings", err)
 	}
 
 	// Determine mode (env vars vs absolute paths)
@@ -701,7 +710,7 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 	// Build new paths for current version
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return errors.FailedTo("get home directory", err)
 	}
 
 	var homeEnvVar string
@@ -779,12 +788,12 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 
 	// Backup before modifying
 	if err := vscode.BackupFile(settingsFile); err != nil {
-		return fmt.Errorf("failed to create backup: %w", err)
+		return errors.FailedTo("create backup", err)
 	}
 
 	// Update settings
 	if err := vscode.UpdateJSONKeys(settingsFile, keysToUpdate); err != nil {
-		return fmt.Errorf("failed to update settings: %w", err)
+		return errors.FailedTo("update settings", err)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "✓ Synced VS Code settings to Go %s\n", version)
@@ -799,15 +808,14 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 func runVSCodeStatus(cmd *cobra.Command, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return errors.FailedTo("get current directory", err)
 	}
 
 	vscodeDir := filepath.Join(cwd, ".vscode")
 	settingsFile := filepath.Join(vscodeDir, "settings.json")
 
 	// Get current Go version
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 	version, source, err := mgr.GetCurrentVersion()
 	if err != nil {
 		version = "none"
@@ -828,8 +836,9 @@ func runVSCodeStatus(cmd *cobra.Command, args []string) error {
 			"settingsPath":      result.SettingsPath,
 			"versionSource":     source,
 		}
-		jsonData, _ := json.MarshalIndent(status, "", "  ")
-		fmt.Fprintln(cmd.OutOrStdout(), string(jsonData))
+		if err := cmdutil.OutputJSON(cmd.OutOrStdout(), status); err != nil {
+			return errors.FailedTo("output JSON", err)
+		}
 		if result.Mismatch {
 			return fmt.Errorf("version mismatch detected")
 		}
@@ -875,7 +884,7 @@ func runVSCodeStatus(cmd *cobra.Command, args []string) error {
 func runVSCodeRevert(cmd *cobra.Command, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return errors.FailedTo("get current directory", err)
 	}
 
 	vscodeDir := filepath.Join(cwd, ".vscode")
@@ -883,7 +892,7 @@ func runVSCodeRevert(cmd *cobra.Command, args []string) error {
 
 	// Check if backup exists
 	backupFile := settingsFile + ".bak"
-	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
+	if !utils.FileExists(backupFile) {
 		return fmt.Errorf("no backup found at %s", backupFile)
 	}
 
@@ -913,11 +922,10 @@ type diagnosticCheck struct {
 func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return errors.FailedTo("get current directory", err)
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	var checks []diagnosticCheck
 
@@ -925,7 +933,7 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 	vscodeDir := filepath.Join(cwd, ".vscode")
 	settingsFile := filepath.Join(vscodeDir, "settings.json")
 
-	if _, err := os.Stat(settingsFile); os.IsNotExist(err) {
+	if !utils.FileExists(settingsFile) {
 		checks = append(checks, diagnosticCheck{
 			Name:    "VS Code Settings",
 			Status:  "fail",
@@ -997,7 +1005,7 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 	toolsPath := filepath.Join(homeDir, "go", "tools")
 
 	// Try to create if doesn't exist
-	if err := os.MkdirAll(toolsPath, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(toolsPath, "create tools directory"); err != nil {
 		checks = append(checks, diagnosticCheck{
 			Name:    "Tools Path",
 			Status:  "fail",
@@ -1008,7 +1016,7 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 	} else {
 		// Test writability with a temp file
 		testFile := filepath.Join(toolsPath, ".goenv-test")
-		if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		if err := utils.WriteFileWithContext(testFile, []byte("test"), utils.PermFileDefault, "tools path"); err != nil {
 			checks = append(checks, diagnosticCheck{
 				Name:    "Tools Path",
 				Status:  "warn",
@@ -1029,16 +1037,16 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 5: Workspace structure
 	goWorkPath := filepath.Join(cwd, "go.work")
-	goModPath := filepath.Join(cwd, "go.mod")
+	goModPath := filepath.Join(cwd, config.GoModFileName)
 
-	if _, err := os.Stat(goWorkPath); err == nil {
+	if utils.FileExists(goWorkPath) {
 		checks = append(checks, diagnosticCheck{
 			Name:    "Workspace",
 			Status:  "pass",
 			Message: "go.work found (monorepo)",
 			Advice:  "Consider using 'goenv vscode init --template monorepo'",
 		})
-	} else if _, err := os.Stat(goModPath); err == nil {
+	} else if utils.FileExists(goModPath) {
 		checks = append(checks, diagnosticCheck{
 			Name:    "Workspace",
 			Status:  "pass",
@@ -1054,7 +1062,7 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 6: Settings sync status (if settings exist)
-	if _, err := os.Stat(settingsFile); err == nil && version != "" {
+	if utils.PathExists(settingsFile) && version != "" {
 		result := vscode.CheckSettings(settingsFile, version)
 		if result.HasSettings {
 			if result.UsesEnvVars {
@@ -1083,7 +1091,7 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 7: Go extension recommendation
 	extensionsFile := filepath.Join(vscodeDir, "extensions.json")
-	if _, err := os.Stat(extensionsFile); os.IsNotExist(err) {
+	if !utils.FileExists(extensionsFile) {
 		checks = append(checks, diagnosticCheck{
 			Name:    "Go Extension",
 			Status:  "warn",
@@ -1125,8 +1133,9 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 			output["status"] = "pass"
 		}
 
-		jsonData, _ := json.MarshalIndent(output, "", "  ")
-		fmt.Fprintln(cmd.OutOrStdout(), string(jsonData))
+		if err := cmdutil.OutputJSON(cmd.OutOrStdout(), output); err != nil {
+			return errors.FailedTo("output JSON", err)
+		}
 
 		if hasFailures {
 			return fmt.Errorf("health checks failed")
@@ -1210,7 +1219,7 @@ func runVSCodeSetup(cmd *cobra.Command, args []string) error {
 	VSCodeInitFlags.DryRun = originalDryRun
 
 	if err != nil {
-		return fmt.Errorf("init failed: %w", err)
+		return errors.FailedTo("initialize VS Code settings", err)
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
 
@@ -1255,7 +1264,7 @@ func runVSCodeSetup(cmd *cobra.Command, args []string) error {
 
 	if err != nil {
 		if vscodeSetupFlags.strict {
-			return fmt.Errorf("validation failed: %w", err)
+			return errors.FailedTo("validate VS Code settings", err)
 		}
 		fmt.Fprintf(cmd.OutOrStderr(), "%sWarning: Some checks failed (use --strict to fail on errors)\n",
 			utils.Emoji("⚠️  "))

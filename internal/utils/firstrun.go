@@ -44,26 +44,17 @@ func ShowFirstRunGuidance(w io.Writer, goenvRoot string) bool {
 		fmt.Fprintf(w, "%s\n", BoldYellow("Step 1: Initialize goenv in your shell"))
 		fmt.Fprintf(w, "To get started, add goenv to your shell by running:\n\n")
 
-		// Provide shell-specific instructions
-		shell := detectShell()
-		switch shell {
-		case "bash":
-			fmt.Fprintf(w, "  %s\n", Cyan("echo 'eval \"$(goenv init -)\"' >> ~/.bashrc"))
-			fmt.Fprintf(w, "  %s\n\n", Cyan("source ~/.bashrc"))
-		case "zsh":
-			fmt.Fprintf(w, "  %s\n", Cyan("echo 'eval \"$(goenv init -)\"' >> ~/.zshrc"))
-			fmt.Fprintf(w, "  %s\n\n", Cyan("source ~/.zshrc"))
-		case "fish":
-			fmt.Fprintf(w, "  %s\n", Cyan("echo 'status --is-interactive; and goenv init - | source' >> ~/.config/fish/config.fish"))
-			fmt.Fprintf(w, "  %s\n\n", Cyan("source ~/.config/fish/config.fish"))
-		case "powershell":
-			fmt.Fprintf(w, "  %s\n\n", Cyan("Add-Content $PROFILE 'goenv init - | Invoke-Expression'"))
-		default:
-			fmt.Fprintf(w, "  %s\n\n", Cyan("eval \"$(goenv init -)\""))
-		}
+		// Provide shell-specific instructions (inlined to avoid import cycles)
+		shell := detectShellSimple()
+		initLine := getInitLineSimple(shell)
+		profileDisplay := getProfilePathDisplaySimple(shell)
+
+		// Show simple instructions
+		fmt.Fprintf(w, "  Add to %s:\n", profileDisplay)
+		fmt.Fprintf(w, "    %s\n\n", Cyan(initLine))
 
 		fmt.Fprintf(w, "Or for just this session:\n")
-		fmt.Fprintf(w, "  %s\n\n", Cyan("eval \"$(goenv init -)\""))
+		fmt.Fprintf(w, "  %s\n\n", Cyan(initLine))
 	}
 
 	if !hasVersions {
@@ -84,29 +75,61 @@ func ShowFirstRunGuidance(w io.Writer, goenvRoot string) bool {
 	return true
 }
 
-// detectShell attempts to detect the current shell
-func detectShell() string {
+// detectShellSimple is a simplified shell detection for first-run guidance only
+// For full shell detection, use shellutil.DetectShell()
+func detectShellSimple() string {
+	// Check GOENV_SHELL first (if already initialized)
+	if shell := GoenvEnvVarShell.UnsafeValue(); shell != "" {
+		return shell
+	}
+
 	// Check SHELL environment variable
 	shell := os.Getenv(EnvVarShell)
-	if shell != "" {
-		if filepath.Base(shell) == "bash" {
-			return "bash"
-		}
-		if filepath.Base(shell) == "zsh" {
-			return "zsh"
-		}
-		if filepath.Base(shell) == "fish" {
-			return "fish"
-		}
+	if shell == "" {
+		return "bash" // default fallback
 	}
 
-	// Check for PowerShell on Windows
-	if IsWindows() {
-		return "powershell"
+	// Extract shell name from path
+	if idx := len(shell) - 1; idx >= 0 {
+		for i := idx; i >= 0; i-- {
+			if shell[i] == '/' || shell[i] == '\\' {
+				return shell[i+1:]
+			}
+		}
 	}
+	return shell
+}
 
-	// Default to bash
-	return "bash"
+// getInitLineSimple returns the init line for a shell (simplified version)
+func getInitLineSimple(shell string) string {
+	switch shell {
+	case "fish":
+		return "status --is-interactive; and source (goenv init -|psub)"
+	case "powershell", "pwsh":
+		return "Invoke-Expression (goenv init - | Out-String)"
+	case "cmd":
+		return "FOR /f \"tokens=*\" %%i IN ('goenv init -') DO @%%i"
+	default:
+		return "eval \"$(goenv init -)\""
+	}
+}
+
+// getProfilePathDisplaySimple returns a display name for the profile file
+func getProfilePathDisplaySimple(shell string) string {
+	switch shell {
+	case "bash":
+		return "~/.bashrc or ~/.bash_profile"
+	case "zsh":
+		return "~/.zshrc"
+	case "fish":
+		return "~/.config/fish/config.fish"
+	case "powershell", "pwsh":
+		return "$PROFILE"
+	case "cmd":
+		return "%USERPROFILE%\\autorun.cmd"
+	default:
+		return "your shell profile"
+	}
 }
 
 // IsShellInitialized checks if goenv is initialized in the current shell

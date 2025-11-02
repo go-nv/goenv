@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/utils"
 	yaml "gopkg.in/yaml.v3"
 )
@@ -78,18 +79,18 @@ func DefaultConfigPath() string {
 // LoadConfig loads the hooks configuration from the specified path
 func LoadConfig(path string) (*Config, error) {
 	// If file doesn't exist, return default config (hooks disabled)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if utils.FileNotExists(path) {
 		return DefaultConfig(), nil
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		return nil, errors.FailedTo("read config file", err)
 	}
 
 	config := DefaultConfig()
 	if err := yaml.Unmarshal(data, config); err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %w", err)
+		return nil, errors.FailedTo("parse config file", err)
 	}
 
 	// Apply defaults for empty settings
@@ -115,17 +116,17 @@ func LoadConfig(path string) (*Config, error) {
 func SaveConfig(path string, config *Config) error {
 	data, err := yaml.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
+		return errors.FailedTo("marshal config", err)
 	}
 
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
+	if err := utils.EnsureDirWithContext(dir, "create config directory"); err != nil {
+		return err
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+	if err := utils.WriteFileWithContext(path, data, utils.PermFileDefault, "write config file"); err != nil {
+		return err
 	}
 
 	return nil

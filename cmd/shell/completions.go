@@ -9,7 +9,7 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -38,7 +38,7 @@ func runCompletions(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(cmd.OutOrStdout(), "--help")
 
 	// Try to find the command
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 
 	// Check if it's a Cobra registered command first
 	for _, subCmd := range cmdpkg.RootCmd.Commands() {
@@ -70,8 +70,7 @@ func runCompletions(cmd *cobra.Command, args []string) error {
 	pathEnv := os.Getenv(utils.EnvVarPath)
 	for _, dir := range filepath.SplitList(pathEnv) {
 		candidate := filepath.Join(dir, "goenv-"+commandName)
-		// On Windows, all files are "executable"; on Unix, check the executable bit
-		if info, err := os.Stat(candidate); err == nil && (utils.IsWindows() || utils.HasExecutableBit(info)) {
+		if utils.IsExecutableFile(candidate) {
 			commandPath = candidate
 			break
 		}
@@ -81,8 +80,7 @@ func runCompletions(cmd *cobra.Command, args []string) error {
 	if commandPath == "" {
 		libexecDir := filepath.Join(cfg.Root, "libexec")
 		candidate := filepath.Join(libexecDir, "goenv-"+commandName)
-		// On Windows, all files are "executable"; on Unix, check the executable bit
-		if info, err := os.Stat(candidate); err == nil && (utils.IsWindows() || utils.HasExecutableBit(info)) {
+		if utils.IsExecutableFile(candidate) {
 			commandPath = candidate
 		}
 	}

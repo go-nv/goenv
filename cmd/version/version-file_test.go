@@ -2,6 +2,8 @@ package version
 
 import (
 	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,13 +26,11 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create project directory with .go-version file
 				projectDir := filepath.Join(goenvRoot, "test-project")
-				if err := os.MkdirAll(projectDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(projectDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create project directory: %v", err)
 				}
 				versionFile := filepath.Join(projectDir, ".go-version")
-				if err := os.WriteFile(versionFile, []byte("1.11.1\n"), 0644); err != nil {
-					t.Fatalf("Failed to create .go-version: %v", err)
-				}
+				testutil.WriteTestFile(t, versionFile, []byte("1.11.1\n"), utils.PermFileDefault)
 				// Change to project directory
 				if err := os.Chdir(projectDir); err != nil {
 					t.Fatalf("Failed to change directory: %v", err)
@@ -43,7 +43,7 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create project directory without .go-version file
 				projectDir := filepath.Join(goenvRoot, "test-project")
-				if err := os.MkdirAll(projectDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(projectDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create project directory: %v", err)
 				}
 				if err := os.Chdir(projectDir); err != nil {
@@ -57,17 +57,15 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create project directory with .go-version file
 				projectDir := filepath.Join(goenvRoot, "test-project")
-				if err := os.MkdirAll(projectDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(projectDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create project directory: %v", err)
 				}
 				versionFile := filepath.Join(projectDir, ".go-version")
-				if err := os.WriteFile(versionFile, []byte("1.11.1\n"), 0644); err != nil {
-					t.Fatalf("Failed to create .go-version: %v", err)
-				}
+				testutil.WriteTestFile(t, versionFile, []byte("1.11.1\n"), utils.PermFileDefault)
 
 				// Create subdirectory and change to it
 				subDir := filepath.Join(projectDir, "subdir")
-				if err := os.MkdirAll(subDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(subDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create subdirectory: %v", err)
 				}
 				if err := os.Chdir(subDir); err != nil {
@@ -81,17 +79,15 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create a directory for GOENV_DIR
 				goenvDir := filepath.Join(goenvRoot, "goenv-dir")
-				if err := os.MkdirAll(goenvDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(goenvDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create GOENV_DIR: %v", err)
 				}
 				versionFile := filepath.Join(goenvDir, ".go-version")
-				if err := os.WriteFile(versionFile, []byte("1.10.3\n"), 0644); err != nil {
-					t.Fatalf("Failed to create .go-version: %v", err)
-				}
+				testutil.WriteTestFile(t, versionFile, []byte("1.10.3\n"), utils.PermFileDefault)
 
 				// Change to a different directory
 				otherDir := filepath.Join(goenvRoot, "other-dir")
-				if err := os.MkdirAll(otherDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(otherDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create other directory: %v", err)
 				}
 				if err := os.Chdir(otherDir); err != nil {
@@ -108,23 +104,19 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create GOENV_DIR with .go-version
 				goenvDir := filepath.Join(goenvRoot, "goenv-dir")
-				if err := os.MkdirAll(goenvDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(goenvDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create GOENV_DIR: %v", err)
 				}
 				goenvVersionFile := filepath.Join(goenvDir, ".go-version")
-				if err := os.WriteFile(goenvVersionFile, []byte("1.10.3\n"), 0644); err != nil {
-					t.Fatalf("Failed to create GOENV_DIR .go-version: %v", err)
-				}
+				testutil.WriteTestFile(t, goenvVersionFile, []byte("1.10.3\n"), utils.PermFileDefault)
 
 				// Create PWD with different .go-version
 				pwdDir := filepath.Join(goenvRoot, "pwd-dir")
-				if err := os.MkdirAll(pwdDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(pwdDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create PWD directory: %v", err)
 				}
 				pwdVersionFile := filepath.Join(pwdDir, ".go-version")
-				if err := os.WriteFile(pwdVersionFile, []byte("1.11.1\n"), 0644); err != nil {
-					t.Fatalf("Failed to create PWD .go-version: %v", err)
-				}
+				testutil.WriteTestFile(t, pwdVersionFile, []byte("1.11.1\n"), utils.PermFileDefault)
 
 				if err := os.Chdir(pwdDir); err != nil {
 					t.Fatalf("Failed to change directory: %v", err)
@@ -140,19 +132,17 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create GOENV_DIR without .go-version
 				goenvDir := filepath.Join(goenvRoot, "goenv-dir")
-				if err := os.MkdirAll(goenvDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(goenvDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create GOENV_DIR: %v", err)
 				}
 
 				// Create PWD with .go-version
 				pwdDir := filepath.Join(goenvRoot, "pwd-dir")
-				if err := os.MkdirAll(pwdDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(pwdDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create PWD directory: %v", err)
 				}
 				pwdVersionFile := filepath.Join(pwdDir, ".go-version")
-				if err := os.WriteFile(pwdVersionFile, []byte("1.11.1\n"), 0644); err != nil {
-					t.Fatalf("Failed to create PWD .go-version: %v", err)
-				}
+				testutil.WriteTestFile(t, pwdVersionFile, []byte("1.11.1\n"), utils.PermFileDefault)
 
 				if err := os.Chdir(pwdDir); err != nil {
 					t.Fatalf("Failed to change directory: %v", err)
@@ -168,17 +158,15 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create target directory with .go-version
 				targetDir := filepath.Join(goenvRoot, "target-dir")
-				if err := os.MkdirAll(targetDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(targetDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create target directory: %v", err)
 				}
 				versionFile := filepath.Join(targetDir, ".go-version")
-				if err := os.WriteFile(versionFile, []byte("1.10.3\n"), 0644); err != nil {
-					t.Fatalf("Failed to create .go-version: %v", err)
-				}
+				testutil.WriteTestFile(t, versionFile, []byte("1.10.3\n"), utils.PermFileDefault)
 
 				// Change to a different directory
 				otherDir := filepath.Join(goenvRoot, "other-dir")
-				if err := os.MkdirAll(otherDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(otherDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create other directory: %v", err)
 				}
 				if err := os.Chdir(otherDir); err != nil {
@@ -193,7 +181,7 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create target directory without .go-version
 				targetDir := filepath.Join(goenvRoot, "target-dir")
-				if err := os.MkdirAll(targetDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(targetDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create target directory: %v", err)
 				}
 			},
@@ -205,13 +193,11 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create project directory with go.mod
 				projectDir := filepath.Join(goenvRoot, "test-project")
-				if err := os.MkdirAll(projectDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(projectDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create project directory: %v", err)
 				}
 				gomodFile := filepath.Join(projectDir, "go.mod")
-				if err := os.WriteFile(gomodFile, []byte("module test\n\ngo 1.11\n"), 0644); err != nil {
-					t.Fatalf("Failed to create go.mod: %v", err)
-				}
+				testutil.WriteTestFile(t, gomodFile, []byte("module test\n\ngo 1.11\n"), utils.PermFileDefault)
 				if err := os.Chdir(projectDir); err != nil {
 					t.Fatalf("Failed to change directory: %v", err)
 				}
@@ -223,17 +209,13 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create project directory with both .go-version and go.mod
 				projectDir := filepath.Join(goenvRoot, "test-project")
-				if err := os.MkdirAll(projectDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(projectDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create project directory: %v", err)
 				}
 				versionFile := filepath.Join(projectDir, ".go-version")
-				if err := os.WriteFile(versionFile, []byte("1.11.1\n"), 0644); err != nil {
-					t.Fatalf("Failed to create .go-version: %v", err)
-				}
+				testutil.WriteTestFile(t, versionFile, []byte("1.11.1\n"), utils.PermFileDefault)
 				gomodFile := filepath.Join(projectDir, "go.mod")
-				if err := os.WriteFile(gomodFile, []byte("module test\n\ngo 1.11\n"), 0644); err != nil {
-					t.Fatalf("Failed to create go.mod: %v", err)
-				}
+				testutil.WriteTestFile(t, gomodFile, []byte("module test\n\ngo 1.11\n"), utils.PermFileDefault)
 				if err := os.Chdir(projectDir); err != nil {
 					t.Fatalf("Failed to change directory: %v", err)
 				}
@@ -245,7 +227,7 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create empty project directory
 				projectDir := filepath.Join(goenvRoot, "test-project")
-				if err := os.MkdirAll(projectDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(projectDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create project directory: %v", err)
 				}
 				if err := os.Chdir(projectDir); err != nil {
@@ -259,7 +241,7 @@ func TestVersionFileCommand(t *testing.T) {
 			setup: func(t *testing.T, goenvRoot string) {
 				// Create deep directory structure without .go-version
 				deepDir := filepath.Join(goenvRoot, "a", "b", "c", "d")
-				if err := os.MkdirAll(deepDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(deepDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create deep directory: %v", err)
 				}
 				if err := os.Chdir(deepDir); err != nil {

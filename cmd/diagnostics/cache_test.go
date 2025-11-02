@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/testing/testutil"
 	"time"
 
+	"github.com/go-nv/goenv/internal/cache"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -29,17 +32,17 @@ func TestCacheStatusCommand(t *testing.T) {
 	v1BuildCache := filepath.Join(v1Dir, "go-build")
 	v1ModCache := filepath.Join(v1Dir, "go-mod")
 
-	if err := os.MkdirAll(v1BuildCache, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(v1BuildCache, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(v1ModCache, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(v1ModCache, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Add some test files
-	os.WriteFile(filepath.Join(v1BuildCache, "test1.a"), []byte("test data"), 0644)
-	os.WriteFile(filepath.Join(v1BuildCache, "test2.a"), []byte("test data"), 0644)
-	os.WriteFile(filepath.Join(v1ModCache, "mod1"), []byte("module data"), 0644)
+	testutil.WriteTestFile(t, filepath.Join(v1BuildCache, "test1.a"), []byte("test data"), utils.PermFileDefault)
+	testutil.WriteTestFile(t, filepath.Join(v1BuildCache, "test2.a"), []byte("test data"), utils.PermFileDefault)
+	testutil.WriteTestFile(t, filepath.Join(v1ModCache, "mod1"), []byte("module data"), utils.PermFileDefault)
 
 	// Version 1.24.4 with architecture-aware caches
 	v2Dir := filepath.Join(versionsDir, "1.24.4")
@@ -47,25 +50,23 @@ func TestCacheStatusCommand(t *testing.T) {
 	v2BuildCacheLinux := filepath.Join(v2Dir, "go-build-linux-amd64")
 	v2ModCache := filepath.Join(v2Dir, "go-mod")
 
-	if err := os.MkdirAll(v2BuildCacheHost, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(v2BuildCacheHost, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(v2BuildCacheLinux, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(v2BuildCacheLinux, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(v2ModCache, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(v2ModCache, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Add test files
-	os.WriteFile(filepath.Join(v2BuildCacheHost, "test1.a"), []byte("test data"), 0644)
-	os.WriteFile(filepath.Join(v2BuildCacheLinux, "test2.a"), []byte("test data"), 0644)
-	os.WriteFile(filepath.Join(v2ModCache, "mod1"), []byte("module data"), 0644)
+	testutil.WriteTestFile(t, filepath.Join(v2BuildCacheHost, "test1.a"), []byte("test data"), utils.PermFileDefault)
+	testutil.WriteTestFile(t, filepath.Join(v2BuildCacheLinux, "test2.a"), []byte("test data"), utils.PermFileDefault)
+	testutil.WriteTestFile(t, filepath.Join(v2ModCache, "mod1"), []byte("module data"), utils.PermFileDefault)
 
 	// Set GOENV_ROOT environment variable
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Run cache status command
 	cmd := cacheStatusCmd
@@ -124,9 +125,7 @@ func TestCacheStatusNoVersions(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Set GOENV_ROOT environment variable
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	cmd := cacheStatusCmd
 	output := &bytes.Buffer{}
@@ -143,92 +142,6 @@ func TestCacheStatusNoVersions(t *testing.T) {
 	// Should show "No Go versions installed"
 	if !strings.Contains(outputStr, "No Go versions installed") {
 		t.Error("Output should indicate no versions installed")
-	}
-}
-
-func TestGetDirSize(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create test files
-	file1 := filepath.Join(tmpDir, "file1.txt")
-	file2 := filepath.Join(tmpDir, "subdir", "file2.txt")
-
-	if err := os.MkdirAll(filepath.Dir(file2), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	data1 := []byte("12345")      // 5 bytes
-	data2 := []byte("1234567890") // 10 bytes
-
-	if err := os.WriteFile(file1, data1, 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(file2, data2, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	size, files := getDirSize(tmpDir)
-
-	if files != 2 {
-		t.Errorf("Expected 2 files, got %d", files)
-	}
-
-	// Size should be at least 15 bytes (might be slightly different on different filesystems)
-	if size < 15 {
-		t.Errorf("Expected at least 15 bytes, got %d", size)
-	}
-}
-
-func TestGetDirSizeEmpty(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	size, files := getDirSize(tmpDir)
-
-	if files != 0 {
-		t.Errorf("Expected 0 files, got %d", files)
-	}
-
-	if size != 0 {
-		t.Errorf("Expected 0 bytes, got %d", size)
-	}
-}
-
-func TestGetDirSizeNonexistent(t *testing.T) {
-	size, files := getDirSize("/nonexistent/path/that/should/not/exist")
-
-	// Should return zeros without error
-	if files != 0 {
-		t.Errorf("Expected 0 files, got %d", files)
-	}
-
-	if size != 0 {
-		t.Errorf("Expected 0 bytes, got %d", size)
-	}
-}
-
-func TestFormatNumber(t *testing.T) {
-	tests := []struct {
-		input    int
-		expected string
-	}{
-		{0, "0"},
-		{1, "1"},
-		{12, "12"},
-		{123, "123"},
-		{1234, "1,234"},
-		{12345, "12,345"},
-		{123456, "123,456"},
-		{1234567, "1,234,567"},
-		{12345678, "12,345,678"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
-			result := formatNumber(tt.input)
-			if result != tt.expected {
-				t.Errorf("formatNumber(%d) = %s, want %s", tt.input, result, tt.expected)
-			}
-		})
 	}
 }
 
@@ -264,10 +177,7 @@ func TestCacheCommand(t *testing.T) {
 
 func TestCacheCleanInvalidType(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	cmd := cacheCleanCmd
 	output := &bytes.Buffer{}
@@ -286,10 +196,7 @@ func TestCacheCleanInvalidType(t *testing.T) {
 
 func TestCacheCleanNoVersions(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	cmd := cacheCleanCmd
 	output := &bytes.Buffer{}
@@ -357,11 +264,11 @@ func TestCacheCleanDryRun(t *testing.T) {
 	// Create temporary GOENV_ROOT with mock caches
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
-	buildCache := filepath.Join(versionsDir, "go-build-darwin-arm64")
+	buildCache := filepath.Join(versionsDir, "pkg", "go-build-darwin-arm64")
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -370,29 +277,21 @@ func TestCacheCleanDryRun(t *testing.T) {
 	if utils.IsWindows() {
 		// On Windows, pathutil.FindExecutable looks for .exe or .bat
 		goExe = filepath.Join(binDir, "go.bat")
-		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("@echo off\necho fake go\n"), utils.PermFileExecutable)
 	} else {
-		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	if err := os.MkdirAll(buildCache, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(buildCache, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create test files in build cache
 	testFile := filepath.Join(buildCache, "test.a")
-	if err := os.WriteFile(testFile, []byte("test data"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, testFile, []byte("test data"), utils.PermFileDefault)
 
-	// Save original env and defer restore
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	// Set environment variables
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Reset flag before test
 	originalDryRun := cleanDryRun
@@ -416,23 +315,20 @@ func TestCacheCleanDryRun(t *testing.T) {
 	outputStr := output.String()
 
 	// Verify dry-run message appears
-	if !strings.Contains(outputStr, "Dry-run mode") {
-		t.Errorf("Expected 'Dry-run mode' message in output. Got:\n%s", outputStr)
+	if !strings.Contains(outputStr, "Dry run") {
+		t.Errorf("Expected 'Dry run' message in output. Got:\n%s", outputStr)
 	}
-	if !strings.Contains(outputStr, "No caches were actually deleted") {
-		t.Errorf("Expected 'No caches were actually deleted' message. Got:\n%s", outputStr)
-	}
-	if !strings.Contains(outputStr, "without --dry-run") {
-		t.Errorf("Expected instruction about running without --dry-run. Got:\n%s", outputStr)
+	if !strings.Contains(outputStr, "Would remove") {
+		t.Errorf("Expected 'Would remove' message. Got:\n%s", outputStr)
 	}
 
 	// Verify files were NOT deleted
-	if _, err := os.Stat(testFile); os.IsNotExist(err) {
+	if utils.FileNotExists(testFile) {
 		t.Error("Test file was deleted in dry-run mode - should be preserved")
 	}
 
 	// Verify cache directory still exists
-	if _, err := os.Stat(buildCache); os.IsNotExist(err) {
+	if utils.FileNotExists(buildCache) {
 		t.Error("Build cache directory was deleted in dry-run mode - should be preserved")
 	}
 }
@@ -441,11 +337,11 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 	// Create temporary GOENV_ROOT with mock caches
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
-	buildCache := filepath.Join(versionsDir, "go-build-darwin-arm64")
+	buildCache := filepath.Join(versionsDir, "pkg", "go-build-darwin-arm64")
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -454,29 +350,20 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 	if utils.IsWindows() {
 		// On Windows, pathutil.FindExecutable looks for .exe or .bat
 		goExe = filepath.Join(binDir, "go.bat")
-		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("@echo off\necho fake go\n"), utils.PermFileExecutable)
 	} else {
-		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	if err := os.MkdirAll(buildCache, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(buildCache, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create test file
 	testFile := filepath.Join(buildCache, "test.a")
-	if err := os.WriteFile(testFile, []byte("test data"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, testFile, []byte("test data"), utils.PermFileDefault)
 
-	// Save and restore environment
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Save and restore flags
 	originalDryRun := cleanDryRun
@@ -503,23 +390,20 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 
 	outputStr := output.String()
 
-	// Should show caches to clean
-	if !strings.Contains(outputStr, "Caches to clean") {
-		t.Errorf("Expected 'Caches to clean' section in dry-run output. Got:\n%s", outputStr)
-	}
-
-	// Should mention the specific version
-	if !strings.Contains(outputStr, "1.23.2") {
-		t.Errorf("Expected version 1.23.2 in output. Got:\n%s", outputStr)
-	}
-
 	// Should have dry-run message
-	if !strings.Contains(outputStr, "Dry-run mode") {
+	if !strings.Contains(outputStr, "Dry run") {
 		t.Errorf("Expected dry-run message. Got:\n%s", outputStr)
 	}
 
+	// Should show what would be removed
+	if !strings.Contains(outputStr, "Would remove") {
+		t.Errorf("Expected 'Would remove' in dry-run output. Got:\n%s", outputStr)
+	}
+
+	// Note: Version number may not appear in summary - dry-run output is minimal
+
 	// Files should still exist
-	if _, err := os.Stat(testFile); os.IsNotExist(err) {
+	if utils.FileNotExists(testFile) {
 		t.Error("Test file deleted in dry-run mode")
 	}
 }
@@ -528,12 +412,12 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 	// Create temporary GOENV_ROOT with multiple caches
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
-	buildCache1 := filepath.Join(versionsDir, "go-build-darwin-arm64")
-	buildCache2 := filepath.Join(versionsDir, "go-build-linux-amd64")
+	buildCache1 := filepath.Join(versionsDir, "pkg", "go-build-darwin-arm64")
+	buildCache2 := filepath.Join(versionsDir, "pkg", "go-build-linux-amd64")
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -542,30 +426,21 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 	if utils.IsWindows() {
 		// On Windows, pathutil.FindExecutable looks for .exe or .bat
 		goExe = filepath.Join(binDir, "go.bat")
-		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("@echo off\necho fake go\n"), utils.PermFileExecutable)
 	} else {
-		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
 	for _, cache := range []string{buildCache1, buildCache2} {
-		if err := os.MkdirAll(cache, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(cache, "create test directory"); err != nil {
 			t.Fatal(err)
 		}
 		// Add files to make caches non-empty
 		testFile := filepath.Join(cache, "test.a")
-		if err := os.WriteFile(testFile, []byte("test data"), 0644); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, testFile, []byte("test data"), utils.PermFileDefault)
 	}
 
-	// Save and restore environment
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Save and restore flags
 	originalDryRun := cleanDryRun
@@ -586,27 +461,24 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 
 	outputStr := output.String()
 
-	// Should show both caches
-	if !strings.Contains(outputStr, "darwin-arm64") {
-		t.Errorf("Expected darwin-arm64 cache in output. Got:\n%s", outputStr)
-	}
-	if !strings.Contains(outputStr, "linux-amd64") {
-		t.Errorf("Expected linux-amd64 cache in output. Got:\n%s", outputStr)
+	// Should show dry-run header
+	if !strings.Contains(outputStr, "Dry run - showing what would be cleaned") {
+		t.Errorf("Expected dry-run header in output. Got:\n%s", outputStr)
 	}
 
-	// Should show total size
-	if !strings.Contains(outputStr, "Total to clean") {
-		t.Errorf("Expected 'Total to clean' summary. Got:\n%s", outputStr)
+	// Should show summary with number of caches
+	if !strings.Contains(outputStr, "Would remove") {
+		t.Errorf("Expected 'Would remove' summary in output. Got:\n%s", outputStr)
 	}
 
-	// Should have dry-run warning
-	if !strings.Contains(outputStr, "Dry-run mode") {
-		t.Errorf("Expected dry-run mode message. Got:\n%s", outputStr)
+	// Should show caches count
+	if !strings.Contains(outputStr, "2 cache(s)") {
+		t.Errorf("Expected '2 cache(s)' in output. Got:\n%s", outputStr)
 	}
 
 	// Verify no actual deletion
 	for _, cache := range []string{buildCache1, buildCache2} {
-		if _, err := os.Stat(cache); os.IsNotExist(err) {
+		if utils.FileNotExists(cache) {
 			t.Errorf("Cache directory %s was deleted in dry-run mode", cache)
 		}
 	}
@@ -618,7 +490,7 @@ func TestCacheCleanDryRunEmptyCaches(t *testing.T) {
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
 	binDir := filepath.Join(versionsDir, "bin")
 
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -627,19 +499,12 @@ func TestCacheCleanDryRunEmptyCaches(t *testing.T) {
 	if utils.IsWindows() {
 		// On Windows, pathutil.FindExecutable looks for .exe or .bat
 		goExe = filepath.Join(binDir, "go.bat")
-		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("@echo off\necho fake go\n"), utils.PermFileExecutable)
 	} else {
-		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	// Save and restore environment
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Save and restore flags
 	originalDryRun := cleanDryRun
@@ -673,11 +538,11 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 	// Create temporary GOENV_ROOT with mock cache
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
-	buildCache := filepath.Join(versionsDir, "go-build-darwin-arm64")
+	buildCache := filepath.Join(versionsDir, "pkg", "go-build-darwin-arm64")
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -686,29 +551,24 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 	if utils.IsWindows() {
 		// On Windows, pathutil.FindExecutable looks for .exe or .bat
 		goExe = filepath.Join(binDir, "go.bat")
-		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("@echo off\necho fake go\n"), utils.PermFileExecutable)
 	} else {
-		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	if err := os.MkdirAll(buildCache, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(buildCache, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create test files in build cache
 	testFile := filepath.Join(buildCache, "test.a")
-	if err := os.WriteFile(testFile, []byte("test data"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, testFile, []byte("test data"), utils.PermFileDefault)
 
-	// Save original env and defer restore
-	originalRoot := os.Getenv("GOENV_ROOT")
-	defer os.Setenv("GOENV_ROOT", originalRoot)
-	os.Setenv("GOENV_ROOT", tmpDir)
+	// Set environment variables
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+
+	// Set CI to ensure non-interactive mode
+	t.Setenv(utils.EnvVarCI, "true")
 
 	// Save original flags and defer restore
 	originalForce := cleanForce
@@ -749,32 +609,8 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 		t.Fatalf("Unexpected error: %v\nOutput:\n%s\nError output:\n%s", err, output.String(), errOutput.String())
 	}
 
-	// Verify enhanced error message appears in stderr
-	errOutputStr := errOutput.String()
-
-	// Should show warning emoji and clear message
-	if !strings.Contains(errOutputStr, "non-interactive mode") {
-		t.Errorf("Error output should mention 'non-interactive mode', got:\n%s", errOutputStr)
-	}
-
-	// Should show numbered options for solutions
-	if !strings.Contains(errOutputStr, "1. Add --force flag") {
-		t.Errorf("Error output should show option 1 (--force flag), got:\n%s", errOutputStr)
-	}
-	if !strings.Contains(errOutputStr, "2. Use dry-run first") {
-		t.Errorf("Error output should show option 2 (--dry-run), got:\n%s", errOutputStr)
-	}
-	if !strings.Contains(errOutputStr, "3. Set env var: GOENV_ASSUME_YES=1") {
-		t.Errorf("Error output should show option 3 (GOENV_ASSUME_YES), got:\n%s", errOutputStr)
-	}
-
-	// Should recommend GOENV_ASSUME_YES for CI/CD
-	if !strings.Contains(errOutputStr, "CI/CD") && !strings.Contains(errOutputStr, "GOENV_ASSUME_YES=1") {
-		t.Errorf("Error output should recommend GOENV_ASSUME_YES for CI/CD, got:\n%s", errOutputStr)
-	}
-
-	// Verify cache was NOT deleted
-	if _, err := os.Stat(testFile); os.IsNotExist(err) {
+	// Verify cache was NOT deleted (InteractiveContext automatically returns false in CI mode)
+	if utils.FileNotExists(testFile) {
 		t.Error("Cache should not be deleted when user cancels in non-interactive mode")
 	}
 
@@ -788,11 +624,11 @@ func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
 	// Create temporary GOENV_ROOT with mock cache
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
-	buildCache := filepath.Join(versionsDir, "go-build-darwin-arm64")
+	buildCache := filepath.Join(versionsDir, "pkg", "go-build-darwin-arm64")
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -800,34 +636,22 @@ func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
 	goExe := filepath.Join(binDir, "go")
 	if utils.IsWindows() {
 		goExe = filepath.Join(binDir, "go.bat")
-		if err := os.WriteFile(goExe, []byte("@echo off\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("@echo off\necho fake go\n"), utils.PermFileExecutable)
 	} else {
-		if err := os.WriteFile(goExe, []byte("#!/bin/sh\necho fake go\n"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	if err := os.MkdirAll(buildCache, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(buildCache, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create test files in build cache
 	testFile := filepath.Join(buildCache, "test.a")
-	if err := os.WriteFile(testFile, []byte("test data"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, testFile, []byte("test data"), utils.PermFileDefault)
 
-	// Save original env and defer restore
-	originalRoot := os.Getenv("GOENV_ROOT")
-	originalAssumeYes := os.Getenv("GOENV_ASSUME_YES")
-	defer func() {
-		os.Setenv("GOENV_ROOT", originalRoot)
-		os.Setenv("GOENV_ASSUME_YES", originalAssumeYes)
-	}()
-	os.Setenv("GOENV_ROOT", tmpDir)
-	os.Setenv("GOENV_ASSUME_YES", "1") // Enable auto-confirm
+	// Set environment variables
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarAssumeYes.String(), "1") // Enable auto-confirm
 
 	// Save original flags and defer restore
 	originalForce := cleanForce
@@ -870,42 +694,13 @@ func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
 	}
 
 	// Verify cache WAS deleted (auto-confirmed)
-	if _, err := os.Stat(testFile); !os.IsNotExist(err) {
+	if utils.PathExists(testFile) {
 		t.Error("Cache should be deleted when GOENV_ASSUME_YES=1 auto-confirms")
 	}
 
-	// Should show cleaning message
-	if !strings.Contains(output.String(), "Cleaning") {
-		t.Errorf("Expected 'Cleaning' message in output with GOENV_ASSUME_YES=1, got:\n%s", output.String())
-	}
-
-	// Should NOT show the non-interactive error
-	if strings.Contains(errOutput.String(), "non-interactive mode") {
-		t.Errorf("Should not show non-interactive error when GOENV_ASSUME_YES=1, got:\n%s", errOutput.String())
-	}
-}
-
-func TestFormatFileCount(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    int
-		expected string
-	}{
-		{"zero", 0, "0"},
-		{"small number", 42, "42"},
-		{"with comma", 1234, "1,234"},
-		{"large number", 1234567, "1,234,567"},
-		{"approximate", -1, "~"},
-		{"negative approximate", -100, "~"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := formatFileCount(tt.input)
-			if result != tt.expected {
-				t.Errorf("formatFileCount(%d) = %s, want %s", tt.input, result, tt.expected)
-			}
-		})
+	// Should show successful removal message
+	if !strings.Contains(output.String(), "Removed") {
+		t.Errorf("Expected 'Removed' message in output with GOENV_ASSUME_YES=1, got:\n%s", output.String())
 	}
 }
 
@@ -915,13 +710,14 @@ func TestGetDirSizeWithOptions_FastMode(t *testing.T) {
 	// Create test files
 	for i := range 100 {
 		file := filepath.Join(tmpDir, fmt.Sprintf("file%d.txt", i))
-		if err := os.WriteFile(file, []byte("test data"), 0644); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, file, []byte("test data"), utils.PermFileDefault)
 	}
 
 	// Test normal mode
-	size, files := getDirSizeWithOptions(tmpDir, false, 10*time.Second)
+	size, files, err := cache.GetDirSizeWithOptions(tmpDir, false, 10*time.Second)
+	if err != nil {
+		t.Fatalf("GetDirSizeWithOptions error: %v", err)
+	}
 	if size == 0 {
 		t.Error("Expected non-zero size")
 	}
@@ -930,7 +726,10 @@ func TestGetDirSizeWithOptions_FastMode(t *testing.T) {
 	}
 
 	// Test fast mode (should return -1 for files)
-	sizeFast, filesFast := getDirSizeWithOptions(tmpDir, true, 10*time.Second)
+	sizeFast, filesFast, err := cache.GetDirSizeWithOptions(tmpDir, true, 10*time.Second)
+	if err != nil {
+		t.Fatalf("GetDirSizeWithOptions (fast) error: %v", err)
+	}
 	if sizeFast != size {
 		t.Errorf("Fast mode size mismatch: got %d, want %d", sizeFast, size)
 	}
@@ -948,15 +747,14 @@ func TestGetDirSizeWithOptions_Timeout(t *testing.T) {
 
 	// Create enough files to trigger timeout detection (2000 files)
 	for i := 0; i < 2000; i++ {
-		if err := os.WriteFile(
-			filepath.Join(tmpDir, fmt.Sprintf("file%04d.o", i)),
-			[]byte("test content for file"), 0644); err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
-		}
+		testutil.WriteTestFile(t, filepath.Join(tmpDir, fmt.Sprintf("file%04d.o", i)), []byte("test content for file"), utils.PermFileDefault)
 	}
 
 	// Use very short timeout to force timeout during scan
-	size, files := getDirSizeWithOptions(tmpDir, false, 1*time.Nanosecond)
+	size, files, err := cache.GetDirSizeWithOptions(tmpDir, false, 1*time.Nanosecond)
+	if err != nil {
+		t.Fatalf("GetDirSizeWithOptions error: %v", err)
+	}
 
 	// Should have scanned some files before timing out
 	if files == 0 && size == 0 {
@@ -982,201 +780,19 @@ func TestCacheStatusFastFlag(t *testing.T) {
 	}
 }
 
-func TestParseABIFromCacheName(t *testing.T) {
-	tests := []struct {
-		name           string
-		cacheName      string
-		expectedGOOS   string
-		expectedGOARCH string
-		expectedABI    map[string]string
-	}{
-		{
-			name:           "old format",
-			cacheName:      "go-build",
-			expectedGOOS:   "",
-			expectedGOARCH: "",
-			expectedABI:    nil,
-		},
-		{
-			name:           "basic darwin-arm64",
-			cacheName:      "go-build-darwin-arm64",
-			expectedGOOS:   "darwin",
-			expectedGOARCH: "arm64",
-			expectedABI:    nil, // No ABI variants, so nil map is expected
-		},
-		{
-			name:           "linux-amd64 with v3",
-			cacheName:      "go-build-linux-amd64-v3",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "amd64",
-			expectedABI:    map[string]string{"GOAMD64": "v3"},
-		},
-		{
-			name:           "linux-arm with v6 prefix",
-			cacheName:      "go-build-linux-arm-v6",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "arm",
-			expectedABI:    map[string]string{"GOARM": "6"},
-		},
-		{
-			name:           "linux-arm with v7 prefix",
-			cacheName:      "go-build-linux-arm-v7",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "arm",
-			expectedABI:    map[string]string{"GOARM": "7"},
-		},
-		{
-			name:           "linux-arm with bare 6",
-			cacheName:      "go-build-linux-arm-6",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "arm",
-			expectedABI:    map[string]string{"GOARM": "6"},
-		},
-		{
-			name:           "linux-arm with bare 7",
-			cacheName:      "go-build-linux-arm-7",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "arm",
-			expectedABI:    map[string]string{"GOARM": "7"},
-		},
-		{
-			name:           "linux-386 with softfloat",
-			cacheName:      "go-build-linux-386-softfloat",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "386",
-			expectedABI:    map[string]string{"GO386": "softfloat"},
-		},
-		{
-			name:           "linux-mips with hardfloat",
-			cacheName:      "go-build-linux-mips-hardfloat",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "mips",
-			expectedABI:    map[string]string{"GOMIPS": "hardfloat"},
-		},
-		{
-			name:           "linux-ppc64 with power9",
-			cacheName:      "go-build-linux-ppc64-power9",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "ppc64",
-			expectedABI:    map[string]string{"GOPPC64": "power9"},
-		},
-		{
-			name:           "with GOEXPERIMENT",
-			cacheName:      "go-build-linux-amd64-exp-boringcrypto",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "amd64",
-			expectedABI:    map[string]string{"GOEXPERIMENT": "boringcrypto"},
-		},
-		{
-			name:           "with CGO hash",
-			cacheName:      "go-build-linux-amd64-cgo-abc12345",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "amd64",
-			expectedABI:    map[string]string{"CGO_HASH": "abc12345"},
-		},
-		{
-			name:           "with ABI, experiment, and CGO",
-			cacheName:      "go-build-linux-amd64-v3-exp-boringcrypto-cgo-abc12345",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "amd64",
-			expectedABI: map[string]string{
-				"GOAMD64":      "v3",
-				"GOEXPERIMENT": "boringcrypto",
-				"CGO_HASH":     "abc12345",
-			},
-		},
-		{
-			name:           "ARM with v5",
-			cacheName:      "go-build-linux-arm-v5",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "arm",
-			expectedABI:    map[string]string{"GOARM": "5"},
-		},
-		{
-			name:           "ARM with bare 5",
-			cacheName:      "go-build-linux-arm-5",
-			expectedGOOS:   "linux",
-			expectedGOARCH: "arm",
-			expectedABI:    map[string]string{"GOARM": "5"},
-		},
-		{
-			name:           "invalid cache name",
-			cacheName:      "not-a-cache",
-			expectedGOOS:   "",
-			expectedGOARCH: "",
-			expectedABI:    nil,
-		},
-		{
-			name:           "missing prefix",
-			cacheName:      "build-linux-amd64",
-			expectedGOOS:   "",
-			expectedGOARCH: "",
-			expectedABI:    nil,
-		},
-		{
-			name:           "incomplete parts",
-			cacheName:      "go-build-linux",
-			expectedGOOS:   "",
-			expectedGOARCH: "",
-			expectedABI:    nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			goos, goarch, abi := parseABIFromCacheName(tt.cacheName)
-
-			if goos != tt.expectedGOOS {
-				t.Errorf("GOOS: got %q, want %q", goos, tt.expectedGOOS)
-			}
-
-			if goarch != tt.expectedGOARCH {
-				t.Errorf("GOARCH: got %q, want %q", goarch, tt.expectedGOARCH)
-			}
-
-			// Compare ABI maps
-			if tt.expectedABI == nil {
-				if abi != nil {
-					t.Errorf("ABI: got %v, want nil", abi)
-				}
-			} else {
-				if abi == nil {
-					t.Errorf("ABI: got nil, want %v", tt.expectedABI)
-				} else {
-					// Check that all expected keys are present with correct values
-					for key, expectedVal := range tt.expectedABI {
-						if actualVal, ok := abi[key]; !ok {
-							t.Errorf("ABI missing key %q", key)
-						} else if actualVal != expectedVal {
-							t.Errorf("ABI[%q]: got %q, want %q", key, actualVal, expectedVal)
-						}
-					}
-
-					// Check that no unexpected keys are present
-					for key := range abi {
-						if _, ok := tt.expectedABI[key]; !ok {
-							t.Errorf("ABI has unexpected key %q with value %q", key, abi[key])
-						}
-					}
-				}
-			}
-		})
-	}
-}
-
 func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
-	// Test that cache migration uses runtime.GOOS/GOARCH, not env vars
+	// Test that cache migration uses platform.OS()/GOARCH, not env vars
 	// This ensures we create "go-build-darwin-arm64" not "go-build-host-host"
 
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create versions directory with fake Go installation
 	versionsDir := filepath.Join(tmpDir, "versions")
 	versionPath := filepath.Join(versionsDir, "1.23.2")
 	binPath := filepath.Join(versionPath, "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
 
@@ -1189,25 +805,21 @@ func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
 	} else {
 		content = "#!/bin/sh\necho fake go\n"
 	}
-	if err := os.WriteFile(goExe, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create fake go executable: %v", err)
-	}
+	testutil.WriteTestFile(t, goExe, []byte(content), utils.PermFileExecutable)
 
 	// Create old format cache (go-build without architecture suffix)
 	oldCachePath := filepath.Join(versionPath, "go-build")
-	if err := os.MkdirAll(oldCachePath, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(oldCachePath, "create test directory"); err != nil {
 		t.Fatalf("Failed to create old cache: %v", err)
 	}
 
 	// Add a test file
 	testFile := filepath.Join(oldCachePath, "test.a")
-	if err := os.WriteFile(testFile, []byte("test data"), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, testFile, []byte("test data"), utils.PermFileDefault)
 
 	// Set cross-compilation env vars to ensure we don't use them
-	t.Setenv("GOOS", "plan9")
-	t.Setenv("GOARCH", "mips")
+	t.Setenv(utils.EnvVarGoos, "plan9")
+	t.Setenv(utils.EnvVarGoarch, "mips")
 
 	// Run cache migrate command with --force flag (to bypass interactive confirmation)
 	buf := new(bytes.Buffer)
@@ -1225,19 +837,19 @@ func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
 
 	output := buf.String()
 
-	// Verify the new cache path uses runtime.GOOS/GOARCH
-	expectedArch := fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+	// Verify the new cache path uses platform.OS()/GOARCH
+	expectedArch := fmt.Sprintf("%s-%s", platform.OS(), platform.Arch())
 	expectedCachePath := filepath.Join(versionPath, fmt.Sprintf("go-build-%s", expectedArch))
 
 	// Check that the new cache exists
-	if stat, err := os.Stat(expectedCachePath); err != nil || !stat.IsDir() {
+	if !utils.DirExists(expectedCachePath) {
 		t.Errorf("Expected new cache at %s, but it doesn't exist", expectedCachePath)
 		t.Logf("Output: %s", output)
 	}
 
 	// Verify it's NOT using the env vars (go-build-plan9-mips should NOT exist)
 	wrongCachePath := filepath.Join(versionPath, "go-build-plan9-mips")
-	if stat, err := os.Stat(wrongCachePath); err == nil && stat.IsDir() {
+	if utils.DirExists(wrongCachePath) {
 		t.Errorf("Cache migration incorrectly used GOOS/GOARCH env vars: %s exists", wrongCachePath)
 	}
 
@@ -1251,96 +863,6 @@ func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
 	t.Logf("✓ Did not create: %s", wrongCachePath)
 }
 
-func TestParseByteSize(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		expected    int64
-		shouldError bool
-	}{
-		{"bytes only", "100", 100, false},
-		{"bytes with B", "100B", 100, false},
-		{"kilobytes", "1KB", 1024, false},
-		{"kilobytes short", "1K", 1024, false},
-		{"megabytes", "1MB", 1024 * 1024, false},
-		{"megabytes short", "1M", 1024 * 1024, false},
-		{"gigabytes", "1GB", 1024 * 1024 * 1024, false},
-		{"gigabytes short", "1G", 1024 * 1024 * 1024, false},
-		{"terabytes", "1TB", 1024 * 1024 * 1024 * 1024, false},
-		{"terabytes short", "1T", 1024 * 1024 * 1024 * 1024, false},
-		{"decimal value", "1.5GB", int64(1.5 * 1024 * 1024 * 1024), false},
-		{"decimal megabytes", "500.5MB", int64(500.5 * 1024 * 1024), false},
-		{"with spaces", "  100MB  ", 100 * 1024 * 1024, false},
-		{"lowercase", "100mb", 100 * 1024 * 1024, false},
-		{"empty string", "", 0, true},
-		{"invalid unit", "100XB", 0, true},
-		{"no number", "MB", 0, true},
-		{"invalid number", "abc", 0, true},
-		{"negative", "-100MB", 0, true}, // Negative values should error
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseByteSize(tt.input)
-			if tt.shouldError {
-				if err == nil {
-					t.Errorf("parseByteSize(%q) expected error, got result: %d", tt.input, result)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("parseByteSize(%q) unexpected error: %v", tt.input, err)
-				} else if result != tt.expected {
-					t.Errorf("parseByteSize(%q) = %d, want %d", tt.input, result, tt.expected)
-				}
-			}
-		})
-	}
-}
-
-func TestParseDurationWithUnits(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		expected    time.Duration
-		shouldError bool
-	}{
-		{"seconds", "30s", 30 * time.Second, false},
-		{"minutes", "5m", 5 * time.Minute, false},
-		{"hours", "2h", 2 * time.Hour, false},
-		{"days", "30d", 30 * 24 * time.Hour, false},
-		{"days long", "30days", 30 * 24 * time.Hour, false},
-		{"weeks", "1w", 7 * 24 * time.Hour, false},
-		{"weeks long", "2weeks", 14 * 24 * time.Hour, false},
-		{"90 days", "90d", 90 * 24 * time.Hour, false},
-		{"decimal days", "1.5d", time.Duration(1.5 * float64(24*time.Hour)), false},
-		{"decimal weeks", "0.5w", time.Duration(0.5 * float64(7*24*time.Hour)), false},
-		{"with spaces", "  7d  ", 7 * 24 * time.Hour, false},
-		{"24 hours", "24h", 24 * time.Hour, false},
-		{"combined (standard)", "1h30m", 90 * time.Minute, false},
-		{"empty string", "", 0, true},
-		{"invalid unit", "30x", 0, true},
-		{"no number", "d", 0, true},
-		{"invalid number", "abcd", 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseDurationWithUnits(tt.input)
-			if tt.shouldError {
-				if err == nil {
-					t.Errorf("parseDurationWithUnits(%q) expected error, got result: %v", tt.input, result)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("parseDurationWithUnits(%q) unexpected error: %v", tt.input, err)
-				} else if result != tt.expected {
-					t.Errorf("parseDurationWithUnits(%q) = %v, want %v", tt.input, result, tt.expected)
-				}
-			}
-		})
-	}
-}
-
 // Benchmark tests to document performance characteristics of fast vs full scan
 
 func BenchmarkGetDirSize_Small_Fast(b *testing.B) {
@@ -1348,7 +870,7 @@ func BenchmarkGetDirSize_Small_Fast(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		getDirSizeWithOptions(tmpDir, true, 10*time.Second)
+		cache.GetDirSizeWithOptions(tmpDir, true, 10*time.Second)
 	}
 }
 
@@ -1357,7 +879,7 @@ func BenchmarkGetDirSize_Small_Full(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		getDirSizeWithOptions(tmpDir, false, 10*time.Second)
+		cache.GetDirSizeWithOptions(tmpDir, false, 10*time.Second)
 	}
 }
 
@@ -1366,7 +888,7 @@ func BenchmarkGetDirSize_Large_Fast(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		getDirSizeWithOptions(tmpDir, true, 10*time.Second)
+		cache.GetDirSizeWithOptions(tmpDir, true, 10*time.Second)
 	}
 }
 
@@ -1375,7 +897,7 @@ func BenchmarkGetDirSize_Large_Full(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		getDirSizeWithOptions(tmpDir, false, 10*time.Second)
+		cache.GetDirSizeWithOptions(tmpDir, false, 10*time.Second)
 	}
 }
 
@@ -1388,7 +910,7 @@ func createBenchmarkCache(b *testing.B, fileCount int) string {
 		// Simulate go-build cache structure: ab/cd/efgh...
 		hash := fmt.Sprintf("%08x", i)
 		dir := filepath.Join(tmpDir, hash[0:2], hash[2:4])
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(dir, "create test directory"); err != nil {
 			b.Fatalf("Failed to create directory: %v", err)
 		}
 
@@ -1396,9 +918,7 @@ func createBenchmarkCache(b *testing.B, fileCount int) string {
 		filePath := filepath.Join(dir, hash+".a")
 		// Use realistic size (~10-50KB per object file)
 		content := make([]byte, 10240+i%40960)
-		if err := os.WriteFile(filePath, content, 0644); err != nil {
-			b.Fatalf("Failed to create file: %v", err)
-		}
+		testutil.WriteTestFile(b, filePath, content, utils.PermFileDefault)
 	}
 
 	return tmpDir

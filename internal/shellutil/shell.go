@@ -1,8 +1,19 @@
+// Package shellutil provides canonical implementations for shell detection,
+// profile path resolution, and initialization command generation.
+//
+// This is the low-level package that other packages should import from rather
+// than duplicating shell-related logic. For high-level profile management
+// operations (backup, modification, issue detection), see internal/shell/profile.
+//
+// Architecture:
+//   - internal/shellutil: Canonical source for shell detection and basic utilities
+//   - internal/shell/profile: High-level profile management built on shellutil
 package shellutil
 
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/utils"
 )
@@ -75,23 +86,23 @@ func DetectShell() ShellType {
 	}
 
 	// Check for PowerShell on Windows (case-insensitive check)
-	if os.Getenv(utils.EnvVarPSModulePath) != "" || os.Getenv("PSMODULEPATH") != "" {
+	if os.Getenv(utils.EnvVarPSModulePath) != "" {
 		return ShellTypePowerShell
 	}
 
 	// Check for specific shell environment variables
-	if os.Getenv("ZSH_VERSION") != "" {
+	if os.Getenv(utils.EnvVarZshVersion) != "" {
 		return ShellTypeZsh
 	}
-	if os.Getenv("FISH_VERSION") != "" {
+	if os.Getenv(utils.EnvVarFishVersion) != "" {
 		return ShellTypeFish
 	}
-	if os.Getenv("BASH_VERSION") != "" {
+	if os.Getenv(utils.EnvVarBashVersion) != "" {
 		return ShellTypeBash
 	}
 
 	// Default to PowerShell on Windows, bash elsewhere
-	if utils.IsWindows() || os.Getenv("COMSPEC") != "" {
+	if utils.IsWindows() || os.Getenv(utils.EnvVarComspec) != "" {
 		return ShellTypePowerShell
 	}
 
@@ -112,12 +123,12 @@ func GetProfilePath(shell ShellType) string {
 		bashProfile := filepath.Join(home, ".bash_profile")
 
 		// If both exist, prefer .bash_profile (login shell file)
-		if _, err := os.Stat(bashProfile); err == nil {
+		if utils.FileExists(bashProfile) {
 			return bashProfile
 		}
 
 		// If only .bashrc exists, use it
-		if _, err := os.Stat(bashrc); err == nil {
+		if utils.FileExists(bashrc) {
 			return bashrc
 		}
 
@@ -129,7 +140,7 @@ func GetProfilePath(shell ShellType) string {
 		return filepath.Join(home, ".config", "fish", "config.fish")
 	case ShellTypePowerShell:
 		// PowerShell profile location
-		if profile := os.Getenv("PROFILE"); profile != "" {
+		if profile := os.Getenv(utils.EnvVarProfile); profile != "" {
 			return profile
 		}
 		// Fallback to typical location
@@ -195,27 +206,14 @@ func HasGoenvInProfile(profilePath string) (bool, error) {
 	// Check for common goenv markers
 	return containsAny(contentStr, []string{
 		"goenv init",
-		"GOENV_ROOT",
+		utils.GoenvEnvVarRoot.String(),
 		"goenv/shims",
 	}), nil
 }
 
 func containsAny(s string, substrs []string) bool {
 	for _, substr := range substrs {
-		if contains(s, substr) {
-			return true
-		}
-	}
-	return false
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findInString(s, substr))
-}
-
-func findInString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
+		if strings.Contains(s, substr) {
 			return true
 		}
 	}

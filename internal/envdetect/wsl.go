@@ -1,8 +1,8 @@
 package envdetect
 
 import (
+	"github.com/go-nv/goenv/internal/osinfo"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/utils"
@@ -10,7 +10,7 @@ import (
 
 // IsWSL detects if we're running in Windows Subsystem for Linux
 func IsWSL() bool {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		return false
 	}
 
@@ -57,7 +57,7 @@ func CheckWSLCrossExecution(binaryPath string) string {
 	// Check if trying to run a Windows binary in WSL
 	if IsWindowsBinary(binaryPath) {
 		// Detect actual host architecture for correct rebuild command
-		hostArch := runtime.GOARCH
+		hostArch := osinfo.Arch()
 		return utils.Emoji("⚠️  ") + "Running Windows binary in WSL. This may work via Windows interop but could have issues.\n" +
 			"   Consider rebuilding for Linux: GOOS=linux GOARCH=" + hostArch + " go install <package>@latest"
 	}

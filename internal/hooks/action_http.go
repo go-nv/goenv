@@ -6,6 +6,9 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // HTTPWebhookAction sends HTTP POST requests with structured data
@@ -94,7 +97,7 @@ func (a *HTTPWebhookAction) Execute(ctx *HookContext, params map[string]interfac
 	// Create request
 	req, err := http.NewRequest(method, url, bodyReader)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return errors.FailedTo("create request", err)
 	}
 
 	// Set headers
@@ -121,9 +124,7 @@ func (a *HTTPWebhookAction) Execute(ctx *HookContext, params map[string]interfac
 	}
 
 	// Execute request with timeout
-	client := &http.Client{
-		Timeout: timeout,
-	}
+	client := utils.NewHTTPClient(timeout)
 
 	resp, err := client.Do(req)
 	if err != nil {

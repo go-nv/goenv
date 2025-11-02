@@ -9,14 +9,16 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestSetupCommand_DryRun(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
-	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.EnvVarHome, tmpDir)
+	t.Setenv(utils.EnvVarUserProfile, tmpDir) // Windows uses USERPROFILE instead of HOME
+	t.Setenv(utils.EnvVarShell, "/bin/bash")
 
 	// Set dry-run flag
 	setupFlags.dryRun = true
@@ -44,17 +46,17 @@ func TestSetupCommand_DryRun(t *testing.T) {
 
 	// Verify no actual files were created in dry-run
 	bashrc := filepath.Join(tmpDir, ".bashrc")
-	if _, err := os.Stat(bashrc); err == nil {
+	if utils.PathExists(bashrc) {
 		t.Error("Dry-run should not create .bashrc file")
 	}
 }
 
 func TestSetupCommand_AutoYes(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
-	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.EnvVarHome, tmpDir)
+	t.Setenv(utils.EnvVarUserProfile, tmpDir) // Windows uses USERPROFILE instead of HOME
+	t.Setenv(utils.EnvVarShell, "/bin/bash")
 
 	setupFlags.yes = true
 	setupFlags.skipVSCode = true
@@ -81,11 +83,11 @@ func TestSetupCommand_AutoYes(t *testing.T) {
 
 func TestSetupCommand_AlreadyConfigured(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
-	t.Setenv("SHELL", "/bin/bash")
-	t.Setenv("GOENV_SHELL", "bash") // Already initialized
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.EnvVarHome, tmpDir)
+	t.Setenv(utils.EnvVarUserProfile, tmpDir) // Windows uses USERPROFILE instead of HOME
+	t.Setenv(utils.EnvVarShell, "/bin/bash")
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash") // Already initialized
 
 	setupFlags.yes = true
 	setupFlags.skipVSCode = true
@@ -99,9 +101,7 @@ func TestSetupCommand_AlreadyConfigured(t *testing.T) {
 	content := `# goenv initialization
 eval "$(goenv init -)"
 `
-	if err := os.WriteFile(bashrc, []byte(content), 0600); err != nil {
-		t.Fatalf("Failed to create .bashrc: %v", err)
-	}
+	testutil.WriteTestFile(t, bashrc, []byte(content), utils.PermFileSecure)
 
 	buf := new(bytes.Buffer)
 	setupCmd.SetOut(buf)
@@ -133,7 +133,7 @@ func TestWriteVSCodeSettings_NewFile(t *testing.T) {
 	}
 
 	// Verify file was created
-	if _, err := os.Stat(settingsFile); os.IsNotExist(err) {
+	if utils.FileNotExists(settingsFile) {
 		t.Fatal("Settings file was not created")
 	}
 
@@ -163,9 +163,7 @@ func TestWriteVSCodeSettings_MergeExisting(t *testing.T) {
 		"go.goroot":       "/old/path",
 	}
 	existingData, _ := json.MarshalIndent(existing, "", "  ")
-	if err := os.WriteFile(settingsFile, existingData, 0600); err != nil {
-		t.Fatalf("Failed to create existing settings: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsFile, existingData, utils.PermFileSecure)
 
 	// Add new settings
 	newSettings := map[string]interface{}{
@@ -206,9 +204,7 @@ func TestWriteVSCodeSettings_InvalidJSON(t *testing.T) {
 	settingsFile := filepath.Join(tmpDir, "settings.json")
 
 	// Create invalid JSON
-	if err := os.WriteFile(settingsFile, []byte("{invalid json"), 0600); err != nil {
-		t.Fatalf("Failed to create invalid settings: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsFile, []byte("{invalid json"), utils.PermFileSecure)
 
 	// Capture stderr to check for warning
 	oldStderr := os.Stderr
@@ -253,16 +249,14 @@ func TestWriteVSCodeSettings_InvalidJSON(t *testing.T) {
 
 func TestSetupShellProfile_FilePermissions(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
-	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.EnvVarHome, tmpDir)
+	t.Setenv(utils.EnvVarUserProfile, tmpDir) // Windows uses USERPROFILE instead of HOME
+	t.Setenv(utils.EnvVarShell, "/bin/bash")
 
 	// Create a .bashrc WITHOUT goenv init (so it will be added)
 	bashrc := filepath.Join(tmpDir, ".bashrc")
-	if err := os.WriteFile(bashrc, []byte("# Existing content\n"), 0644); err != nil {
-		t.Fatalf("Failed to create test .bashrc: %v", err)
-	}
+	testutil.WriteTestFile(t, bashrc, []byte("# Existing content\n"), utils.PermFileDefault)
 
 	setupFlags.shell = "bash"
 	setupFlags.yes = true
@@ -297,24 +291,22 @@ func TestSetupShellProfile_FilePermissions(t *testing.T) {
 		t.Errorf("Expected .bashrc to contain 'goenv init', got: %s", string(content))
 	}
 
-	// Note: File permissions will be preserved from original 0644 by append mode
+	// Note: File permissions will be preserved from original utils.PermFileDefault by append mode
 	// The security fix applies to NEW files created via os.OpenFile with O_CREATE
 }
 
 func TestSetupShellProfile_BackupCreation(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
-	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.EnvVarHome, tmpDir)
+	t.Setenv(utils.EnvVarUserProfile, tmpDir) // Windows uses USERPROFILE instead of HOME
+	t.Setenv(utils.EnvVarShell, "/bin/bash")
 
 	bashrc := filepath.Join(tmpDir, ".bashrc")
 	originalContent := "# Original content\nexport PATH=$HOME/bin:$PATH\n"
 
 	// Create existing profile WITHOUT goenv init
-	if err := os.WriteFile(bashrc, []byte(originalContent), 0600); err != nil {
-		t.Fatalf("Failed to create .bashrc: %v", err)
-	}
+	testutil.WriteTestFile(t, bashrc, []byte(originalContent), utils.PermFileSecure)
 
 	setupFlags.shell = "bash"
 	setupFlags.yes = true
@@ -356,10 +348,10 @@ func TestSetupShellProfile_BackupCreation(t *testing.T) {
 
 func TestSetupCommand_NonInteractive(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("USERPROFILE", tmpDir) // Windows uses USERPROFILE instead of HOME
-	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.EnvVarHome, tmpDir)
+	t.Setenv(utils.EnvVarUserProfile, tmpDir) // Windows uses USERPROFILE instead of HOME
+	t.Setenv(utils.EnvVarShell, "/bin/bash")
 
 	setupFlags.nonInteractive = true
 	setupFlags.skipVSCode = true

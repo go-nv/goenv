@@ -5,7 +5,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
@@ -28,16 +29,15 @@ func init() {
 
 func runVersionName(cmd *cobra.Command, args []string) error {
 	// Validate: version-name command takes no arguments
-	if len(args) > 0 {
+	if err := cmdutil.ValidateExactArgs(args, 0, ""); err != nil {
 		return fmt.Errorf("usage: goenv version-name")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	version, _, err := mgr.GetCurrentVersion()
 	if err != nil {
-		return fmt.Errorf("no version set: %w", err)
+		return errors.FailedTo("determine version", err)
 	}
 
 	// Handle multiple versions separated by ':'
@@ -49,7 +49,7 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 		var errorMessages []string
 
 		for _, v := range versions {
-			if !mgr.IsVersionInstalled(v) && v != "system" {
+			if !mgr.IsVersionInstalled(v) && v != manager.SystemVersion {
 				hasErrors = true
 				// Get source info for error message
 				_, source, _ := mgr.GetCurrentVersion()
@@ -64,17 +64,17 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 
 		// Then print successfully installed versions
 		for _, v := range versions {
-			if mgr.IsVersionInstalled(v) || v == "system" {
+			if mgr.IsVersionInstalled(v) || v == manager.SystemVersion {
 				fmt.Fprintln(cmd.OutOrStdout(), v)
 			}
 		}
 
 		if hasErrors {
-			return fmt.Errorf("some versions are not installed")
+			return errors.SomeVersionsNotInstalled()
 		}
 	} else {
 		// Single version - validate it
-		if version != "system" && !mgr.IsVersionInstalled(version) {
+		if version != manager.SystemVersion && !mgr.IsVersionInstalled(version) {
 			_, source, _ := mgr.GetCurrentVersion()
 			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", version, source)
 		}

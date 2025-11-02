@@ -3,21 +3,22 @@ package meta
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +54,7 @@ func init() {
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 
 	fmt.Fprintf(cmd.OutOrStdout(), "%sChecking for goenv updates...\n", utils.Emoji("🔄 "))
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -61,7 +62,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// Detect installation method
 	installType, installPath, err := detectInstallation(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to detect installation type: %w", err)
+		return errors.FailedTo("detect installation type", err)
 	}
 
 	if cfg.Debug {
@@ -85,7 +86,7 @@ func detectInstallation(cfg *config.Config) (string, string, error) {
 	// This handles the case where someone is developing/testing goenv
 	execPath, err := os.Executable()
 	if err != nil {
-		return "", "", fmt.Errorf("cannot determine binary location: %w", err)
+		return "", "", errors.FailedTo("determine binary location", err)
 	}
 
 	// Resolve symlinks
@@ -112,11 +113,9 @@ func detectInstallation(cfg *config.Config) (string, string, error) {
 // isGitRepo checks if a directory is a git repository
 func isGitRepo(dir string) bool {
 	gitDir := filepath.Join(dir, ".git")
-	if stat, err := os.Stat(gitDir); err == nil && stat.IsDir() {
+	if utils.DirExists(gitDir) {
 		// Verify it's actually a git repo
-		cmd := exec.Command("git", "rev-parse", "--git-dir")
-		cmd.Dir = dir
-		return cmd.Run() == nil
+		return utils.RunCommandInDir(dir, "git", "rev-parse", "--git-dir") == nil
 	}
 	return false
 }
@@ -130,7 +129,7 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 		if utils.IsWindows() {
 			errMsg += "  • Install Git for Windows: https://git-scm.com/download/win\n"
 			errMsg += "  • Or install via winget: winget install Git.Git\n"
-		} else if runtime.GOOS == "darwin" {
+		} else if platform.IsMacOS() {
 			errMsg += "  • Install Xcode Command Line Tools: xcode-select --install\n"
 			errMsg += "  • Or install via Homebrew: brew install git\n"
 		} else {
@@ -138,19 +137,19 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 		}
 		errMsg += "\nAlternatively, if you don't have write permissions to update:\n"
 		errMsg += "  • Download the latest binary from: https://github.com/go-nv/goenv/releases"
-		return errors.New(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Get current commit
 	currentCommit, err := getGitCommit(gitRoot)
 	if err != nil {
-		return fmt.Errorf("failed to get current git commit: %w", err)
+		return errors.FailedTo("get current git commit", err)
 	}
 
 	// Get current branch
 	currentBranch, err := getGitBranch(gitRoot)
 	if err != nil {
-		return fmt.Errorf("failed to get current git branch: %w", err)
+		return errors.FailedTo("get current git branch", err)
 	}
 
 	if cfg.Debug {
@@ -161,13 +160,13 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 	// Fetch latest changes
 	fmt.Fprintf(cmd.OutOrStdout(), "%sFetching latest changes...\n", utils.Emoji("📡 "))
 	if err := runGitCommand(gitRoot, "fetch", "origin"); err != nil {
-		return fmt.Errorf("git fetch failed: %w", err)
+		return errors.FailedTo("fetch git updates", err)
 	}
 
 	// Check if there are updates
 	remoteCommit, err := getGitCommit(gitRoot, "origin/"+currentBranch)
 	if err != nil {
-		return fmt.Errorf("failed to get remote commit: %w", err)
+		return errors.FailedTo("get remote commit", err)
 	}
 
 	if currentCommit == remoteCommit && !updateForce {
@@ -208,7 +207,7 @@ func updateGitInstallation(cmd *cobra.Command, cfg *config.Config, gitRoot strin
 	// Perform the update
 	fmt.Fprintf(cmd.OutOrStdout(), "%sUpdating goenv...\n", utils.Emoji("⬇️  "))
 	if err := runGitCommand(gitRoot, "pull", "origin", currentBranch); err != nil {
-		return fmt.Errorf("git pull failed: %w", err)
+		return errors.FailedTo("pull git updates", err)
 	}
 
 	// Get new commit
@@ -237,7 +236,7 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	fmt.Fprintf(cmd.OutOrStdout(), "%sChecking GitHub releases...\n", utils.Emoji("🔍 "))
 	latestVersion, downloadURL, err := getLatestRelease()
 	if err != nil {
-		return fmt.Errorf("failed to get latest release: %w", err)
+		return errors.FailedTo("get latest release", err)
 	}
 
 	if cfg.Debug {
@@ -281,14 +280,14 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 		}
 		errMsg += "\nAlternatively, download and install manually:\n"
 		errMsg += "  • https://github.com/go-nv/goenv/releases"
-		return errors.New(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Download new binary
 	fmt.Fprintf(cmd.OutOrStdout(), "%sDownloading goenv %s...\n", utils.Emoji("⬇️  "), latestVersion)
 	tmpFile, err := downloadBinary(downloadURL)
 	if err != nil {
-		return fmt.Errorf("failed to download update: %w", err)
+		return errors.FailedTo("download update", err)
 	}
 	defer os.Remove(tmpFile)
 
@@ -310,7 +309,7 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	backupPath := binaryPath + ".backup"
 	fmt.Fprintf(cmd.OutOrStdout(), "%sCreating backup...\n", utils.Emoji("💾 "))
 	if err := utils.CopyFile(binaryPath, backupPath); err != nil {
-		return fmt.Errorf("failed to create backup: %w", err)
+		return errors.FailedTo("create backup", err)
 	}
 
 	// Replace binary
@@ -318,15 +317,24 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 
 	// Make executable on Unix (Windows uses file extension for executability)
 	if !utils.IsWindows() {
-		if err := os.Chmod(tmpFile, 0755); err != nil {
-			return fmt.Errorf("failed to set permissions: %w", err)
+		if err := os.Chmod(tmpFile, utils.PermFileExecutable); err != nil {
+			return errors.FailedTo("set permissions", err)
 		}
 	}
 
+	// On Windows, we cannot replace a running executable directly
+	// Instead, we use a two-step process:
+	// 1. Rename the new binary to the target name with .new extension
+	// 2. Create a batch script that waits, renames, and restarts
+	if utils.IsWindows() {
+		return replaceWindowsBinary(cmd, tmpFile, binaryPath, backupPath, currentVersion, latestVersion)
+	}
+
+	// On Unix, we can replace the binary directly
 	if err := os.Rename(tmpFile, binaryPath); err != nil {
 		// Try to restore backup
 		os.Rename(backupPath, binaryPath)
-		return fmt.Errorf("failed to replace binary: %w", err)
+		return errors.FailedTo("replace binary", err)
 	}
 
 	// Remove backup
@@ -347,42 +355,24 @@ func getGitCommit(gitRoot string, ref ...string) (string, error) {
 		args = []string{"rev-parse", ref[0]}
 	}
 
-	cmd := exec.Command("git", args...)
-	cmd.Dir = gitRoot
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
+	return utils.RunCommandOutputInDir(gitRoot, "git", args...)
 }
 
 func getGitBranch(gitRoot string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = gitRoot
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
+	return utils.RunCommandOutputInDir(gitRoot, "git", "rev-parse", "--abbrev-ref", "HEAD")
 }
 
 func runGitCommand(gitRoot string, args ...string) error {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = gitRoot
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return utils.RunCommandWithIOInDir(gitRoot, "git", args, os.Stdout, os.Stderr)
 }
 
 func showGitLog(cmd *cobra.Command, gitRoot string, from, to string) error {
-	gitCmd := exec.Command("git", "log", "--oneline", "--no-decorate", from+".."+to)
-	gitCmd.Dir = gitRoot
-	output, err := gitCmd.Output()
+	output, err := utils.RunCommandOutputInDir(gitRoot, "git", "log", "--oneline", "--no-decorate", from+".."+to)
 	if err != nil {
 		return err
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		if line != "" {
 			fmt.Fprintf(cmd.OutOrStdout(), "   • %s\n", line)
@@ -392,13 +382,11 @@ func showGitLog(cmd *cobra.Command, gitRoot string, from, to string) error {
 }
 
 func hasUncommittedChanges(gitRoot string) bool {
-	cmd := exec.Command("git", "status", "--porcelain")
-	cmd.Dir = gitRoot
-	output, err := cmd.Output()
+	output, err := utils.RunCommandOutputInDir(gitRoot, "git", "status", "--porcelain")
 	if err != nil {
 		return false
 	}
-	return strings.TrimSpace(string(output)) != ""
+	return output != ""
 }
 
 // Helper functions for binary updates
@@ -408,14 +396,14 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 	apiURL := "https://api.github.com/repos/go-nv/goenv/releases/latest"
 
 	// Try to load cached ETag
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 	etagFile := filepath.Join(cfg.Root, "cache", "update-etag")
 	cachedETag, _ := os.ReadFile(etagFile)
 
 	// Create request with ETag support
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create request: %w", err)
+		return "", "", errors.FailedTo("create HTTP request", err)
 	}
 
 	// Set headers
@@ -433,14 +421,14 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 	}
 
 	// Make request with retries for rate limiting
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := utils.NewHTTPClient(10 * time.Second)
 	var resp *http.Response
 
 	maxRetries := 3
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		resp, err = client.Do(req)
 		if err != nil {
-			return "", "", fmt.Errorf("request failed: %w", err)
+			return "", "", errors.FailedTo("execute HTTP request", err)
 		}
 
 		// Handle rate limiting
@@ -503,14 +491,14 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 	// Save ETag for next request
 	if etag := resp.Header.Get("ETag"); etag != "" {
 		// Ensure cache directory exists with secure permissions
-		if err := os.MkdirAll(filepath.Dir(etagFile), 0700); err != nil {
+		if err := utils.EnsureDirWithContext(filepath.Dir(etagFile), "create cache directory"); err != nil {
 			// Non-fatal: log but continue
 			if cfg.Debug {
 				fmt.Fprintf(os.Stderr, "Warning: failed to create cache directory: %v\n", err)
 			}
 		} else {
 			// Write ETag file with secure permissions
-			if err := os.WriteFile(etagFile, []byte(etag), 0600); err != nil {
+			if err := utils.WriteFileWithContext(etagFile, []byte(etag), utils.PermFileSecure, "save etag cache"); err != nil {
 				// Non-fatal: log but continue
 				if cfg.Debug {
 					fmt.Fprintf(os.Stderr, "Warning: failed to save ETag cache: %v\n", err)
@@ -537,9 +525,9 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 
 	// Build download URL for current platform
 	if version != "" {
-		platform := runtime.GOOS
-		arch := runtime.GOARCH
-		assetName := fmt.Sprintf("goenv_%s_%s_%s", strings.TrimPrefix(version, "v"), platform, arch)
+		osName := platform.OS()
+		arch := platform.Arch()
+		assetName := fmt.Sprintf("goenv_%s_%s_%s", strings.TrimPrefix(version, "v"), osName, arch)
 
 		// Look for this asset in the release
 		if strings.Contains(bodyStr, assetName) {
@@ -548,7 +536,7 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 	}
 
 	if version == "" || downloadURL == "" {
-		return "", "", fmt.Errorf("failed to parse release information")
+		return "", "", errors.FailedTo("parse release information", fmt.Errorf("incomplete release data"))
 	}
 
 	return version, downloadURL, nil
@@ -564,7 +552,7 @@ func getCurrentVersion() string {
 }
 
 func checkWritePermission(path string) error {
-	file, err := os.OpenFile(path, os.O_WRONLY, 0755)
+	file, err := os.OpenFile(path, os.O_WRONLY, utils.PermFileExecutable)
 	if err != nil {
 		return err
 	}
@@ -573,7 +561,7 @@ func checkWritePermission(path string) error {
 }
 
 func downloadBinary(url string) (string, error) {
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := utils.NewHTTPClient(60 * time.Second)
 	resp, err := client.Get(url)
 	if err != nil {
 		return "", err
@@ -603,10 +591,10 @@ func downloadBinary(url string) (string, error) {
 // verifyChecksum downloads SHA256SUMS and verifies the binary matches
 func verifyChecksum(binaryPath, checksumURL, filename string) error {
 	// Download checksum file
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := utils.NewHTTPClient(10 * time.Second)
 	resp, err := client.Get(checksumURL)
 	if err != nil {
-		return fmt.Errorf("failed to download checksums: %w", err)
+		return errors.FailedTo("download checksums", err)
 	}
 	defer resp.Body.Close()
 
@@ -620,7 +608,7 @@ func verifyChecksum(binaryPath, checksumURL, filename string) error {
 
 	checksums, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read checksums: %w", err)
+		return errors.FailedTo("read checksums", err)
 	}
 
 	// Parse SHA256SUMS file format: "<hash>  <filename>"
@@ -645,13 +633,13 @@ func verifyChecksum(binaryPath, checksumURL, filename string) error {
 	// Calculate actual hash of downloaded binary
 	file, err := os.Open(binaryPath)
 	if err != nil {
-		return fmt.Errorf("failed to open binary: %w", err)
+		return errors.FailedTo("open binary", err)
 	}
 	defer file.Close()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
-		return fmt.Errorf("failed to calculate hash: %w", err)
+		return errors.FailedTo("calculate hash", err)
 	}
 
 	actualHash := hex.EncodeToString(hasher.Sum(nil))
@@ -660,6 +648,76 @@ func verifyChecksum(binaryPath, checksumURL, filename string) error {
 	if actualHash != expectedHash {
 		return fmt.Errorf("checksum mismatch: expected %s, got %s (possible tampering!)", expectedHash, actualHash)
 	}
+
+	return nil
+}
+
+// replaceWindowsBinary handles binary replacement on Windows using a helper batch script
+// Windows locks running executables, so we can't replace the binary directly.
+// Instead, we move the new binary to .new, create a batch script that:
+// 1. Waits for goenv.exe to exit
+// 2. Moves old binary to .backup
+// 3. Moves new binary to final location
+// 4. Cleans up
+func replaceWindowsBinary(cmd *cobra.Command, tmpFile, binaryPath, backupPath, currentVersion, latestVersion string) error {
+	// Move new binary next to the old one with .new extension
+	newPath := binaryPath + ".new"
+	if err := os.Rename(tmpFile, newPath); err != nil {
+		return errors.FailedTo("move new binary", err)
+	}
+
+	// Create batch script to complete the update after goenv exits
+	updateScript := binaryPath + ".update.bat"
+	scriptContent := fmt.Sprintf(`@echo off
+REM goenv Windows Update Helper Script
+REM This script completes the update after goenv.exe exits
+
+echo Waiting for goenv.exe to exit...
+:WAIT
+timeout /t 1 /nobreak >nul 2>&1
+tasklist /FI "IMAGENAME eq %s" 2>nul | find /I "%s" >nul
+if not errorlevel 1 goto WAIT
+
+echo Replacing binary...
+move /Y "%s" "%s" >nul 2>&1
+move /Y "%s" "%s" >nul 2>&1
+del /Q "%s" >nul 2>&1
+
+echo.
+echo goenv updated successfully!
+echo    Updated from %s to %s
+echo.
+echo Update complete. You can close this window.
+
+REM Self-delete the update script
+del "%%~f0" >nul 2>&1
+`, filepath.Base(binaryPath), filepath.Base(binaryPath),
+		binaryPath, backupPath,
+		newPath, binaryPath,
+		updateScript,
+		currentVersion, latestVersion)
+
+	if err := utils.WriteFileWithContext(updateScript, []byte(scriptContent), utils.PermFileDefault, "create update script"); err != nil {
+		os.Remove(newPath)
+		return err
+	}
+
+	// Start the batch script in a new console window
+	startCmd := exec.Command("cmd", "/C", "start", "goenv Update", updateScript)
+	startCmd.SysProcAttr = nil // Let it run detached
+	if err := startCmd.Start(); err != nil {
+		os.Remove(newPath)
+		os.Remove(updateScript)
+		return errors.FailedTo("start update script", err)
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintf(cmd.OutOrStdout(), "%sUpdate downloaded and prepared!\n", utils.Emoji("✅ "))
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "A batch script has been started to complete the update.")
+	fmt.Fprintln(cmd.OutOrStdout(), "The update will finish automatically when goenv exits.")
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintf(cmd.OutOrStdout(), "   Updating from %s to %s\n", currentVersion, latestVersion)
 
 	return nil
 }

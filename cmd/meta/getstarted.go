@@ -5,7 +5,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/shell/profile"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -32,7 +33,7 @@ func init() {
 }
 
 func runGetStarted(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 
 	// Show welcome message
 	fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n\n", utils.Emoji("👋 "), utils.BoldBlue("Welcome to goenv!"))
@@ -45,24 +46,31 @@ func runGetStarted(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n", utils.BoldYellow("Step 1: Initialize goenv in your shell"))
 		fmt.Fprintf(cmd.OutOrStdout(), "To get started, add goenv to your shell by running:\n\n")
 
-		// Provide shell-specific instructions
-		shell := shellutil.DetectShell()
-		switch shell {
-		case shellutil.ShellTypeBash:
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", utils.Cyan("echo 'eval \"$(goenv init -)\"' >> ~/.bashrc"))
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", utils.Cyan("source ~/.bashrc"))
-		case shellutil.ShellTypeZsh:
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", utils.Cyan("echo 'eval \"$(goenv init -)\"' >> ~/.zshrc"))
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", utils.Cyan("source ~/.zshrc"))
-		case shellutil.ShellTypeFish:
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", utils.Cyan("echo 'status --is-interactive; and goenv init - | source' >> ~/.config/fish/config.fish"))
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", utils.Cyan("source ~/.config/fish/config.fish"))
-		default:
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", utils.Cyan("eval \"$(goenv init -)\""))
+		// Provide shell-specific instructions using profile manager
+		shell := profile.ShellType(shellutil.DetectShell())
+		pm := profile.NewProfileManager(shell)
+		initLine := pm.GetInitLine()
+		profileDisplay := pm.GetProfilePathDisplay()
+
+		// Get the primary profile path for echo command
+		prof, _ := pm.GetProfile()
+		profilePath := prof.Path
+		if profilePath != "" {
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", utils.Cyan(fmt.Sprintf("echo '%s' >> %s", initLine, profilePath)))
+
+			// Shell-specific source command
+			switch shell {
+			case profile.ShellTypeFish:
+				fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", utils.Cyan(fmt.Sprintf("source %s", profilePath)))
+			default:
+				fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", utils.Cyan(fmt.Sprintf("source %s", profilePath)))
+			}
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Add to %s: %s\n\n", profileDisplay, utils.Cyan(initLine))
 		}
 
 		fmt.Fprintf(cmd.OutOrStdout(), "Or for just this session:\n")
-		fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", utils.Cyan("eval \"$(goenv init -)\""))
+		fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", utils.Cyan(initLine))
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n\n", utils.Green("✓"), utils.Green("goenv is initialized in your shell"))
 	}

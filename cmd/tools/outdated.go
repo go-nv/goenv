@@ -3,8 +3,9 @@ package tools
 import (
 	"fmt"
 
-	"github.com/go-nv/goenv/internal/config"
-	"github.com/go-nv/goenv/internal/tooldetect"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -42,23 +43,23 @@ type outdatedTool struct {
 }
 
 func runOutdated(cmd *cobra.Command, jsonOutput bool) error {
-	cfg := config.Load()
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Get all installed Go versions
-	versions, err := getInstalledVersions(cfg)
+	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		return err
 	}
 
 	if len(versions) == 0 {
-		return fmt.Errorf("no Go versions installed")
+		return errors.NoVersionsInstalled()
 	}
 
 	// Collect outdated tools
 	var allOutdated []outdatedTool
 
 	for _, version := range versions {
-		tools, err := tooldetect.ListInstalledTools(cfg.Root, version)
+		tools, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
 			continue // Skip versions where we can't list tools
 		}
@@ -69,13 +70,13 @@ func runOutdated(cmd *cobra.Command, jsonOutput bool) error {
 			}
 
 			// Query latest version
-			latestVersion, err := tooldetect.GetLatestVersion(tool.PackagePath)
+			latestVersion, err := toolspkg.GetLatestVersion(tool.PackagePath)
 			if err != nil {
 				continue // Skip tools we can't check
 			}
 
 			// Compare versions
-			if tooldetect.CompareVersions(tool.Version, latestVersion) < 0 {
+			if toolspkg.CompareVersions(tool.Version, latestVersion) < 0 {
 				allOutdated = append(allOutdated, outdatedTool{
 					Name:           tool.Name,
 					GoVersion:      version,

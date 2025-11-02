@@ -5,9 +5,9 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
-	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
 
@@ -27,13 +27,12 @@ func init() {
 }
 
 func runVersionFileRead(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	filename := args[0]
 	version, err := mgr.ReadVersionFile(filename)
 	if err != nil {
-		return err
+		return errors.FailedTo("read version file", err)
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout(), version)

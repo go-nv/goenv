@@ -22,7 +22,7 @@ func TestDefaultRoot(t *testing.T) {
 	}
 
 	// Test without GOENV_ROOT set
-	os.Unsetenv("GOENV_ROOT")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), "")
 	root = DefaultRoot()
 	homeDir, _ := os.UserHomeDir()
 	expected := filepath.Join(homeDir, ".goenv")

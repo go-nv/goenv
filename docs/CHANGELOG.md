@@ -117,6 +117,16 @@ Change line format:
   - Dry-run mode (`--dry-run`) for previewing operations
   - Verbose mode (`--verbose`) for detailed installation output
   - Tool categorization: Consistent (all versions), Partial (some versions), Version-Specific (one version)
+- **🔄 Auto-Update for Default Tools** - Intelligent tool update management:
+  - Automatic update checks when switching or installing Go versions
+  - Configurable trigger strategies: `on_use`, `on_install`, or `manual`
+  - Check interval throttling to avoid excessive network calls (`auto_update_interval: "24h"`)
+  - Interactive prompts to install updates immediately or passive hints
+  - Version overrides: pin specific tool versions per Go version with pattern matching (`"1.18"`, `"1.21+"`, `"1.18-1.20"`)
+  - Latest compatible version strategy: automatically find newest tool version that works with your Go version
+  - Update strategies: `latest`, `auto` (stable only), `pin`, `minor`, `patch`, `latest_compatible`
+  - Persistent check timestamps to implement throttling across sessions
+  - `goenv tools update` with `--check`, `--dry-run`, `--all`, `--strategy`, `--force`, `--verbose` flags
 - **🏗️ Internal Packages** - 5 new internal packages for enhanced functionality:
   - `internal/lifecycle` - Go version EOL tracking (Go 1.12-1.25)
   - `internal/shellutil` - Enhanced shell detection and management

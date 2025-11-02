@@ -1,13 +1,13 @@
 package meta
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 
 	"github.com/spf13/cobra"
 )
@@ -87,7 +87,7 @@ func TestCommandsCommand(t *testing.T) {
 			// Setup custom commands if specified
 			if len(tt.setupCommands) > 0 {
 				libexecDir := filepath.Join(goenvRoot, "libexec")
-				os.MkdirAll(libexecDir, 0755)
+				_ = utils.EnsureDirWithContext(libexecDir, "create test directory")
 				for _, cmdName := range tt.setupCommands {
 					cmdPath := filepath.Join(libexecDir, "goenv-"+cmdName)
 					var content string
@@ -97,7 +97,7 @@ func TestCommandsCommand(t *testing.T) {
 					} else {
 						content = "#!/bin/sh\n"
 					}
-					os.WriteFile(cmdPath, []byte(content), 0755)
+					testutil.WriteTestFile(t, cmdPath, []byte(content), utils.PermFileExecutable)
 				}
 			}
 

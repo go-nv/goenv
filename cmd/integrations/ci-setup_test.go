@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestCISetupPowerShellQuoting(t *testing.T) {
@@ -58,7 +59,7 @@ func TestCISetupPowerShellQuoting(t *testing.T) {
 			}
 
 			// Create test directory
-			if err := os.MkdirAll(tt.goenvRoot, 0755); err != nil {
+			if err := utils.EnsureDirWithContext(tt.goenvRoot, "create test directory"); err != nil {
 				t.Fatalf("Failed to create test directory: %v", err)
 			}
 			defer os.RemoveAll(tt.goenvRoot)
@@ -145,10 +146,10 @@ func TestCISetupPowerShellExecution(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test directory structure
-			if err := os.MkdirAll(filepath.Join(tt.goenvRoot, "bin"), 0755); err != nil {
+			if err := utils.EnsureDir(filepath.Join(tt.goenvRoot, "bin")); err != nil {
 				t.Fatalf("Failed to create bin directory: %v", err)
 			}
-			if err := os.MkdirAll(filepath.Join(tt.goenvRoot, "shims"), 0755); err != nil {
+			if err := utils.EnsureDir(filepath.Join(tt.goenvRoot, "shims")); err != nil {
 				t.Fatalf("Failed to create shims directory: %v", err)
 			}
 			defer os.RemoveAll(tt.goenvRoot)
@@ -176,9 +177,7 @@ func TestCISetupPowerShellExecution(t *testing.T) {
 
 			// Write script to temp file
 			scriptFile := filepath.Join(t.TempDir(), "test-script.ps1")
-			if err := os.WriteFile(scriptFile, []byte(script), 0644); err != nil {
-				t.Fatalf("Failed to write script file: %v", err)
-			}
+			testutil.WriteTestFile(t, scriptFile, []byte(script), utils.PermFileDefault)
 
 			// Execute PowerShell script
 			cmdExec := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptFile)

@@ -1,9 +1,11 @@
 package manager
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestScanProjects(t *testing.T) {
@@ -12,32 +14,26 @@ func TestScanProjects(t *testing.T) {
 
 	// Project 1: .go-version
 	proj1 := filepath.Join(tmpDir, "proj1")
-	if err := os.MkdirAll(proj1, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(proj1, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), utils.PermFileDefault)
 
 	// Project 2: go.mod
 	proj2 := filepath.Join(tmpDir, "proj2")
-	if err := os.MkdirAll(proj2, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(proj2, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 	gomodContent := "module test\n\ngo 1.22.3\n"
-	if err := os.WriteFile(filepath.Join(proj2, "go.mod"), []byte(gomodContent), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, filepath.Join(proj2, "go.mod"), []byte(gomodContent), utils.PermFileDefault)
 
 	// Project 3: go.mod with toolchain
 	proj3 := filepath.Join(tmpDir, "proj3")
-	if err := os.MkdirAll(proj3, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(proj3, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 	gomodWithToolchain := "module test3\n\ngo 1.21.0\n\ntoolchain go1.23.2\n"
-	if err := os.WriteFile(filepath.Join(proj3, "go.mod"), []byte(gomodWithToolchain), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, filepath.Join(proj3, "go.mod"), []byte(gomodWithToolchain), utils.PermFileDefault)
 
 	// Scan with no depth limit
 	projects, err := ScanProjects(tmpDir, 0)
@@ -86,18 +82,18 @@ func TestScanProjectsWithDepthLimit(t *testing.T) {
 
 	// Project at depth 1
 	proj1 := filepath.Join(tmpDir, "proj1")
-	os.MkdirAll(proj1, 0755)
-	os.WriteFile(filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), 0644)
+	_ = utils.EnsureDirWithContext(proj1, "create test directory")
+	testutil.WriteTestFile(t, filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), utils.PermFileDefault)
 
 	// Project at depth 3
 	proj2 := filepath.Join(tmpDir, "a", "b", "proj2")
-	os.MkdirAll(proj2, 0755)
-	os.WriteFile(filepath.Join(proj2, ".go-version"), []byte("1.22.3\n"), 0644)
+	_ = utils.EnsureDirWithContext(proj2, "create test directory")
+	testutil.WriteTestFile(t, filepath.Join(proj2, ".go-version"), []byte("1.22.3\n"), utils.PermFileDefault)
 
 	// Project at depth 5
 	proj3 := filepath.Join(tmpDir, "a", "b", "c", "d", "proj3")
-	os.MkdirAll(proj3, 0755)
-	os.WriteFile(filepath.Join(proj3, ".go-version"), []byte("1.23.2\n"), 0644)
+	_ = utils.EnsureDirWithContext(proj3, "create test directory")
+	testutil.WriteTestFile(t, filepath.Join(proj3, ".go-version"), []byte("1.23.2\n"), utils.PermFileDefault)
 
 	// Scan with depth 3 - should find proj1 and proj2, but not proj3
 	projects, err := ScanProjects(tmpDir, 3)
@@ -132,21 +128,21 @@ func TestScanProjectsSkipsCommonDirs(t *testing.T) {
 
 	// Create .go-version in node_modules (should be skipped)
 	nmDir := filepath.Join(tmpDir, "node_modules", "something")
-	os.MkdirAll(nmDir, 0755)
-	os.WriteFile(filepath.Join(nmDir, ".go-version"), []byte("1.21.5\n"), 0644)
+	_ = utils.EnsureDirWithContext(nmDir, "create test directory")
+	testutil.WriteTestFile(t, filepath.Join(nmDir, ".go-version"), []byte("1.21.5\n"), utils.PermFileDefault)
 
 	// Create .go-version in vendor (should be skipped)
 	vendorDir := filepath.Join(tmpDir, "vendor", "github.com", "something")
-	os.MkdirAll(vendorDir, 0755)
-	os.WriteFile(filepath.Join(vendorDir, ".go-version"), []byte("1.22.3\n"), 0644)
+	_ = utils.EnsureDirWithContext(vendorDir, "create test directory")
+	testutil.WriteTestFile(t, filepath.Join(vendorDir, ".go-version"), []byte("1.22.3\n"), utils.PermFileDefault)
 
 	// Create .go-version in .git (should be skipped)
 	gitDir := filepath.Join(tmpDir, ".git", "something")
-	os.MkdirAll(gitDir, 0755)
-	os.WriteFile(filepath.Join(gitDir, ".go-version"), []byte("1.23.2\n"), 0644)
+	_ = utils.EnsureDirWithContext(gitDir, "create test directory")
+	testutil.WriteTestFile(t, filepath.Join(gitDir, ".go-version"), []byte("1.23.2\n"), utils.PermFileDefault)
 
 	// Create valid project at root
-	os.WriteFile(filepath.Join(tmpDir, ".go-version"), []byte("1.20.5\n"), 0644)
+	testutil.WriteTestFile(t, filepath.Join(tmpDir, ".go-version"), []byte("1.20.5\n"), utils.PermFileDefault)
 
 	// Scan
 	projects, err := ScanProjects(tmpDir, 0)
@@ -188,7 +184,7 @@ func TestScanProjectsWithComments(t *testing.T) {
 1.21.5
 # Trailing comment
 `
-	os.WriteFile(versionFile, []byte(content), 0644)
+	testutil.WriteTestFile(t, versionFile, []byte(content), utils.PermFileDefault)
 
 	// Scan
 	projects, err := ScanProjects(tmpDir, 0)
@@ -246,9 +242,7 @@ func TestReadVersionFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpFile := filepath.Join(t.TempDir(), ".go-version")
-			if err := os.WriteFile(tmpFile, []byte(tt.content), 0644); err != nil {
-				t.Fatal(err)
-			}
+			testutil.WriteTestFile(t, tmpFile, []byte(tt.content), utils.PermFileDefault)
 
 			version, err := readVersionFile(tmpFile)
 			if err != nil {

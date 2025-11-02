@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestNewExecutor(t *testing.T) {
@@ -241,7 +243,7 @@ func TestExecutorExecute_StopOnError(t *testing.T) {
 	}
 
 	// Verify second action did NOT execute
-	if _, err := os.Stat(logFile); err == nil {
+	if utils.PathExists(logFile) {
 		t.Error("Second action was executed despite continue_on_error=false")
 	}
 }

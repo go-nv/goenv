@@ -45,6 +45,7 @@ This project was originally cloned from [pyenv](https://github.com/pyenv/pyenv),
   - Sync tools between versions with `goenv tools sync`
 - **Version aliases** (`goenv alias`) - create convenient shorthand names for versions
 - **VS Code integration** (`goenv vscode`) - sync Go settings with workspace-relative paths and security validation
+- **Shell prompt integration** (`goenv prompt`) - display active Go version in your shell prompt with smart caching
 
 ### goenv compared to others:
 
@@ -171,6 +172,154 @@ See [Installation Guide](docs/user-guide/INSTALL.md) for platform-specific setup
 
 ---
 
+## 🎨 Shell Prompt Integration
+
+Display your active Go version directly in your shell prompt for instant visual feedback:
+
+```bash
+# Quick setup with the interactive wizard
+goenv prompt config
+
+# Manual setup - add to your shell config:
+# Bash/Zsh (~/.bashrc or ~/.zshrc)
+export PS1='$(goenv prompt --prefix "(" --suffix ") ") '"$PS1"
+
+# Fish (~/.config/fish/config.fish)
+function fish_prompt
+  set -l goenv_version (goenv prompt 2>/dev/null)
+  test -n "$goenv_version"; and echo -n "($goenv_version) "
+  # ... rest of your prompt
+end
+
+# PowerShell ($PROFILE)
+function prompt {
+  $goenvVersion = goenv prompt 2>$null
+  if ($goenvVersion) {
+    Write-Host "($goenvVersion) " -NoNewline -ForegroundColor Cyan
+  }
+  "PS $($PWD.Path)> "
+}
+```
+
+**Features:**
+- **Smart caching** - minimal performance impact (< 50ms)
+- **Customizable format** - control prefix, suffix, and display format
+- **Project-aware** - show only in Go projects with `--go-project-only`
+- **Hide system Go** - use `--no-system` to hide when using system Go
+
+**Advanced options:**
+```bash
+# Short version (1.23 instead of 1.23.2)
+export PS1='$(goenv prompt --short) '"$PS1"
+
+# Custom format with emoji
+export PS1='$(goenv prompt --icon "🐹" --format "go:%s") '"$PS1"
+
+# Show only in Go projects
+export PS1='$(goenv prompt --go-project-only) '"$PS1"
+
+# Environment variable configuration
+export GOENV_PROMPT_PREFIX="["
+export GOENV_PROMPT_SUFFIX="]"
+export GOENV_PROMPT_FORMAT="go:%s"
+```
+
+See `goenv prompt --help` for all options.
+
+---
+
+## 🎯 Interactive Mode
+
+goenv adapts to your workflow with three levels of interactivity:
+
+### Non-Interactive Mode (CI/Automation)
+Perfect for scripts and CI/CD pipelines - auto-confirms all operations:
+
+```bash
+# Auto-confirm with --yes flag
+goenv install 1.23.0 --yes
+goenv uninstall 1.22.0 -y
+
+# Or set globally
+export GOENV_ASSUME_YES=1
+goenv install 1.23.0
+
+# Quiet mode (suppress output)
+goenv install 1.23.0 --quiet
+
+# Auto-detected in CI environments (GitHub Actions, GitLab CI, etc.)
+```
+
+### Minimal Interactive Mode (Default)
+Balances automation with safety - prompts only for critical operations:
+
+```bash
+# Default behavior
+goenv uninstall 1.22.0
+# Prompt: "Really uninstall Go 1.22.0? [y/N]"
+
+goenv install 1.23.0
+# Shows progress, offers retry on failure
+```
+
+### Guided Interactive Mode (Learning)
+Helpful prompts and suggestions for new users:
+
+```bash
+# Enable guided mode
+goenv install --interactive
+# Offers version selection, explains choices
+
+goenv doctor --interactive  
+# Offers to fix issues automatically
+
+goenv use --interactive
+# Guides through version selection
+```
+
+### Global Flags
+
+- `--interactive` - Enable guided mode with helpful prompts
+- `--yes` / `-y` - Auto-confirm all prompts (non-interactive)
+- `--quiet` / `-q` - Suppress progress output (only show errors)
+
+### Environment Variables
+
+- `GOENV_ASSUME_YES=1` - Auto-confirm globally (like --yes)
+- `CI=true` - Automatically enables non-interactive mode
+
+### Examples by Use Case
+
+**Daily development**:
+```bash
+goenv install 1.23.0    # Default: shows progress, confirms if needed
+goenv use 1.23.0        # Installs if needed (with prompt)
+```
+
+**Automation scripts**:
+```bash
+#!/bin/bash
+goenv install 1.23.0 --yes
+goenv global 1.23.0 --yes
+```
+
+**CI/CD pipelines**:
+```yaml
+# goenv auto-detects CI - no flags needed
+- run: goenv install 1.23.0
+- run: goenv global 1.23.0
+```
+
+**Learning mode**:
+```bash
+goenv install --interactive  # Guided experience
+goenv explain               # Understand version resolution
+```
+
+📖 **Full Guide**: See [Interactive Mode Guide](docs/INTERACTIVE_MODE_GUIDE.md) for comprehensive documentation.
+
+---
+
 ## 🪝 Hooks System
 
 goenv includes a powerful hooks system that lets you automate actions at key points in the goenv lifecycle. Hooks are **declarative**, **safe**, and **cross-platform**.
@@ -236,6 +385,7 @@ goenv hooks test       # Dry-run hooks without executing
 
 #### Getting Started
 - **[Installation Guide](./docs/user-guide/INSTALL.md)** - Get started with goenv ⭐ **NEW: Windows FAQ**
+- **[Interactive Mode Guide](./docs/INTERACTIVE_MODE_GUIDE.md)** - CI/CD, automation, and guided workflows ⭐ **NEW**
 - **[Quick Reference](./docs/QUICK_REFERENCE.md)** - One-page cheat sheet ⭐ **NEW**
 - **[FAQ](./docs/FAQ.md)** - Frequently asked questions ⭐ **NEW**
 - **[What's New in Docs](./docs/WHATS_NEW_DOCUMENTATION.md)** - Recent documentation improvements ⭐ **NEW**

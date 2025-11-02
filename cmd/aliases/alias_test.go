@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-nv/goenv/cmd/legacy"
 	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -94,27 +96,25 @@ func TestAliasCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testRoot, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Setup test versions
 			for _, version := range tt.setupVersions {
-				cmdtest.CreateTestVersion(t, testRoot, version)
+				cmdtest.CreateMockGoVersion(t, tmpDir, version)
 			}
 
 			// Setup test aliases
 			if len(tt.setupAliases) > 0 {
-				aliasesFile := filepath.Join(testRoot, "aliases")
+				aliasesFile := filepath.Join(tmpDir, "aliases")
 				var content strings.Builder
 				content.WriteString("# goenv aliases\n")
 				content.WriteString("# Format: alias_name=target_version\n")
 				for name, version := range tt.setupAliases {
 					content.WriteString(name + "=" + version + "\n")
 				}
-				err := os.WriteFile(aliasesFile, []byte(content.String()), 0644)
-				if err != nil {
-					t.Fatalf("Failed to setup aliases: %v", err)
-				}
+				testutil.WriteTestFile(t, aliasesFile, []byte(content.String()), utils.PermFileDefault, "Failed to setup aliases")
 			}
 
 			// Create and execute command
@@ -158,7 +158,7 @@ func TestAliasCommand(t *testing.T) {
 
 			// For set operations, verify the file was written correctly
 			if len(tt.args) == 2 && tt.expectedError == "" {
-				aliasesFile := filepath.Join(testRoot, "aliases")
+				aliasesFile := filepath.Join(tmpDir, "aliases")
 				content, err := os.ReadFile(aliasesFile)
 				if err != nil {
 					t.Errorf("Failed to read aliases file: %v", err)
@@ -211,27 +211,25 @@ func TestUnaliasCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testRoot, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Setup test versions
 			for _, version := range tt.setupVersions {
-				cmdtest.CreateTestVersion(t, testRoot, version)
+				cmdtest.CreateMockGoVersion(t, tmpDir, version)
 			}
 
 			// Setup test aliases
 			if len(tt.setupAliases) > 0 {
-				aliasesFile := filepath.Join(testRoot, "aliases")
+				aliasesFile := filepath.Join(tmpDir, "aliases")
 				var content strings.Builder
 				content.WriteString("# goenv aliases\n")
 				content.WriteString("# Format: alias_name=target_version\n")
 				for name, version := range tt.setupAliases {
 					content.WriteString(name + "=" + version + "\n")
 				}
-				err := os.WriteFile(aliasesFile, []byte(content.String()), 0644)
-				if err != nil {
-					t.Fatalf("Failed to setup aliases: %v", err)
-				}
+				testutil.WriteTestFile(t, aliasesFile, []byte(content.String()), utils.PermFileDefault, "Failed to setup aliases")
 			}
 
 			// Create and execute command
@@ -268,7 +266,7 @@ func TestUnaliasCommand(t *testing.T) {
 
 			// Verify the alias was removed from the file
 			if len(tt.args) == 1 && tt.expectedError == "" {
-				aliasesFile := filepath.Join(testRoot, "aliases")
+				aliasesFile := filepath.Join(tmpDir, "aliases")
 				content, err := os.ReadFile(aliasesFile)
 				if err != nil {
 					t.Errorf("Failed to read aliases file: %v", err)
@@ -322,20 +320,18 @@ func TestAliasResolution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testRoot, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Setup test version
-			cmdtest.CreateTestVersion(t, testRoot, tt.targetVersion)
+			cmdtest.CreateMockGoVersion(t, tmpDir, tt.targetVersion)
 
 			// Setup alias
-			aliasesFile := filepath.Join(testRoot, "aliases")
+			aliasesFile := filepath.Join(tmpDir, "aliases")
 			content := "# goenv aliases\n# Format: alias_name=target_version\n"
 			content += tt.aliasName + "=" + tt.targetVersion + "\n"
-			err := os.WriteFile(aliasesFile, []byte(content), 0644)
-			if err != nil {
-				t.Fatalf("Failed to setup aliases: %v", err)
-			}
+			testutil.WriteTestFile(t, aliasesFile, []byte(content), utils.PermFileDefault, "Failed to setup aliases")
 
 			if tt.useGlobal {
 				// Test global command with alias
@@ -350,14 +346,14 @@ func TestAliasResolution(t *testing.T) {
 				cmd.SetOut(stdout)
 				cmd.SetArgs([]string{tt.aliasName})
 
-				err = cmd.Execute()
+				err := cmd.Execute()
 				if err != nil {
 					t.Errorf("Failed to set global with alias: %v", err)
 					return
 				}
 
 				// Verify the resolved version was written
-				globalFile := filepath.Join(testRoot, "version")
+				globalFile := filepath.Join(tmpDir, "version")
 				content, err := os.ReadFile(globalFile)
 				if err != nil {
 					t.Errorf("Failed to read global version file: %v", err)
@@ -383,7 +379,7 @@ func TestAliasResolution(t *testing.T) {
 				cmd.SetOut(stdout)
 				cmd.SetArgs([]string{tt.aliasName})
 
-				err = cmd.Execute()
+				err := cmd.Execute()
 				if err != nil {
 					t.Errorf("Failed to set local with alias: %v", err)
 					return

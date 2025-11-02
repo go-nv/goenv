@@ -1,15 +1,16 @@
 package legacy
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
@@ -18,7 +19,7 @@ import (
 
 var versionsCmd = &cobra.Command{
 	Use:   "versions",
-	Short: "List all installed Go versions",
+	Short: "List all installed Go versions (deprecated: use 'goenv list')",
 	Long: `Show all locally installed Go versions with the current version highlighted.
 
 Usage: goenv versions [--bare] [--skip-aliases] [--used]
@@ -45,8 +46,8 @@ Examples:
 
   # Deep scan (search deeper)
   goenv versions --used --depth 5`,
-	RunE:   RunVersions,
-	Hidden: true, // Legacy command - use 'goenv list' instead
+	RunE:    RunVersions,
+	GroupID: string(cmdpkg.GroupLegacy),
 }
 
 var VersionsFlags struct {
@@ -93,7 +94,7 @@ func findLatestVersion(versions []string) string {
 	latest := versions[0]
 	for _, v := range versions[1:] {
 		// Skip system and special versions
-		if v == "system" || latest == "system" {
+		if v == manager.SystemVersion || latest == manager.SystemVersion {
 			continue
 		}
 
@@ -121,12 +122,11 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStderr(), "  See: goenv help list\n\n")
 
 	// Handle invalid arguments (BATS test expects usage error)
-	if len(args) > 0 {
+	if err := cmdutil.ValidateMaxArgs(args, 0, "no arguments"); err != nil {
 		return fmt.Errorf("usage: goenv versions [--bare] [--skip-aliases] [--used]")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// If --used flag is set, show usage analysis
 	if VersionsFlags.Used {
@@ -135,7 +135,7 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return fmt.Errorf("failed to list versions: %w", err)
+		return errors.FailedTo("list versions", err)
 	}
 
 	hasSystemGo := mgr.HasSystemGo()
@@ -155,9 +155,7 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 						SchemaVersion: "1",
 						Versions:      []interface{}{},
 					}
-					encoder := json.NewEncoder(cmd.OutOrStdout())
-					encoder.SetIndent("", "  ")
-					return encoder.Encode(output)
+					return cmdutil.OutputJSON(cmd.OutOrStdout(), output)
 				}
 				return nil
 			}
@@ -171,7 +169,7 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(cmd.OutOrStderr(), "After installing, set it as your default:\n")
 			fmt.Fprintf(cmd.OutOrStderr(), "  goenv global <version>\n")
 
-			return fmt.Errorf("no Go versions installed")
+			return errors.NoVersionsInstalled()
 		}
 
 		// Only system version available
@@ -218,11 +216,11 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 		var items []versionInfo
 
 		// Add system version if available
-		if hasSystemGo || currentVersion == "system" {
+		if hasSystemGo || currentVersion == manager.SystemVersion {
 			displaySource := simplifySource(source, cfg)
 			items = append(items, versionInfo{
 				Version:  "system",
-				Active:   currentVersion == "system",
+				Active:   currentVersion == manager.SystemVersion,
 				Source:   displaySource,
 				IsSystem: true,
 			})
@@ -246,19 +244,17 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 			Versions:      items,
 		}
 
-		encoder := json.NewEncoder(cmd.OutOrStdout())
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(output)
+		return cmdutil.OutputJSON(cmd.OutOrStdout(), output)
 	}
 
 	// Show system version first (if available and not bare mode)
 	// Only show system if: (1) system go exists, OR (2) it's the current version
-	showSystem := (hasSystemGo || currentVersion == "system") && !VersionsFlags.Bare
+	showSystem := (hasSystemGo || currentVersion == manager.SystemVersion) && !VersionsFlags.Bare
 	if showSystem {
 		prefix := "  "
 		suffix := ""
 
-		if currentVersion == "system" {
+		if currentVersion == manager.SystemVersion {
 			prefix = "* "
 			displaySource := simplifySource(source, cfg)
 			if displaySource != "" {
@@ -318,7 +314,7 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 	if !VersionsFlags.SkipAliases && !VersionsFlags.Bare {
 		aliases, err := mgr.ListAliases()
 		if err != nil {
-			return fmt.Errorf("failed to list aliases: %w", err)
+			return errors.FailedTo("list aliases", err)
 		}
 
 		if len(aliases) > 0 {
@@ -327,7 +323,7 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 			for name := range aliases {
 				aliasNames = append(aliasNames, name)
 			}
-			sort.Strings(aliasNames)
+			slices.Sort(aliasNames)
 
 			// Display aliases section
 			fmt.Fprintln(cmd.OutOrStdout())
@@ -353,13 +349,13 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 func runVersionsWithUsage(cmd *cobra.Command, mgr *manager.Manager, cfg *config.Config) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return errors.FailedTo("get current directory", err)
 	}
 
 	// Get installed versions
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return fmt.Errorf("failed to list versions: %w", err)
+		return errors.FailedTo("list versions", err)
 	}
 
 	if len(versions) == 0 {
@@ -373,7 +369,7 @@ func runVersionsWithUsage(cmd *cobra.Command, mgr *manager.Manager, cfg *config.
 	// Scan for projects
 	projects, err := manager.ScanProjects(cwd, VersionsFlags.Depth)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return errors.FailedTo("scan directories", err)
 	}
 
 	// Build usage map: version -> []projects
@@ -420,8 +416,8 @@ func runVersionsWithUsage(cmd *cobra.Command, mgr *manager.Manager, cfg *config.
 		for ver := range usageMap {
 			sortedVersions = append(sortedVersions, ver)
 		}
-		sort.Slice(sortedVersions, func(i, j int) bool {
-			return utils.CompareGoVersions(sortedVersions[i], sortedVersions[j]) < 0
+		slices.SortFunc(sortedVersions, func(a, b string) int {
+			return utils.CompareGoVersions(a, b)
 		})
 
 		// Display projects grouped by version

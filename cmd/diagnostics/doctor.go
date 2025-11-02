@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -17,13 +16,15 @@ import (
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
 	"github.com/go-nv/goenv/internal/binarycheck"
-	"github.com/go-nv/goenv/internal/cgo"
+	"github.com/go-nv/goenv/internal/cache"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/envdetect"
-	"github.com/go-nv/goenv/internal/goenv"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
@@ -126,8 +127,8 @@ type checkResult struct {
 	status    Status // OK, Warning, or Error
 	message   string
 	advice    string
-	issueType IssueType   // Structured issue type for fix detection
-	fixData   interface{} // Additional data needed for fixing (version, path, etc)
+	issueType IssueType // Structured issue type for fix detection
+	fixData   any       // Additional data needed for fixing (version, path, etc)
 }
 
 // JSON-serializable version of checkResult
@@ -169,7 +170,7 @@ func init() {
 }
 
 func runDoctor(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, mgr := cmdutil.SetupContext()
 	results := []checkResult{}
 
 	// Validate and parse --fail-on flag
@@ -216,10 +217,10 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	results = append(results, checkShimsDir(cfg))
 
 	// Check 6: Installed versions
-	results = append(results, checkInstalledVersions(cfg))
+	results = append(results, checkInstalledVersions(cfg, mgr))
 
 	// Check 7: Current version
-	results = append(results, checkCurrentVersion(cfg))
+	results = append(results, checkCurrentVersion(cfg, mgr))
 
 	// Check 8: Conflicting installations
 	results = append(results, checkConflictingGo(cfg))
@@ -237,25 +238,25 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	results = append(results, checkGoModVersion(cfg))
 
 	// Check 13: Verify 'which go' matches expected version
-	results = append(results, checkWhichGo(cfg))
+	results = append(results, checkWhichGo(cfg, mgr))
 
 	// Check 14: Check for unmigrated tools when using a new version
-	results = append(results, checkToolMigration(cfg))
+	results = append(results, checkToolMigration(cfg, mgr))
 
 	// Check 15: GOCACHE isolation
-	results = append(results, checkGocacheIsolation(cfg))
+	results = append(results, checkGocacheIsolation(cfg, mgr))
 
 	// Check 16: Architecture mismatches in cache
 	results = append(results, checkCacheArchitecture(cfg))
 
 	// Check 16a: Cache on problem mounts (NFS, Docker bind mounts)
-	results = append(results, checkCacheMountType(cfg))
+	results = append(results, checkCacheMountType(cfg, mgr))
 
 	// Check 17: GOTOOLCHAIN setting
 	results = append(results, checkGoToolchain())
 
 	// Check 18: Cache isolation effectiveness (architecture-aware)
-	results = append(results, checkCacheIsolationEffectiveness(cfg))
+	results = append(results, checkCacheIsolationEffectiveness(cfg, mgr))
 
 	// Check 19: Rosetta detection (macOS only)
 	results = append(results, checkRosetta(cfg))
@@ -264,13 +265,13 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	results = append(results, checkPathOrder(cfg))
 
 	// Check 21: System libc compatibility (Linux only)
-	if runtime.GOOS == "linux" {
+	if platform.IsLinux() {
 		results = append(results, checkLibcCompatibility(cfg))
 	}
 
 	// Check 22: macOS deployment target (macOS only)
-	if runtime.GOOS == "darwin" {
-		results = append(results, checkMacOSDeploymentTarget(cfg))
+	if platform.IsMacOS() {
+		results = append(results, checkMacOSDeploymentTarget(cfg, mgr))
 	}
 
 	// Check 23: Windows compiler availability (Windows only)
@@ -284,7 +285,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 25: Linux kernel version (Linux only)
-	if runtime.GOOS == "linux" {
+	if platform.IsLinux() {
 		results = append(results, checkLinuxKernelVersion(cfg))
 	}
 
@@ -336,7 +337,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		encoder := json.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(output); err != nil {
-			return fmt.Errorf("failed to encode JSON: %w", err)
+			return errors.FailedTo("encode JSON", err)
 		}
 
 		// Check if we should fail based on --fail-on flag
@@ -508,7 +509,7 @@ func checkGoenvBinary(_ *config.Config) checkResult {
 
 func checkGoenvRoot(cfg *config.Config) checkResult {
 	root := cfg.Root
-	if _, err := os.Stat(root); os.IsNotExist(err) {
+	if utils.FileNotExists(root) {
 		return checkResult{
 			id:      "goenvroot-directory",
 			name:    "GOENV_ROOT directory",
@@ -575,7 +576,7 @@ func checkShellConfig(_ *config.Config) checkResult {
 	for _, configFile := range configFiles {
 		if data, err := os.ReadFile(configFile); err == nil {
 			content := string(data)
-			if strings.Contains(content, "goenv init") || strings.Contains(content, "GOENV_ROOT") {
+			if strings.Contains(content, "goenv init") || strings.Contains(content, utils.GoenvEnvVarRoot.String()) {
 				found = true
 				foundIn = configFile
 				break
@@ -718,7 +719,7 @@ func checkShellEnvironment(cfg *config.Config) checkResult {
 	shimsDir := cfg.ShimsDir()
 	if pathEnv != "" {
 		// Only perform this check if shims directory exists
-		if _, err := os.Stat(shimsDir); err == nil {
+		if utils.PathExists(shimsDir) {
 			// Shims dir exists, check if it's in PATH (case-insensitive on Windows)
 			if !utils.IsPathInPATH(shimsDir, pathEnv) {
 				return checkResult{
@@ -753,7 +754,7 @@ func detectUndoSourcing(cfg *config.Config, currentShell shellutil.ShellType, go
 	// This is THE key "undo sourcing" scenario - re-source profile that resets PATH
 	// This check is NOT covered by existing logic which only looks at env var presence
 	if goenvShell != "" && pathEnv != "" {
-		if _, err := os.Stat(shimsDir); err == nil {
+		if utils.PathExists(shimsDir) {
 			if !utils.IsPathInPATH(shimsDir, pathEnv) {
 				return "GOENV_SHELL is set but shims directory not in PATH - likely caused by re-sourcing a profile that resets PATH without goenv init (e.g., 'source ~/.bashrc' or 'source ~/.zshrc')"
 			}
@@ -769,7 +770,7 @@ func detectUndoSourcing(cfg *config.Config, currentShell shellutil.ShellType, go
 		// Check both .bashrc and .bash_profile
 		bashrc := filepath.Join(homeDir, ".bashrc")
 		bashProfile := filepath.Join(homeDir, ".bash_profile")
-		if _, err := os.Stat(bashProfile); err == nil {
+		if utils.PathExists(bashProfile) {
 			profileFile = bashProfile
 		} else {
 			profileFile = bashrc
@@ -805,10 +806,8 @@ func detectUndoSourcing(cfg *config.Config, currentShell shellutil.ShellType, go
 		versionsDir := filepath.Join(goenvRoot, "versions")
 		// Only run this check if versions directory exists (indicates real goenv setup)
 		// This prevents false positives in test environments with fake goenv executables
-		if _, err := os.Stat(versionsDir); err == nil {
-			cmd := exec.Command("goenv", "version-name")
-			cmd.Env = os.Environ()
-			if err := cmd.Run(); err != nil {
+		if utils.PathExists(versionsDir) {
+			if err := utils.RunCommand("goenv", "version-name"); err != nil {
 				return "Shell environment variables are set but 'goenv' command fails - possible PATH override or broken shell function"
 			}
 		}
@@ -1022,9 +1021,10 @@ func checkProfileSourcingIssues(cfg *config.Config) checkResult {
 		if data, err := os.ReadFile(parentEnvFile); err == nil {
 			parentEnv := string(data)
 			// Check if parent had GOENV_SHELL but we're in a subshell that doesn't
-			if !strings.Contains(parentEnv, "GOENV_SHELL=") && goenvShell != "" {
+			goenvShellVar := fmt.Sprintf("%s=", utils.GoenvEnvVarShell.String())
+			if !strings.Contains(parentEnv, goenvShellVar) && goenvShell != "" {
 				// This is fine - we initialized in this shell
-			} else if strings.Contains(parentEnv, "GOENV_SHELL=") && goenvShell == "" {
+			} else if strings.Contains(parentEnv, goenvShellVar) && goenvShell == "" {
 				issues = append(issues, "Parent shell has goenv but current shell doesn't - possible subshell without re-init")
 				advice = append(advice, "Run 'eval \"$(goenv init -)\"' in this shell, or ensure subshells inherit goenv configuration")
 				status = StatusWarning
@@ -1041,13 +1041,12 @@ func checkProfileSourcingIssues(cfg *config.Config) checkResult {
 		// If shims are in PATH but function doesn't work, it's been reset
 		if utils.IsPathInPATH(shimsDir, pathEnv) {
 			// Try to execute goenv via shell function
-			cmd := exec.Command(string(currentShell), "-c", "goenv --version 2>&1")
-			output, err := cmd.CombinedOutput()
+			output, err := utils.RunCommandCombinedOutput(string(currentShell), "-c", "goenv --version 2>&1")
 			if err != nil {
 				issues = append(issues, "goenv command fails despite shims in PATH - shell function may be broken")
 				advice = append(advice, "Run 'eval \"$(goenv init -)\"' to restore the shell function")
 				status = StatusError
-			} else if !strings.Contains(string(output), "goenv") {
+			} else if !strings.Contains(output, "goenv") {
 				issues = append(issues, "goenv command returns unexpected output - shell function may be misconfigured")
 				advice = append(advice, "Run 'eval \"$(goenv init -)\"' to fix the shell function")
 				status = StatusWarning
@@ -1188,7 +1187,7 @@ func detectAllGoenvInstallations() []string {
 	locations := []string{}
 
 	// Method 2: Homebrew locations
-	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+	if platform.IsMacOS() || platform.IsLinux() {
 		locations = append(locations,
 			"/opt/homebrew/bin/goenv",              // ARM Mac
 			"/usr/local/bin/goenv",                 // Intel Mac / Linux Homebrew
@@ -1218,7 +1217,7 @@ func detectAllGoenvInstallations() []string {
 		)
 
 		// Check scoop
-		if scoopPath := os.Getenv("SCOOP"); scoopPath != "" {
+		if scoopPath := os.Getenv(utils.EnvVarScoop); scoopPath != "" {
 			locations = append(locations, filepath.Join(scoopPath, "shims", "goenv.exe"))
 		}
 
@@ -1230,7 +1229,7 @@ func detectAllGoenvInstallations() []string {
 
 	// Check all locations
 	for _, loc := range locations {
-		if stat, err := os.Stat(loc); err == nil && !stat.IsDir() {
+		if utils.FileExists(loc) {
 			// Resolve symlinks
 			resolved := loc
 			if r, err := filepath.EvalSymlinks(loc); err == nil {
@@ -1282,7 +1281,7 @@ func classifyInstallations(paths []string) []installationType {
 	}
 
 	// Determine recommendations based on platform and installation types
-	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+	if platform.IsMacOS() && platform.Arch() == "arm64" {
 		// On M1/M2 Mac, recommend ARM homebrew or manual, remove Intel homebrew
 		for i := range classified {
 			if classified[i].installType == InstallTypeHomebrewArm || classified[i].installType == InstallTypeManual {
@@ -1290,7 +1289,7 @@ func classifyInstallations(paths []string) []installationType {
 				break // Only keep one
 			}
 		}
-	} else if runtime.GOOS == "darwin" && runtime.GOARCH == "amd64" {
+	} else if platform.IsMacOS() && platform.Arch() == "amd64" {
 		// On Intel Mac, recommend Intel homebrew or manual
 		for i := range classified {
 			if classified[i].installType == InstallTypeHomebrewIntel || classified[i].installType == InstallTypeManual {
@@ -1329,7 +1328,7 @@ func generateCleanupRecommendation(installations []installationType) string {
 		return ""
 	}
 
-	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+	if platform.IsMacOS() && platform.Arch() == "arm64" {
 		// Check if there's an Intel homebrew installation
 		for _, inst := range installations {
 			if inst.installType == InstallTypeHomebrewIntel {
@@ -1366,6 +1365,8 @@ func generateCleanupRecommendation(installations []installationType) string {
 
 // runFixMode provides unified interactive fixing for all detected issues
 func runFixMode(cmd *cobra.Command, results []checkResult, cfg *config.Config) error {
+	ctx := cmdutil.NewInteractiveContext(cmd)
+
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Fprintf(cmd.OutOrStdout(), "%sInteractive Fix Mode\n", utils.Emoji("🔧 "))
@@ -1432,28 +1433,21 @@ func runFixMode(cmd *cobra.Command, results []checkResult, cfg *config.Config) e
 	}
 
 	// Tier 2: Prompted fixes
-	reader := bufio.NewReader(doctorStdin)
 	if len(promptFixes) > 0 {
 		for _, issue := range promptFixes {
 			fmt.Fprintln(cmd.OutOrStdout(), "──────────────────────────────────────────────────")
 			fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", utils.Emoji("🔧 "), issue.name)
 			fmt.Fprintf(cmd.OutOrStdout(), "  %s\n\n", issue.description)
-			fmt.Fprintf(cmd.OutOrStdout(), "Would you like to fix this? [Y/n]: ")
 
-			response, err := reader.ReadString('\n')
-			if err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "%sSkipping (input error)\n\n", utils.Emoji("⏭️  "))
-				continue
-			}
-
-			response = strings.TrimSpace(strings.ToLower(response))
-			if response != "" && response != "y" && response != "yes" {
+			// Use InteractiveContext for confirmation
+			question := "Would you like to fix this?"
+			if !ctx.Confirm(question, true) {
 				fmt.Fprintf(cmd.OutOrStdout(), "%sSkipped\n\n", utils.Emoji("⏭️  "))
 				continue
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout())
-			err = issue.fixFunc(cmd, cfg)
+			err := issue.fixFunc(cmd, cfg)
 			if err != nil {
 				fmt.Fprintf(cmd.OutOrStdout(), "\n%sError: %v\n\n", utils.Emoji("❌ "), err)
 			} else {
@@ -1478,7 +1472,7 @@ func runFixMode(cmd *cobra.Command, results []checkResult, cfg *config.Config) e
 		}
 
 		// Pause so user can read and copy the manual fix commands
-		utils.PauseForUser(cmd.OutOrStdout(), reader)
+		ctx.WaitForUser(fmt.Sprintf("%sPress Enter to continue...", utils.Emoji("⏸️  ")))
 		fmt.Fprintln(cmd.OutOrStdout())
 	}
 
@@ -1674,7 +1668,7 @@ func fixRehash(cmd *cobra.Command, cfg *config.Config) error {
 }
 
 func fixCacheClean(cmd *cobra.Command, cfg *config.Config) error {
-	buildCache := os.Getenv("GOCACHE")
+	buildCache := os.Getenv(utils.EnvVarGocache)
 	if buildCache == "" {
 		buildCache = filepath.Join(cfg.Root, "go-build")
 	}
@@ -1684,7 +1678,7 @@ func fixCacheClean(cmd *cobra.Command, cfg *config.Config) error {
 func fixInstallMissingVersion(cmd *cobra.Command, cfg *config.Config, version string) error {
 	// For now, show instructions - actual install would need to import install package
 	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv install %s\n", version)
-	return fmt.Errorf("please run the command manually")
+	return errors.PleaseRunManually()
 }
 
 func fixReinstallCorrupted(cmd *cobra.Command, cfg *config.Config, version string) error {
@@ -1699,12 +1693,12 @@ func fixSetVersion(cmd *cobra.Command, cfg *config.Config) error {
 		return fmt.Errorf("no versions installed")
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv global %s\n", versions[0])
-	return fmt.Errorf("please run the command manually")
+	return errors.PleaseRunManually()
 }
 
 func fixInstallLatest(cmd *cobra.Command, cfg *config.Config) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv install\n")
-	return fmt.Errorf("please run the command manually")
+	return errors.PleaseRunManually()
 }
 
 func fixGoModVersion(cmd *cobra.Command, cfg *config.Config, version string) error {
@@ -1714,22 +1708,22 @@ func fixGoModVersion(cmd *cobra.Command, cfg *config.Config, version string) err
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv install %s && goenv local %s\n", version, version)
 	}
-	return fmt.Errorf("please run the command manually")
+	return errors.PleaseRunManually()
 }
 
 func fixVSCodeInit(cmd *cobra.Command, cfg *config.Config) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv vscode init\n")
-	return fmt.Errorf("please run the command manually")
+	return errors.PleaseRunManually()
 }
 
 func fixVSCodeSync(cmd *cobra.Command, cfg *config.Config) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv vscode sync\n")
-	return fmt.Errorf("please run the command manually")
+	return errors.PleaseRunManually()
 }
 
 func fixToolSync(cmd *cobra.Command, cfg *config.Config) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv tools sync\n")
-	return fmt.Errorf("please run the command manually")
+	return errors.PleaseRunManually()
 }
 
 func fixDuplicateInstallations(cmd *cobra.Command, cfg *config.Config) error {
@@ -1818,7 +1812,7 @@ func cleanupDuplicateInstallations(cmd *cobra.Command) error {
 
 	scanner := bufio.NewScanner(doctorStdin)
 	if !scanner.Scan() {
-		return fmt.Errorf("failed to read input")
+		return errors.FailedTo("read input", scanner.Err())
 	}
 
 	input := strings.TrimSpace(scanner.Text())
@@ -1857,7 +1851,7 @@ func cleanupDuplicateInstallations(cmd *cobra.Command) error {
 	fmt.Print("\nProceed? (yes/no): ")
 
 	if !scanner.Scan() {
-		return fmt.Errorf("failed to read confirmation")
+		return errors.FailedTo("read confirmation", scanner.Err())
 	}
 
 	confirmation := strings.ToLower(strings.TrimSpace(scanner.Text()))
@@ -1910,7 +1904,7 @@ func cleanupShellProfiles(cmd *cobra.Command, cfg *config.Config) error {
 		// Find goenv-related lines
 		var goenvLines []int
 		for i, line := range lines {
-			if strings.Contains(line, "goenv init") || strings.Contains(line, "GOENV_ROOT") {
+			if strings.Contains(line, "goenv init") || strings.Contains(line, utils.GoenvEnvVarRoot.String()) {
 				goenvLines = append(goenvLines, i)
 			}
 		}
@@ -2062,8 +2056,8 @@ func checkPath(cfg *config.Config) checkResult {
 func checkShimsDir(cfg *config.Config) checkResult {
 	shimsDir := cfg.ShimsDir()
 
-	stat, err := os.Stat(shimsDir)
-	if os.IsNotExist(err) {
+	info, exists, err := utils.StatWithExistence(shimsDir)
+	if !exists {
 		return checkResult{
 			id:        "shims-directory",
 			name:      "Shims directory",
@@ -2083,7 +2077,7 @@ func checkShimsDir(cfg *config.Config) checkResult {
 		}
 	}
 
-	if !stat.IsDir() {
+	if !info.IsDir() {
 		return checkResult{
 			id:      "shims-directory",
 			name:    "Shims directory",
@@ -2124,8 +2118,7 @@ func checkShimsDir(cfg *config.Config) checkResult {
 	}
 }
 
-func checkInstalledVersions(cfg *config.Config) checkResult {
-	mgr := manager.NewManager(cfg)
+func checkInstalledVersions(cfg *config.Config, mgr *manager.Manager) checkResult {
 	versions, err := mgr.ListInstalledVersions()
 
 	if err != nil {
@@ -2185,8 +2178,7 @@ func checkInstalledVersions(cfg *config.Config) checkResult {
 	}
 }
 
-func checkCurrentVersion(cfg *config.Config) checkResult {
-	mgr := manager.NewManager(cfg)
+func checkCurrentVersion(cfg *config.Config, mgr *manager.Manager) checkResult {
 	version, source, err := mgr.GetCurrentVersion()
 
 	if err != nil {
@@ -2200,7 +2192,7 @@ func checkCurrentVersion(cfg *config.Config) checkResult {
 		}
 	}
 
-	if version == "system" {
+	if version == manager.SystemVersion {
 		return checkResult{
 			id:      "current-go-version",
 			name:    "Current Go version",
@@ -2267,7 +2259,7 @@ func checkConflictingGo(cfg *config.Config) checkResult {
 			goBinary += ".exe"
 		}
 
-		if _, err := os.Stat(goBinary); err == nil {
+		if utils.PathExists(goBinary) {
 			systemGoLocations = append(systemGoLocations, dir)
 		}
 	}
@@ -2322,10 +2314,10 @@ func checkCacheFiles(cfg *config.Config) checkResult {
 	versionsCache := filepath.Join(cfg.Root, "versions-cache.json")
 
 	var foundCaches []string
-	if _, err := os.Stat(releasesCache); err == nil {
+	if utils.PathExists(releasesCache) {
 		foundCaches = append(foundCaches, "releases-cache.json")
 	}
-	if _, err := os.Stat(versionsCache); err == nil {
+	if utils.PathExists(versionsCache) {
 		foundCaches = append(foundCaches, "versions-cache.json")
 	}
 
@@ -2435,7 +2427,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 	settingsFile := filepath.Join(vscodeDir, "settings.json")
 
 	// Check if .vscode directory exists
-	if _, err := os.Stat(vscodeDir); os.IsNotExist(err) {
+	if utils.FileNotExists(vscodeDir) {
 		// No .vscode directory - this is fine, just informational
 		return checkResult{
 			id:      "vs-code-integration",
@@ -2447,7 +2439,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 	}
 
 	// Check if settings.json exists
-	if _, err := os.Stat(settingsFile); os.IsNotExist(err) {
+	if utils.FileNotExists(settingsFile) {
 		return checkResult{
 			id:        "vs-code-integration",
 			name:      "VS Code integration",
@@ -2527,10 +2519,10 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 
 func checkGoModVersion(cfg *config.Config) checkResult {
 	cwd, _ := os.Getwd()
-	gomodPath := filepath.Join(cwd, "go.mod")
+	gomodPath := filepath.Join(cwd, config.GoModFileName)
 
 	// Only check if go.mod exists
-	if _, err := os.Stat(gomodPath); os.IsNotExist(err) {
+	if utils.FileNotExists(gomodPath) {
 		return checkResult{
 			id:      "gomod-version",
 			name:    "go.mod version",
@@ -2602,9 +2594,8 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 	}
 }
 
-func checkWhichGo(cfg *config.Config) checkResult {
+func checkWhichGo(cfg *config.Config, mgr *manager.Manager) checkResult {
 	// Get what goenv thinks the version should be
-	mgr := manager.NewManager(cfg)
 	expectedVersion, source, err := mgr.GetCurrentVersion()
 	if err != nil {
 		return checkResult{
@@ -2629,8 +2620,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 	}
 
 	// Get the actual version by running 'go version'
-	cmd := exec.Command("go", "version")
-	output, err := cmd.Output()
+	versionStr, err := utils.RunCommandOutput("go", "version")
 	if err != nil {
 		return checkResult{
 			id:      "actual-go-binary",
@@ -2642,11 +2632,10 @@ func checkWhichGo(cfg *config.Config) checkResult {
 	}
 
 	// Parse version from output (format: "go version go1.23.2 darwin/arm64")
-	versionStr := string(output)
 	parts := strings.Fields(versionStr)
 	var actualVersion string
 	if len(parts) >= 3 {
-		actualVersion = strings.TrimPrefix(parts[2], "go")
+		actualVersion = utils.NormalizeGoVersion(parts[2])
 	} else {
 		return checkResult{
 			id:      "actual-go-binary",
@@ -2661,7 +2650,7 @@ func checkWhichGo(cfg *config.Config) checkResult {
 	isUsingShim := strings.HasPrefix(goPath, shimsDir)
 
 	// If expected version is "system", we just need to verify go works
-	if expectedVersion == "system" {
+	if expectedVersion == manager.SystemVersion {
 		if isUsingShim {
 			return checkResult{
 				id:      "actual-go-binary",
@@ -2719,12 +2708,10 @@ func checkWhichGo(cfg *config.Config) checkResult {
 	}
 }
 
-func checkToolMigration(cfg *config.Config) checkResult {
-	mgr := manager.NewManager(cfg)
-
+func checkToolMigration(cfg *config.Config, mgr *manager.Manager) checkResult {
 	// Get current version
 	currentVersion, _, err := mgr.GetCurrentVersion()
-	if err != nil || currentVersion == "" || currentVersion == "system" {
+	if err != nil || currentVersion == "" || currentVersion == manager.SystemVersion {
 		// Can't check if no version is set or using system
 		return checkResult{
 			id:      "tool-migration",
@@ -2824,8 +2811,7 @@ func checkToolMigration(cfg *config.Config) checkResult {
 	}
 }
 
-func checkGocacheIsolation(cfg *config.Config) checkResult {
-	mgr := manager.NewManager(cfg)
+func checkGocacheIsolation(cfg *config.Config, mgr *manager.Manager) checkResult {
 	version, _, err := mgr.GetCurrentVersion()
 	if err != nil || version == "" {
 		return checkResult{
@@ -2836,7 +2822,7 @@ func checkGocacheIsolation(cfg *config.Config) checkResult {
 		}
 	}
 
-	if version == "system" {
+	if version == manager.SystemVersion {
 		return checkResult{
 			id:      "build-cache-isolation",
 			name:    "Build cache isolation",
@@ -2878,18 +2864,14 @@ func checkGocacheIsolation(cfg *config.Config) checkResult {
 
 func checkCacheArchitecture(cfg *config.Config) checkResult {
 	// Detect current architecture
-	currentArch := runtime.GOARCH
-	currentOS := runtime.GOOS
+	currentArch := platform.Arch()
+	currentOS := platform.OS()
 
 	// Try to get GOCACHE location
-	cmd := exec.Command("go", "env", "GOCACHE")
-	output, err := cmd.Output()
-	var gocache string
-	if err == nil {
-		gocache = strings.TrimSpace(string(output))
-	} else {
+	gocache, err := utils.RunCommandOutput("go", "env", "GOCACHE")
+	if err != nil {
 		// Fallback to environment variable
-		gocache = os.Getenv("GOCACHE")
+		gocache = os.Getenv(utils.EnvVarGocache)
 	}
 
 	if gocache == "" {
@@ -2902,8 +2884,7 @@ func checkCacheArchitecture(cfg *config.Config) checkResult {
 	}
 
 	// Check if cache directory exists
-	stat, err := os.Stat(gocache)
-	if err != nil || !stat.IsDir() {
+	if !utils.DirExists(gocache) {
 		return checkResult{
 			id:      "cache-architecture",
 			name:    "Cache architecture",
@@ -2939,7 +2920,7 @@ func listToolsForVersion(cfg *config.Config, version string) ([]string, error) {
 	gopathBin := filepath.Join(cfg.VersionsDir(), version, "gopath", "bin")
 
 	// Check if directory exists
-	if _, err := os.Stat(gopathBin); os.IsNotExist(err) {
+	if utils.FileNotExists(gopathBin) {
 		return []string{}, nil
 	}
 
@@ -2975,8 +2956,7 @@ func listToolsForVersion(cfg *config.Config, version string) ([]string, error) {
 	return tools, nil
 }
 
-func checkCacheMountType(cfg *config.Config) checkResult {
-	mgr := manager.NewManager(cfg)
+func checkCacheMountType(cfg *config.Config, mgr *manager.Manager) checkResult {
 	version, _, err := mgr.GetCurrentVersion()
 	if err != nil || version == "" {
 		return checkResult{
@@ -2987,7 +2967,7 @@ func checkCacheMountType(cfg *config.Config) checkResult {
 		}
 	}
 
-	if version == "system" {
+	if version == manager.SystemVersion {
 		return checkResult{
 			id:      "cache-mount-type",
 			name:    "Cache mount type",
@@ -3048,7 +3028,7 @@ func checkCacheMountType(cfg *config.Config) checkResult {
 }
 
 func checkGoToolchain() checkResult {
-	gotoolchain := os.Getenv("GOTOOLCHAIN")
+	gotoolchain := os.Getenv(utils.EnvVarGotoolchain)
 
 	if gotoolchain == "" {
 		return checkResult{
@@ -3088,10 +3068,9 @@ func checkGoToolchain() checkResult {
 	}
 }
 
-func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
-	mgr := manager.NewManager(cfg)
+func checkCacheIsolationEffectiveness(cfg *config.Config, mgr *manager.Manager) checkResult {
 	version, _, err := mgr.GetCurrentVersion()
-	if err != nil || version == "" || version == "system" {
+	if err != nil || version == "" || version == manager.SystemVersion {
 		return checkResult{
 			id:      "architecture-aware-cache-isolation",
 			name:    "Architecture-aware cache isolation",
@@ -3111,43 +3090,25 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 	}
 
 	// Get GOOS and GOARCH (if set for cross-compile)
-	goos := os.Getenv("GOOS")
-	goarch := os.Getenv("GOARCH")
+	goos := os.Getenv(utils.EnvVarGoos)
+	goarch := os.Getenv(utils.EnvVarGoarch)
 	if goos == "" {
-		goos = runtime.GOOS
+		goos = platform.OS()
 	}
 	if goarch == "" {
-		goarch = runtime.GOARCH
+		goarch = platform.Arch()
 	}
 
 	// Get Go binary path for ABI detection
-	versionPath := filepath.Join(cfg.VersionsDir(), version)
-	goBinaryPath := filepath.Join(versionPath, "bin", "go")
+	versionPath := cfg.VersionDir(version)
+	goBinaryPath := cfg.VersionGoBinary(version)
 	if utils.IsWindows() {
 		goBinaryPath += ".exe"
 	}
 
-	// Build expected cache path using same logic as exec.go
-	// Start with OS-arch
-	cacheSuffix := fmt.Sprintf("go-build-%s-%s", goos, goarch)
-
-	// Add ABI variants (GOAMD64, GOARM, etc.)
-	abiSuffix := goenv.BuildABISuffix(goBinaryPath, goarch, os.Environ())
-	cacheSuffix += abiSuffix
-
-	// Add GOEXPERIMENT if set
-	if goexp := os.Getenv("GOEXPERIMENT"); goexp != "" {
-		goexp = strings.ReplaceAll(goexp, ",", "-")
-		cacheSuffix += "-exp-" + goexp
-	}
-
-	// Add CGO toolchain hash if CGO is enabled
-	if cgo.IsCGOEnabled(os.Environ()) {
-		cgoHash := cgo.ComputeToolchainHash(os.Environ())
-		if cgoHash != "" {
-			cacheSuffix += "-cgo-" + cgoHash[:8]
-		}
-	}
+	// Build expected cache path using cache package API
+	// This centralizes the complex logic for ABI variants, GOEXPERIMENT, and CGO hashing
+	cacheSuffix := cache.BuildCacheSuffix(goBinaryPath, goos, goarch, os.Environ())
 
 	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
 
@@ -3160,14 +3121,14 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 
 	// Check if the cache directory exists
 	cacheExists := false
-	if stat, err := os.Stat(expectedGocache); err == nil && stat.IsDir() {
+	if utils.DirExists(expectedGocache) {
 		cacheExists = true
 	}
 
 	// Check for old-style cache (without architecture suffix)
 	oldCachePath := filepath.Join(versionPath, "go-build")
 	oldCacheExists := false
-	if stat, err := os.Stat(oldCachePath); err == nil && stat.IsDir() {
+	if utils.DirExists(oldCachePath) {
 		oldCacheExists = true
 	}
 
@@ -3208,7 +3169,7 @@ func checkCacheIsolationEffectiveness(cfg *config.Config) checkResult {
 
 func checkRosetta(cfg *config.Config) checkResult {
 	// Only relevant on macOS
-	if runtime.GOOS != "darwin" {
+	if !platform.IsMacOS() {
 		return checkResult{
 			id:      "rosetta-detection",
 			name:    "Rosetta detection",
@@ -3222,8 +3183,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 	// by checking if the process architecture differs from the machine architecture
 
 	// Get the native architecture
-	cmd := exec.Command("sysctl", "-n", "hw.optional.arm64")
-	output, err := cmd.Output()
+	output, err := utils.RunCommandOutput("sysctl", "-n", "hw.optional.arm64")
 	if err != nil {
 		// Probably not Apple Silicon, or sysctl failed
 		return checkResult{
@@ -3234,7 +3194,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		}
 	}
 
-	hasArm64 := strings.TrimSpace(string(output)) == "1"
+	hasArm64 := output == "1"
 	if !hasArm64 {
 		// Intel Mac
 		return checkResult{
@@ -3259,8 +3219,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 	}
 
 	// Use 'file' command to check actual binary architecture
-	fileCmd := exec.Command("file", executable)
-	fileOutput, err := fileCmd.Output()
+	fileStr, err := utils.RunCommandOutput("file", executable)
 	if err != nil {
 		return checkResult{
 			id:      "rosetta-detection",
@@ -3269,8 +3228,6 @@ func checkRosetta(cfg *config.Config) checkResult {
 			message: "Cannot determine binary architecture",
 		}
 	}
-
-	fileStr := string(fileOutput)
 
 	// Check if goenv binary is x86_64
 	if strings.Contains(fileStr, "x86_64") {
@@ -3286,7 +3243,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 	// Check current Go version architecture
 	mgr := manager.NewManager(cfg)
 	currentVersion, _, err := mgr.GetCurrentVersion()
-	if err != nil || currentVersion == "" || currentVersion == "system" {
+	if err != nil || currentVersion == "" || currentVersion == manager.SystemVersion {
 		// Can't check Go version
 		return checkResult{
 			id:      "rosetta-detection",
@@ -3307,8 +3264,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 		}
 	}
 
-	goFileCmd := exec.Command("file", goPath)
-	goFileOutput, err := goFileCmd.Output()
+	goFileStr, err := utils.RunCommandOutput("file", goPath)
 	if err != nil {
 		return checkResult{
 			id:      "rosetta-detection",
@@ -3317,8 +3273,6 @@ func checkRosetta(cfg *config.Config) checkResult {
 			message: "goenv is native arm64",
 		}
 	}
-
-	goFileStr := string(goFileOutput)
 	if strings.Contains(goFileStr, "x86_64") {
 		return checkResult{
 			id:      "rosetta-detection",
@@ -3372,7 +3326,7 @@ func checkPathOrder(cfg *config.Config) checkResult {
 			}
 
 			// Check if file exists and is not in goenv directories
-			if stat, err := os.Stat(goPath); err == nil && !stat.IsDir() {
+			if utils.FileExists(goPath) {
 				// Skip if this is in goenv root (versions or shims)
 				if !strings.HasPrefix(dir, cfg.Root) {
 					systemGoIndex = i
@@ -3475,11 +3429,10 @@ func checkLibcCompatibility(_ *config.Config) checkResult {
 	}
 }
 
-func checkMacOSDeploymentTarget(cfg *config.Config) checkResult {
+func checkMacOSDeploymentTarget(cfg *config.Config, mgr *manager.Manager) checkResult {
 	// Get current Go binary
-	mgr := manager.NewManager(cfg)
 	version, _, err := mgr.GetCurrentVersion()
-	if err != nil || version == "" || version == "system" {
+	if err != nil || version == "" || version == manager.SystemVersion {
 		return checkResult{
 			id:      "macos-deployment-target",
 			name:    "macOS deployment target",
@@ -3490,7 +3443,7 @@ func checkMacOSDeploymentTarget(cfg *config.Config) checkResult {
 
 	// Find go binary
 	goBinary := filepath.Join(cfg.VersionsDir(), version, "bin", "go")
-	if _, err := os.Stat(goBinary); err != nil {
+	if !utils.FileExists(goBinary) {
 		return checkResult{
 			id:      "macos-deployment-target",
 			name:    "macOS deployment target",
@@ -3701,6 +3654,13 @@ func isInteractive() bool {
 
 // offerShellEnvironmentFix prompts the user to fix shell environment issues
 func offerShellEnvironmentFix(cmd *cobra.Command, results []checkResult, cfg *config.Config) {
+	// Create interactive context for prompts
+	ctx := cmdutil.NewInteractiveContext(cmd)
+	// Use command streams for testing
+	ctx.Reader = doctorStdin
+	ctx.Writer = cmd.OutOrStdout()
+	ctx.ErrWriter = cmd.OutOrStderr()
+
 	// Find the shell-environment check result
 	var shellEnvResult *checkResult
 	for _, result := range results {
@@ -3730,17 +3690,8 @@ func offerShellEnvironmentFix(cmd *cobra.Command, results []checkResult, cfg *co
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Ask if they want to see the fix
-	fmt.Fprintf(cmd.OutOrStdout(), "Would you like to see the command to fix this? [Y/n]: ")
-
-	reader := bufio.NewReader(doctorStdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		// If we can't read input, just continue
-		return
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	if response == "" || response == "y" || response == "yes" {
+	question := "Would you like to see the command to fix this?"
+	if ctx.Confirm(question, true) {
 		// Show the fix command prominently with extra spacing
 		fmt.Fprintln(cmd.OutOrStdout())
 		fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -3759,6 +3710,6 @@ func offerShellEnvironmentFix(cmd *cobra.Command, results []checkResult, cfg *co
 		fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 		// Pause so user can read and copy the command before more output
-		utils.PauseForUser(cmd.OutOrStdout(), reader)
+		ctx.WaitForUser(fmt.Sprintf("%sPress Enter to continue...", utils.Emoji("⏸️  ")))
 	}
 }

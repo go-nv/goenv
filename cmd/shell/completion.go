@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
 	"github.com/go-nv/goenv/internal/completions"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -77,7 +79,7 @@ func runCompletion(cmd *cobra.Command, args []string) error {
 		script = completions.Bash
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return fmt.Errorf("cannot determine home directory: %w", err)
+			return errors.FailedTo("determine home directory", err)
 		}
 		installPath = filepath.Join(home, ".bashrc")
 		installInstructions = `
@@ -96,7 +98,7 @@ Or install system-wide (requires sudo):
 		// Try to find zsh fpath
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return fmt.Errorf("cannot determine home directory: %w", err)
+			return errors.FailedTo("determine home directory", err)
 		}
 		// Use user's home directory for zsh completions (cross-platform)
 		fpath := filepath.Join(home, ".zsh", "completions")
@@ -117,7 +119,7 @@ To install manually:
 		script = completions.Fish
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return fmt.Errorf("cannot determine home directory: %w", err)
+			return errors.FailedTo("determine home directory", err)
 		}
 		installPath = filepath.Join(home, ".config", "fish", "completions", "goenv.fish")
 		installInstructions = `
@@ -173,18 +175,18 @@ func installCompletion(shell shellutil.ShellType, script, installPath string) er
 	case shellutil.ShellTypeZsh:
 		// Create directory and write file
 		dir := filepath.Dir(installPath)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory: %w", err)
+		if err := utils.EnsureDirWithContext(dir, "create directory"); err != nil {
+			return err
 		}
-		return os.WriteFile(installPath, []byte(script), 0644)
+		return utils.WriteFileWithContext(installPath, []byte(script), utils.PermFileDefault, "write file")
 
 	case shellutil.ShellTypeFish:
 		// Create directory and write file
 		dir := filepath.Dir(installPath)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory: %w", err)
+		if err := utils.EnsureDirWithContext(dir, "create directory"); err != nil {
+			return err
 		}
-		return os.WriteFile(installPath, []byte(script), 0644)
+		return utils.WriteFileWithContext(installPath, []byte(script), utils.PermFileDefault, "write file")
 
 	case shellutil.ShellTypePowerShell:
 		// Would need to find $PROFILE on Windows
@@ -198,29 +200,23 @@ func installCompletion(shell shellutil.ShellType, script, installPath string) er
 func appendToFile(path, content string) error {
 	// Check if content already exists
 	if data, err := os.ReadFile(path); err == nil {
-		if contains(string(data), "goenv shell completion") {
+		if strings.Contains(string(data), "goenv shell completion") {
 			return fmt.Errorf("completion already installed in %s", path)
 		}
 	}
 
 	// Append content
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, utils.PermFileDefault)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return errors.FailedTo("open file", err)
 	}
 	defer f.Close()
 
 	if _, err := f.WriteString(content); err != nil {
-		return fmt.Errorf("failed to write completion: %w", err)
+		return errors.FailedTo("write completion", err)
 	}
 
 	fmt.Printf("%sCompletion installed to %s\n", utils.Emoji("✅ "), path)
 	fmt.Println("Run 'source " + path + "' to activate")
 	return nil
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			len(s) > len(substr)+1 && s[1:len(substr)+1] == substr))
 }

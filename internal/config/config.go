@@ -4,10 +4,25 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
+)
+
+// Common version file names used by goenv and Go toolchain
+const (
+	// VersionFileName is the name of the local version file
+	VersionFileName = ".go-version"
+
+	// GoModFileName is the name of the Go module file
+	GoModFileName = "go.mod"
+
+	// ToolVersionsFileName is the name of the asdf-compatible version file
+	ToolVersionsFileName = ".tool-versions"
+
+	// LegacyGlobalFileName is the name of the legacy global version file
+	LegacyGlobalFileName = "global"
 )
 
 // Config holds goenv configuration
@@ -81,7 +96,7 @@ func (c *Config) GlobalVersionFile() string {
 
 // LocalVersionFile returns the name of the local version file
 func (c *Config) LocalVersionFile() string {
-	return ".go-version"
+	return VersionFileName
 }
 
 // AliasesFile returns the path to the aliases file
@@ -95,10 +110,10 @@ func (c *Config) HostsDir() string {
 }
 
 // HostDir returns the directory for the current host (GOOS-GOARCH)
-// Uses runtime.GOOS and runtime.GOARCH to identify the host architecture
+// Uses platform.OS() and platform.Arch() to identify the host architecture
 func (c *Config) HostDir() string {
-	hostOS := runtime.GOOS
-	hostArch := runtime.GOARCH
+	hostOS := platform.OS()
+	hostArch := platform.Arch()
 	return filepath.Join(c.HostsDir(), hostOS+"-"+hostArch)
 }
 
@@ -123,10 +138,50 @@ func (c *Config) EnsureDirectories() error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		if err := utils.EnsureDirWithContext(dir, fmt.Sprintf("create directory %s", dir)); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+// VersionDir returns the installation directory for a specific Go version
+// Example: /Users/user/.goenv/versions/1.21.0
+func (c *Config) VersionDir(version string) string {
+	return filepath.Join(c.VersionsDir(), version)
+}
+
+// VersionBinDir returns the bin directory for a specific Go version
+// Example: /Users/user/.goenv/versions/1.21.0/bin
+func (c *Config) VersionBinDir(version string) string {
+	return filepath.Join(c.VersionDir(version), "bin")
+}
+
+// VersionGoBinary returns the path to the Go binary for a specific version
+// Returns the expected path (doesn't check if it exists)
+// Example: /Users/user/.goenv/versions/1.21.0/bin/go[.exe]
+func (c *Config) VersionGoBinary(version string) string {
+	goBinary := filepath.Join(c.VersionBinDir(version), "go")
+	return goBinary
+}
+
+// VersionGopathBin returns the gopath/bin directory for a specific version
+// This is where tools installed with "go install" are placed
+// Example: /Users/user/.goenv/versions/1.21.0/gopath/bin
+func (c *Config) VersionGopathBin(version string) string {
+	return filepath.Join(c.VersionDir(version), "gopath", "bin")
+}
+
+// FindVersionGoBinary returns the path to the Go binary for a specific version,
+// handling platform-specific executable extensions (.exe on Windows)
+// Returns an error if the binary doesn't exist
+func (c *Config) FindVersionGoBinary(version string) (string, error) {
+	return pathutil.FindExecutable(c.VersionGoBinary(version))
+}
+
+// IsVersionInstalled checks if a specific Go version is installed
+func (c *Config) IsVersionInstalled(version string) bool {
+	_, err := c.FindVersionGoBinary(version)
+	return err == nil
 }

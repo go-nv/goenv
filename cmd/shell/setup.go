@@ -1,19 +1,19 @@
 package shell
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/shell/profile"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -24,6 +24,8 @@ var setupCmd = &cobra.Command{
 	Short:   "Automatic first-time setup for goenv",
 	GroupID: string(cmdpkg.GroupGettingStarted),
 	Long: `Automatically configure goenv for first-time use.
+
+This is the recommended command for beginners. For manual control, use 'goenv init' instead.
 
 This command will:
   - Detect your shell (bash, zsh, fish, PowerShell, cmd)
@@ -38,7 +40,11 @@ Examples:
   goenv setup              # Interactive setup with prompts
   goenv setup --yes        # Auto-accept all prompts
   goenv setup --verify     # Run doctor checks after setup
-  goenv setup --shell zsh  # Force specific shell`,
+  goenv setup --shell zsh  # Force specific shell
+
+Difference from 'goenv init':
+  setup - Interactive wizard that modifies your profile (automated, beginner-friendly)
+  init  - Outputs shell code or checks status (manual, advanced)`,
 	RunE: runSetup,
 }
 
@@ -67,7 +73,12 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.NewInteractiveContext(cmd)
+	// Use command streams and setupStdin for testing
+	ctx.Reader = setupStdin
+	ctx.Writer = cmd.OutOrStdout()
+	ctx.ErrWriter = cmd.OutOrStderr()
 
 	fmt.Fprintf(cmd.OutOrStdout(), "%sWelcome to goenv setup!\n", utils.Emoji("🚀 "))
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -76,7 +87,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 	// Ensure directories exist
 	if err := cfg.EnsureDirectories(); err != nil {
-		return fmt.Errorf("failed to create goenv directories: %w", err)
+		return errors.FailedTo("create goenv directories", err)
 	}
 
 	// Step 1: Shell profile setup
@@ -131,20 +142,20 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(cmd.OutOrStdout(), "%sNext steps:\n", utils.Emoji("🎯 "))
 			fmt.Fprintln(cmd.OutOrStdout(), "  1. Restart your shell or run:")
 
-			var shell shellutil.ShellType
+			var shell profile.ShellType
 			if setupFlags.shell != "" {
-				shell = shellutil.ShellType(setupFlags.shell)
+				shell = profile.ShellType(setupFlags.shell)
 			} else {
-				shell = shellutil.DetectShell()
+				shell = profile.ShellType(shellutil.DetectShell())
 			}
-			profilePath := shellutil.GetProfilePathDisplay(shell)
+			profilePath := profile.NewProfileManager(shell).GetProfilePathDisplay()
 
 			switch shell {
-			case shellutil.ShellTypePowerShell:
+			case profile.ShellTypePowerShell:
 				fmt.Fprintf(cmd.OutOrStdout(), "     . %s\n", profilePath)
-			case shellutil.ShellTypeCmd:
+			case profile.ShellTypeCmd:
 				fmt.Fprintf(cmd.OutOrStdout(), "     (Restart your command prompt)\n")
-			case shellutil.ShellTypeFish:
+			case profile.ShellTypeFish:
 				fmt.Fprintf(cmd.OutOrStdout(), "     source %s\n", profilePath)
 			default:
 				fmt.Fprintf(cmd.OutOrStdout(), "     source %s\n", profilePath)
@@ -157,8 +168,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 			// Pause if --verify will run, to prevent doctor output from burying these commands
 			if setupFlags.verify && !setupFlags.dryRun {
-				reader := bufio.NewReader(setupStdin)
-				utils.PauseForUser(cmd.OutOrStdout(), reader)
+				ctx.WaitForUser(fmt.Sprintf("%sPress Enter to continue...", utils.Emoji("⏸️  ")))
 			}
 		}
 	}
@@ -182,12 +192,8 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			goenvBinary = "./goenv"
 		}
 
-		doctorCmd := exec.Command(goenvBinary, "doctor")
-		doctorCmd.Stdout = cmd.OutOrStdout()
-		doctorCmd.Stderr = cmd.ErrOrStderr()
-
 		// Run doctor and capture exit code (but don't fail setup)
-		_ = doctorCmd.Run()
+		_ = utils.RunCommandWithIO(goenvBinary, []string{"doctor"}, cmd.OutOrStdout(), cmd.ErrOrStderr())
 
 		// Print newline for spacing
 		fmt.Fprintln(cmd.OutOrStdout())
@@ -205,15 +211,15 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			if shellModified {
 				fmt.Fprintf(cmd.OutOrStdout(), "%sNote: Shell environment checks may report issues until you restart your shell:\n", utils.Emoji("💡 "))
 
-				var shell shellutil.ShellType
+				var shell profile.ShellType
 				if setupFlags.shell != "" {
-					shell = shellutil.ShellType(setupFlags.shell)
+					shell = profile.ShellType(setupFlags.shell)
 				} else {
-					shell = shellutil.DetectShell()
+					shell = profile.ShellType(shellutil.DetectShell())
 				}
 
 				switch shell {
-				case shellutil.ShellTypeCmd:
+				case profile.ShellTypeCmd:
 					fmt.Fprintln(cmd.OutOrStdout(), "  (Restart your command prompt)")
 				default:
 					fmt.Fprintf(cmd.OutOrStdout(), "  exec %s\n", shell)
@@ -235,58 +241,49 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 func setupShellProfile(cmd *cobra.Command, cfg *config.Config) ([]string, error) {
 	changes := []string{}
+	ctx := cmdutil.NewInteractiveContext(cmd)
 
 	fmt.Fprintf(cmd.OutOrStdout(), "%sConfiguring shell integration...\n", utils.Emoji("🐚 "))
 
 	// Detect shell
-	var shell shellutil.ShellType
+	var shell profile.ShellType
 	if setupFlags.shell != "" {
-		shell = shellutil.ShellType(setupFlags.shell)
+		shell = profile.ShellType(setupFlags.shell)
 	} else {
-		shell = shellutil.DetectShell()
+		// Convert profile.ShellType to profile.ShellType
+		shell = profile.ShellType(shellutil.DetectShell())
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "  Detected shell: %s\n", shell)
 
-	// Get profile path
-	profilePath := shellutil.GetProfilePath(shell)
-	if profilePath == "" {
-		return changes, fmt.Errorf("unsupported shell: %s", shell)
+	// Create profile manager
+	pm := profile.NewProfileManager(shell)
+
+	// Get profile information
+	prof, err := pm.GetProfile()
+	if err != nil {
+		return changes, errors.FailedTo("get profile", err)
 	}
 
-	profileDisplay := shellutil.GetProfilePathDisplay(shell)
+	profileDisplay := pm.GetProfilePathDisplay()
 	fmt.Fprintf(cmd.OutOrStdout(), "  Profile file: %s\n", profileDisplay)
 
 	// Check if already configured
-	alreadyConfigured, err := shellutil.HasGoenvInProfile(profilePath)
-	if err == nil && alreadyConfigured {
+	if prof.HasGoenv {
 		fmt.Fprintf(cmd.OutOrStdout(), "  %sAlready configured\n", utils.Emoji("✓ "))
 		return changes, nil
 	}
 
-	// Check if profile exists
-	profileExists := false
-	if _, err := os.Stat(profilePath); err == nil {
-		profileExists = true
-	}
-
-	// Build the init line
-	initLine := shellutil.GetInitLine(shell)
+	// Build the init line for display
+	initLine := pm.GetInitLine()
 
 	// Prompt user
 	if !setupFlags.yes && !setupFlags.dryRun && !setupFlags.nonInteractive {
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintf(cmd.OutOrStdout(), "  Add this to %s? [Y/n]: ", profileDisplay)
-		fmt.Fprintf(cmd.OutOrStdout(), "\n    %s\n", initLine)
-		fmt.Fprint(cmd.OutOrStdout(), "  ")
+		fmt.Fprintf(cmd.OutOrStdout(), "  Will add this to %s:\n", profileDisplay)
+		fmt.Fprintf(cmd.OutOrStdout(), "    %s\n\n", initLine)
 
-		reader := bufio.NewReader(setupStdin)
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			return changes, err
-		}
-
-		response = strings.TrimSpace(strings.ToLower(response))
-		if response != "" && response != "y" && response != "yes" {
+		question := fmt.Sprintf("Add this to %s?", profileDisplay)
+		if !ctx.Confirm(question, true) {
 			fmt.Fprintf(cmd.OutOrStdout(), "  Skipped\n")
 			return changes, nil
 		}
@@ -298,32 +295,15 @@ func setupShellProfile(cmd *cobra.Command, cfg *config.Config) ([]string, error)
 		return changes, nil
 	}
 
-	// Create backup
-	if profileExists {
-		backupPath := profilePath + ".goenv-backup." + time.Now().Format("20060102-150405")
-		if err := utils.CopyFile(profilePath, backupPath); err != nil {
-			return changes, fmt.Errorf("failed to backup profile: %w", err)
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "  Created backup: %s\n", filepath.Base(backupPath))
+	// Add initialization (includes automatic backup)
+	if err := pm.AddInitialization(true); err != nil {
+		return changes, errors.FailedTo("add initialization", err)
+	}
+
+	if prof.Exists {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Created backup: %s.goenv-backup.*\n", filepath.Base(prof.Path))
 		changes = append(changes, fmt.Sprintf("Backed up %s", profileDisplay))
 	}
-
-	// Add init line
-	// Use 0600 permissions for shell config files (user read/write only)
-	file, err := os.OpenFile(profilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		return changes, fmt.Errorf("failed to open profile: %w", err)
-	}
-	defer file.Close()
-
-	// Add some spacing if file already has content
-	if profileExists {
-		fmt.Fprintln(file)
-	}
-
-	// Write the init block
-	fmt.Fprintln(file, "# goenv initialization")
-	fmt.Fprintln(file, initLine)
 
 	fmt.Fprintf(cmd.OutOrStdout(), "  %sAdded goenv initialization\n", utils.Emoji("✓ "))
 	changes = append(changes, fmt.Sprintf("Added goenv init to %s", profileDisplay))
@@ -333,6 +313,7 @@ func setupShellProfile(cmd *cobra.Command, cfg *config.Config) ([]string, error)
 
 func setupVSCode(cmd *cobra.Command, cfg *config.Config) ([]string, error) {
 	changes := []string{}
+	ctx := cmdutil.NewInteractiveContext(cmd)
 
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintf(cmd.OutOrStdout(), "%sChecking for VS Code...\n", utils.Emoji("💻 "))
@@ -347,21 +328,13 @@ func setupVSCode(cmd *cobra.Command, cfg *config.Config) ([]string, error) {
 	settingsFile := filepath.Join(vscodeDir, "settings.json")
 
 	// Check if .vscode exists
-	if _, err := os.Stat(vscodeDir); os.IsNotExist(err) {
+	if !utils.PathExists(vscodeDir) {
 		fmt.Fprintf(cmd.OutOrStdout(), "  No .vscode directory in current folder\n")
 
 		// Ask if they want to set up VS Code for current directory
 		if !setupFlags.yes && !setupFlags.dryRun && !setupFlags.nonInteractive {
-			fmt.Fprint(cmd.OutOrStdout(), "  Set up VS Code integration for this directory? [y/N]: ")
-
-			reader := bufio.NewReader(setupStdin)
-			response, err := reader.ReadString('\n')
-			if err != nil {
-				return changes, nil
-			}
-
-			response = strings.TrimSpace(strings.ToLower(response))
-			if response != "y" && response != "yes" {
+			question := "Set up VS Code integration for this directory?"
+			if !ctx.Confirm(question, false) {
 				fmt.Fprintf(cmd.OutOrStdout(), "  Skipped\n")
 				return changes, nil
 			}
@@ -372,7 +345,7 @@ func setupVSCode(cmd *cobra.Command, cfg *config.Config) ([]string, error) {
 	}
 
 	// Check if settings already exist
-	if _, err := os.Stat(settingsFile); err == nil {
+	if utils.PathExists(settingsFile) {
 		content, readErr := os.ReadFile(settingsFile)
 		if readErr == nil && strings.Contains(string(content), "go.goroot") {
 			fmt.Fprintf(cmd.OutOrStdout(), "  %sVS Code already configured\n", utils.Emoji("✓ "))
@@ -387,15 +360,15 @@ func setupVSCode(cmd *cobra.Command, cfg *config.Config) ([]string, error) {
 	}
 
 	// Create .vscode directory if needed
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
-		return changes, fmt.Errorf("failed to create .vscode directory: %w", err)
+	if err := utils.EnsureDirWithContext(vscodeDir, "create .vscode directory"); err != nil {
+		return changes, err
 	}
 
 	// Get current Go version if set
 	currentVersion := utils.GoenvEnvVarVersion.UnsafeValue()
 	if currentVersion == "" {
 		// Try to read from .go-version
-		goVersionFile := filepath.Join(cwd, ".go-version")
+		goVersionFile := filepath.Join(cwd, config.VersionFileName)
 		if content, err := os.ReadFile(goVersionFile); err == nil {
 			currentVersion = strings.TrimSpace(string(content))
 		}
@@ -410,7 +383,7 @@ func setupVSCode(cmd *cobra.Command, cfg *config.Config) ([]string, error) {
 
 	// Write settings file
 	if err := writeVSCodeSettings(settingsFile, settings); err != nil {
-		return changes, fmt.Errorf("failed to configure VS Code: %w", err)
+		return changes, errors.FailedTo("configure VS Code", err)
 	}
 
 	if currentVersion != "" {
@@ -448,5 +421,5 @@ func writeVSCodeSettings(settingsFile string, newSettings map[string]interface{}
 		return err
 	}
 
-	return os.WriteFile(settingsFile, data, 0644)
+	return utils.WriteFileWithContext(settingsFile, data, utils.PermFileDefault, "write file")
 }

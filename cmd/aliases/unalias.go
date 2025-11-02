@@ -5,9 +5,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/helptext"
-	"github.com/go-nv/goenv/internal/manager"
 	"github.com/spf13/cobra"
 )
 
@@ -27,12 +26,11 @@ func init() {
 }
 
 func runUnalias(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
+	if err := cmdutil.ValidateExactArgs(args, 1, "name"); err != nil {
 		return fmt.Errorf("usage: goenv unalias <name>")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	name := args[0]
 	if err := mgr.DeleteAlias(name); err != nil {

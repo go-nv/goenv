@@ -2,23 +2,24 @@ package core
 
 import (
 	"bytes"
-	"os"
+	"github.com/go-nv/goenv/internal/utils"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/lifecycle"
 )
 
 func TestCompareCommand_Basic(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 
@@ -46,20 +47,11 @@ func TestCompareCommand_Basic(t *testing.T) {
 
 func TestCompareCommand_InstalledVersions(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create versions directory with installed versions
-	versionsDir := filepath.Join(tmpDir, "versions")
-	version1Dir := filepath.Join(versionsDir, "1.21.5")
-	version2Dir := filepath.Join(versionsDir, "1.22.3")
-
-	if err := os.MkdirAll(filepath.Join(version1Dir, "bin"), 0755); err != nil {
-		t.Fatalf("Failed to create version1 directory: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(version2Dir, "bin"), 0755); err != nil {
-		t.Fatalf("Failed to create version2 directory: %v", err)
-	}
+	cmdtest.CreateMockGoVersions(t, tmpDir, "1.21.5", "1.22.3")
 
 	buf := new(bytes.Buffer)
 	compareCmd.SetOut(buf)

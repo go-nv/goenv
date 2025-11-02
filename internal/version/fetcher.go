@@ -1,19 +1,17 @@
 package version
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
-	"runtime"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -56,9 +54,7 @@ type Fetcher struct {
 // NewFetcher creates a new version fetcher
 func NewFetcher() *Fetcher {
 	return &Fetcher{
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		client:  utils.NewHTTPClientDefault(),
 		baseURL: "https://go.dev/dl/",
 		debug:   false,
 	}
@@ -103,7 +99,7 @@ func (f *Fetcher) FetchAvailableVersions() ([]GoRelease, error) {
 
 	resp, err := f.client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch Go versions: %w", err)
+		return nil, errors.FailedTo("fetch Go versions", err)
 	}
 	defer resp.Body.Close()
 
@@ -113,12 +109,12 @@ func (f *Fetcher) FetchAvailableVersions() ([]GoRelease, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errors.FailedTo("read response body", err)
 	}
 
 	var releases []GoRelease
 	if err := json.Unmarshal(body, &releases); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+		return nil, errors.FailedTo("parse JSON response", err)
 	}
 
 	return releases, nil
@@ -145,7 +141,7 @@ func (f *Fetcher) FetchAllReleasesWithETag(etag string) ([]GoRelease, string, er
 	// Create request with ETag support
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to create request: %w", err)
+		return nil, "", errors.FailedTo("create request", err)
 	}
 
 	// Add If-None-Match header if we have an ETag
@@ -155,7 +151,7 @@ func (f *Fetcher) FetchAllReleasesWithETag(etag string) ([]GoRelease, string, er
 
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to fetch Go versions: %w", err)
+		return nil, "", errors.FailedTo("fetch Go versions", err)
 	}
 	defer resp.Body.Close()
 
@@ -176,12 +172,12 @@ func (f *Fetcher) FetchAllReleasesWithETag(etag string) ([]GoRelease, string, er
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to read response body: %w", err)
+		return nil, "", errors.FailedTo("read response body", err)
 	}
 
 	var releases []GoRelease
 	if err := json.Unmarshal(body, &releases); err != nil {
-		return nil, "", fmt.Errorf("failed to parse JSON response: %w", err)
+		return nil, "", errors.FailedTo("parse JSON response", err)
 	}
 
 	return releases, newETag, nil
@@ -206,10 +202,10 @@ func (f *Fetcher) GetLatestVersion() (*GoRelease, error) {
 // GetVersionsForPlatform filters versions for the current or specified platform
 func (f *Fetcher) GetVersionsForPlatform(goos, goarch string) ([]GoRelease, error) {
 	if goos == "" {
-		goos = runtime.GOOS
+		goos = platform.OS()
 	}
 	if goarch == "" {
-		goarch = runtime.GOARCH
+		goarch = platform.Arch()
 	}
 
 	releases, err := f.FetchAvailableVersions()
@@ -236,18 +232,18 @@ func (f *Fetcher) GetVersionsForPlatform(goos, goarch string) ([]GoRelease, erro
 
 // SortVersions sorts Go versions in descending order (newest first)
 func SortVersions(versions []GoRelease) {
-	sort.Slice(versions, func(i, j int) bool {
-		return utils.CompareGoVersions(versions[i].Version, versions[j].Version) > 0
+	slices.SortFunc(versions, func(a, b GoRelease) int {
+		return utils.CompareGoVersions(b.Version, a.Version)
 	})
 }
 
 // GetFileForPlatform returns the download file for a specific platform
 func (r *GoRelease) GetFileForPlatform(goos, goarch string) (*GoFile, error) {
 	if goos == "" {
-		goos = runtime.GOOS
+		goos = platform.OS()
 	}
 	if goarch == "" {
-		goarch = runtime.GOARCH
+		goarch = platform.Arch()
 	}
 
 	for _, file := range r.Files {
@@ -306,7 +302,7 @@ func (f *Fetcher) FetchAllVersions() ([]string, error) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errors.FailedTo("read response body", err)
 	}
 
 	// Parse API response (array of GoRelease objects)
@@ -344,14 +340,10 @@ func (f *Fetcher) loadCachedVersions() ([]string, error) {
 	}
 
 	cachePath := filepath.Join(f.cacheDir, "versions-cache.json")
-	data, err := os.ReadFile(cachePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cache file: %w", err)
-	}
 
 	var cache VersionCache
-	if err := json.Unmarshal(data, &cache); err != nil {
-		return nil, fmt.Errorf("failed to parse cache file: %w", err)
+	if err := utils.UnmarshalJSONFile(cachePath, &cache); err != nil {
+		return nil, fmt.Errorf("failed to read/parse cache file: %w", err)
 	}
 
 	// Strategy 1: If cache is very fresh (< 6 hours), use it without checking
@@ -414,15 +406,15 @@ func (f *Fetcher) cacheVersionsWithETag(versions []string, etag string) error {
 		return fmt.Errorf("no cache directory configured")
 	}
 
-	// Ensure cache directory exists with secure permissions (0700)
-	if err := os.MkdirAll(f.cacheDir, 0700); err != nil {
-		return fmt.Errorf("failed to create cache directory: %w", err)
+	// Ensure cache directory exists with secure permissions (utils.PermDirSecure)
+	if err := utils.EnsureDirWithContext(f.cacheDir, "create cache directory"); err != nil {
+		return err
 	}
 
 	// Compute SHA256 hash of versions data for integrity
 	versionsJSON, err := json.Marshal(versions)
 	if err != nil {
-		return fmt.Errorf("failed to marshal versions for hashing: %w", err)
+		return errors.FailedTo("marshal versions for hashing", err)
 	}
 
 	hash := computeSHA256(versionsJSON)
@@ -436,13 +428,13 @@ func (f *Fetcher) cacheVersionsWithETag(versions []string, etag string) error {
 
 	data, err := json.MarshalIndent(cache, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal cache: %w", err)
+		return errors.FailedTo("marshal cache", err)
 	}
 
 	cachePath := filepath.Join(f.cacheDir, "versions-cache.json")
-	// Write with secure permissions (0600)
-	if err := os.WriteFile(cachePath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write cache file: %w", err)
+	// Write with secure permissions (utils.PermFileSecure)
+	if err := utils.WriteFileWithContext(cachePath, data, utils.PermFileSecure, "write cache file"); err != nil {
+		return errors.FailedTo("write cache file", err)
 	}
 
 	return nil
@@ -450,13 +442,12 @@ func (f *Fetcher) cacheVersionsWithETag(versions []string, etag string) error {
 
 // computeSHA256 computes the SHA256 hash of data and returns it as a hex string
 func computeSHA256(data []byte) string {
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
+	return utils.SHA256Bytes(data)
 }
 
 // sortVersionStrings sorts version strings in descending order (newest first)
 func sortVersionStrings(versions []string) {
-	sort.Slice(versions, func(i, j int) bool {
-		return utils.CompareGoVersions(versions[i], versions[j]) > 0
+	slices.SortFunc(versions, func(a, b string) int {
+		return utils.CompareGoVersions(b, a)
 	})
 }

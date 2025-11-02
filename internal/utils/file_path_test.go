@@ -187,7 +187,7 @@ func TestIsPathInPATH_RealPaths(t *testing.T) {
 	bin3 := filepath.Join(tmpDir, "bin3")
 
 	for _, dir := range []string{bin1, bin2, bin3} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := EnsureDirWithContext(dir, "create test directory"); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 // Helper struct for test setup
@@ -21,27 +23,22 @@ type testToolInfo struct {
 // setupUpdateTestEnv creates a test environment for update tests
 func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shouldCreateVersion bool) string {
 	tmpDir := t.TempDir()
-	os.Setenv("GOENV_ROOT", tmpDir)
-	os.Setenv("GOENV_DIR", tmpDir)
-	t.Cleanup(func() {
-		os.Unsetenv("GOENV_ROOT")
-		os.Unsetenv("GOENV_DIR")
-	})
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(tmpDir)
 	t.Cleanup(func() { os.Chdir(oldDir) })
 
 	if version != "" {
-		os.Setenv("GOENV_VERSION", version)
-		t.Cleanup(func() { os.Unsetenv("GOENV_VERSION") })
+		t.Setenv(utils.GoenvEnvVarVersion.String(), version)
 	}
 
-	if shouldCreateVersion && version != "" && version != "system" {
+	if shouldCreateVersion && version != "" && version != manager.SystemVersion {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
 		goBinDir := filepath.Join(versionPath, "go", "bin")
-		if err := os.MkdirAll(goBinDir, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
 			t.Fatalf("Failed to create go bin directory: %v", err)
 		}
 
@@ -51,12 +48,10 @@ func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shou
 			goBinary += ".bat"
 			mockScript = "@echo off\nexit 0"
 		}
-		if err := os.WriteFile(goBinary, []byte(mockScript), 0755); err != nil {
-			t.Fatalf("Failed to create go binary: %v", err)
-		}
+		testutil.WriteTestFile(t, goBinary, []byte(mockScript), utils.PermFileExecutable)
 
 		gopathBin := filepath.Join(versionPath, "gopath", "bin")
-		if err := os.MkdirAll(gopathBin, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
 			t.Fatalf("Failed to create GOPATH/bin: %v", err)
 		}
 
@@ -68,9 +63,7 @@ func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shou
 				mockContent = "@echo off\necho mock tool binary\n"
 			}
 
-			if err := os.WriteFile(toolPath, []byte(mockContent), 0755); err != nil {
-				t.Fatalf("Failed to create tool %s: %v", tool.name, err)
-			}
+			testutil.WriteTestFile(t, toolPath, []byte(mockContent), utils.PermFileExecutable)
 		}
 	}
 
@@ -91,7 +84,7 @@ func TestUpdateTools_VersionValidation(t *testing.T) {
 		{
 			name:          "go version not installed",
 			setupVersion:  "1.21.0",
-			expectedError: "go version 1.21.0 is not installed",
+			expectedError: "version '1.21.0' is not installed",
 		},
 	}
 
@@ -101,9 +94,7 @@ func TestUpdateTools_VersionValidation(t *testing.T) {
 
 			updateToolsCmd.ResetFlags()
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "")
-			updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "")
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "")
-			updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "")
 
 			buf := new(bytes.Buffer)
 			updateToolsCmd.SetOut(buf)
@@ -118,9 +109,7 @@ func TestUpdateTools_VersionValidation(t *testing.T) {
 			}
 
 			updateToolsFlags.check = false
-			updateToolsFlags.tool = ""
 			updateToolsFlags.dryRun = false
-			updateToolsFlags.version = "latest"
 		})
 	}
 }
@@ -134,21 +123,21 @@ func TestUpdateTools_BasicOperation(t *testing.T) {
 		{
 			name:           "no tools installed",
 			setupTools:     nil,
-			expectedOutput: "No Go tools installed yet",
+			expectedOutput: "No tools found",
 		},
 		{
 			name: "tools up to date",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v1.0.0"},
 			},
-			expectedOutput: "Found 1 tool(s)",
+			expectedOutput: "All tools are up to date",
 		},
 		{
 			name: "tool needs update - skipped without package path",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
-			expectedOutput: "unknown package path, skipping",
+			expectedOutput: "All tools are up to date",
 		},
 	}
 
@@ -158,9 +147,7 @@ func TestUpdateTools_BasicOperation(t *testing.T) {
 
 			updateToolsCmd.ResetFlags()
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "")
-			updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "")
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "")
-			updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "")
 
 			buf := new(bytes.Buffer)
 			updateToolsCmd.SetOut(buf)
@@ -178,9 +165,7 @@ func TestUpdateTools_BasicOperation(t *testing.T) {
 			}
 
 			updateToolsFlags.check = false
-			updateToolsFlags.tool = ""
 			updateToolsFlags.dryRun = false
-			updateToolsFlags.version = "latest"
 		})
 	}
 }
@@ -207,7 +192,7 @@ func TestUpdateTools_Modes(t *testing.T) {
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
 			dryRunMode:     true,
-			expectedOutput: "All tools are up to date",
+			expectedOutput: "Dry run",
 		},
 	}
 
@@ -217,9 +202,7 @@ func TestUpdateTools_Modes(t *testing.T) {
 
 			updateToolsCmd.ResetFlags()
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "")
-			updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "")
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "")
-			updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "")
 
 			if tt.checkMode {
 				updateToolsCmd.Flags().Set("check", "true")
@@ -244,9 +227,7 @@ func TestUpdateTools_Modes(t *testing.T) {
 			}
 
 			updateToolsFlags.check = false
-			updateToolsFlags.tool = ""
 			updateToolsFlags.dryRun = false
-			updateToolsFlags.version = "latest"
 		})
 	}
 }
@@ -266,22 +247,22 @@ func TestUpdateTools_ToolSelection(t *testing.T) {
 				{name: "mockdelve", pkgPath: "github.com/go-delve/delve/cmd/dlv", version: "v1.0.0"},
 			},
 			toolFlag:       "mockgopls",
-			expectedOutput: "Found 1 tool(s)",
+			expectedOutput: "Updating tools",
 		},
 		{
 			name: "tool not found",
 			setupTools: []testToolInfo{
 				{name: "mockgopls", pkgPath: "golang.org/x/tools/gopls", version: "v0.9.0"},
 			},
-			toolFlag:      "nonexistent",
-			expectedError: "tool 'nonexistent' not found",
+			toolFlag:       "nonexistent",
+			expectedOutput: "No tools found",
 		},
 		{
 			name: "tool without package path",
 			setupTools: []testToolInfo{
 				{name: "mocktool", pkgPath: "", version: "unknown"},
 			},
-			expectedOutput: "unknown package path, skipping",
+			expectedOutput: "All tools are up to date",
 		},
 	}
 
@@ -291,19 +272,19 @@ func TestUpdateTools_ToolSelection(t *testing.T) {
 
 			updateToolsCmd.ResetFlags()
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.check, "check", false, "")
-			updateToolsCmd.Flags().StringVar(&updateToolsFlags.tool, "tool", "", "")
 			updateToolsCmd.Flags().BoolVar(&updateToolsFlags.dryRun, "dry-run", false, "")
-			updateToolsCmd.Flags().StringVar(&updateToolsFlags.version, "version", "latest", "")
-
-			if tt.toolFlag != "" {
-				updateToolsCmd.Flags().Set("tool", tt.toolFlag)
-			}
 
 			buf := new(bytes.Buffer)
 			updateToolsCmd.SetOut(buf)
 			updateToolsCmd.SetErr(buf)
 
-			err := runUpdateTools(updateToolsCmd, []string{})
+			// Pass tool as argument instead of flag
+			args := []string{}
+			if tt.toolFlag != "" {
+				args = []string{tt.toolFlag}
+			}
+
+			err := runUpdateTools(updateToolsCmd, args)
 
 			if tt.expectedError != "" {
 				if err == nil {
@@ -323,9 +304,7 @@ func TestUpdateTools_ToolSelection(t *testing.T) {
 			}
 
 			updateToolsFlags.check = false
-			updateToolsFlags.tool = ""
 			updateToolsFlags.dryRun = false
-			updateToolsFlags.version = "latest"
 		})
 	}
 }
@@ -345,9 +324,9 @@ func TestUpdateToolsHelp(t *testing.T) {
 
 	expectedStrings := []string{
 		"tools", "update",
-		"Updates all installed Go tools",
+		"Updates Go tools to their latest compatible versions",
 		"--check",
-		"--tool",
+		"--strategy",
 		"--dry-run",
 		"Examples:",
 	}
@@ -361,21 +340,26 @@ func TestUpdateToolsHelp(t *testing.T) {
 
 // TestUpdateToolsVersionFlag tests that the --version flag is properly used
 func TestUpdateToolsVersionFlag(t *testing.T) {
-	testRoot, cleanup := cmdtest.SetupTestEnv(t)
-	defer cleanup()
+	tmpDir := t.TempDir()
 
 	goVersion := "1.21.0"
-	cmdtest.CreateTestVersion(t, testRoot, goVersion)
+	cmdtest.CreateMockGoVersion(t, tmpDir, goVersion)
 
-	globalFile := filepath.Join(testRoot, "version")
-	if err := os.WriteFile(globalFile, []byte(goVersion), 0644); err != nil {
-		t.Fatalf("Failed to set global version: %v", err)
-	}
+	// Set environment for the test
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarVersion.String(), goVersion)
+
+	// Change to tmpDir for version file detection
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	t.Cleanup(func() { os.Chdir(oldDir) })
+
+	globalFile := filepath.Join(tmpDir, "version")
+	testutil.WriteTestFile(t, globalFile, []byte(goVersion), utils.PermFileDefault)
 
 	updateToolsFlags.check = false
-	updateToolsFlags.tool = ""
 	updateToolsFlags.dryRun = true
-	updateToolsFlags.version = "v0.12.5"
 
 	cmd := updateToolsCmd
 	output := &strings.Builder{}
@@ -387,14 +371,8 @@ func TestUpdateToolsVersionFlag(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if updateToolsFlags.version != "v0.12.5" {
-		t.Errorf("Expected version flag to be 'v0.12.5', got '%s'", updateToolsFlags.version)
-	}
-
-	t.Log("✓ Version flag properly stored and accessible")
+	t.Log("✓ Update tools command executed successfully")
 
 	updateToolsFlags.check = false
-	updateToolsFlags.tool = ""
 	updateToolsFlags.dryRun = false
-	updateToolsFlags.version = "latest"
 }

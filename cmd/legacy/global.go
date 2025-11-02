@@ -5,9 +5,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/helptext"
-	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/lifecycle"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
@@ -16,7 +15,7 @@ import (
 
 var globalCmd = &cobra.Command{
 	Use:   "global [version]",
-	Short: "Set or show the global Go version",
+	Short: "Set or show the global Go version (deprecated: use 'goenv use --global')",
 	Long:  "Set the global Go version that is used in all directories unless overridden by a local .go-version file",
 	Example: `  # Show current global version
   goenv global
@@ -26,8 +25,8 @@ var globalCmd = &cobra.Command{
 
   # Use system Go
   goenv global system`,
-	RunE:   RunGlobal,
-	Hidden: true, // Legacy command - use 'goenv use <version> --global' instead
+	RunE:    RunGlobal,
+	GroupID: string(cmdpkg.GroupLegacy),
 }
 
 var globalFlags struct {
@@ -45,8 +44,7 @@ func init() {
 func RunGlobal(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if globalFlags.complete {
-		cfg := config.Load()
-		mgr := manager.NewManager(cfg)
+		_, mgr := cmdutil.SetupContext()
 		versions, err := mgr.ListInstalledVersions()
 		if err == nil {
 			for _, v := range versions {
@@ -63,12 +61,11 @@ func RunGlobal(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStderr(), "  See: goenv help use\n\n")
 
 	// Validate: global command takes 0 or 1 argument
-	if len(args) > 1 {
+	if err := cmdutil.ValidateMaxArgs(args, 1, "at most one version"); err != nil {
 		return fmt.Errorf("usage: goenv global [version]")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	if len(args) == 0 {
 		// Show current global version(s) - read raw file to preserve multi-line format
@@ -96,39 +93,20 @@ func RunGlobal(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Check installation status
-	status, err := mgr.CheckVersionStatus(resolvedVersion)
+	// Handle installation/reinstallation using consolidated helper
+	// Note: Quiet is true to maintain legacy command's silent behavior
+	_, err = manager.HandleVersionInstallation(manager.InstallOptions{
+		Config:      cfg,
+		Manager:     mgr,
+		Version:     resolvedVersion,
+		AutoInstall: false,
+		Force:       false,
+		Quiet:       true,
+		Reason:      fmt.Sprintf("Setting global version to %s", resolvedVersion),
+		Writer:      cmd.OutOrStdout(),
+	})
 	if err != nil {
-		return fmt.Errorf("failed to check version status: %w", err)
-	}
-
-	if !status.Installed {
-		fmt.Fprintf(cmd.OutOrStdout(), "Go %s is not installed\n\n", resolvedVersion)
-
-		// Prompt for installation
-		if manager.PromptForInstall(resolvedVersion, fmt.Sprintf("Setting global version to %s", resolvedVersion)) {
-			fmt.Fprintf(cmd.OutOrStdout(), "\n%sInstalling Go %s...\n", utils.Emoji("📦 "), resolvedVersion)
-
-			installer := install.NewInstaller(cfg)
-			if err := installer.Install(resolvedVersion, false); err != nil {
-				return fmt.Errorf("installation failed: %w", err)
-			}
-
-			fmt.Fprintf(cmd.OutOrStdout(), "%sInstallation complete\n\n", utils.Emoji("✅ "))
-		} else {
-			fmt.Fprint(cmd.OutOrStdout(), manager.GetInstallHint(resolvedVersion, "global"))
-			return fmt.Errorf("installation cancelled")
-		}
-	} else if status.Corrupted {
-		if manager.PromptForReinstall(resolvedVersion) {
-			installer := install.NewInstaller(cfg)
-			if err := installer.Install(resolvedVersion, true); err != nil {
-				return fmt.Errorf("reinstallation failed: %w", err)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%sReinstallation complete\n\n", utils.Emoji("✅ "))
-		} else {
-			return fmt.Errorf("corrupted installation - reinstall cancelled")
-		}
+		return err
 	}
 
 	if cfg.Debug {
@@ -149,7 +127,7 @@ func RunGlobal(cmd *cobra.Command, args []string) error {
 // displayVersionWarning shows a warning if the version is outdated or EOL
 func displayVersionWarning(cmd *cobra.Command, version string) {
 	// Skip warning for system version
-	if version == "system" {
+	if version == manager.SystemVersion {
 		return
 	}
 

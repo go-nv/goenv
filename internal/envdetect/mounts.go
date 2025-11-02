@@ -2,9 +2,9 @@ package envdetect
 
 import (
 	"bufio"
+	"github.com/go-nv/goenv/internal/osinfo"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/utils"
@@ -25,9 +25,9 @@ func DetectMountType(path string) (*MountInfo, error) {
 		return nil, err
 	}
 
-	if runtime.GOOS == "linux" {
+	if osinfo.IsLinux() {
 		return detectLinuxMount(absPath)
-	} else if runtime.GOOS == "darwin" {
+	} else if osinfo.IsMacOS() {
 		return detectDarwinMount(absPath)
 	}
 
@@ -122,12 +122,12 @@ func CheckCacheOnProblemMount(cachePath string) string {
 
 // IsInContainer detects if we're running inside a container
 func IsInContainer() bool {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		return false
 	}
 
 	// Check for /.dockerenv file
-	if _, err := os.Stat("/.dockerenv"); err == nil {
+	if utils.PathExists("/.dockerenv") {
 		return true
 	}
 

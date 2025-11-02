@@ -514,6 +514,40 @@ tool --version  # Now works
 
 **Note:** `goenv use` automatically runs `goenv rehash`, but `go install` doesn't.
 
+### Can goenv automatically update my tools?
+
+Yes! Enable auto-update in `~/.goenv/default-tools.yaml`:
+
+```yaml
+auto_update_enabled: true
+auto_update_strategy: "on_use"  # Check when switching versions
+auto_update_interval: "24h"     # Check at most once per day
+```
+
+When you run `goenv use 1.21.5`, you'll see:
+```
+💡 2 tool update(s) available for Go 1.21.5
+   Run 'goenv tools update' to update
+```
+
+[Complete auto-update guide](./user-guide/AUTO_UPDATE_TOOLS.md)
+
+### Will auto-update slow down `goenv use`?
+
+No. Checks are throttled (default: 24h) and cached. Most of the time no network calls are made.
+
+### Can I pin tools to specific versions per Go version?
+
+Yes! Use version overrides in `~/.goenv/default-tools.yaml`:
+
+```yaml
+tools:
+  - name: gopls
+    version_overrides:
+      "1.18": "v0.11.0"  # Go 1.18 gets gopls v0.11.0
+      "1.23+": "@latest" # Go 1.23+ gets latest
+```
+
 ## VS Code Integration
 
 ### How do I set up VS Code with goenv?

@@ -1,11 +1,14 @@
 package legacy
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 
 	"github.com/spf13/cobra"
 )
@@ -97,10 +100,7 @@ func TestInstalledCommand(t *testing.T) {
 			// Set local version if specified
 			if tt.localVersion != "" {
 				localFile := filepath.Join(testRoot, ".go-version")
-				err := os.WriteFile(localFile, []byte(tt.localVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set local version: %v", err)
-				}
+				testutil.WriteTestFile(t, localFile, []byte(tt.localVersion), utils.PermFileDefault, "Failed to set local version")
 				// Change to test root so local version is found
 				oldDir, _ := os.Getwd()
 				defer os.Chdir(oldDir)

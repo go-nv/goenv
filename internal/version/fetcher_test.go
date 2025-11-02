@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestCompareVersions(t *testing.T) {
@@ -184,7 +185,7 @@ func TestSHA256Verification(t *testing.T) {
 	// Keep the old SHA256 - this should cause verification to fail
 
 	corruptedData, _ := json.MarshalIndent(corrupted, "", "  ")
-	os.WriteFile(cachePath, corruptedData, 0600)
+	testutil.WriteTestFile(t, cachePath, corruptedData, utils.PermFileSecure)
 
 	// Try to read corrupted cache - should fail verification
 	_, err = cache.Get()
@@ -214,7 +215,7 @@ func TestCachePermissions(t *testing.T) {
 		t.Fatalf("Failed to set cache: %v", err)
 	}
 
-	// Check file permissions (should be 0600)
+	// Check file permissions (should be utils.PermFileSecure)
 	cachePath := filepath.Join(tmpDir, "releases-cache.json")
 	info, err := os.Stat(cachePath)
 	if err != nil {
@@ -222,19 +223,19 @@ func TestCachePermissions(t *testing.T) {
 	}
 
 	mode := info.Mode().Perm()
-	expectedMode := os.FileMode(0600)
+	expectedMode := os.FileMode(utils.PermFileSecure)
 	if mode != expectedMode {
 		t.Errorf("Expected cache file mode %o, got %o", expectedMode, mode)
 	}
 
-	// Check directory permissions (should be 0700)
+	// Check directory permissions (should be utils.PermDirSecure)
 	dirInfo, err := os.Stat(tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to stat cache dir: %v", err)
 	}
 
 	dirMode := dirInfo.Mode().Perm()
-	expectedDirMode := os.FileMode(0700)
+	expectedDirMode := os.FileMode(utils.PermDirSecure)
 	if dirMode != expectedDirMode {
 		t.Errorf("Expected cache dir mode %o, got %o", expectedDirMode, dirMode)
 	}
@@ -261,8 +262,8 @@ func TestPermissionFixing(t *testing.T) {
 
 	// Manually set insecure permissions
 	cachePath := filepath.Join(tmpDir, "releases-cache.json")
-	os.Chmod(cachePath, 0644) // World-readable
-	os.Chmod(tmpDir, 0755)    // World-readable dir
+	os.Chmod(cachePath, utils.PermFileDefault) // World-readable
+	os.Chmod(tmpDir, utils.PermFileExecutable) // World-readable dir
 
 	// Try to read - should auto-fix permissions
 	_, err := cache.Get()
@@ -272,13 +273,13 @@ func TestPermissionFixing(t *testing.T) {
 
 	// Verify permissions were fixed
 	info, _ := os.Stat(cachePath)
-	if info.Mode().Perm() != 0600 {
-		t.Errorf("Expected permissions to be fixed to 0600, got %o", info.Mode().Perm())
+	if info.Mode().Perm() != utils.PermFileSecure {
+		t.Errorf("Expected permissions to be fixed to utils.PermFileSecure, got %o", info.Mode().Perm())
 	}
 
 	dirInfo, _ := os.Stat(tmpDir)
-	if dirInfo.Mode().Perm() != 0700 {
-		t.Errorf("Expected dir permissions to be fixed to 0700, got %o", dirInfo.Mode().Perm())
+	if dirInfo.Mode().Perm() != utils.PermDirSecure {
+		t.Errorf("Expected dir permissions to be fixed to utils.PermDirSecure, got %o", dirInfo.Mode().Perm())
 	}
 }
 

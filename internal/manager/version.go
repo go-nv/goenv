@@ -12,6 +12,12 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 )
 
+// SystemVersion is the special version name that refers to the system-installed Go
+const SystemVersion = "system"
+
+// LatestVersion is the special version name that refers to the latest available version
+const LatestVersion = "latest"
+
 // Manager handles version management operations
 type Manager struct {
 	config *config.Config
@@ -33,6 +39,11 @@ func (m *Manager) UnsetLocalVersion() error {
 // If targetDir is provided, searches from that directory
 // Otherwise searches from GOENV_DIR or current directory
 // Returns empty string and no error if no local version file is found (defaults to global)
+//
+// Search priority (first found wins):
+// 1. .go-version (goenv-specific)
+// 2. .tool-versions (asdf-compatible)
+// 3. go.mod (Go toolchain directive)
 func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 	var searchDir string
 
@@ -56,15 +67,21 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 	// Walk up the directory tree
 	currentDir := searchDir
 	for {
-		// Check for .go-version file
+		// Check for .go-version file (highest priority)
 		versionFile := filepath.Join(currentDir, localFile)
-		if _, err := os.Stat(versionFile); err == nil {
+		if utils.PathExists(versionFile) {
 			return versionFile, nil
 		}
 
+		// Check for .tool-versions (asdf-compatible)
+		toolVersionsFile := filepath.Join(currentDir, config.ToolVersionsFileName)
+		if utils.PathExists(toolVersionsFile) {
+			return toolVersionsFile, nil
+		}
+
 		// Check for go.mod (always enabled)
-		gomodFile := filepath.Join(currentDir, "go.mod")
-		if _, err := os.Stat(gomodFile); err == nil {
+		gomodFile := filepath.Join(currentDir, config.GoModFileName)
+		if utils.PathExists(gomodFile) {
 			return gomodFile, nil
 		}
 
@@ -88,13 +105,13 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 			currentDir := pwdDir
 			for {
 				versionFile := filepath.Join(currentDir, localFile)
-				if _, err := os.Stat(versionFile); err == nil {
+				if utils.PathExists(versionFile) {
 					return versionFile, nil
 				}
 
 				// Check for go.mod (always enabled)
-				gomodFile := filepath.Join(currentDir, "go.mod")
-				if _, err := os.Stat(gomodFile); err == nil {
+				gomodFile := filepath.Join(currentDir, config.GoModFileName)
+				if utils.PathExists(gomodFile) {
 					return gomodFile, nil
 				}
 
@@ -111,11 +128,16 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 	return "", nil
 }
 
-// ResolveVersionSpec resolves a version specification to an actual version NewManager creates a new version manager
+// NewManager creates a new version manager
 func NewManager(cfg *config.Config) *Manager {
 	return &Manager{
 		config: cfg,
 	}
+}
+
+// Config returns the manager's configuration
+func (m *Manager) Config() *config.Config {
+	return m.config
 }
 
 // ListInstalledVersions returns all installed Go versions
@@ -148,7 +170,7 @@ func (m *Manager) ListInstalledVersions() ([]string, error) {
 func (m *Manager) GetCurrentVersion() (string, string, error) {
 	// Check GOENV_VERSION environment variable first (highest precedence)
 	if envVersion := utils.GoenvEnvVarVersion.UnsafeValue(); envVersion != "" {
-		return envVersion, "GOENV_VERSION environment variable", nil
+		return envVersion, fmt.Sprintf("%s environment variable", utils.GoenvEnvVarVersion.String()), nil
 	}
 
 	// Check for local version file (including go.mod if enabled)
@@ -166,25 +188,25 @@ func (m *Manager) GetCurrentVersion() (string, string, error) {
 	if err == nil && globalVersion != "" {
 		// Check if a global version file actually exists
 		globalFile := m.config.GlobalVersionFile()
-		if _, statErr := os.Stat(globalFile); statErr == nil {
+		if utils.FileExists(globalFile) {
 			// Global file exists, return its path
 			return globalVersion, globalFile, nil
 		}
 
 		// Try legacy files
-		globalLegacyFile := filepath.Join(m.config.Root, "global")
-		if _, statErr := os.Stat(globalLegacyFile); statErr == nil {
+		globalLegacyFile := filepath.Join(m.config.Root, config.LegacyGlobalFileName)
+		if utils.FileExists(globalLegacyFile) {
 			return globalVersion, globalLegacyFile, nil
 		}
 
 		defaultFile := filepath.Join(m.config.Root, "default")
-		if _, statErr := os.Stat(defaultFile); statErr == nil {
+		if utils.FileExists(defaultFile) {
 			return globalVersion, defaultFile, nil
 		}
 
 		// No file exists, this is a default fallback to "system"
 		// Return empty source to indicate default behavior
-		if globalVersion == "system" {
+		if globalVersion == SystemVersion {
 			return "system", "", nil
 		}
 
@@ -211,7 +233,7 @@ func (m *Manager) GetGlobalVersion() (string, error) {
 	}
 
 	// Try legacy 'global' file
-	globalLegacyFile := filepath.Join(m.config.Root, "global")
+	globalLegacyFile := filepath.Join(m.config.Root, config.LegacyGlobalFileName)
 	if version, err := m.readVersionFile(globalLegacyFile); err == nil {
 		return version, nil
 	}
@@ -243,7 +265,7 @@ func (m *Manager) findLocalVersionFile() string {
 
 	for {
 		versionFile := filepath.Join(currentDir, localFile)
-		if _, err := os.Stat(versionFile); err == nil {
+		if utils.PathExists(versionFile) {
 			return versionFile
 		}
 
@@ -288,6 +310,7 @@ func (m *Manager) readVersionFile(filename string) (string, error) {
 // Supports:
 // - Regular .go-version files (single or multi-line)
 // - go.mod files (extracts Go version from "go X.Y" or "toolchain goX.Y.Z")
+// - .tool-versions files (asdf format: "golang X.Y.Z" or "go X.Y.Z")
 // - Multi-line version files (returns colon-separated versions)
 // - Skips relative path traversal (lines starting with ".." or containing "./")
 // - Trims whitespace and handles various line endings (\n, \r\n, \r)
@@ -302,8 +325,10 @@ func (m *Manager) ReadVersionFile(filename string) (string, error) {
 	}
 	defer file.Close()
 
-	// Check if it's a go.mod file
-	isGoMod := filepath.Base(filename) == "go.mod"
+	// Check file type
+	basename := filepath.Base(filename)
+	isGoMod := basename == config.GoModFileName
+	isToolVersions := basename == config.ToolVersionsFileName
 
 	var versions []string
 	scanner := bufio.NewScanner(file)
@@ -329,7 +354,7 @@ func (m *Manager) ReadVersionFile(filename string) (string, error) {
 			// Look for "toolchain go1.11.4" first (takes precedence)
 			if parts[0] == "toolchain" && len(parts) >= 2 {
 				if strings.HasPrefix(parts[1], "go") {
-					version := strings.TrimPrefix(parts[1], "go")
+					version := utils.NormalizeGoVersion(parts[1])
 					// Validate version string for path traversal attacks
 					if err := validateVersionString(version); err != nil {
 						continue // Skip invalid versions
@@ -345,6 +370,23 @@ func (m *Manager) ReadVersionFile(filename string) (string, error) {
 				}
 				// Store but continue looking for toolchain
 				versions = append(versions, parts[1])
+			}
+		} else if isToolVersions {
+			// Parse .tool-versions file (asdf format: "tool version")
+			parts := strings.Fields(line)
+			if len(parts) < 2 {
+				continue
+			}
+
+			// Look for "golang" or "go" entries
+			if parts[0] == "golang" || parts[0] == "go" {
+				version := parts[1]
+				// Validate version string for path traversal attacks
+				if err := validateVersionString(version); err != nil {
+					continue // Skip invalid versions
+				}
+				// Return first matching Go version
+				return version, nil
 			}
 		} else {
 			// Regular version file - validate for path traversal attacks
@@ -371,8 +413,8 @@ func (m *Manager) ReadVersionFile(filename string) (string, error) {
 // writeVersionFile writes a version to a file
 func (m *Manager) writeVersionFile(filename, version string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+	if err := utils.EnsureDirWithContext(filepath.Dir(filename), "create directory"); err != nil {
+		return err
 	}
 
 	file, err := os.Create(filename)
@@ -448,7 +490,7 @@ func validateVersionString(version string) error {
 	}
 
 	// Allow "system" and "latest" as special cases
-	if version == "system" || version == "latest" {
+	if version == SystemVersion || version == LatestVersion {
 		return nil
 	}
 
@@ -511,7 +553,7 @@ func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 	}
 	spec = resolved
 
-	if spec == "system" {
+	if spec == SystemVersion {
 		return "system", nil
 	}
 
@@ -521,13 +563,13 @@ func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 	}
 
 	if len(installed) == 0 {
-		if spec == "latest" {
+		if spec == LatestVersion {
 			return "", fmt.Errorf("goenv: version 'latest' not installed")
 		}
 		return "", fmt.Errorf("goenv: version '%s' not installed", spec)
 	}
 
-	if spec == "latest" {
+	if spec == LatestVersion {
 		resolved := maxVersion(installed)
 		if resolved == "" {
 			return "", fmt.Errorf("goenv: version 'latest' not installed")
@@ -542,13 +584,13 @@ func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 		}
 	}
 
-	trimmedSpec := strings.TrimPrefix(spec, "go")
+	trimmedSpec := utils.NormalizeGoVersion(spec)
 	specParts := strings.Split(trimmedSpec, ".")
 
 	if len(specParts) == 1 {
 		// Try matching major version first
 		majorMatches := filterVersions(installed, func(v string) bool {
-			parts := strings.Split(strings.TrimPrefix(v, "go"), ".")
+			parts := strings.Split(utils.NormalizeGoVersion(v), ".")
 			return len(parts) > 0 && parts[0] == specParts[0]
 		})
 		if len(majorMatches) > 0 {
@@ -557,7 +599,7 @@ func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 
 		// Fallback to matching minor version anywhere
 		minorMatches := filterVersions(installed, func(v string) bool {
-			parts := strings.Split(strings.TrimPrefix(v, "go"), ".")
+			parts := strings.Split(utils.NormalizeGoVersion(v), ".")
 			return len(parts) > 1 && parts[1] == specParts[0]
 		})
 		if len(minorMatches) > 0 {
@@ -567,7 +609,7 @@ func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 		// Match prefix for major.minor (or longer) specs
 		prefix := trimmedSpec + "."
 		prefixMatches := filterVersions(installed, func(v string) bool {
-			trimmed := strings.TrimPrefix(v, "go")
+			trimmed := utils.NormalizeGoVersion(v)
 			return trimmed == trimmedSpec || strings.HasPrefix(trimmed, prefix)
 		})
 		if len(prefixMatches) > 0 {
@@ -593,12 +635,12 @@ func (m *Manager) ValidateVersion(version string) error {
 	}
 	version = resolved
 
-	if version == "system" {
+	if version == SystemVersion {
 		return nil // "system" is always valid
 	}
 
 	versionDir := filepath.Join(m.config.VersionsDir(), version)
-	if _, err := os.Stat(versionDir); os.IsNotExist(err) {
+	if utils.FileNotExists(versionDir) {
 		return fmt.Errorf("goenv: version '%s' not installed", version)
 	}
 
@@ -607,26 +649,22 @@ func (m *Manager) ValidateVersion(version string) error {
 
 // IsVersionInstalled checks if a version is installed
 func (m *Manager) IsVersionInstalled(version string) bool {
-	if version == "system" {
+	if version == SystemVersion {
 		return true
 	}
 
 	versionDir := filepath.Join(m.config.VersionsDir(), version)
-	if _, err := os.Stat(versionDir); os.IsNotExist(err) {
-		return false
-	}
-
-	return true
+	return !utils.FileNotExists(versionDir)
 }
 
 // GetVersionPath returns the path to a specific Go version
 func (m *Manager) GetVersionPath(version string) (string, error) {
-	if version == "system" {
+	if version == SystemVersion {
 		return "", nil // System version uses default PATH
 	}
 
 	versionDir := filepath.Join(m.config.VersionsDir(), version)
-	if _, err := os.Stat(versionDir); os.IsNotExist(err) {
+	if utils.FileNotExists(versionDir) {
 		return "", fmt.Errorf("goenv: version '%s' not installed", version)
 	}
 
@@ -635,7 +673,7 @@ func (m *Manager) GetVersionPath(version string) (string, error) {
 
 // GetGoBinaryPath returns the path to the go binary for a specific version
 func (m *Manager) GetGoBinaryPath(version string) (string, error) {
-	if version == "system" {
+	if version == SystemVersion {
 		return "go", nil // Use system go from PATH
 	}
 
@@ -689,13 +727,13 @@ func findExecutableInPath(dir, name string) (string, error) {
 	if utils.IsWindows() {
 		for _, ext := range utils.WindowsExecutableExtensions() {
 			path := filepath.Join(dir, name+ext)
-			if _, err := os.Stat(path); err == nil {
+			if utils.PathExists(path) {
 				return path, nil
 			}
 		}
 		// Also try without extension
 		path := filepath.Join(dir, name)
-		if _, err := os.Stat(path); err == nil {
+		if utils.PathExists(path) {
 			return path, nil
 		}
 		return "", fmt.Errorf("executable not found")
@@ -703,7 +741,7 @@ func findExecutableInPath(dir, name string) (string, error) {
 
 	// On Unix, check if file exists
 	path := filepath.Join(dir, name)
-	if _, err := os.Stat(path); err == nil {
+	if utils.PathExists(path) {
 		return path, nil
 	}
 	return "", fmt.Errorf("executable not found")
@@ -714,7 +752,7 @@ func (m *Manager) HasSystemGo() bool {
 	// This is equivalent to the BATS test helper stub_system_go check
 	if goBinary, err := m.GetGoBinaryPath("system"); err == nil {
 		// Check if the system go actually exists
-		if _, err := os.Stat(goBinary); err == nil {
+		if utils.PathExists(goBinary) {
 			return true
 		}
 
@@ -881,8 +919,8 @@ func (m *Manager) writeAliasesFile(aliases map[string]string) error {
 	aliasesFile := m.config.AliasesFile()
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(aliasesFile), 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+	if err := utils.EnsureDirWithContext(filepath.Dir(aliasesFile), "create directory"); err != nil {
+		return err
 	}
 
 	file, err := os.Create(aliasesFile)
@@ -983,7 +1021,7 @@ func ParseGoModVersion(path string) (string, error) {
 				// Skip "default" toolchain
 				if version != "default" {
 					// Remove "go" prefix from toolchain version (e.g., "go1.22.5" -> "1.22.5")
-					toolchainVersion = strings.TrimPrefix(version, "go")
+					toolchainVersion = utils.NormalizeGoVersion(version)
 				}
 			}
 		}

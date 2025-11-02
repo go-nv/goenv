@@ -169,7 +169,7 @@ func logError(message string) {
 	// Optionally write to log file if GOENV_HOOKS_LOG is set
 	if logPath := utils.GoenvEnvVarHooksLog.UnsafeValue(); logPath != "" {
 		// Open or create log file with append mode
-		f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, utils.PermFileDefault)
 		if err != nil {
 			// Can't log the error without recursing, so just skip
 			return

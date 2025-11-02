@@ -8,9 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/platform"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestUpdateCommand_FlagValidation(t *testing.T) {
@@ -37,8 +40,8 @@ func TestUpdateCommand_FlagValidation(t *testing.T) {
 			updateForce = tt.force
 
 			tmpDir := t.TempDir()
-			t.Setenv("GOENV_ROOT", tmpDir)
-			t.Setenv("GOENV_DIR", tmpDir)
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			buf := new(bytes.Buffer)
 			updateCmd.SetOut(buf)
@@ -53,20 +56,18 @@ func TestUpdateCommand_FlagValidation(t *testing.T) {
 
 func TestUpdateCommand_DetectionGitInstall(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create a fake git repository structure
 	gitDir := filepath.Join(tmpDir, ".git")
-	if err := os.MkdirAll(gitDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(gitDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .git directory: %v", err)
 	}
 
 	// Create a fake HEAD file to make it look like a git repo
 	headFile := filepath.Join(gitDir, "HEAD")
-	if err := os.WriteFile(headFile, []byte("ref: refs/heads/main\n"), 0644); err != nil {
-		t.Fatalf("Failed to create HEAD file: %v", err)
-	}
+	testutil.WriteTestFile(t, headFile, []byte("ref: refs/heads/main\n"), utils.PermFileDefault)
 
 	buf := new(bytes.Buffer)
 	updateCmd.SetOut(buf)
@@ -85,8 +86,8 @@ func TestUpdateCommand_DetectionGitInstall(t *testing.T) {
 
 func TestUpdateCommand_BinaryDetection(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Don't create .git directory - should detect as binary installation
 
@@ -113,8 +114,8 @@ func TestUpdateCommand_CheckOnly(t *testing.T) {
 	updateCheckOnly = true
 
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	buf := new(bytes.Buffer)
 	updateCmd.SetOut(buf)
@@ -132,8 +133,8 @@ func TestUpdateCommand_CheckOnly(t *testing.T) {
 
 func TestUpdateCommand_NoArgs(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	buf := new(bytes.Buffer)
 	updateCmd.SetOut(buf)
@@ -151,8 +152,8 @@ func TestUpdateCommand_NoArgs(t *testing.T) {
 
 func TestUpdateCommand_RejectsArgs(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	buf := new(bytes.Buffer)
 	updateCmd.SetOut(buf)
@@ -170,8 +171,8 @@ func TestUpdateCommand_RejectsArgs(t *testing.T) {
 
 func TestUpdateCommand_OutputFormat(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	buf := new(bytes.Buffer)
 	updateCmd.SetOut(buf)
@@ -199,24 +200,22 @@ func TestUpdateCommand_GitInstallWithGit(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Initialize a real git repo
 	gitDir := filepath.Join(tmpDir, ".git")
-	if err := os.MkdirAll(gitDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(gitDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .git directory: %v", err)
 	}
 
 	// Create minimal git repo structure
 	headFile := filepath.Join(gitDir, "HEAD")
-	if err := os.WriteFile(headFile, []byte("ref: refs/heads/main\n"), 0644); err != nil {
-		t.Fatalf("Failed to create HEAD file: %v", err)
-	}
+	testutil.WriteTestFile(t, headFile, []byte("ref: refs/heads/main\n"), utils.PermFileDefault)
 
 	// Create refs directory
 	refsDir := filepath.Join(gitDir, "refs", "heads")
-	if err := os.MkdirAll(refsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(refsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create refs directory: %v", err)
 	}
 
@@ -276,9 +275,9 @@ func TestUpdateCommand_Flags(t *testing.T) {
 
 func TestUpdateCommand_WithDebug(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_DEBUG", "1")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDebug.String(), "1")
 
 	buf := new(bytes.Buffer)
 	updateCmd.SetOut(buf)
@@ -311,9 +310,9 @@ func TestUpdateCommand_GitNotFoundError(t *testing.T) {
 	t.Log("Expected error message includes:")
 	t.Log("  • 'git not found in PATH - cannot update git-based installation'")
 	t.Log("  • 'To fix this:' section with platform-specific instructions")
-	if os.Getenv("GOOS") == "windows" {
+	if os.Getenv(utils.EnvVarGoos) == "windows" {
 		t.Log("  • Windows: Install Git for Windows or use winget")
-	} else if os.Getenv("GOOS") == "darwin" {
+	} else if os.Getenv(utils.EnvVarGoos) == "darwin" {
 		t.Log("  • macOS: Install Xcode Command Line Tools or use Homebrew")
 	} else {
 		t.Log("  • Linux: Install via package manager")
@@ -331,9 +330,7 @@ func TestUpdateCommand_WritePermissionError(t *testing.T) {
 	tmpFile := filepath.Join(tmpDir, "goenv-test")
 
 	// Create a file
-	if err := os.WriteFile(tmpFile, []byte("test"), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, tmpFile, []byte("test"), utils.PermFileDefault)
 
 	// Make it read-only
 	if err := os.Chmod(tmpFile, 0444); err != nil {
@@ -374,24 +371,22 @@ func TestGetLatestRelease_304NotModified(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		// Return a minimal valid JSON response
 		fmt.Fprintf(w, `{"tag_name": "v1.0.0", "assets": [{"name": "goenv_1.0.0_%s_%s"}]}`,
-			runtime.GOOS, runtime.GOARCH)
+			platform.OS(), platform.Arch())
 	}))
 	defer server.Close()
 
 	// Create temp cache directory
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Create cache directory and write ETag
 	cacheDir := filepath.Join(tmpDir, "cache")
-	if err := os.MkdirAll(cacheDir, 0700); err != nil {
+	if err := utils.EnsureDirWithContext(cacheDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create cache directory: %v", err)
 	}
 
 	etagFile := filepath.Join(cacheDir, "update-etag")
-	if err := os.WriteFile(etagFile, []byte(etag), 0600); err != nil {
-		t.Fatalf("Failed to write ETag file: %v", err)
-	}
+	testutil.WriteTestFile(t, etagFile, []byte(etag), utils.PermFileSecure)
 
 	// Note: We can't easily test getLatestRelease with a custom server
 	// since it hardcodes the GitHub API URL. This test documents the expected behavior.

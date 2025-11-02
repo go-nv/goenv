@@ -10,6 +10,7 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -129,7 +130,7 @@ func runHooksInit(cmd *cobra.Command, args []string) error {
 	configPath := hooks.DefaultConfigPath()
 
 	// Check if config already exists
-	if _, err := os.Stat(configPath); err == nil {
+	if utils.PathExists(configPath) {
 		return fmt.Errorf("hooks configuration already exists at %s", configPath)
 	}
 
@@ -138,13 +139,13 @@ func runHooksInit(cmd *cobra.Command, args []string) error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+	if err := utils.EnsureDirWithContext(dir, "create directory"); err != nil {
+		return err
 	}
 
 	// Write template
-	if err := os.WriteFile(configPath, []byte(template), 0644); err != nil {
-		return fmt.Errorf("failed to write configuration: %w", err)
+	if err := utils.WriteFileWithContext(configPath, []byte(template), utils.PermFileDefault, "write configuration"); err != nil {
+		return err
 	}
 
 	fmt.Printf("%sCreated hooks configuration template at: %s\n\n", utils.Emoji("✅ "), configPath)
@@ -163,7 +164,7 @@ func runHooksList(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	config, err := hooks.LoadConfig(hooks.DefaultConfigPath())
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return errors.FailedTo("load configuration", err)
 	}
 
 	// Show status
@@ -229,13 +230,13 @@ func runHooksValidate(cmd *cobra.Command, args []string) error {
 	config, err := hooks.LoadConfig(configPath)
 	if err != nil {
 		fmt.Printf("%sConfiguration validation FAILED\n\n", utils.Emoji("❌ "))
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return errors.FailedTo("load configuration", err)
 	}
 
 	// Validate configuration
 	if err := config.Validate(); err != nil {
 		fmt.Printf("%sConfiguration validation FAILED\n\n", utils.Emoji("❌ "))
-		return fmt.Errorf("validation error: %w", err)
+		return errors.FailedTo("validate configuration", err)
 	}
 
 	// Validate each hook's actions
@@ -292,12 +293,12 @@ func runHooksTest(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	config, err := hooks.LoadConfig(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return errors.FailedTo("load configuration", err)
 	}
 
 	// Validate first
 	if err := config.Validate(); err != nil {
-		return fmt.Errorf("configuration validation failed: %w", err)
+		return errors.FailedTo("validate configuration", err)
 	}
 
 	// For testing, temporarily enable hooks (bypass the IsEnabled check)

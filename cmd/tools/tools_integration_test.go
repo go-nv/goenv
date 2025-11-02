@@ -1,12 +1,14 @@
 package tools
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 // TestMultiVersionToolManagement is a comprehensive integration test
@@ -25,14 +27,19 @@ func TestMultiVersionToolManagement(t *testing.T) {
 	versions := []string{"1.21.0", "1.22.0", "1.23.0"}
 	for _, v := range versions {
 		versionPath := filepath.Join(tmpDir, "versions", v)
-		goRoot := filepath.Join(versionPath, "go", "bin")
+		// Create Go binary (required by ListInstalledVersions)
+		goBinDir := filepath.Join(versionPath, "bin")
 		gopath := filepath.Join(versionPath, "gopath", "bin")
-		if err := os.MkdirAll(goRoot, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if err := os.MkdirAll(gopath, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(gopath, "create test directory"); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+
+		// Create Go binary
+		goBin := filepath.Join(goBinDir, "go")
+		testutil.WriteTestFile(t, goBin, []byte("#!/bin/sh\necho go version"), utils.PermFileExecutable)
 	}
 
 	// Install different tools in different versions
@@ -45,14 +52,13 @@ func TestMultiVersionToolManagement(t *testing.T) {
 	for version, tools := range toolInstallations {
 		binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
 		for _, tool := range tools {
-			if err := os.WriteFile(filepath.Join(binPath, tool), []byte("fake binary"), 0755); err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			testutil.WriteTestFile(t, filepath.Join(binPath, tool), []byte("fake binary"), utils.PermFileExecutable, "unexpected error")
 		}
 	}
 
-	// Test 1: Verify getInstalledVersions
-	installedVersions, err := getInstalledVersions(cfg)
+	// Test 1: Verify ListInstalledVersions
+	mgr := manager.NewManager(cfg)
+	installedVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -65,24 +71,31 @@ func TestMultiVersionToolManagement(t *testing.T) {
 
 	// Test 2: Verify tools for each version
 	for version, expectedTools := range toolInstallations {
-		tools, err := getToolsForVersion(cfg, version)
+		toolList, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if !utils.SlicesEqual(expectedTools, tools) {
-			t.Errorf("Tools for version %s don't match: expected %v, got %v", version, expectedTools, tools)
+
+		// Extract tool names
+		var toolNames []string
+		for _, tool := range toolList {
+			toolNames = append(toolNames, tool.Name)
+		}
+
+		if !utils.SlicesEqual(expectedTools, toolNames) {
+			t.Errorf("Tools for version %s don't match: expected %v, got %v", version, expectedTools, toolNames)
 		}
 	}
 
 	// Test 3: Collect all unique tools
 	allTools := make(map[string]bool)
 	for _, version := range versions {
-		tools, err := getToolsForVersion(cfg, version)
+		toolList, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		for _, tool := range tools {
-			allTools[tool] = true
+		for _, tool := range toolList {
+			allTools[tool.Name] = true
 		}
 	}
 	if len(allTools) != 3 {

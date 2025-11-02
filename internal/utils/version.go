@@ -180,3 +180,38 @@ func ParseVersionTuple(ver string) (major, minor, patch int, err error) {
 	// Only one component is invalid for Go versions
 	return 0, 0, 0, fmt.Errorf("invalid version format: %q (need at least major.minor)", ver)
 }
+
+// NormalizeGoVersion removes the "go" prefix from a version string if present.
+// This is a very common operation throughout the codebase (19+ occurrences).
+//
+// Examples:
+//   - "go1.21.0" → "1.21.0"
+//   - "1.21.0" → "1.21.0"
+//   - "go1.22rc1" → "1.22rc1"
+func NormalizeGoVersion(version string) string {
+	return strings.TrimPrefix(version, "go")
+}
+
+// FormatGoVersion ensures a version string has the "go" prefix.
+// This is the inverse of NormalizeGoVersion.
+//
+// Examples:
+//   - "1.21.0" → "go1.21.0"
+//   - "go1.21.0" → "go1.21.0"
+func FormatGoVersion(version string) string {
+	if strings.HasPrefix(version, "go") {
+		return version
+	}
+	return "go" + version
+}
+
+// MatchesVersion checks if a version string matches a target version,
+// handling both "go" prefixed and non-prefixed formats.
+//
+// Examples:
+//   - MatchesVersion("1.21.0", "go1.21.0") → true
+//   - MatchesVersion("go1.21.0", "1.21.0") → true
+//   - MatchesVersion("1.21.0", "1.21.0") → true
+func MatchesVersion(v1, v2 string) bool {
+	return NormalizeGoVersion(v1) == NormalizeGoVersion(v2)
+}

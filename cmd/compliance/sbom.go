@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
-	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -81,8 +82,7 @@ func init() {
 }
 
 func runSBOMProject(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Validate flags
 	if sbomImage != "" && sbomDir != "." {
@@ -107,7 +107,7 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 
 	// Print provenance header to stderr (safe for CI logs)
 	fmt.Fprintf(cmd.ErrOrStderr(), "goenv: Generating SBOM with %s (Go %s, %s/%s)\n",
-		sbomTool, goVersion, runtime.GOOS, runtime.GOARCH)
+		sbomTool, goVersion, platform.OS(), platform.Arch())
 
 	// Build command based on tool
 	var toolCmd *exec.Cmd
@@ -121,7 +121,7 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to build command: %w", err)
+		return errors.FailedTo("build command", err)
 	}
 
 	// Set up environment
@@ -146,7 +146,7 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 			// Preserve tool's exit code
 			os.Exit(exitErr.ExitCode())
 		}
-		return fmt.Errorf("tool execution failed: %w", err)
+		return errors.FailedTo("execute tool", err)
 	}
 
 	fmt.Fprintf(cmd.ErrOrStderr(), "goenv: SBOM written to %s\n", sbomOutput)

@@ -3,12 +3,15 @@ package utils
 import (
 	"os"
 	"path/filepath"
-	"runtime"
+
+	"github.com/go-nv/goenv/internal/osinfo"
 )
 
-// IsWindows returns true if the current OS is Windows
+// IsWindows returns true if the current OS is Windows.
+// Note: platform.IsWindows() provides the same functionality with other OS checks
+// (IsMacOS, IsLinux, IsUnix). Both implementations are kept to avoid import cycles.
 func IsWindows() bool {
-	return runtime.GOOS == "windows"
+	return osinfo.IsWindows()
 }
 
 // WindowsExecutableExtensions returns the list of valid executable extensions on Windows
@@ -19,7 +22,7 @@ func WindowsExecutableExtensions() []string {
 // HasExecutableBit returns true if the file has the executable bit set (Unix permission 0111).
 // This is only meaningful on Unix-like systems. On Windows, this always returns true.
 func HasExecutableBit(info os.FileInfo) bool {
-	return info.Mode()&0111 != 0
+	return info.Mode()&PermExecutableBit != 0
 }
 
 // FindExecutable looks for an executable file in the given directory.
@@ -32,7 +35,7 @@ func FindExecutable(dir, name string) (string, error) {
 		// On Windows, try all executable extensions in order of preference
 		for _, ext := range WindowsExecutableExtensions() {
 			path := filepath.Join(dir, name+ext)
-			if _, err := os.Stat(path); err == nil {
+			if FileExists(path) {
 				return path, nil
 			}
 		}

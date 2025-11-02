@@ -2,8 +2,9 @@ package envdetect
 
 import (
 	"os"
-	"runtime"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/osinfo"
 
 	"github.com/go-nv/goenv/internal/utils"
 )
@@ -26,7 +27,7 @@ func TestDetect(t *testing.T) {
 }
 
 func TestDetectWSL(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		t.Skip("WSL detection only works on Linux")
 	}
 
@@ -86,7 +87,7 @@ func TestDetectFilesystem(t *testing.T) {
 }
 
 func TestDetectLinuxFilesystem(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		t.Skip("Linux filesystem detection only works on Linux")
 	}
 
@@ -101,7 +102,7 @@ func TestDetectLinuxFilesystem(t *testing.T) {
 }
 
 func TestDetectDarwinFilesystem(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("Darwin filesystem detection only works on macOS")
 	}
 
@@ -160,7 +161,7 @@ func TestDetectWindowsFilesystemUNC(t *testing.T) {
 			// Skip WSL mount test on native Windows (only valid in WSL)
 			if tt.name == "WSL mount" && utils.IsWindows() {
 				// Check if we're in WSL by looking for /proc/version
-				if _, err := os.Stat("/proc/version"); os.IsNotExist(err) {
+				if utils.FileNotExists("/proc/version") {
 					t.Skip("Skipping WSL mount test on native Windows")
 				}
 			}

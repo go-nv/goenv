@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // LogToFileAction writes formatted log messages to a file
@@ -74,8 +77,8 @@ func (a *LogToFileAction) Execute(ctx *HookContext, params map[string]interface{
 
 	// Create directory if needed
 	dir := filepath.Dir(file)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory: %w", err)
+	if err := utils.EnsureDirWithContext(dir, "create log directory"); err != nil {
+		return err
 	}
 
 	// Open file
@@ -86,9 +89,9 @@ func (a *LogToFileAction) Execute(ctx *HookContext, params map[string]interface{
 		flags |= os.O_TRUNC
 	}
 
-	f, err := os.OpenFile(file, flags, 0644)
+	f, err := os.OpenFile(file, flags, utils.PermFileDefault)
 	if err != nil {
-		return fmt.Errorf("failed to open log file: %w", err)
+		return errors.FailedTo("open log file", err)
 	}
 	defer f.Close()
 
@@ -104,16 +107,16 @@ func (a *LogToFileAction) Execute(ctx *HookContext, params map[string]interface{
 		}
 
 		// Reopen file (will create new empty file)
-		f, err = os.OpenFile(file, flags, 0644)
+		f, err = os.OpenFile(file, flags, utils.PermFileDefault)
 		if err != nil {
-			return fmt.Errorf("failed to reopen log file after rotation: %w", err)
+			return errors.FailedTo("reopen log file after rotation", err)
 		}
 		defer f.Close()
 	}
 
 	// Write message
 	if _, err := f.WriteString(message); err != nil {
-		return fmt.Errorf("failed to write to log file: %w", err)
+		return errors.FailedTo("write to log file", err)
 	}
 
 	return nil

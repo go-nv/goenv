@@ -2,9 +2,11 @@ package core
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestInstallCommand_FlagValidation(t *testing.T) {
@@ -28,8 +30,8 @@ func TestInstallCommand_FlagValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			t.Setenv("GOENV_ROOT", tmpDir)
-			t.Setenv("GOENV_DIR", tmpDir)
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Reset flags
 			installCmd.ResetFlags()
@@ -120,14 +122,11 @@ func TestInstallHelp(t *testing.T) {
 
 func TestInstallCommand_SkipExisting(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
-	// Create a fake installed version
-	versionDir := tmpDir + "/versions/1.21.0"
-	if err := os.MkdirAll(versionDir, 0755); err != nil {
-		t.Fatalf("Failed to create version directory: %v", err)
-	}
+	// Create a proper mock installed version with go binary
+	cmdtest.CreateMockGoVersion(t, tmpDir, "1.21.0")
 
 	// Reset flags
 	installCmd.ResetFlags()

@@ -50,7 +50,7 @@ func TestEmojiSuppression_CommandOutput(t *testing.T) {
 		{
 			name: "NO_COLOR environment variable",
 			setup: func() {
-				os.Setenv("NO_COLOR", "1")
+				os.Setenv(utils.EnvVarNoColor, "1")
 			},
 			expectEmoji: false,
 		},
@@ -126,7 +126,7 @@ func TestEmojiFunction_DirectUsage(t *testing.T) {
 		{
 			name: "Emoji() with NO_COLOR returns empty",
 			setup: func() {
-				os.Setenv("NO_COLOR", "1")
+				os.Setenv(utils.EnvVarNoColor, "1")
 				utils.SetOutputOptions(false, false)
 			},
 			emoji: "✓ ",
@@ -137,7 +137,7 @@ func TestEmojiFunction_DirectUsage(t *testing.T) {
 		{
 			name: "EmojiOr() with NO_COLOR returns fallback",
 			setup: func() {
-				os.Setenv("NO_COLOR", "1")
+				os.Setenv(utils.EnvVarNoColor, "1")
 				utils.SetOutputOptions(false, false)
 			},
 			emoji:    "✓ ",
@@ -224,7 +224,7 @@ func TestOutputFunctions_NilCheck(t *testing.T) {
 	}
 
 	// Test with NO_COLOR
-	os.Setenv("NO_COLOR", "1")
+	os.Setenv(utils.EnvVarNoColor, "1")
 	result = utils.Emoji("✓")
 	if result != "" {
 		t.Errorf("With NO_COLOR, Emoji should return empty, got %q", result)

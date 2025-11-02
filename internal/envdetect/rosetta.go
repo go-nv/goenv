@@ -2,44 +2,39 @@ package envdetect
 
 import (
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/osinfo"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
 // IsAppleSilicon detects if running on Apple Silicon (M1/M2/M3/etc)
 func IsAppleSilicon() bool {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		return false
 	}
 
 	// Check for arm64 support via sysctl
-	cmd := exec.Command("sysctl", "-n", "hw.optional.arm64")
-	output, err := cmd.Output()
+	output, err := utils.RunCommandOutput("sysctl", "-n", "hw.optional.arm64")
 	if err != nil {
 		return false
 	}
 
-	return strings.TrimSpace(string(output)) == "1"
+	return output == "1"
 }
 
 // GetBinaryArchitecture returns the architecture of a binary file
 // Returns "arm64", "x86_64", or "" if unable to determine
 func GetBinaryArchitecture(binaryPath string) string {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		return ""
 	}
 
 	// Use 'file' command to check binary architecture
-	cmd := exec.Command("file", binaryPath)
-	output, err := cmd.Output()
+	fileStr, err := utils.RunCommandOutput("file", binaryPath)
 	if err != nil {
 		return ""
 	}
-
-	fileStr := string(output)
 
 	// Check for arm64
 	if strings.Contains(fileStr, "arm64") {
@@ -101,17 +96,16 @@ func CheckRosettaMixedArchitecture(toolPath string) string {
 
 // IsRosetta detects if the current process is running under Rosetta 2 translation
 func IsRosetta() bool {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		return false
 	}
 
 	// Check if running under Rosetta 2 translation
 	// sysctl.proc_translated returns 1 when under Rosetta, 0 for native, or error if not applicable
-	cmd := exec.Command("sysctl", "-n", "sysctl.proc_translated")
-	output, err := cmd.Output()
+	output, err := utils.RunCommandOutput("sysctl", "-n", "sysctl.proc_translated")
 	if err != nil {
 		return false
 	}
 
-	return strings.TrimSpace(string(output)) == "1"
+	return output == "1"
 }

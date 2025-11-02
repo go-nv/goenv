@@ -1,11 +1,14 @@
 package version
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 
 	"github.com/spf13/cobra"
 )
@@ -51,45 +54,40 @@ func TestVersionOriginCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testRoot, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+
+			// Change to test directory so local version files are found
+			oldDir, _ := os.Getwd()
+			defer os.Chdir(oldDir)
+			os.Chdir(tmpDir)
 
 			// Setup test versions
 			for _, version := range tt.setupVersions {
-				cmdtest.CreateTestVersion(t, testRoot, version)
+				cmdtest.CreateMockGoVersion(t, tmpDir, version)
 			}
 
 			// Set global version if specified
 			if tt.globalVersion != "" {
-				globalFile := filepath.Join(testRoot, "version")
-				err := os.WriteFile(globalFile, []byte(tt.globalVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set global version: %v", err)
-				}
+				globalFile := filepath.Join(tmpDir, "version")
+				testutil.WriteTestFile(t, globalFile, []byte(tt.globalVersion), utils.PermFileDefault, "Failed to set global version")
 			}
 
 			// Set local version if specified
 			if tt.localVersion != "" {
-				localFile := filepath.Join(testRoot, ".go-version")
-				err := os.WriteFile(localFile, []byte(tt.localVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set local version: %v", err)
-				}
-				// Change to test root so local version is found
-				oldDir, _ := os.Getwd()
-				defer os.Chdir(oldDir)
-				os.Chdir(testRoot)
+				localFile := filepath.Join(tmpDir, ".go-version")
+				testutil.WriteTestFile(t, localFile, []byte(tt.localVersion), utils.PermFileDefault, "Failed to set local version")
 			}
 
 			// Set environment version if specified
 			if tt.envVersion != "" {
-				os.Setenv("GOENV_VERSION", tt.envVersion)
+				t.Setenv(utils.GoenvEnvVarVersion.String(), tt.envVersion)
 			}
 
 			// Set version origin from hook if specified
 			if tt.envOrigin != "" {
-				os.Setenv("GOENV_VERSION_ORIGIN", tt.envOrigin)
-				defer os.Unsetenv("GOENV_VERSION_ORIGIN")
+				t.Setenv(utils.GoenvEnvVarVersionOrigin.String(), tt.envOrigin)
 			}
 
 			// Create and execute command
@@ -116,9 +114,9 @@ func TestVersionOriginCommand(t *testing.T) {
 			// Build expected output
 			expected := tt.expectedOutput
 			if expected == "version" {
-				expected = filepath.Join(testRoot, "version")
+				expected = filepath.Join(tmpDir, "version")
 			} else if expected == ".go-version" {
-				expected = filepath.Join(testRoot, ".go-version")
+				expected = filepath.Join(tmpDir, ".go-version")
 			}
 
 			// Resolve symlinks for comparison (macOS /var -> /private/var)

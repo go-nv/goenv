@@ -55,25 +55,22 @@ func TestInitWindowsShells(t *testing.T) {
 
 func TestDetermineProfilePathWindows(t *testing.T) {
 	tests := []struct {
-		shell         shellutil.ShellType
-		originalShell string
-		expected      string
+		shell    shellutil.ShellType
+		expected string
 	}{
 		{
-			shell:         shellutil.ShellTypePowerShell,
-			originalShell: "powershell",
-			expected:      "$PROFILE",
+			shell:    shellutil.ShellTypePowerShell,
+			expected: "$PROFILE",
 		},
 		{
-			shell:         shellutil.ShellTypeCmd,
-			originalShell: "cmd",
-			expected:      "%USERPROFILE%\\autorun.cmd",
+			shell:    shellutil.ShellTypeCmd,
+			expected: "%USERPROFILE%\\autorun.cmd",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(string(tt.shell), func(t *testing.T) {
-			result := determineProfilePath(tt.shell, tt.originalShell)
+			result := shellutil.GetProfilePathDisplay(tt.shell)
 			if result != tt.expected {
 				t.Errorf("expected %s, got %s", tt.expected, result)
 			}
@@ -84,24 +81,21 @@ func TestDetermineProfilePathWindows(t *testing.T) {
 func TestRenderUsageSnippetWindows(t *testing.T) {
 	tests := []struct {
 		shell           shellutil.ShellType
-		originalShell   string
 		expectedSnippet string
 	}{
 		{
 			shell:           shellutil.ShellTypePowerShell,
-			originalShell:   "powershell",
 			expectedSnippet: "Invoke-Expression (goenv init - | Out-String)",
 		},
 		{
 			shell:           shellutil.ShellTypeCmd,
-			originalShell:   "cmd",
 			expectedSnippet: "FOR /f \"tokens=*\" %%i IN ('goenv init -') DO @%%i",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(string(tt.shell), func(t *testing.T) {
-			snippet := renderUsageSnippet(tt.shell, tt.originalShell)
+			snippet := renderUsageSnippet(tt.shell)
 			if !strings.Contains(snippet, tt.expectedSnippet) {
 				t.Errorf("expected snippet to contain %s", tt.expectedSnippet)
 			}

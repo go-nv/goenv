@@ -2,12 +2,17 @@ package tools
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -21,24 +26,10 @@ func TestInstallCommand_AllFlag(t *testing.T) {
 		Root: tmpDir,
 	}
 
-	// Create multiple Go versions
+	// Create multiple Go versions with tool directories
 	versions := []string{"1.21.0", "1.22.0", "1.23.0"}
 	for _, v := range versions {
-		versionPath := filepath.Join(tmpDir, "versions", v)
-		goRoot := filepath.Join(versionPath, "go", "bin")
-		gopath := filepath.Join(versionPath, "gopath", "bin")
-		if err := os.MkdirAll(goRoot, 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.MkdirAll(gopath, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		// Create fake go binary that does nothing (just exists)
-		goBin := filepath.Join(goRoot, "go")
-		if err := os.WriteFile(goBin, []byte("#!/bin/sh\nexit 0"), 0755); err != nil {
-			t.Fatal(err)
-		}
+		cmdtest.CreateMockGoVersionWithTools(t, tmpDir, v)
 	}
 
 	// Test dry-run with --all flag
@@ -55,9 +46,10 @@ func TestInstallCommand_AllFlag(t *testing.T) {
 	}()
 
 	// Test that the function validates versions correctly
-	foundVersions, err := getInstalledVersions(cfg)
+	mgr := manager.NewManager(cfg)
+	foundVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		t.Fatalf("getInstalledVersions failed: %v", err)
+		t.Fatalf("ListInstalledVersions failed: %v", err)
 	}
 
 	if len(foundVersions) != 3 {
@@ -89,27 +81,23 @@ func TestInstallCommand_DryRun(t *testing.T) {
 	versionPath := filepath.Join(tmpDir, "versions", version)
 	goRoot := filepath.Join(versionPath, "go", "bin")
 	gopath := filepath.Join(versionPath, "gopath", "bin")
-	if err := os.MkdirAll(goRoot, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(goRoot, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(gopath, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(gopath, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create fake go binary
 	goBin := filepath.Join(goRoot, "go")
-	if err := os.WriteFile(goBin, []byte("#!/bin/sh\nexit 0"), 0755); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, goBin, []byte("#!/bin/sh\nexit 0"), utils.PermFileExecutable)
 
 	// Create .go-version file to set current version
 	goVersionFile := filepath.Join(tmpDir, ".go-version")
-	if err := os.WriteFile(goVersionFile, []byte(version), 0644); err != nil {
-		t.Fatal(err)
-	}
+	testutil.WriteTestFile(t, goVersionFile, []byte(version), utils.PermFileDefault)
 
 	// Test package normalization
-	packages := normalizePackagePaths([]string{"gopls", "golang.org/x/tools/cmd/goimports@v0.1.0"})
+	packages := toolspkg.NormalizePackagePaths([]string{"gopls", "golang.org/x/tools/cmd/goimports@v0.1.0"})
 	expected := []string{"gopls@latest", "golang.org/x/tools/cmd/goimports@v0.1.0"}
 
 	if len(packages) != len(expected) {
@@ -131,12 +119,13 @@ func TestInstallCommand_NoVersionsInstalled(t *testing.T) {
 
 	// Create empty versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Try to get installed versions
-	versions, err := getInstalledVersions(cfg)
+	mgr := manager.NewManager(cfg)
+	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -187,7 +176,7 @@ func TestExtractToolNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := extractToolNames(tt.packages)
+			result := toolspkg.ExtractToolNames(tt.packages)
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected %d names, got %d", len(tt.expected), len(result))
 				return
@@ -209,12 +198,14 @@ func TestInstallToolForVersion_MissingGo(t *testing.T) {
 
 	version := "1.23.0"
 	versionPath := filepath.Join(tmpDir, "versions", version)
-	if err := os.MkdirAll(versionPath, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Don't create Go binary - should fail
-	err := installToolForVersion(cfg, version, "gopls@latest", false)
+	mgr := manager.NewManager(cfg)
+	toolMgr := toolspkg.NewManager(cfg, mgr)
+	err := toolMgr.InstallSingleTool(version, "gopls@latest", false)
 	if err == nil {
 		t.Error("Expected error when Go binary is missing")
 	}

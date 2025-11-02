@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // tempFileCounter is used to generate unique temp file names
@@ -25,15 +29,15 @@ type AtomicWriter struct {
 // It acquires an advisory lock on the cache directory to prevent concurrent modifications.
 func NewAtomicWriter(cacheRoot string) (*AtomicWriter, error) {
 	// Create cache root if it doesn't exist
-	if err := os.MkdirAll(cacheRoot, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create cache directory: %w", err)
+	if err := utils.EnsureDirWithContext(cacheRoot, "create cache directory"); err != nil {
+		return nil, err
 	}
 
 	// Advisory lock per cache root
 	lockPath := filepath.Join(cacheRoot, ".goenv-cache.lock")
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, utils.PermFileDefault)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create lock file: %w", err)
+		return nil, errors.FailedTo("create lock file", err)
 	}
 
 	// Try to acquire exclusive lock (non-blocking)
@@ -44,10 +48,10 @@ func NewAtomicWriter(cacheRoot string) (*AtomicWriter, error) {
 
 	// Create temporary directory for atomic writes
 	tmpDir := filepath.Join(cacheRoot, ".tmp")
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(tmpDir, "create temp directory"); err != nil {
 		releaseLock(lockFile)
 		lockFile.Close()
-		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+		return nil, err
 	}
 
 	return &AtomicWriter{
@@ -63,8 +67,8 @@ func NewAtomicWriter(cacheRoot string) (*AtomicWriter, error) {
 func (w *AtomicWriter) WriteFile(targetPath string, data []byte, perm os.FileMode) error {
 	// Ensure target directory exists
 	targetDir := filepath.Dir(targetPath)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		return fmt.Errorf("failed to create target directory: %w", err)
+	if err := utils.EnsureDirWithContext(targetDir, "create target directory"); err != nil {
+		return err
 	}
 
 	// Write to temp file with unique name to avoid concurrent write collisions
@@ -79,27 +83,27 @@ func (w *AtomicWriter) WriteFile(targetPath string, data []byte, perm os.FileMod
 	// Open with O_RDWR on Windows to allow Sync() to work
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
+		return errors.FailedTo("create temp file", err)
 	}
 
 	if _, err := f.Write(data); err != nil {
 		f.Close()
-		return fmt.Errorf("failed to write temp file: %w", err)
+		return errors.FailedTo("write temp file", err)
 	}
 
 	// Fsync the file before closing
 	if err := f.Sync(); err != nil {
 		f.Close()
-		return fmt.Errorf("failed to sync temp file: %w", err)
+		return errors.FailedTo("sync temp file", err)
 	}
 
 	if err := f.Close(); err != nil {
-		return fmt.Errorf("failed to close temp file: %w", err)
+		return errors.FailedTo("close temp file", err)
 	}
 
 	// Atomic rename
 	if err := os.Rename(tmpPath, targetPath); err != nil {
-		return fmt.Errorf("failed to rename temp file: %w", err)
+		return errors.FailedTo("rename temp file", err)
 	}
 
 	// Fsync the directory to ensure the rename is durable
@@ -116,7 +120,7 @@ func (w *AtomicWriter) WriteFile(targetPath string, data []byte, perm os.FileMod
 // This is useful for creating cache subdirectories safely.
 func (w *AtomicWriter) CreateDirectory(path string, perm os.FileMode) error {
 	if err := os.MkdirAll(path, perm); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return errors.FailedTo("create directory", err)
 	}
 	return nil
 }
@@ -150,19 +154,5 @@ func isLockError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return contains(err.Error(), "locked by another process")
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr ||
-		len(s) > len(substr) && findSubstring(s, substr)
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(err.Error(), "locked by another process")
 }

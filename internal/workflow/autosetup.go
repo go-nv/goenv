@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -139,8 +138,8 @@ func (s *InteractiveSetup) checkVersionMismatch(discoveredVersion *manager.Disco
 		response := s.readInput()
 
 		if response == "" || response == "y" || response == "yes" {
-			versionFile := filepath.Join(s.WorkingDir, ".go-version")
-			if err := os.WriteFile(versionFile, []byte(goModVer+"\n"), 0644); err != nil {
+			versionFile := filepath.Join(s.WorkingDir, config.VersionFileName)
+			if err := utils.WriteFileWithContext(versionFile, []byte(goModVer+"\n"), utils.PermFileDefault, "update .go-version"); err != nil {
 				fmt.Fprintf(s.Stdout, "%sFailed to update .go-version: %v\n", utils.Emoji("⚠️  "), err)
 				return false
 			}
@@ -163,7 +162,7 @@ func (s *InteractiveSetup) checkVersionMismatch(discoveredVersion *manager.Disco
 // checkVSCodeSettings checks VS Code settings and returns true if they need updating
 func (s *InteractiveSetup) checkVSCodeSettings(version string, versionInstalled bool) bool {
 	vscodeSettingsPath := filepath.Join(s.WorkingDir, ".vscode", "settings.json")
-	if _, err := os.Stat(vscodeSettingsPath); err != nil {
+	if !utils.FileExists(vscodeSettingsPath) {
 		// No VS Code settings found
 		return false
 	}

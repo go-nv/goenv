@@ -1,12 +1,14 @@
 package meta
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -49,19 +51,17 @@ func TestHelpCommand(t *testing.T) {
 			// Create command if specified
 			if tt.createCommand {
 				binDir := filepath.Join(goenvRoot, "bin")
-				if err := os.MkdirAll(binDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create bin directory: %v", err)
 				}
 
 				cmdPath := filepath.Join(binDir, "goenv-hello")
-				if err := os.WriteFile(cmdPath, []byte(tt.commandContent), 0755); err != nil {
-					t.Fatalf("Failed to create command: %v", err)
-				}
+				testutil.WriteTestFile(t, cmdPath, []byte(tt.commandContent), utils.PermFileExecutable)
 
 				// Add bin to PATH
-				originalPath := os.Getenv("PATH")
-				os.Setenv("PATH", binDir+":"+originalPath)
-				defer os.Setenv("PATH", originalPath)
+				originalPath := os.Getenv(utils.EnvVarPath)
+				os.Setenv(utils.EnvVarPath, binDir+":"+originalPath)
+				defer os.Setenv(utils.EnvVarPath, originalPath)
 			}
 
 			// Execute command

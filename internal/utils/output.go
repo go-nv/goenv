@@ -35,7 +35,7 @@ func ShouldUseColor() bool {
 	}
 
 	// Check NO_COLOR environment variable (https://no-color.org/)
-	if os.Getenv("NO_COLOR") != "" {
+	if os.Getenv(EnvVarNoColor) != "" {
 		return false
 	}
 
@@ -56,7 +56,7 @@ func ShouldUseEmojis() bool {
 
 	// Check NO_COLOR environment variable (https://no-color.org/)
 	// Many parsers that break on emojis also set NO_COLOR
-	if os.Getenv("NO_COLOR") != "" {
+	if os.Getenv(EnvVarNoColor) != "" {
 		return false
 	}
 

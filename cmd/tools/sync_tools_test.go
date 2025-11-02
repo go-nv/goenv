@@ -8,22 +8,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
 // setupSyncTestEnv creates a test environment with Go versions and tools
 func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string) string {
 	tmpDir := t.TempDir()
-	os.Setenv("GOENV_ROOT", tmpDir)
-	t.Cleanup(func() { os.Unsetenv("GOENV_ROOT") })
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	for _, version := range versions {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
-		// Create go binary directory
-		goBinDir := filepath.Join(versionPath, "bin")
-		if err := os.MkdirAll(goBinDir, 0755); err != nil {
+		// Create go binary directory (manager expects versionPath/go/bin/go)
+		goBinDir := filepath.Join(versionPath, "go", "bin")
+		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
 			t.Fatalf("Failed to create go bin directory: %v", err)
 		}
 
@@ -37,13 +39,11 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 			content = "#!/bin/sh\necho 'mock go'\n"
 		}
 
-		if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
-			t.Fatalf("Failed to create go binary: %v", err)
-		}
+		testutil.WriteTestFile(t, goBinary, []byte(content), utils.PermFileExecutable)
 
 		// Create GOPATH/bin directory
 		gopathBin := filepath.Join(versionPath, "gopath", "bin")
-		if err := os.MkdirAll(gopathBin, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
 			t.Fatalf("Failed to create GOPATH/bin: %v", err)
 		}
 
@@ -56,9 +56,7 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 					toolPath += ".bat"
 					content = "@echo off\necho mock tool\n"
 				}
-				if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
-					t.Fatalf("Failed to create tool %s: %v", tool, err)
-				}
+				testutil.WriteTestFile(t, toolPath, []byte(content), utils.PermFileExecutable)
 			}
 		}
 	}
@@ -81,7 +79,7 @@ func TestSyncTools_ArgumentValidation(t *testing.T) {
 		{
 			name:          "only one argument provided",
 			args:          []string{"1.21.0"},
-			expectedError: "source Go version 1.21.0 is not installed",
+			expectedError: "version '1.21.0' is not installed",
 		},
 		{
 			name:          "too many arguments provided",
@@ -132,13 +130,13 @@ func TestSyncTools_VersionValidation(t *testing.T) {
 			name:          "source version does not exist",
 			args:          []string{"99.99.99", "1.22.0"},
 			setupVersions: []string{"1.22.0"},
-			expectedError: "source Go version 99.99.99 is not installed",
+			expectedError: "version '99.99.99' is not installed",
 		},
 		{
 			name:          "target version does not exist",
 			args:          []string{"1.21.0", "99.99.99"},
 			setupVersions: []string{"1.21.0"},
-			expectedError: "target Go version 99.99.99 is not installed",
+			expectedError: "version '99.99.99' is not installed",
 		},
 	}
 
@@ -401,34 +399,17 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Unsetenv("GOENV_ROOT")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	for _, version := range []string{"1.21.0", "1.22.0"} {
-		versionPath := filepath.Join(tmpDir, "versions", version)
-
-		goBinDir := filepath.Join(versionPath, "bin")
-		if err := os.MkdirAll(goBinDir, 0755); err != nil {
-			t.Fatalf("Failed to create go bin directory: %v", err)
-		}
-
-		goBinary := filepath.Join(goBinDir, "go.bat")
-		goBatchContent := "@echo off\necho mock go\n"
-		if err := os.WriteFile(goBinary, []byte(goBatchContent), 0755); err != nil {
-			t.Fatalf("Failed to create go.bat: %v", err)
-		}
-
-		gopathBin := filepath.Join(versionPath, "gopath", "bin")
-		if err := os.MkdirAll(gopathBin, 0755); err != nil {
-			t.Fatalf("Failed to create GOPATH/bin: %v", err)
-		}
+		cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
 
 		if version == "1.21.0" {
+			cfg := &config.Config{Root: tmpDir}
+			gopathBin := cfg.VersionGopathBin(version)
 			toolPath := filepath.Join(gopathBin, "mockgopls.bat")
 			toolBatchContent := "@echo off\necho mock tool\n"
-			if err := os.WriteFile(toolPath, []byte(toolBatchContent), 0755); err != nil {
-				t.Fatalf("Failed to create tool: %v", err)
-			}
+			testutil.WriteTestFile(t, toolPath, []byte(toolBatchContent), utils.PermFileExecutable)
 		}
 	}
 

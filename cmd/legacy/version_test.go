@@ -1,11 +1,13 @@
 package legacy
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/testing/testutil"
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -62,19 +64,13 @@ func TestVersionCommand(t *testing.T) {
 			// Set global version if specified
 			if tt.globalVersion != "" {
 				globalFile := filepath.Join(testRoot, "version")
-				err := os.WriteFile(globalFile, []byte(tt.globalVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set global version: %v", err)
-				}
+				testutil.WriteTestFile(t, globalFile, []byte(tt.globalVersion), utils.PermFileDefault, "Failed to set global version")
 			}
 
 			// Set local version if specified
 			if tt.localVersion != "" {
 				localFile := filepath.Join(testRoot, ".go-version")
-				err := os.WriteFile(localFile, []byte(tt.localVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set local version: %v", err)
-				}
+				testutil.WriteTestFile(t, localFile, []byte(tt.localVersion), utils.PermFileDefault, "Failed to set local version")
 				// Change to test root so local version is found
 				oldDir, _ := os.Getwd()
 				defer os.Chdir(oldDir)
@@ -149,10 +145,7 @@ func TestVersionWithMultipleVersions(t *testing.T) {
 
 	// Set global version with multiple versions separated by ':'
 	globalFile := filepath.Join(testRoot, "version")
-	err := os.WriteFile(globalFile, []byte("1.11.1:1.10.3"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to set global version: %v", err)
-	}
+	testutil.WriteTestFile(t, globalFile, []byte("1.11.1:1.10.3"), utils.PermFileDefault, "Failed to set global version")
 
 	// Create and execute command
 	cmd := &cobra.Command{
@@ -166,7 +159,7 @@ func TestVersionWithMultipleVersions(t *testing.T) {
 	cmd.SetOut(output)
 	cmd.SetArgs([]string{})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
@@ -255,10 +248,7 @@ func TestVersionCommandRejectsExtraArguments(t *testing.T) {
 
 	// Set global version
 	globalFile := filepath.Join(testRoot, "version")
-	err := os.WriteFile(globalFile, []byte("1.21.5"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to set global version: %v", err)
-	}
+	testutil.WriteTestFile(t, globalFile, []byte("1.21.5"), utils.PermFileDefault, "Failed to set global version")
 
 	// Create command with extra arguments
 	cmd := &cobra.Command{
@@ -272,7 +262,7 @@ func TestVersionCommandRejectsExtraArguments(t *testing.T) {
 	cmd.SetErr(output)
 	cmd.SetArgs([]string{"extra"})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 
 	// Should error with usage message
 	if err == nil {

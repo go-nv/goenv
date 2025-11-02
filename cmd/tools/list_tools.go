@@ -1,11 +1,12 @@
 package tools
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -35,32 +36,31 @@ func init() {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Determine target versions
 	var targetVersions []string
 	if listAllVersions {
-		versions, err := getInstalledVersions(cfg)
+		versions, err := mgr.ListInstalledVersions()
 		if err != nil {
 			return err
 		}
 		if len(versions) == 0 {
-			return fmt.Errorf("no Go versions installed")
+			return errors.NoVersionsInstalled()
 		}
 		targetVersions = versions
 	} else {
-		mgr := manager.NewManager(cfg)
 		currentVersion, _, err := mgr.GetCurrentVersion()
 		if err != nil {
-			return fmt.Errorf("no Go version set: %w", err)
+			return errors.FailedTo("determine Go version", err)
 		}
-		if currentVersion == "system" {
+		if currentVersion == manager.SystemVersion {
 			fmt.Fprintln(cmd.OutOrStdout(), "Cannot list tools for system Go")
 			fmt.Fprintln(cmd.OutOrStdout(), "Use 'which <tool>' or check your system's $GOPATH/bin")
 			return nil
 		}
 		if err := mgr.ValidateVersion(currentVersion); err != nil {
-			return fmt.Errorf("go version %s not installed", currentVersion)
+			return errors.VersionNotInstalled(currentVersion, "")
 		}
 		targetVersions = []string{currentVersion}
 	}
@@ -75,16 +75,22 @@ func runList(cmd *cobra.Command, args []string) error {
 	totalTools := 0
 
 	for _, version := range targetVersions {
-		tools, err := getToolsForVersion(cfg, version)
+		toolList, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
-			return fmt.Errorf("failed to list tools for %s: %w", version, err)
+			return errors.FailedTo("list tools", err)
+		}
+
+		// Extract tool names
+		var toolNames []string
+		for _, tool := range toolList {
+			toolNames = append(toolNames, tool.Name)
 		}
 
 		allVersionTools = append(allVersionTools, versionTools{
 			Version: version,
-			Tools:   tools,
+			Tools:   toolNames,
 		})
-		totalTools += len(tools)
+		totalTools += len(toolNames)
 	}
 
 	// Handle JSON output
@@ -97,9 +103,7 @@ func runList(cmd *cobra.Command, args []string) error {
 			SchemaVersion: "1",
 			Versions:      allVersionTools,
 		}
-		encoder := json.NewEncoder(cmd.OutOrStdout())
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(output)
+		return cmdutil.OutputJSON(cmd.OutOrStdout(), output)
 	}
 
 	// Human-readable output

@@ -6,10 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/osinfo"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -49,7 +49,7 @@ type LinuxInfo struct {
 
 // CheckMacOSDeploymentTarget checks macOS binary compatibility
 func CheckMacOSDeploymentTarget(binaryPath string) (*macOSInfo, []CompatibilityIssue) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		return nil, nil
 	}
 
@@ -67,10 +67,8 @@ func CheckMacOSDeploymentTarget(binaryPath string) (*macOSInfo, []CompatibilityI
 	// Check load commands for version min
 	// We can't directly check LC_VERSION_MIN_* as the types are not exported
 	// Instead, we'll use otool to check the binary
-	cmd := exec.Command("otool", "-l", binaryPath)
-	output, err := cmd.Output()
+	outputStr, err := utils.RunCommandOutput("otool", "-l", binaryPath)
 	if err == nil {
-		outputStr := string(output)
 
 		// Look for LC_VERSION_MIN commands
 		if strings.Contains(outputStr, "LC_VERSION_MIN_MACOSX") {
@@ -137,7 +135,7 @@ func CheckMacOSDeploymentTarget(binaryPath string) (*macOSInfo, []CompatibilityI
 	}
 
 	// Check MACOSX_DEPLOYMENT_TARGET environment variable
-	deployTarget := os.Getenv("MACOSX_DEPLOYMENT_TARGET")
+	deployTarget := os.Getenv(utils.EnvVarMacOSXDeploymentTarget)
 	if deployTarget != "" && info.DeploymentTarget != "" {
 		if deployTarget != info.DeploymentTarget {
 			issues = append(issues, CompatibilityIssue{
@@ -161,12 +159,11 @@ func CheckMacOSDeploymentTarget(binaryPath string) (*macOSInfo, []CompatibilityI
 
 // getCurrentMacOSVersion gets the current macOS version
 func getCurrentMacOSVersion() string {
-	cmd := exec.Command("sw_vers", "-productVersion")
-	output, err := cmd.Output()
+	output, err := utils.RunCommandOutput("sw_vers", "-productVersion")
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(output))
+	return output
 }
 
 // isVersionCompatible checks if current version meets minimum requirement
@@ -209,10 +206,8 @@ func CheckWindowsCompiler() (*WindowsInfo, []CompatibilityIssue) {
 		info.Compiler = "MSVC"
 
 		// Try to get MSVC version
-		cmd := exec.Command(clPath)
-		output, err := cmd.CombinedOutput()
+		outputStr, err := utils.RunCommandCombinedOutput(clPath)
 		if err == nil {
-			outputStr := string(output)
 			if strings.Contains(outputStr, "Microsoft") {
 				info.Compiler = "MSVC"
 			}
@@ -234,7 +229,7 @@ func CheckWindowsCompiler() (*WindowsInfo, []CompatibilityIssue) {
 	}
 
 	// Check for Visual C++ runtime
-	systemRoot := os.Getenv("SystemRoot")
+	systemRoot := os.Getenv(utils.EnvVarSystemRoot)
 	if systemRoot != "" {
 		vcRuntimePaths := []string{
 			filepath.Join(systemRoot, "System32", "vcruntime140.dll"),
@@ -242,7 +237,7 @@ func CheckWindowsCompiler() (*WindowsInfo, []CompatibilityIssue) {
 		}
 		hasAnyRuntime := false
 		for _, path := range vcRuntimePaths {
-			if _, err := os.Stat(path); err == nil {
+			if utils.PathExists(path) {
 				hasAnyRuntime = true
 				break
 			}
@@ -271,15 +266,13 @@ func CheckWindowsARM64() (*WindowsInfo, []CompatibilityIssue) {
 	issues := []CompatibilityIssue{}
 
 	// Detect current architecture
-	info.ProcessMode = runtime.GOARCH
+	info.ProcessMode = osinfo.Arch()
 
 	// Check if running under emulation
-	if runtime.GOARCH == "amd64" {
+	if osinfo.Arch() == "amd64" {
 		// Check if we're on ARM64 hardware running x64 emulation
-		cmd := exec.Command("cmd", "/c", "echo", "%PROCESSOR_ARCHITECTURE%")
-		output, err := cmd.Output()
+		arch, err := utils.RunCommandOutput("cmd", "/c", "echo", "%PROCESSOR_ARCHITECTURE%")
 		if err == nil {
-			arch := strings.TrimSpace(string(output))
 			if arch == "ARM64" {
 				info.ProcessMode = "x64-on-ARM64"
 				issues = append(issues, CompatibilityIssue{
@@ -292,10 +285,10 @@ func CheckWindowsARM64() (*WindowsInfo, []CompatibilityIssue) {
 	}
 
 	// ARM64EC detection (Windows 11 22H2+)
-	if runtime.GOARCH == "arm64" {
+	if osinfo.Arch() == "arm64" {
 		// ARM64EC allows mixing ARM64 and x64 code in the same process
 		// This is detected by checking for certain environment indicators
-		programFiles := os.Getenv("ProgramFiles(Arm)")
+		programFiles := os.Getenv(utils.EnvVarProgramFilesArm)
 		if programFiles != "" {
 			info.IsARM64EC = true
 			issues = append(issues, CompatibilityIssue{
@@ -311,7 +304,7 @@ func CheckWindowsARM64() (*WindowsInfo, []CompatibilityIssue) {
 
 // CheckLinuxKernelVersion checks Linux kernel version compatibility
 func CheckLinuxKernelVersion() (*LinuxInfo, []CompatibilityIssue) {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		return nil, nil
 	}
 
@@ -319,13 +312,12 @@ func CheckLinuxKernelVersion() (*LinuxInfo, []CompatibilityIssue) {
 	issues := []CompatibilityIssue{}
 
 	// Get kernel version
-	cmd := exec.Command("uname", "-r")
-	output, err := cmd.Output()
+	output, err := utils.RunCommandOutput("uname", "-r")
 	if err != nil {
 		return nil, nil
 	}
 
-	info.KernelVersion = strings.TrimSpace(string(output))
+	info.KernelVersion = output
 
 	// Parse version (e.g., "5.15.0-91-generic")
 	parts := strings.Split(info.KernelVersion, ".")
@@ -422,7 +414,7 @@ func CheckWindowsScriptShims(scriptPath string) []CompatibilityIssue {
 
 // SuggestGlibcCompatibility suggests remediation for glibc version mismatches
 func SuggestGlibcCompatibility(requiredGlibc, currentGlibc string) []CompatibilityIssue {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		return nil
 	}
 
@@ -478,17 +470,17 @@ func parseVersion(version string) []int {
 // GetPlatformInfo returns comprehensive platform information
 func GetPlatformInfo() *PlatformInfo {
 	info := &PlatformInfo{
-		OS:      runtime.GOOS,
-		Arch:    runtime.GOARCH,
+		OS:      osinfo.OS(),
+		Arch:    osinfo.Arch(),
 		Details: make(map[string]string),
 	}
 
-	switch runtime.GOOS {
+	switch osinfo.OS() {
 	case "darwin":
 		if version := getCurrentMacOSVersion(); version != "" {
 			info.Details["macos_version"] = version
 		}
-		if target := os.Getenv("MACOSX_DEPLOYMENT_TARGET"); target != "" {
+		if target := os.Getenv(utils.EnvVarMacOSXDeploymentTarget); target != "" {
 			info.Details["deployment_target"] = target
 		}
 

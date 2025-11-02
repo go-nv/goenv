@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -71,12 +72,11 @@ func TestUninstallCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			os.Setenv("GOENV_ROOT", tmpDir)
-			defer os.Unsetenv("GOENV_ROOT")
-
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 			// Set GOENV_DIR to tmpDir to prevent FindVersionFile from looking in parent directories
-			os.Setenv("GOENV_DIR", tmpDir)
-			defer os.Unsetenv("GOENV_DIR")
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+			// Set CI to disable interactive prompts in tests
+			t.Setenv(utils.EnvVarCI, "true")
 
 			// Change to tmpDir
 			oldDir, _ := os.Getwd()
@@ -85,8 +85,7 @@ func TestUninstallCommand(t *testing.T) {
 
 			// Set current version if specified
 			if tt.currentVersion != "" {
-				os.Setenv("GOENV_VERSION", tt.currentVersion)
-				defer os.Unsetenv("GOENV_VERSION")
+				t.Setenv(utils.GoenvEnvVarVersion.String(), tt.currentVersion)
 			}
 
 			// Setup versions
@@ -94,15 +93,13 @@ func TestUninstallCommand(t *testing.T) {
 				versionPath := filepath.Join(tmpDir, "versions", version)
 				goPath := filepath.Join(versionPath, "go")
 
-				if err := os.MkdirAll(goPath, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(goPath, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 
 				// Create a marker file to verify existence
 				markerFile := filepath.Join(versionPath, ".installed")
-				if err := os.WriteFile(markerFile, []byte("installed"), 0644); err != nil {
-					t.Fatalf("Failed to create marker file: %v", err)
-				}
+				testutil.WriteTestFile(t, markerFile, []byte("installed"), utils.PermFileDefault)
 			}
 
 			// Create command
@@ -157,8 +154,7 @@ func TestUninstallCommand(t *testing.T) {
 			// Check if version still exists or not
 			if tt.versionToCheck != "" {
 				versionPath := filepath.Join(tmpDir, "versions", tt.versionToCheck)
-				_, err := os.Stat(versionPath)
-				exists := err == nil
+				exists := utils.PathExists(versionPath)
 
 				if tt.shouldExist && !exists {
 					t.Errorf("Expected version %s to still exist, but it doesn't", tt.versionToCheck)
@@ -203,12 +199,9 @@ func TestUninstallHelp(t *testing.T) {
 
 func TestUninstallCompletion(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Unsetenv("GOENV_ROOT")
-
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	// Set GOENV_DIR to prevent looking in parent directories
-	os.Setenv("GOENV_DIR", tmpDir)
-	defer os.Unsetenv("GOENV_DIR")
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Change to tmpDir
 	oldDir, _ := os.Getwd()
@@ -221,7 +214,7 @@ func TestUninstallCompletion(t *testing.T) {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 		binPath := filepath.Join(versionPath, "bin")
 
-		if err := os.MkdirAll(binPath, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
 			t.Fatalf("Failed to create bin directory: %v", err)
 		}
 
@@ -232,9 +225,7 @@ func TestUninstallCompletion(t *testing.T) {
 			goExe += ".bat"
 			content = []byte("@echo off\necho mock go")
 		}
-		if err := os.WriteFile(goExe, content, 0755); err != nil {
-			t.Fatalf("Failed to create go binary: %v", err)
-		}
+		testutil.WriteTestFile(t, goExe, content, utils.PermFileExecutable)
 	}
 
 	// Create command with --complete flag

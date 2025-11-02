@@ -8,7 +8,7 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -41,8 +41,7 @@ func init() {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Header
 	fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", utils.Emoji("📊 "), utils.BoldBlue("goenv Status"))
@@ -76,7 +75,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	} else {
 		// Check if it's installed
 		installed := ""
-		if versionSpec != "system" {
+		if versionSpec != manager.SystemVersion {
 			if mgr.IsVersionInstalled(versionSpec) {
 				installed = utils.Green(" ✓")
 			} else {
@@ -133,7 +132,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Check 4: Shims
 	shimsDir := cfg.ShimsDir()
-	if stat, err := os.Stat(shimsDir); err == nil && stat.IsDir() {
+	if utils.DirExists(shimsDir) {
 		entries, err := os.ReadDir(shimsDir)
 		if err == nil {
 			shimCount := 0

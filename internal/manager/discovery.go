@@ -5,14 +5,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // VersionSource represents where a version was discovered from
 type VersionSource string
 
 const (
-	SourceGoVersion VersionSource = ".go-version"
-	SourceGoMod     VersionSource = "go.mod"
+	SourceGoVersion VersionSource = config.VersionFileName
+	SourceGoMod     VersionSource = config.GoModFileName
 	SourceNone      VersionSource = "none"
 )
 
@@ -55,9 +58,9 @@ func DiscoverVersion(dir string) (*DiscoveredVersion, error) {
 	}
 
 	// Check for .go-version
-	versionFile := filepath.Join(dir, ".go-version")
+	versionFile := filepath.Join(dir, config.VersionFileName)
 	var goVersionFileVer string
-	if _, err := os.Stat(versionFile); err == nil {
+	if utils.PathExists(versionFile) {
 		content, err := os.ReadFile(versionFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read .go-version: %w", err)
@@ -66,9 +69,10 @@ func DiscoverVersion(dir string) (*DiscoveredVersion, error) {
 	}
 
 	// Check for go.mod (with toolchain precedence)
-	gomodPath := filepath.Join(dir, "go.mod")
+	gomodPath := filepath.Join(dir, config.GoModFileName)
 	var goModVer string
-	if _, err := os.Stat(gomodPath); err == nil {
+	if utils.PathExists(gomodPath) {
+		var err error
 		goModVer, err = ParseGoModVersion(gomodPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse go.mod: %w", err)
@@ -126,9 +130,9 @@ func DiscoverVersionMismatch(dir string) (mismatch bool, goVersionVer string, go
 	}
 
 	// Check for .go-version
-	versionFile := filepath.Join(dir, ".go-version")
+	versionFile := filepath.Join(dir, config.VersionFileName)
 	hasGoVersion := false
-	if _, err := os.Stat(versionFile); err == nil {
+	if utils.PathExists(versionFile) {
 		content, err := os.ReadFile(versionFile)
 		if err == nil {
 			goVersionVer = parseVersionContent(string(content))
@@ -137,9 +141,9 @@ func DiscoverVersionMismatch(dir string) (mismatch bool, goVersionVer string, go
 	}
 
 	// Check for go.mod
-	gomodPath := filepath.Join(dir, "go.mod")
+	gomodPath := filepath.Join(dir, config.GoModFileName)
 	hasGoMod := false
-	if _, err := os.Stat(gomodPath); err == nil {
+	if utils.PathExists(gomodPath) {
 		goModVer, err = ParseGoModVersion(gomodPath)
 		if err == nil && goModVer != "" {
 			hasGoMod = true

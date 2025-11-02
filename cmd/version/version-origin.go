@@ -6,9 +6,9 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/helptext"
-	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -28,12 +28,11 @@ func init() {
 
 func runVersionOrigin(cmd *cobra.Command, args []string) error {
 	// Validate: version-origin command takes no arguments
-	if len(args) > 0 {
+	if err := cmdutil.ValidateExactArgs(args, 0, ""); err != nil {
 		return fmt.Errorf("usage: goenv version-origin")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Get the current version
 	_, source, err := mgr.GetCurrentVersion()
@@ -46,9 +45,10 @@ func runVersionOrigin(cmd *cobra.Command, args []string) error {
 	}
 
 	// Convert source to full path if needed
+	envVarSource := fmt.Sprintf("%s environment variable", utils.GoenvEnvVarVersion.String())
 	switch source {
-	case "GOENV_VERSION environment variable":
-		fmt.Fprintln(cmd.OutOrStdout(), "GOENV_VERSION environment variable")
+	case envVarSource:
+		fmt.Fprintln(cmd.OutOrStdout(), envVarSource)
 	case "global":
 		// Return the actual global version file path
 		fmt.Fprintln(cmd.OutOrStdout(), cfg.GlobalVersionFile())

@@ -2,11 +2,14 @@ package tools
 
 import (
 	"encoding/json"
-	"os"
+	"github.com/go-nv/goenv/internal/utils"
 	"path/filepath"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 )
 
 func TestOutdatedCommand_NoVersions(t *testing.T) {
@@ -17,12 +20,13 @@ func TestOutdatedCommand_NoVersions(t *testing.T) {
 
 	// Create empty versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
 	// Get installed versions - should be empty
-	versions, err := getInstalledVersions(cfg)
+	mgr := manager.NewManager(cfg)
+	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -218,15 +222,13 @@ func TestOutdatedCommand_WithVersions(t *testing.T) {
 	// Create versions but no tools
 	versions := []string{"1.21.0", "1.22.0", "1.23.0"}
 	for _, v := range versions {
-		versionPath := filepath.Join(tmpDir, "versions", v)
-		if err := os.MkdirAll(versionPath, 0755); err != nil {
-			t.Fatal(err)
-		}
+		cmdtest.CreateMockGoVersion(t, tmpDir, v)
 	}
 
-	foundVersions, err := getInstalledVersions(cfg)
+	mgr := manager.NewManager(cfg)
+	foundVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		t.Fatalf("getInstalledVersions failed: %v", err)
+		t.Fatalf("ListInstalledVersions failed: %v", err)
 	}
 
 	if len(foundVersions) != 3 {
@@ -235,13 +237,13 @@ func TestOutdatedCommand_WithVersions(t *testing.T) {
 
 	// No tools installed - outdated should be empty
 	for _, version := range foundVersions {
-		tools, err := getToolsForVersion(cfg, version)
+		toolList, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
-			t.Fatalf("getToolsForVersion failed for %s: %v", version, err)
+			t.Fatalf("ListForVersion failed for %s: %v", version, err)
 		}
 
-		if len(tools) != 0 {
-			t.Errorf("Version %s: expected no tools, got %d", version, len(tools))
+		if len(toolList) != 0 {
+			t.Errorf("Version %s: expected no tools, got %d", version, len(toolList))
 		}
 	}
 }

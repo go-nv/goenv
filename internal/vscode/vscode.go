@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/tidwall/jsonc"
 	"github.com/tidwall/pretty"
@@ -106,7 +107,7 @@ func expandEnvVars(path string) string {
 	result := path
 
 	// Common environment variables in VS Code settings
-	envVars := []string{"HOME", "USERPROFILE", "GOENV_ROOT", "GOPATH", "GOROOT"}
+	envVars := []string{"HOME", "USERPROFILE", utils.GoenvEnvVarRoot.String(), "GOPATH", "GOROOT"}
 
 	for _, envVar := range envVars {
 		placeholder := fmt.Sprintf("${env:%s}", envVar)
@@ -215,7 +216,7 @@ func UpdateJSONKeys(path string, keysToUpdate map[string]any) error {
 	prettyJSON := pretty.PrettyOptions([]byte(jsonData), opts)
 
 	// Write back with proper formatting
-	if err := os.WriteFile(path, prettyJSON, 0644); err != nil {
+	if err := utils.WriteFileWithContext(path, prettyJSON, utils.PermFileDefault, "write file"); err != nil {
 		return err
 	}
 
@@ -228,7 +229,7 @@ func FindSettingsFile(dir string) (string, error) {
 		var err error
 		dir, err = os.Getwd()
 		if err != nil {
-			return "", fmt.Errorf("failed to get current directory: %w", err)
+			return "", errors.FailedTo("get current directory", err)
 		}
 	}
 
@@ -244,8 +245,7 @@ func HasVSCodeDirectory(dir string) bool {
 		dir, _ = os.Getwd()
 	}
 	vscodeDir := filepath.Join(dir, ".vscode")
-	info, err := os.Stat(vscodeDir)
-	return err == nil && info.IsDir()
+	return utils.DirExists(vscodeDir)
 }
 
 // ReadExistingSettings reads and parses existing settings.json
@@ -324,7 +324,7 @@ func WriteJSONFile(path string, data any) error {
 		output = jsonData
 	}
 
-	if err := os.WriteFile(path, output, 0644); err != nil {
+	if err := utils.WriteFileWithContext(path, output, utils.PermFileDefault, "write file"); err != nil {
 		return err
 	}
 
@@ -334,7 +334,7 @@ func WriteJSONFile(path string, data any) error {
 // BackupFile creates a backup of a file by copying it to .bak extension
 func BackupFile(path string) error {
 	// Check if file exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if utils.FileNotExists(path) {
 		// No file to backup
 		return nil
 	}
@@ -342,13 +342,13 @@ func BackupFile(path string) error {
 	// Read original file
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read file for backup: %w", err)
+		return errors.FailedTo("read file for backup", err)
 	}
 
 	// Write backup
 	backupPath := path + ".bak"
-	if err := os.WriteFile(backupPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write backup file: %w", err)
+	if err := utils.WriteFileWithContext(backupPath, data, utils.PermFileDefault, "write backup file"); err != nil {
+		return err
 	}
 
 	return nil
@@ -359,19 +359,19 @@ func RestoreFromBackup(path string) error {
 	backupPath := path + ".bak"
 
 	// Check if backup exists
-	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+	if utils.FileNotExists(backupPath) {
 		return fmt.Errorf("no backup found at %s", backupPath)
 	}
 
 	// Read backup
 	data, err := os.ReadFile(backupPath)
 	if err != nil {
-		return fmt.Errorf("failed to read backup file: %w", err)
+		return errors.FailedTo("read backup file", err)
 	}
 
 	// Write to original path
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("failed to restore from backup: %w", err)
+	if err := utils.WriteFileWithContext(path, data, utils.PermFileDefault, "restore from backup"); err != nil {
+		return err
 	}
 
 	return nil
@@ -444,4 +444,99 @@ func ConvertToWorkspacePaths(settings map[string]any, workspaceRoot string) map[
 	}
 
 	return result
+}
+
+// UpdateSettingsForVersion updates VS Code settings for a specific Go version
+// This function is designed to be called from workflows and automation without cobra dependencies
+// Returns nil if successful, error otherwise
+func UpdateSettingsForVersion(workingDir string, goenvRoot string, version string, gopathPrefix string) error {
+	if workingDir == "" {
+		var err error
+		workingDir, err = os.Getwd()
+		if err != nil {
+			return errors.FailedTo("get current directory", err)
+		}
+	}
+
+	settingsFile, err := FindSettingsFile(workingDir)
+	if err != nil {
+		return err
+	}
+
+	// Check if settings file exists
+	if utils.FileNotExists(settingsFile) {
+		// No settings file to update - this is not an error, just skip silently
+		// The user may not have run 'goenv vscode init' yet
+		return nil
+	}
+
+	// Read existing settings
+	existingSettings, err := ReadExistingSettings(settingsFile)
+	if err != nil {
+		return errors.FailedTo("read existing settings", err)
+	}
+
+	// Check if using environment variables - if so, no update needed
+	if goroot, ok := existingSettings["go.goroot"].(string); ok {
+		if strings.Contains(goroot, "${env:GOROOT}") {
+			// Using env vars - no sync needed as they auto-track
+			return nil
+		}
+	}
+
+	// Build paths for the new version
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return errors.FailedTo("get home directory", err)
+	}
+
+	var homeEnvVar string
+	if utils.IsWindows() {
+		homeEnvVar = "${env:USERPROFILE}"
+	} else {
+		homeEnvVar = "${env:HOME}"
+	}
+
+	gorootAbs := filepath.Join(goenvRoot, "versions", version)
+	goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
+
+	var gopathAbs string
+	if gopathPrefix == "" {
+		gopathAbs = filepath.Join(homeDir, "go", version)
+	} else {
+		gopathAbs = filepath.Join(gopathPrefix, version)
+	}
+	gopath := strings.Replace(gopathAbs, homeDir, homeEnvVar, 1)
+
+	keysToUpdate := map[string]interface{}{
+		"go.goroot": goroot,
+		"go.gopath": gopath,
+	}
+
+	// Check if any values actually differ before updating
+	hasChanges := false
+	for key, newVal := range keysToUpdate {
+		oldVal := existingSettings[key]
+		if oldVal != newVal {
+			hasChanges = true
+			break
+		}
+	}
+
+	if !hasChanges {
+		// No changes needed
+		return nil
+	}
+
+	// Backup before modifying
+	if err := BackupFile(settingsFile); err != nil {
+		return errors.FailedTo("create backup", err)
+	}
+
+	// Update settings
+	if err := UpdateJSONKeys(settingsFile, keysToUpdate); err != nil {
+		return errors.FailedTo("update settings", err)
+	}
+
+	return nil
 }

@@ -1,14 +1,17 @@
 package tools
 
 import (
-	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestFindToolBinaries(t *testing.T) {
@@ -61,16 +64,14 @@ func TestFindToolBinaries(t *testing.T) {
 			// Create temp directory
 			tmpDir := t.TempDir()
 			binPath := filepath.Join(tmpDir, "bin")
-			if err := os.MkdirAll(binPath, 0755); err != nil {
+			if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// Create test files
 			for _, file := range tt.files {
 				filePath := filepath.Join(binPath, file)
-				if err := os.WriteFile(filePath, []byte("fake binary"), 0755); err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
+				testutil.WriteTestFile(t, filePath, []byte("fake binary"), utils.PermFileExecutable)
 			}
 
 			// Find binaries
@@ -111,31 +112,26 @@ func TestFindCurrentVersionToolTargets(t *testing.T) {
 	}
 
 	version := "1.23.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
+	binPath := cfg.VersionGopathBin(version)
 
 	// Create test tools
 	tools := []string{"gopls", "staticcheck"}
 	for _, tool := range tools {
 		toolPath := filepath.Join(binPath, tool)
-		if err := os.WriteFile(toolPath, []byte("fake"), 0755); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		testutil.WriteTestFile(t, toolPath, []byte("fake"), utils.PermFileExecutable)
 	}
 
 	// Set current version
 	versionFile := filepath.Join(tmpDir, "version")
-	if err := os.WriteFile(versionFile, []byte(version), 0644); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	testutil.WriteTestFile(t, versionFile, []byte(version), utils.PermFileDefault)
 
 	// Set environment variable to simulate current version
-	t.Setenv("GOENV_VERSION", version)
+	t.Setenv(utils.GoenvEnvVarVersion.String(), version)
 
 	// Find targets
-	targets := findCurrentVersionToolTargets(cfg, []string{"gopls", "staticcheck", "nonexistent"})
+	mgr := manager.NewManager(cfg)
+	targets := findCurrentVersionToolTargets(cfg, mgr, []string{"gopls", "staticcheck", "nonexistent"})
 
 	if len(targets) != 3 {
 		t.Fatalf("should return target for each tool name: expected length %v, got %v", 3, len(targets))
@@ -185,23 +181,17 @@ func TestFindAllVersionToolTargets(t *testing.T) {
 
 	// Create gopls in all versions, staticcheck only in some
 	for i, version := range versions {
-		binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-		if err := os.MkdirAll(binPath, 0755); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
+		binPath := cfg.VersionGopathBin(version)
 
 		// gopls in all versions
 		goplsPath := filepath.Join(binPath, "gopls")
-		if err := os.WriteFile(goplsPath, []byte("fake"), 0755); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		testutil.WriteTestFile(t, goplsPath, []byte("fake"), utils.PermFileExecutable)
 
 		// staticcheck only in 1.22.0 and 1.23.0
 		if i >= 1 {
 			staticPath := filepath.Join(binPath, "staticcheck")
-			if err := os.WriteFile(staticPath, []byte("fake"), 0755); err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			testutil.WriteTestFile(t, staticPath, []byte("fake"), utils.PermFileExecutable)
 		}
 	}
 
@@ -244,18 +234,16 @@ func TestFindGlobalToolTargets(t *testing.T) {
 
 	globalGopath := filepath.Join(tmpDir, "global-go")
 	binPath := filepath.Join(globalGopath, "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Create test tool
 	goplsPath := filepath.Join(binPath, "gopls")
-	if err := os.WriteFile(goplsPath, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	testutil.WriteTestFile(t, goplsPath, []byte("fake"), utils.PermFileExecutable)
 
 	// Override GOPATH
-	t.Setenv("GOPATH", globalGopath)
+	t.Setenv(utils.EnvVarGopath, globalGopath)
 
 	// Find targets
 	targets := findGlobalToolTargets(cfg, []string{"gopls", "nonexistent"})
@@ -291,18 +279,14 @@ func TestRunUninstall_StripVersionSuffix(t *testing.T) {
 	}
 
 	version := "1.23.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
+	binPath := cfg.VersionGopathBin(version)
 
 	// Create tool
 	goplsPath := filepath.Join(binPath, "gopls")
-	if err := os.WriteFile(goplsPath, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	testutil.WriteTestFile(t, goplsPath, []byte("fake"), utils.PermFileExecutable)
 
-	t.Setenv("GOENV_VERSION", version)
+	t.Setenv(utils.GoenvEnvVarVersion.String(), version)
 
 	// Test the stripping logic directly (runUninstall does the stripping)
 	toolName := "gopls@v0.12.0"
@@ -314,7 +298,8 @@ func TestRunUninstall_StripVersionSuffix(t *testing.T) {
 	}
 
 	// Now verify findCurrentVersionToolTargets works with the clean name
-	targets := findCurrentVersionToolTargets(cfg, []string{toolName})
+	mgr := manager.NewManager(cfg)
+	targets := findCurrentVersionToolTargets(cfg, mgr, []string{toolName})
 	if len(targets) != 1 {
 		t.Fatalf("expected length %v, got %v", 1, len(targets))
 	}
@@ -328,25 +313,25 @@ func TestRunUninstall_StripVersionSuffix(t *testing.T) {
 
 func TestExecuteUninstalls(t *testing.T) {
 	tmpDir := t.TempDir()
-	binPath := filepath.Join(tmpDir, "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := &config.Config{Root: tmpDir}
+	version := "1.23.0"
+	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
+	binPath := cfg.VersionGopathBin(version)
 
 	// Create test files
 	gopls := filepath.Join(binPath, "gopls")
 	goplsExe := filepath.Join(binPath, "gopls.exe")
-	if err := os.WriteFile(gopls, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := os.WriteFile(goplsExe, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	testutil.WriteTestFile(t, gopls, []byte("fake"), utils.PermFileExecutable)
+	testutil.WriteTestFile(t, goplsExe, []byte("fake"), utils.PermFileExecutable)
+
+	// Create manager
+	mgr := manager.NewManager(cfg)
+	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	targets := []toolUninstallTarget{
 		{
 			ToolName:    "gopls",
-			GoVersion:   "1.23.0",
+			GoVersion:   version,
 			BinPath:     binPath,
 			Exists:      true,
 			BinaryFiles: []string{gopls, goplsExe},
@@ -357,51 +342,49 @@ func TestExecuteUninstalls(t *testing.T) {
 	uninstallVerbose = false
 	uninstallForce = true
 
-	err := executeUninstalls(targets)
+	err := executeUninstalls(toolsMgr, targets)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	// Verify files are removed
-	_, err = os.Stat(gopls)
-	if !os.IsNotExist(err) {
+	if utils.PathExists(gopls) {
 		t.Errorf("gopls should be removed")
 	}
 
-	_, err = os.Stat(goplsExe)
-	if !os.IsNotExist(err) {
+	if utils.PathExists(goplsExe) {
 		t.Errorf("gopls.exe should be removed")
 	}
 }
 
 func TestExecuteUninstalls_MultipleTools(t *testing.T) {
 	tmpDir := t.TempDir()
-	binPath := filepath.Join(tmpDir, "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := &config.Config{Root: tmpDir}
+	version := "1.23.0"
+	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
+	binPath := cfg.VersionGopathBin(version)
 
 	// Create multiple tools
 	gopls := filepath.Join(binPath, "gopls")
 	staticcheck := filepath.Join(binPath, "staticcheck")
-	if err := os.WriteFile(gopls, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := os.WriteFile(staticcheck, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	testutil.WriteTestFile(t, gopls, []byte("fake"), utils.PermFileExecutable)
+	testutil.WriteTestFile(t, staticcheck, []byte("fake"), utils.PermFileExecutable)
+
+	// Create manager
+	mgr := manager.NewManager(cfg)
+	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	targets := []toolUninstallTarget{
 		{
 			ToolName:    "gopls",
-			GoVersion:   "1.23.0",
+			GoVersion:   version,
 			BinPath:     binPath,
 			Exists:      true,
 			BinaryFiles: []string{gopls},
 		},
 		{
 			ToolName:    "staticcheck",
-			GoVersion:   "1.23.0",
+			GoVersion:   version,
 			BinPath:     binPath,
 			Exists:      true,
 			BinaryFiles: []string{staticcheck},
@@ -411,48 +394,48 @@ func TestExecuteUninstalls_MultipleTools(t *testing.T) {
 	uninstallVerbose = false
 	uninstallForce = true
 
-	err := executeUninstalls(targets)
+	err := executeUninstalls(toolsMgr, targets)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	// Verify both removed
-	_, err = os.Stat(gopls)
-	if !os.IsNotExist(err) {
+	if utils.PathExists(gopls) {
 		t.Errorf("expected file to not exist")
 	}
 
-	_, err = os.Stat(staticcheck)
-	if !os.IsNotExist(err) {
+	if utils.PathExists(staticcheck) {
 		t.Errorf("expected file to not exist")
 	}
 }
 
 func TestExecuteUninstalls_PartialFailure(t *testing.T) {
 	tmpDir := t.TempDir()
-	binPath := filepath.Join(tmpDir, "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := &config.Config{Root: tmpDir}
+	version := "1.23.0"
+	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
+	binPath := cfg.VersionGopathBin(version)
 
 	// Create one tool
 	gopls := filepath.Join(binPath, "gopls")
-	if err := os.WriteFile(gopls, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	testutil.WriteTestFile(t, gopls, []byte("fake"), utils.PermFileExecutable)
+
+	// Create manager
+	mgr := manager.NewManager(cfg)
+	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	// Create target with non-existent file (will fail to remove)
 	targets := []toolUninstallTarget{
 		{
 			ToolName:    "gopls",
-			GoVersion:   "1.23.0",
+			GoVersion:   version,
 			BinPath:     binPath,
 			Exists:      true,
 			BinaryFiles: []string{gopls},
 		},
 		{
 			ToolName:    "nonexistent",
-			GoVersion:   "1.23.0",
+			GoVersion:   version,
 			BinPath:     binPath,
 			Exists:      true,
 			BinaryFiles: []string{filepath.Join(binPath, "nonexistent")},
@@ -462,7 +445,7 @@ func TestExecuteUninstalls_PartialFailure(t *testing.T) {
 	uninstallVerbose = false
 	uninstallForce = true
 
-	err := executeUninstalls(targets)
+	err := executeUninstalls(toolsMgr, targets)
 	if err == nil {
 		t.Errorf("should return error when some tools fail")
 	}
@@ -471,8 +454,7 @@ func TestExecuteUninstalls_PartialFailure(t *testing.T) {
 	}
 
 	// First tool should still be removed
-	_, err = os.Stat(gopls)
-	if !os.IsNotExist(err) {
+	if utils.PathExists(gopls) {
 		t.Errorf("expected file to not exist")
 	}
 }
@@ -540,21 +522,15 @@ func TestRunUninstall_Integration(t *testing.T) {
 
 	// Setup: Create Go version with tools
 	version := "1.23.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
+	binPath := cfg.VersionGopathBin(version)
 
 	gopls := filepath.Join(binPath, "gopls")
 	staticcheck := filepath.Join(binPath, "staticcheck")
-	if err := os.WriteFile(gopls, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := os.WriteFile(staticcheck, []byte("fake"), 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	testutil.WriteTestFile(t, gopls, []byte("fake"), utils.PermFileExecutable)
+	testutil.WriteTestFile(t, staticcheck, []byte("fake"), utils.PermFileExecutable)
 
-	t.Setenv("GOENV_VERSION", version)
+	t.Setenv(utils.GoenvEnvVarVersion.String(), version)
 
 	// Run uninstall with dry-run
 	uninstallDryRun = true
@@ -568,7 +544,7 @@ func TestRunUninstall_Integration(t *testing.T) {
 	}
 
 	// Files should still exist after dry-run
-	if _, err := os.Stat(gopls); os.IsNotExist(err) {
+	if utils.FileNotExists(gopls) {
 		t.Errorf("expected file to exist: %s", gopls)
 	}
 
@@ -580,13 +556,12 @@ func TestRunUninstall_Integration(t *testing.T) {
 	}
 
 	// gopls should be removed
-	_, err = os.Stat(gopls)
-	if !os.IsNotExist(err) {
+	if utils.PathExists(gopls) {
 		t.Errorf("expected file to not exist")
 	}
 
 	// staticcheck should still exist
-	if _, err := os.Stat(staticcheck); os.IsNotExist(err) {
+	if utils.FileNotExists(staticcheck) {
 		t.Errorf("expected file to exist: %s", staticcheck)
 	}
 }
@@ -598,12 +573,9 @@ func TestRunUninstall_NoToolsFound(t *testing.T) {
 	}
 
 	version := "1.23.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-	if err := os.MkdirAll(binPath, 0755); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
 
-	t.Setenv("GOENV_VERSION", version)
+	t.Setenv(utils.GoenvEnvVarVersion.String(), version)
 
 	uninstallForce = true
 	err := runUninstall(cfg, []string{"nonexistent"})

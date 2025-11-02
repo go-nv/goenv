@@ -7,10 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 // TestExec_AutoRehashAfterGoInstall tests the end-to-end auto-rehash workflow
@@ -28,8 +29,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	utils.GoenvEnvVarRoot.Set(tempRoot)
 	defer utils.GoenvEnvVarRoot.Set(oldRoot)
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Check if we have a Go version installed to test with
 	versions, err := mgr.ListInstalledVersions()
@@ -41,7 +41,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	testVersion := versions[0]
 
 	// Skip if it's 'system' (we need a real goenv-managed version)
-	if testVersion == "system" {
+	if testVersion == manager.SystemVersion {
 		if len(versions) < 2 {
 			t.Skip("Only system Go available, need goenv-managed version for test")
 		}
@@ -53,14 +53,14 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 
 	// Get the Go binary path
 	goBin := filepath.Join(cfg.Root, "versions", testVersion, "bin", "go")
-	if _, err := os.Stat(goBin); err != nil {
+	if utils.FileNotExists(goBin) {
 		t.Skipf("Go binary not found at %s, skipping test", goBin)
 	}
 
 	// Count shims before
 	shimMgr := shims.NewShimManager(cfg)
 	shimsDir := filepath.Join(cfg.Root, "shims")
-	os.MkdirAll(shimsDir, 0755)
+	_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
 
 	shimsBefore, err := os.ReadDir(shimsDir)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	// Create a mock GOPATH for testing
 	gopath := filepath.Join(tempRoot, "go", testVersion)
 	gopathBin := filepath.Join(gopath, "bin")
-	os.MkdirAll(gopathBin, 0755)
+	_ = utils.EnsureDirWithContext(gopathBin, "create test directory")
 
 	// Create a mock tool binary
 	mockToolName := "test-tool-auto-rehash"
@@ -89,16 +89,14 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 
 	// Create executable mock binary
 	mockContent := []byte("#!/bin/sh\necho 'test tool'\n")
-	if err := os.WriteFile(mockToolPath, mockContent, 0755); err != nil {
-		t.Fatalf("Failed to create mock tool: %v", err)
-	}
+	testutil.WriteTestFile(t, mockToolPath, mockContent, utils.PermFileExecutable)
 
 	// Set GOENV_GOPATH_PREFIX to our test GOPATH
 	utils.GoenvEnvVarGopathPrefix.Set(filepath.Join(tempRoot, "go"))
 	defer os.Unsetenv("GOENV_GOPATH_PREFIX")
 
 	// Verify tool exists
-	if _, err := os.Stat(mockToolPath); err != nil {
+	if utils.FileNotExists(mockToolPath) {
 		t.Fatalf("Mock tool not created: %v", err)
 	}
 
@@ -118,7 +116,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 
 	// Verify shim was created
 	shimPath := filepath.Join(shimsDir, mockToolName)
-	if _, err := os.Stat(shimPath); err != nil {
+	if utils.FileNotExists(shimPath) {
 		t.Errorf("Shim not created for %s at %s", mockToolName, shimPath)
 		// List all shims for debugging
 		t.Logf("Available shims:")
@@ -153,7 +151,7 @@ func TestExec_AutoRehashCanBeDisabled(t *testing.T) {
 	}()
 
 	// Verify the environment variable is set
-	if os.Getenv("GOENV_NO_AUTO_REHASH") != "1" {
+	if os.Getenv(utils.GoenvEnvVarNoAutoRehash.String()) != "1" {
 		t.Fatal("Failed to set GOENV_NO_AUTO_REHASH")
 	}
 
@@ -181,8 +179,7 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 	utils.GoenvEnvVarRoot.Set(tempRoot)
 	defer utils.GoenvEnvVarRoot.Set(oldRoot)
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Check if we have a Go version installed
 	versions, err := mgr.ListInstalledVersions()
@@ -193,7 +190,7 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 	// Use the first available non-system version
 	var testVersion string
 	for _, v := range versions {
-		if v != "system" {
+		if v != manager.SystemVersion {
 			testVersion = v
 			break
 		}
@@ -215,7 +212,7 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 
 	// Count shims before
 	shimsDir := filepath.Join(cfg.Root, "shims")
-	os.MkdirAll(shimsDir, 0755)
+	_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
 
 	shimsBefore, _ := os.ReadDir(shimsDir)
 	shimCountBefore := len(shimsBefore)
@@ -279,9 +276,7 @@ func main() {
 `
 
 	toolSourcePath := filepath.Join(tempDir, "testtool.go")
-	if err := os.WriteFile(toolSourcePath, []byte(toolSource), 0644); err != nil {
-		t.Fatalf("Failed to write test tool source: %v", err)
-	}
+	testutil.WriteTestFile(t, toolSourcePath, []byte(toolSource), utils.PermFileDefault)
 
 	// Compile the test tool using system Go
 	toolBinaryName := "testtool"
@@ -295,7 +290,7 @@ func main() {
 	}
 
 	// Verify the binary was created and is executable
-	if _, err := os.Stat(toolBinaryPath); err != nil {
+	if utils.FileNotExists(toolBinaryPath) {
 		t.Fatalf("Test tool binary not created: %v", err)
 	}
 
@@ -311,9 +306,9 @@ func main() {
 
 	// Test 2: Execution through PATH (simulating shim behavior)
 	// Add our temp directory to PATH
-	oldPath := os.Getenv("PATH")
+	oldPath := os.Getenv(utils.EnvVarPath)
 	newPath := tempDir + string(os.PathListSeparator) + oldPath
-	t.Setenv("PATH", newPath)
+	t.Setenv(utils.EnvVarPath, newPath)
 
 	// Execute the tool by name (should find it in PATH)
 	// On Windows, we can use "testtool" and the shell will find "testtool.exe"

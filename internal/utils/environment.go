@@ -20,15 +20,60 @@ const (
 	EnvVarUserProfile = "USERPROFILE" // Windows
 	EnvVarProgramData = "ProgramData" // Windows
 
+	// Go toolchain environment variables
+	EnvVarGocache     = "GOCACHE"
+	EnvVarGotoolchain = "GOTOOLCHAIN"
+	EnvVarGoos        = "GOOS"
+	EnvVarGoarch      = "GOARCH"
+
 	// CI/CD environment variable names
 	EnvVarGitHubActions = "GITHUB_ACTIONS"
 	EnvVarGitHubToken   = "GITHUB_TOKEN"
 	EnvVarGitLabCI      = "GITLAB_CI"
 	EnvVarCircleCI      = "CIRCLECI"
 	EnvVarTravisCI      = "TRAVIS"
+	EnvVarCI            = "CI"
+
+	// Container/Virtualization detection
+	EnvVarWSLDistroName           = "WSL_DISTRO_NAME"
+	EnvVarKubernetesServiceHost   = "KUBERNETES_SERVICE_HOST"
+	EnvVarContainer               = "container" // lowercase
+	EnvVarContainerUpper          = "CONTAINER" // uppercase
+	EnvVarBuildkitSandboxHostname = "BUILDKIT_SANDBOX_HOSTNAME"
+
+	// Go installation/build variables
+	EnvVarGoBuildMirrorURL = "GO_BUILD_MIRROR_URL"
+
+	// Test control environment variables
+	EnvVarSkipNetworkTests = "SKIP_NETWORK_TESTS"
+
+	// Display/UI environment variables
+	EnvVarNoColor = "NO_COLOR"
 
 	// PowerShell environment
 	EnvVarPSModulePath = "PSModulePath"
+
+	// Shell version detection
+	EnvVarZshVersion  = "ZSH_VERSION"
+	EnvVarFishVersion = "FISH_VERSION"
+	EnvVarBashVersion = "BASH_VERSION"
+
+	// Shell profile
+	EnvVarProfile = "PROFILE"
+	EnvVarComspec = "COMSPEC" // Windows command processor
+
+	// Windows-specific environment variables
+	EnvVarLocalAppData    = "LOCALAPPDATA"
+	EnvVarSystemRoot      = "SystemRoot"
+	EnvVarProgramFilesArm = "ProgramFiles(Arm)"
+	EnvVarScoop           = "SCOOP"
+
+	// macOS-specific environment variables
+	EnvVarMacOSXDeploymentTarget = "MACOSX_DEPLOYMENT_TARGET"
+
+	// MinGW/MSYS environment
+	EnvVarMSYSTEM     = "MSYSTEM"      // MinGW system type (MINGW64, MINGW32, etc.)
+	EnvVarMINGWPrefix = "MINGW_PREFIX" // MinGW installation prefix
 )
 
 const (
@@ -45,24 +90,38 @@ const (
 	GoenvEnvVarHooksConfig      GoenvEnvVar = "GOENV_HOOKS_CONFIG"
 	GoenvEnvVarHooksLog         GoenvEnvVar = "GOENV_HOOKS_LOG"
 	GoenvEnvVarInstallRoot      GoenvEnvVar = "GOENV_INSTALL_ROOT"
+	GoenvEnvVarInstallTimeout   GoenvEnvVar = "GOENV_INSTALL_TIMEOUT"
+	GoenvEnvVarInstallRetries   GoenvEnvVar = "GOENV_INSTALL_RETRIES"
+	GoenvEnvVarInstallResume    GoenvEnvVar = "GOENV_INSTALL_RESUME"
 	GoenvEnvVarGocacheDir       GoenvEnvVar = "GOENV_GOCACHE_DIR"
 	GoenvEnvVarGomodcacheDir    GoenvEnvVar = "GOENV_GOMODCACHE_DIR"
+	GoenvEnvVarFileArg          GoenvEnvVar = "GOENV_FILE_ARG"
+	GoenvEnvVarPromptPrefix     GoenvEnvVar = "GOENV_PROMPT_PREFIX"
+	GoenvEnvVarPromptSuffix     GoenvEnvVar = "GOENV_PROMPT_SUFFIX"
+	GoenvEnvVarPromptFormat     GoenvEnvVar = "GOENV_PROMPT_FORMAT"
+	GoenvEnvVarPromptIcon       GoenvEnvVar = "GOENV_PROMPT_ICON"
+	GoenvEnvVarVersionOrigin    GoenvEnvVar = "GOENV_VERSION_ORIGIN"
 	// #endregion
 
 	// #region Bool Env Vars
-	GoenvEnvVarDisableGoroot     GoenvBoolEnv = "GOENV_DISABLE_GOROOT"
-	GoenvEnvVarDisableGopath     GoenvBoolEnv = "GOENV_DISABLE_GOPATH"
-	GoenvEnvVarGopathPrefix      GoenvBoolEnv = "GOENV_GOPATH_PREFIX"
-	GoenvEnvVarAppendGopath      GoenvBoolEnv = "GOENV_APPEND_GOPATH"
-	GoenvEnvVarPrependGopath     GoenvBoolEnv = "GOENV_PREPEND_GOPATH"
-	GoenvEnvVarAutoInstall       GoenvBoolEnv = "GOENV_AUTO_INSTALL"
-	GoenvEnvVarNoAutoRehash      GoenvBoolEnv = "GOENV_NO_AUTO_REHASH"
-	GoenvEnvVarOffline           GoenvBoolEnv = "GOENV_OFFLINE"
-	GoenvEnvVarAutoRehash        GoenvBoolEnv = "GOENV_AUTO_REHASH"
-	GoenvEnvVarDisableGocache    GoenvBoolEnv = "GOENV_DISABLE_GOCACHE"
-	GoenvEnvVarDisableGomodcache GoenvBoolEnv = "GOENV_DISABLE_GOMODCACHE"
-	GoenvEnvVarCacheBgRefresh    GoenvBoolEnv = "GOENV_CACHE_BG_REFRESH"
-	GoenvEnvVarAssumeYes         GoenvBoolEnv = "GOENV_ASSUME_YES"
+	GoenvEnvVarDisableGoroot       GoenvBoolEnv = "GOENV_DISABLE_GOROOT"
+	GoenvEnvVarDisableGopath       GoenvBoolEnv = "GOENV_DISABLE_GOPATH"
+	GoenvEnvVarGopathPrefix        GoenvBoolEnv = "GOENV_GOPATH_PREFIX"
+	GoenvEnvVarAppendGopath        GoenvBoolEnv = "GOENV_APPEND_GOPATH"
+	GoenvEnvVarPrependGopath       GoenvBoolEnv = "GOENV_PREPEND_GOPATH"
+	GoenvEnvVarAutoInstall         GoenvBoolEnv = "GOENV_AUTO_INSTALL"
+	GoenvEnvVarNoAutoRehash        GoenvBoolEnv = "GOENV_NO_AUTO_REHASH"
+	GoenvEnvVarOffline             GoenvBoolEnv = "GOENV_OFFLINE"
+	GoenvEnvVarAutoRehash          GoenvBoolEnv = "GOENV_AUTO_REHASH"
+	GoenvEnvVarDisableGocache      GoenvBoolEnv = "GOENV_DISABLE_GOCACHE"
+	GoenvEnvVarDisableGomodcache   GoenvBoolEnv = "GOENV_DISABLE_GOMODCACHE"
+	GoenvEnvVarDisableGomod        GoenvBoolEnv = "GOENV_DISABLE_GOMOD"
+	GoenvEnvVarDisablePrompt       GoenvBoolEnv = "GOENV_DISABLE_PROMPT"
+	GoenvEnvVarDisablePromptHelper GoenvBoolEnv = "GOENV_DISABLE_PROMPT_HELPER"
+	GoenvEnvVarPromptNoSystem      GoenvBoolEnv = "GOENV_PROMPT_NO_SYSTEM"
+	GoenvEnvVarPromptProjectOnly   GoenvBoolEnv = "GOENV_PROMPT_PROJECT_ONLY"
+	GoenvEnvVarCacheBgRefresh      GoenvBoolEnv = "GOENV_CACHE_BG_REFRESH"
+	GoenvEnvVarAssumeYes           GoenvBoolEnv = "GOENV_ASSUME_YES"
 	// #endregion
 )
 
@@ -128,4 +187,24 @@ func GetEnvValue(env []string, key string) string {
 		}
 	}
 	return ""
+}
+
+// IsMinGW detects if running in MinGW/MSYS environment (Git Bash, MSYS2)
+// MinGW is a Unix-like environment on Windows that uses Unix-style paths
+// but runs Windows binaries.
+func IsMinGW() bool {
+	if !IsWindows() {
+		return false
+	}
+
+	// Check MinGW/MSYS environment variables
+	msystem := os.Getenv(EnvVarMSYSTEM)
+	mingwPrefix := os.Getenv(EnvVarMINGWPrefix)
+	if msystem != "" || mingwPrefix != "" {
+		return true
+	}
+
+	// Check if SHELL points to bash/sh but we're on Windows
+	shell := os.Getenv(EnvVarShell)
+	return strings.Contains(shell, "bash") || strings.Contains(shell, "/sh")
 }

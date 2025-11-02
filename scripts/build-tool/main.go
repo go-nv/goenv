@@ -6,10 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -68,17 +68,13 @@ func build() {
 	fmt.Println("Building goenv...")
 
 	binaryName := "goenv"
-	if runtime.GOOS == "windows" {
+	if platform.IsWindows() {
 		binaryName += ".exe"
 	}
 
 	ldflags := fmt.Sprintf("-X main.version=%s -X main.commit=%s -X main.buildTime=%s", version, commitSHA, buildTime)
 
-	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", binaryName, ".")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("go", []string{"build", "-ldflags", ldflags, "-o", binaryName, "."}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("Build failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -89,11 +85,7 @@ func build() {
 func test() {
 	fmt.Println("Running tests...")
 
-	cmd := exec.Command("go", "test", "-v", "./...")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("go", []string{"test", "-v", "./..."}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("Tests failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -113,8 +105,7 @@ func clean() {
 	}
 
 	// Run go clean
-	cmd := exec.Command("go", "clean")
-	cmd.Run() // Ignore errors
+	_ = utils.RunCommand("go", "clean") // Ignore errors
 
 	fmt.Println("✓ Clean complete")
 }
@@ -125,7 +116,7 @@ func crossBuild() {
 	// Generate embedded versions first
 	generateEmbedded()
 
-	if err := os.MkdirAll("dist", 0755); err != nil {
+	if err := utils.EnsureDirWithContext("dist", "create dist directory"); err != nil {
 		fmt.Printf("Failed to create dist directory: %v\n", err)
 		os.Exit(1)
 	}
@@ -178,14 +169,14 @@ func install(prefix string) {
 	build()
 
 	binDir := filepath.Join(prefix, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create bin directory"); err != nil {
 		fmt.Printf("Failed to create bin directory: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Copy binary
 	srcBinary := "goenv"
-	if runtime.GOOS == "windows" {
+	if platform.IsWindows() {
 		srcBinary += ".exe"
 	}
 
@@ -196,8 +187,8 @@ func install(prefix string) {
 	}
 
 	// Ensure executable on Unix (CopyFile preserves permissions, but set explicitly for safety)
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(dstBinary, 0755); err != nil {
+	if !platform.IsWindows() {
+		if err := os.Chmod(dstBinary, utils.PermFileExecutable); err != nil {
 			fmt.Printf("Failed to make binary executable: %v\n", err)
 			os.Exit(1)
 		}
@@ -209,11 +200,7 @@ func install(prefix string) {
 func generateEmbedded() {
 	fmt.Println("Generating embedded versions...")
 
-	cmd := exec.Command("go", "run", "scripts/generate_embedded_versions/main.go")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("go", []string{"run", "scripts/generate_embedded_versions/main.go"}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("Failed to generate embedded versions: %v\n", err)
 		os.Exit(1)
 	}
@@ -223,7 +210,7 @@ func generateEmbedded() {
 
 func uninstall(prefix string) {
 	binPath := filepath.Join(prefix, "bin", "goenv")
-	if runtime.GOOS == "windows" {
+	if platform.IsWindows() {
 		binPath += ".exe"
 	}
 
@@ -245,11 +232,7 @@ func showVersion() {
 func testWindows() {
 	fmt.Println("Testing Windows compatibility...")
 
-	cmd := exec.Command("go", "run", "scripts/test_windows_compatibility/main.go")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("go", []string{"run", "scripts/test_windows_compatibility/main.go"}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("Windows compatibility test failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -261,19 +244,13 @@ func devDeps() {
 	fmt.Println("Managing Go module dependencies...")
 
 	fmt.Println("Downloading dependencies...")
-	cmd := exec.Command("go", "mod", "download")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("go", []string{"mod", "download"}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("Failed to download dependencies: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Println("Tidying modules...")
-	cmd = exec.Command("go", "mod", "tidy")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("go", []string{"mod", "tidy"}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("Failed to tidy modules: %v\n", err)
 		os.Exit(1)
 	}
@@ -295,22 +272,17 @@ func batsTest() {
 	fmt.Println("Running legacy bats tests (if available)...")
 
 	// Check if bats is available and test directory exists
-	batsCmd := exec.Command("bats", "--version")
-	if err := batsCmd.Run(); err != nil {
+	if err := utils.RunCommand("bats", "--version"); err != nil {
 		fmt.Println("Bats not installed - skipping legacy tests")
 		return
 	}
 
-	if _, err := os.Stat("test"); os.IsNotExist(err) {
+	if utils.FileNotExists("test") {
 		fmt.Println("Test directory not found - skipping legacy tests")
 		return
 	}
 
-	cmd := exec.Command("bats", "test/")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("bats", []string{"test/"}, os.Stdout, os.Stderr); err != nil {
 		fmt.Println("Bats tests failed or not available - continuing")
 	} else {
 		fmt.Println("✓ Bats tests passed")
@@ -321,17 +293,12 @@ func release() {
 	fmt.Println("Creating release with GoReleaser...")
 
 	// Check if goreleaser is available
-	checkCmd := exec.Command("goreleaser", "version")
-	if err := checkCmd.Run(); err != nil {
+	if err := utils.RunCommand("goreleaser", "version"); err != nil {
 		fmt.Printf("Error: goreleaser not found. Install with: go install github.com/goreleaser/goreleaser@latest\n")
 		os.Exit(1)
 	}
 
-	cmd := exec.Command("goreleaser", "release", "--clean")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("goreleaser", []string{"release", "--clean"}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("GoReleaser release failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -343,17 +310,12 @@ func snapshot() {
 	fmt.Println("Creating snapshot build with GoReleaser...")
 
 	// Check if goreleaser is available
-	checkCmd := exec.Command("goreleaser", "version")
-	if err := checkCmd.Run(); err != nil {
+	if err := utils.RunCommand("goreleaser", "version"); err != nil {
 		fmt.Printf("Error: goreleaser not found. Install with: go install github.com/goreleaser/goreleaser@latest\n")
 		os.Exit(1)
 	}
 
-	cmd := exec.Command("goreleaser", "build", "--snapshot", "--clean")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIO("goreleaser", []string{"build", "--snapshot", "--clean"}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("GoReleaser snapshot failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -402,15 +364,14 @@ func getVersion() string {
 }
 
 func getCommitSHA() string {
-	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
-	if output, err := cmd.Output(); err == nil {
-		return strings.TrimSpace(string(output))
+	if output, err := utils.RunCommandOutput("git", "rev-parse", "--short", "HEAD"); err == nil {
+		return strings.TrimSpace(output)
 	}
 	return "unknown"
 }
 
 func getDefaultPrefix() string {
-	if runtime.GOOS == "windows" {
+	if platform.IsWindows() {
 		if appdata := os.Getenv("LOCALAPPDATA"); appdata != "" {
 			return filepath.Join(appdata, "goenv")
 		}

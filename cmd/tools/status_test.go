@@ -2,11 +2,17 @@ package tools
 
 import (
 	"encoding/json"
-	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestStatusCommand_NoVersions(t *testing.T) {
@@ -17,11 +23,12 @@ func TestStatusCommand_NoVersions(t *testing.T) {
 
 	// Create empty versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
-	versions, err := getInstalledVersions(cfg)
+	mgr := manager.NewManager(cfg)
+	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -156,43 +163,49 @@ func TestStatusCommand_Categorization(t *testing.T) {
 	}
 
 	for version, tools := range versionsTools {
-		binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-		if err := os.MkdirAll(binPath, 0755); err != nil {
-			t.Fatal(err)
-		}
+		// Create version with tool directory
+		cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
 
+		// Create individual tool binaries
+		binPath := cfg.VersionGopathBin(version)
 		for _, tool := range tools {
 			toolPath := filepath.Join(binPath, tool)
-			if err := os.WriteFile(toolPath, []byte("fake"), 0755); err != nil {
-				t.Fatal(err)
-			}
+			testutil.WriteTestFile(t, toolPath, []byte("fake"), utils.PermFileExecutable)
 		}
 	}
 
 	// Get versions and collect tools
-	foundVersions, err := getInstalledVersions(cfg)
+	mgr := manager.NewManager(cfg)
+	foundVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		t.Fatalf("getInstalledVersions failed: %v", err)
+		t.Fatalf("ListInstalledVersions failed: %v", err)
 	}
 
 	toolsByVersion := make(map[string][]string)
 	allToolNames := make(map[string]bool)
 
 	for _, version := range foundVersions {
-		tools, err := getToolsForVersion(cfg, version)
+		toolList, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
-			t.Fatalf("getToolsForVersion failed for %s: %v", version, err)
+			t.Fatalf("ListForVersion failed for %s: %v", version, err)
 		}
-		toolsByVersion[version] = tools
-		for _, tool := range tools {
-			allToolNames[tool] = true
+
+		// Extract tool names
+		var toolNames []string
+		for _, tool := range toolList {
+			toolNames = append(toolNames, tool.Name)
+		}
+
+		toolsByVersion[version] = toolNames
+		for _, toolName := range toolNames {
+			allToolNames[toolName] = true
 		}
 	}
 
 	// Verify gopls is consistent (in all versions)
 	goplsCount := 0
 	for _, tools := range toolsByVersion {
-		if contains(tools, "gopls") {
+		if slices.Contains(tools, "gopls") {
 			goplsCount++
 		}
 	}
@@ -203,7 +216,7 @@ func TestStatusCommand_Categorization(t *testing.T) {
 	// Verify staticcheck is partial (in 2 versions)
 	staticcheckCount := 0
 	for _, tools := range toolsByVersion {
-		if contains(tools, "staticcheck") {
+		if slices.Contains(tools, "staticcheck") {
 			staticcheckCount++
 		}
 	}
@@ -214,7 +227,7 @@ func TestStatusCommand_Categorization(t *testing.T) {
 	// Verify gofmt is version-specific (in 1 version)
 	gofmtCount := 0
 	for _, tools := range toolsByVersion {
-		if contains(tools, "gofmt") {
+		if slices.Contains(tools, "gofmt") {
 			gofmtCount++
 		}
 	}
@@ -225,7 +238,7 @@ func TestStatusCommand_Categorization(t *testing.T) {
 	// Verify golangci-lint is version-specific (in 1 version)
 	golangciCount := 0
 	for _, tools := range toolsByVersion {
-		if contains(tools, "golangci-lint") {
+		if slices.Contains(tools, "golangci-lint") {
 			golangciCount++
 		}
 	}
@@ -244,14 +257,19 @@ func TestStatusCommand_EmptyTools(t *testing.T) {
 	versions := []string{"1.21.0", "1.22.0", "1.23.0"}
 	for _, v := range versions {
 		versionPath := filepath.Join(tmpDir, "versions", v)
-		if err := os.MkdirAll(versionPath, 0755); err != nil {
+		// Create Go binary (required by ListInstalledVersions)
+		goBinDir := filepath.Join(versionPath, "bin")
+		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
 			t.Fatal(err)
 		}
+		goBin := filepath.Join(goBinDir, "go")
+		testutil.WriteTestFile(t, goBin, []byte("#!/bin/sh\necho go version"), utils.PermFileExecutable)
 	}
 
-	foundVersions, err := getInstalledVersions(cfg)
+	mgr := manager.NewManager(cfg)
+	foundVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		t.Fatalf("getInstalledVersions failed: %v", err)
+		t.Fatalf("ListInstalledVersions failed: %v", err)
 	}
 
 	if len(foundVersions) != 3 {
@@ -261,17 +279,17 @@ func TestStatusCommand_EmptyTools(t *testing.T) {
 	// All versions should have no tools
 	allToolNames := make(map[string]bool)
 	for _, version := range foundVersions {
-		tools, err := getToolsForVersion(cfg, version)
+		toolList, err := toolspkg.ListForVersion(cfg, version)
 		if err != nil {
-			t.Fatalf("getToolsForVersion failed for %s: %v", version, err)
+			t.Fatalf("ListForVersion failed for %s: %v", version, err)
 		}
 
-		if len(tools) != 0 {
-			t.Errorf("Version %s: expected no tools, got %d", version, len(tools))
+		if len(toolList) != 0 {
+			t.Errorf("Version %s: expected no tools, got %d", version, len(toolList))
 		}
 
-		for _, tool := range tools {
-			allToolNames[tool] = true
+		for _, tool := range toolList {
+			allToolNames[tool.Name] = true
 		}
 	}
 

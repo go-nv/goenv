@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -52,7 +53,7 @@ func TestShimsCommand(t *testing.T) {
 			// Setup shims
 			shimsDir := filepath.Join(testRoot, "shims")
 			if len(tt.setupShims) > 0 {
-				os.MkdirAll(shimsDir, 0755)
+				_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
 				for _, shim := range tt.setupShims {
 					shimPath := filepath.Join(shimsDir, shim)
 					var shimContent string
@@ -62,7 +63,7 @@ func TestShimsCommand(t *testing.T) {
 					} else {
 						shimContent = "#!/bin/bash\necho shim\n"
 					}
-					os.WriteFile(shimPath, []byte(shimContent), 0755)
+					testutil.WriteTestFile(t, shimPath, []byte(shimContent), utils.PermFileExecutable)
 				}
 			}
 
@@ -173,7 +174,7 @@ func TestFindInSystemPath(t *testing.T) {
 	// Create GOENV_ROOT/shims directory
 	goenvRoot := filepath.Join(tmpDir, "goenv")
 	shimsDir := filepath.Join(goenvRoot, "shims")
-	if err := os.MkdirAll(shimsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(shimsDir, "create test directory"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -183,7 +184,7 @@ func TestFindInSystemPath(t *testing.T) {
 	nestedShimsDir := filepath.Join(shimsDir, "subdir")       // Subdirectory of shims
 
 	for _, dir := range []string{similarDir, otherDir, nestedShimsDir} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := utils.EnsureDirWithContext(dir, "create test directory"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -198,9 +199,7 @@ func TestFindInSystemPath(t *testing.T) {
 		} else {
 			content = "#!/bin/bash\necho test\n"
 		}
-		if err := os.WriteFile(path, []byte(content), 0755); err != nil {
-			t.Fatal(err)
-		}
+		testutil.WriteTestFile(t, path, []byte(content), utils.PermFileExecutable)
 	}
 
 	// Create "go" executable in each directory
@@ -255,9 +254,9 @@ func TestFindInSystemPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set PATH environment variable
-			originalPath := os.Getenv("PATH")
-			defer os.Setenv("PATH", originalPath)
-			os.Setenv("PATH", tt.pathEnv)
+			originalPath := os.Getenv(utils.EnvVarPath)
+			defer os.Setenv(utils.EnvVarPath, originalPath)
+			os.Setenv(utils.EnvVarPath, tt.pathEnv)
 
 			// Call findInSystemPath
 			foundPath, err := findInSystemPath(tt.commandName, goenvRoot)

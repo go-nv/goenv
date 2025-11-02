@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-nv/goenv/internal/config"
-	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -71,8 +70,7 @@ func (h *CommandHelp) format(substituteVersions bool) string {
 
 // getLatestInstalledVersion returns the latest installed Go version or empty string if none
 func getLatestInstalledVersion() string {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	installed, err := mgr.ListInstalledVersions()
 	if err != nil || len(installed) == 0 {

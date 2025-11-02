@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestCheckSettings_EnvVars(t *testing.T) {
@@ -20,9 +21,7 @@ func TestCheckSettings_EnvVars(t *testing.T) {
 	"go.toolsGopath": "~/go/tools"
 }`
 
-	if err := os.WriteFile(settingsPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsPath, []byte(content), utils.PermFileDefault)
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
@@ -52,9 +51,7 @@ func TestCheckSettings_EnvHomeWithVersion(t *testing.T) {
 	"go.toolsGopath": "${env:HOME}/go/tools"
 }`
 
-	if err := os.WriteFile(settingsPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsPath, []byte(content), utils.PermFileDefault)
 
 	// Current version is 1.24.3, but settings have 1.24.1
 	result := CheckSettings(settingsPath, "1.24.3")
@@ -82,9 +79,7 @@ func TestCheckSettings_UnixPath(t *testing.T) {
 	"go.goroot": "/Users/adam/.goenv/versions/1.23.2"
 }`
 
-	if err := os.WriteFile(settingsPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsPath, []byte(content), utils.PermFileDefault)
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
@@ -111,9 +106,7 @@ func TestCheckSettings_WindowsPath(t *testing.T) {
 	"go.goroot": "C:\\Users\\adam\\.goenv\\versions\\1.23.2"
 }`
 
-	if err := os.WriteFile(settingsPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsPath, []byte(content), utils.PermFileDefault)
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
@@ -139,9 +132,7 @@ func TestCheckSettings_VersionMismatch_Unix(t *testing.T) {
 	"go.goroot": "/Users/adam/.goenv/versions/1.22.0"
 }`
 
-	if err := os.WriteFile(settingsPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsPath, []byte(content), utils.PermFileDefault)
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
@@ -165,9 +156,7 @@ func TestCheckSettings_VersionMismatch_Windows(t *testing.T) {
 	"go.goroot": "C:\\Users\\adam\\.goenv\\versions\\1.22.0"
 }`
 
-	if err := os.WriteFile(settingsPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsPath, []byte(content), utils.PermFileDefault)
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
@@ -188,9 +177,7 @@ func TestCheckSettings_NoSettings(t *testing.T) {
 	"editor.fontSize": 14
 }`
 
-	if err := os.WriteFile(settingsPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsPath, []byte(content), utils.PermFileDefault)
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
@@ -226,9 +213,7 @@ func TestCheckSettings_InvalidJSON(t *testing.T) {
 	invalid json here
 }`
 
-	if err := os.WriteFile(settingsPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, settingsPath, []byte(content), utils.PermFileDefault)
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
@@ -320,9 +305,7 @@ func TestUpdateJSONKeys(t *testing.T) {
   "go.goroot": "/old/path"
 }`
 
-	if err := os.WriteFile(testFile, []byte(initial), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, testFile, []byte(initial), utils.PermFileDefault)
 
 	// Update keys
 	updates := map[string]any{
@@ -362,9 +345,7 @@ func TestUpdateJSONKeys_PreservesIndentation(t *testing.T) {
     "go.goroot": "/old/path"
 }`
 
-	if err := os.WriteFile(testFile, []byte(initial), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, testFile, []byte(initial), utils.PermFileDefault)
 
 	updates := map[string]any{
 		"go.goroot": "/new/path",
@@ -423,9 +404,7 @@ func TestReadExistingSettings_JSONC(t *testing.T) {
   "go.toolsGopath": "~/go/tools", // trailing comma
 }`
 
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, testFile, []byte(content), utils.PermFileDefault)
 
 	settings, err := ReadExistingSettings(testFile)
 	if err != nil {
@@ -444,7 +423,7 @@ func TestReadExistingSettings_JSONC(t *testing.T) {
 func TestFindSettingsFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	vscodeDir := filepath.Join(tmpDir, ".vscode")
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .vscode directory: %v", err)
 	}
 
@@ -469,7 +448,7 @@ func TestHasVSCodeDirectory(t *testing.T) {
 
 	// Create .vscode directory
 	vscodeDir := filepath.Join(tmpDir, ".vscode")
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create .vscode directory: %v", err)
 	}
 
@@ -553,9 +532,7 @@ func TestWriteJSONFile_PreservesIndentation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create existing file if specified
 			if tt.existingFile != "" {
-				if err := os.WriteFile(testFile, []byte(tt.existingFile), 0644); err != nil {
-					t.Fatalf("Failed to write existing file: %v", err)
-				}
+				testutil.WriteTestFile(t, testFile, []byte(tt.existingFile), utils.PermFileDefault)
 			} else {
 				// Remove file if it exists
 				os.Remove(testFile)

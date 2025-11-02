@@ -2,11 +2,10 @@ package core
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -16,29 +15,12 @@ func TestInstallCommand_NoRehashFlag(t *testing.T) {
 	}()
 
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_DEBUG", "1")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDebug.String(), "1")
 
 	// Create a fake existing installation
-	versionDir := filepath.Join(tmpDir, "versions", "1.21.0")
-	binDir := filepath.Join(versionDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-
-	// Create mock go binary
-	goBinary := filepath.Join(binDir, "go")
-	var content string
-	if utils.IsWindows() {
-		goBinary += ".bat"
-		content = "@echo off\necho go1.21.0\n"
-	} else {
-		content = "#!/bin/bash\necho go1.21.0\n"
-	}
-	if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create mock go binary: %v", err)
-	}
+	cmdtest.CreateMockGoVersion(t, tmpDir, "1.21.0")
 
 	buf := new(bytes.Buffer)
 	installCmd.SetOut(buf)
@@ -64,30 +46,13 @@ func TestInstallCommand_NoRehashFlag(t *testing.T) {
 
 func TestInstallCommand_NoRehashEnv(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_DEBUG", "1")
-	t.Setenv("GOENV_NO_AUTO_REHASH", "1")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDebug.String(), "1")
+	t.Setenv(utils.GoenvEnvVarNoAutoRehash.String(), "1")
 
 	// Create a fake existing installation
-	versionDir := filepath.Join(tmpDir, "versions", "1.21.0")
-	binDir := filepath.Join(versionDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-
-	// Create mock go binary
-	goBinary := filepath.Join(binDir, "go")
-	var content string
-	if utils.IsWindows() {
-		goBinary += ".bat"
-		content = "@echo off\necho go1.21.0\n"
-	} else {
-		content = "#!/bin/bash\necho go1.21.0\n"
-	}
-	if err := os.WriteFile(goBinary, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create mock go binary: %v", err)
-	}
+	cmdtest.CreateMockGoVersion(t, tmpDir, "1.21.0")
 
 	buf := new(bytes.Buffer)
 	installCmd.SetOut(buf)

@@ -7,12 +7,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 const (
@@ -54,34 +53,16 @@ func main() {
 	}
 
 	// Get file info
-	info, _ := os.Stat(outputFile)
+	size := utils.GetFileSize(outputFile)
 	fmt.Printf("✅ Generated %s with %d versions (%d KB)\n",
-		outputFile, len(releases), info.Size()/1024)
+		outputFile, len(releases), size/1024)
 }
 
 func fetchReleases() ([]GoRelease, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
-
-	resp, err := client.Get(apiURL)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
 	var releases []GoRelease
-	if err := json.Unmarshal(body, &releases); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	if err := utils.FetchJSONWithTimeout(apiURL, &releases, 30*time.Second); err != nil {
+		return nil, fmt.Errorf("failed to fetch releases: %w", err)
 	}
-
 	return releases, nil
 }
 

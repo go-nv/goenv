@@ -5,7 +5,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -40,16 +41,15 @@ func init() {
 
 func runCurrent(cmd *cobra.Command, args []string) error {
 	// Validate: current command takes no positional arguments
-	if len(args) > 0 {
+	if err := cmdutil.ValidateMaxArgs(args, 0, "no arguments"); err != nil {
 		return fmt.Errorf("usage: goenv current [--verbose] [--file]")
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	_, mgr := cmdutil.SetupContext()
 
 	version, source, err := mgr.GetCurrentVersion()
 	if err != nil {
-		return fmt.Errorf("no version set: %w", err)
+		return errors.FailedTo("determine active version", err)
 	}
 
 	// --file flag: just show the source file
@@ -71,9 +71,9 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 		var errorMessages []string
 
 		for _, v := range versions {
-			if !mgr.IsVersionInstalled(v) && v != "system" {
+			if !mgr.IsVersionInstalled(v) && v != manager.SystemVersion {
 				hasErrors = true
-				errorMessages = append(errorMessages, fmt.Sprintf("goenv: version '%s' is not installed (set by %s)", v, source))
+				errorMessages = append(errorMessages, errors.VersionNotInstalled(v, source).Error())
 			}
 		}
 
@@ -84,7 +84,7 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 
 		// Then print successfully installed versions
 		for _, v := range versions {
-			if mgr.IsVersionInstalled(v) || v == "system" {
+			if mgr.IsVersionInstalled(v) || v == manager.SystemVersion {
 				if source != "" {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s (set by %s)\n", v, source)
 				} else {
@@ -94,17 +94,14 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 		}
 
 		if hasErrors {
-			return fmt.Errorf("some versions are not installed")
+			return errors.SomeVersionsNotInstalled()
 		}
 	} else {
 		// Single version - check if it's installed
-		if version != "system" && !mgr.IsVersionInstalled(version) {
-			// Version not installed - show warning but still display info
-			cmd.PrintErrf("Warning: version '%s' is not installed (set by %s)\n", version, source)
-			cmd.PrintErrln("")
-			cmd.PrintErrln("To install this version:")
-			cmd.PrintErrf("  goenv install %s\n", version)
-			return fmt.Errorf("version not installed")
+		if version != manager.SystemVersion && !mgr.IsVersionInstalled(version) {
+			// Version not installed - return detailed error with suggestions
+			installed, _ := mgr.ListInstalledVersions()
+			return errors.VersionNotInstalledDetailed(version, source, installed)
 		}
 
 		// Show version with source info

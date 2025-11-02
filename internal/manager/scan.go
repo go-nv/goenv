@@ -4,13 +4,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/config"
 )
 
 // ProjectInfo represents a discovered Go project
 type ProjectInfo struct {
 	Path    string // Absolute path to project directory
 	Version string // Go version required
-	Source  string // ".go-version" or "go.mod"
+	Source  string // config.VersionFileName or config.GoModFileName
 }
 
 // Directories to skip during scanning for performance
@@ -77,26 +79,26 @@ func ScanProjects(rootDir string, maxDepth int) ([]ProjectInfo, error) {
 		}
 
 		// Check for .go-version file
-		if info.Name() == ".go-version" {
+		if info.Name() == config.VersionFileName {
 			version, err := readVersionFile(path)
 			if err == nil && version != "" {
 				projects = append(projects, ProjectInfo{
 					Path:    filepath.Dir(path),
 					Version: version,
-					Source:  ".go-version",
+					Source:  config.VersionFileName,
 				})
 			}
 			return nil
 		}
 
 		// Check for go.mod file
-		if info.Name() == "go.mod" {
+		if info.Name() == config.GoModFileName {
 			version, err := ParseGoModVersion(path)
 			if err == nil && version != "" {
 				projects = append(projects, ProjectInfo{
 					Path:    filepath.Dir(path),
 					Version: version,
-					Source:  "go.mod",
+					Source:  config.GoModFileName,
 				})
 			}
 			return nil

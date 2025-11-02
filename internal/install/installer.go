@@ -5,7 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"crypto/sha256"
-	"errors"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/version"
@@ -82,11 +83,9 @@ func (e *InstallError) Unwrap() error {
 // NewInstaller creates a new installer
 func NewInstaller(cfg *config.Config) *Installer {
 	return &Installer{
-		config: cfg,
-		client: &http.Client{
-			Timeout: 10 * time.Minute, // Long timeout for downloads
-		},
-		MirrorURL: os.Getenv("GO_BUILD_MIRROR_URL"),
+		config:    cfg,
+		client:    utils.NewHTTPClientForDownloads(),
+		MirrorURL: os.Getenv(utils.EnvVarGoBuildMirrorURL),
 	}
 }
 
@@ -96,12 +95,12 @@ func (i *Installer) Install(goVersion string, force bool) error {
 	fetcher := version.NewFetcherWithOptions(version.FetcherOptions{Debug: false})
 	releases, err := fetcher.FetchWithFallback(i.config.Root)
 	if err != nil {
-		return fmt.Errorf("failed to fetch available versions: %w", err)
+		return errors.FailedTo("fetch available versions", err)
 	}
 
 	var targetRelease *version.GoRelease
 	for _, release := range releases {
-		if release.Version == goVersion || strings.TrimPrefix(release.Version, "go") == goVersion {
+		if utils.MatchesVersion(release.Version, goVersion) {
 			targetRelease = &release
 			break
 		}
@@ -117,11 +116,11 @@ func (i *Installer) Install(goVersion string, force bool) error {
 		return fmt.Errorf("no download available for current platform: %w", err)
 	}
 
-	versionDir := filepath.Join(i.config.VersionsDir(), strings.TrimPrefix(targetRelease.Version, "go"))
+	versionDir := i.config.VersionDir(utils.NormalizeGoVersion(targetRelease.Version))
 
 	// Check if already installed
 	if !force {
-		if _, err := os.Stat(versionDir); err == nil {
+		if utils.PathExists(versionDir) {
 			return fmt.Errorf("version %s is already installed (use --force to reinstall)", goVersion)
 		}
 	}
@@ -156,10 +155,10 @@ func (i *Installer) Install(goVersion string, force bool) error {
 			downloadURL = fmt.Sprintf("https://go.dev/dl/%s", file.Filename)
 			tempFile, err = i.downloadFile(downloadURL, file.SHA256, file.Filename)
 			if err != nil {
-				return fmt.Errorf("failed to download: %w", err)
+				return errors.FailedTo("download", err)
 			}
 		} else {
-			return fmt.Errorf("failed to download: %w", err)
+			return errors.FailedTo("download", err)
 		}
 	}
 
@@ -176,12 +175,12 @@ func (i *Installer) Install(goVersion string, force bool) error {
 	if strings.HasSuffix(file.Filename, ".zip") {
 		if err := i.extractZip(tempFile, versionDir); err != nil {
 			os.RemoveAll(versionDir) // Clean up on failure
-			return fmt.Errorf("failed to extract: %w", err)
+			return errors.FailedTo("extract", err)
 		}
 	} else {
 		if err := i.extractTarGz(tempFile, versionDir); err != nil {
 			os.RemoveAll(versionDir) // Clean up on failure
-			return fmt.Errorf("failed to extract: %w", err)
+			return errors.FailedTo("extract", err)
 		}
 	}
 
@@ -218,7 +217,7 @@ func (i *Installer) downloadFile(url, expectedSHA256, filename string) (string, 
 	// Create temporary file
 	tempFile, err := os.CreateTemp("", "goenv-download-*.tar.gz")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
+		return "", errors.FailedTo("create temp file", err)
 	}
 	defer tempFile.Close()
 
@@ -256,7 +255,7 @@ func (i *Installer) downloadFile(url, expectedSHA256, filename string) (string, 
 	_, err = io.Copy(writer, resp.Body)
 	if err != nil {
 		os.Remove(tempFile.Name())
-		return "", fmt.Errorf("failed to write download: %w", err)
+		return "", errors.FailedTo("write download", err)
 	}
 
 	// Verify checksum
@@ -277,13 +276,13 @@ func (i *Installer) downloadFile(url, expectedSHA256, filename string) (string, 
 func (i *Installer) extractTarGz(tarGzPath, destDir string) error {
 	file, err := os.Open(tarGzPath)
 	if err != nil {
-		return fmt.Errorf("failed to open archive: %w", err)
+		return errors.FailedTo("open archive", err)
 	}
 	defer file.Close()
 
 	gzr, err := gzip.NewReader(file)
 	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
+		return errors.FailedTo("create gzip reader", err)
 	}
 	defer gzr.Close()
 
@@ -311,8 +310,8 @@ func (i *Installer) extractTarGz(tarGzPath, destDir string) error {
 		target := filepath.Join(destDir, path)
 
 		// Ensure the target directory exists
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			return fmt.Errorf("failed to create directory: %w", err)
+		if err := utils.EnsureDirWithContext(filepath.Dir(target), "create directory"); err != nil {
+			return err
 		}
 
 		switch header.Typeflag {
@@ -344,7 +343,7 @@ func (i *Installer) extractTarGz(tarGzPath, destDir string) error {
 func (i *Installer) extractZip(zipPath, destDir string) error {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
-		return fmt.Errorf("failed to open ZIP archive: %w", err)
+		return errors.FailedTo("open ZIP archive", err)
 	}
 	defer r.Close()
 
@@ -369,13 +368,13 @@ func (i *Installer) extractZip(zipPath, destDir string) error {
 
 		if f.FileInfo().IsDir() {
 			// Create directory
-			if err := os.MkdirAll(target, 0755); err != nil {
+			if err := utils.EnsureDir(target); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", target, err)
 			}
 		} else {
 			// Ensure parent directory exists
-			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory: %w", err)
+			if err := utils.EnsureDirWithContext(filepath.Dir(target), "create parent directory"); err != nil {
+				return err
 			}
 
 			// Extract file
@@ -387,7 +386,7 @@ func (i *Installer) extractZip(zipPath, destDir string) error {
 			rc, err := f.Open()
 			if err != nil {
 				outFile.Close()
-				return fmt.Errorf("failed to open file in ZIP: %w", err)
+				return errors.FailedTo("open file in ZIP", err)
 			}
 
 			_, err = io.Copy(outFile, rc)
@@ -410,14 +409,14 @@ func (i *Installer) extractZip(zipPath, destDir string) error {
 func (i *Installer) Uninstall(goVersion string) error {
 	versionDir := filepath.Join(i.config.VersionsDir(), goVersion)
 
-	if _, err := os.Stat(versionDir); os.IsNotExist(err) {
+	if utils.FileNotExists(versionDir) {
 		return fmt.Errorf("version %s is not installed", goVersion)
 	}
 
 	fmt.Printf("Uninstalling Go %s...\n", goVersion)
 
 	if err := os.RemoveAll(versionDir); err != nil {
-		return fmt.Errorf("failed to remove version directory: %w", err)
+		return errors.FailedTo("remove version directory", err)
 	}
 
 	fmt.Printf("Successfully uninstalled Go %s\n", goVersion)
@@ -446,7 +445,7 @@ func (i *Installer) createVersionNotFoundError(requestedVersion string, availabl
 		errMsg += "\n\nUse 'goenv install-list' to see all available versions"
 	}
 
-	return errors.New(errMsg)
+	return stderrors.New(errMsg)
 }
 
 // versionSuggestion represents a suggested version with metadata
@@ -460,7 +459,7 @@ func (i *Installer) findSimilarVersions(requested string, releases []version.GoR
 	var suggestions []versionSuggestion
 
 	// Normalize requested version (remove "go" prefix if present)
-	normalized := strings.TrimPrefix(requested, "go")
+	normalized := utils.NormalizeGoVersion(requested)
 
 	// Strategy 1: Prefix matching (e.g., "1.21" matches "1.21.0", "1.21.1", etc.)
 	if strings.Count(normalized, ".") < 2 {
@@ -468,7 +467,7 @@ func (i *Installer) findSimilarVersions(requested string, releases []version.GoR
 		latestPerMinor := make(map[string]string) // track latest per minor version
 
 		for _, release := range releases {
-			ver := strings.TrimPrefix(release.Version, "go")
+			ver := utils.NormalizeGoVersion(release.Version)
 
 			// Check if this matches the prefix
 			if strings.HasPrefix(ver, normalized+".") || ver == normalized {
@@ -510,7 +509,7 @@ func (i *Installer) findSimilarVersions(requested string, releases []version.GoR
 
 		// Try adjacent minor versions
 		for _, release := range releases {
-			ver := strings.TrimPrefix(release.Version, "go")
+			ver := utils.NormalizeGoVersion(release.Version)
 			verParts := strings.Split(ver, ".")
 
 			if len(verParts) >= 2 && verParts[0] == major {
@@ -539,7 +538,7 @@ func (i *Installer) findSimilarVersions(requested string, releases []version.GoR
 	// Strategy 3: Show latest stable versions as fallback
 	for _, release := range releases {
 		if release.Stable && !strings.Contains(release.Version, "beta") && !strings.Contains(release.Version, "rc") {
-			ver := strings.TrimPrefix(release.Version, "go")
+			ver := utils.NormalizeGoVersion(release.Version)
 			suggestions = append(suggestions, versionSuggestion{
 				Version:         ver,
 				IsLatestInMinor: true,
@@ -559,7 +558,7 @@ func (i *Installer) isLatestPatchVersion(ver string, releases []version.GoReleas
 	minorKey := utils.ExtractMajorMinor(ver)
 
 	for _, release := range releases {
-		releaseVer := strings.TrimPrefix(release.Version, "go")
+		releaseVer := utils.NormalizeGoVersion(release.Version)
 		if utils.ExtractMajorMinor(releaseVer) == minorKey {
 			if utils.CompareGoVersions(releaseVer, ver) > 0 {
 				return false // Found a newer patch version

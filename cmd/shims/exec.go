@@ -15,10 +15,10 @@ import (
 	"github.com/go-nv/goenv/internal/binarycheck"
 	"github.com/go-nv/goenv/internal/cache"
 	"github.com/go-nv/goenv/internal/cgo"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/envdetect"
 	"github.com/go-nv/goenv/internal/errors"
-	"github.com/go-nv/goenv/internal/goenv"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/manager"
@@ -62,20 +62,20 @@ func runExec(cmd *cobra.Command, args []string) error {
 		args = args[1:]
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Get the current version
 	currentVersion, source, err := mgr.GetCurrentVersion()
 	if err != nil {
-		return fmt.Errorf("no Go version set: %w", err)
+		return errors.FailedTo("determine active Go version", err)
 	}
 
 	// Validate that the version is installed
-	if currentVersion != "system" {
+	if currentVersion != manager.SystemVersion {
 		if err := mgr.ValidateVersion(currentVersion); err != nil {
 			// Provide enhanced error message with suggestions
-			return errors.VersionNotInstalledDetailed(currentVersion, source, mgr)
+			installed, _ := mgr.ListInstalledVersions()
+			return errors.VersionNotInstalledDetailed(currentVersion, source, installed)
 		}
 	}
 
@@ -97,10 +97,10 @@ func runExec(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if currentVersion != "system" {
+	if currentVersion != manager.SystemVersion {
 		versionPath, err := mgr.GetVersionPath(currentVersion)
 		if err != nil {
-			return fmt.Errorf("version path not found: %w", err)
+			return errors.FailedTo("get version path", err)
 		}
 
 		// Add Go version's bin directory to PATH
@@ -200,7 +200,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 						fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Failed to marshal build.info: %v\n", err)
 					} else {
 						buildInfoPath := filepath.Join(versionGocache, "build.info")
-						if err := writer.WriteFile(buildInfoPath, buildInfoJSON, 0644); err != nil && cfg.Debug {
+						if err := writer.WriteFile(buildInfoPath, buildInfoJSON, utils.PermFileDefault); err != nil && cfg.Debug {
 							fmt.Fprintf(cmd.ErrOrStderr(), "Debug: Failed to write build.info: %v\n", err)
 						}
 					}
@@ -238,7 +238,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 	var commandPath string
 
-	if currentVersion != "system" {
+	if currentVersion != manager.SystemVersion {
 		// First try to find command in the version's bin directory
 		versionPath, err := mgr.GetVersionPath(currentVersion)
 		if err != nil {
@@ -413,36 +413,9 @@ func setEnvVar(env []string, key, value string) []string {
 }
 
 // buildCacheSuffix constructs a cache directory suffix that includes ABI variants.
-// ABI variants (GOAMD64, GOARM, etc.) affect binary compatibility even when GOOS/GOARCH match.
-// Uses auto-discovery via 'go env -json' to future-proof against new ABI variables.
+// This is a wrapper around cache.BuildCacheSuffix for backward compatibility.
 func buildCacheSuffix(goBinaryPath, goos, goarch string, env []string) string {
-	// Start with OS-arch
-	suffix := fmt.Sprintf("go-build-%s-%s", goos, goarch)
-
-	// Add ABI variants using auto-discovery from Go binary
-	// This dynamically discovers GOAMD64, GOARM, GO386, GOMIPS*, GOPPC64, GORISCV64, etc.
-	// and future-proofs against new ABI variants (e.g., GOAMD64v5, GOLOONG64)
-	abiSuffix := goenv.BuildABISuffix(goBinaryPath, goarch, env)
-	suffix += abiSuffix
-
-	// Add GOEXPERIMENT if set (affects runtime behavior)
-	if goexp := utils.GetEnvValue(env, "GOEXPERIMENT"); goexp != "" {
-		// Sanitize GOEXPERIMENT for use in filename (replace , with -)
-		goexp = strings.ReplaceAll(goexp, ",", "-")
-		suffix += "-exp-" + goexp
-	}
-
-	// Add CGO toolchain hash if CGO is enabled
-	// This prevents cache conflicts when swapping C compilers/headers/flags
-	if cgo.IsCGOEnabled(env) {
-		cgoHash := cgo.ComputeToolchainHash(env)
-		if cgoHash != "" {
-			// Use first 8 chars of hash for brevity
-			suffix += "-cgo-" + cgoHash[:8]
-		}
-	}
-
-	return suffix
+	return cache.BuildCacheSuffix(goBinaryPath, goos, goarch, env)
 }
 
 // prependToPath prepends a directory to the PATH environment variable

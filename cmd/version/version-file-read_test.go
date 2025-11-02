@@ -1,12 +1,12 @@
 package version
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -117,17 +117,16 @@ require (
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			goenvRoot, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			var args []string
 			if !tt.noFile || tt.filename != "" {
 				// Create the file
-				testFile := filepath.Join(goenvRoot, tt.filename)
+				testFile := filepath.Join(tmpDir, tt.filename)
 				if tt.fileContent != "" {
-					if err := os.WriteFile(testFile, []byte(tt.fileContent), 0644); err != nil {
-						t.Fatalf("Failed to create test file: %v", err)
-					}
+					testutil.WriteTestFile(t, testFile, []byte(tt.fileContent), utils.PermFileDefault)
 				}
 				args = []string{testFile}
 			}

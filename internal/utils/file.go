@@ -6,6 +6,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+)
+
+// Common file permission constants
+const (
+	// File permissions
+	PermFileDefault    = 0644 // rw-r--r-- (regular files)
+	PermFileSecure     = 0600 // rw------- (secure files: configs, caches)
+	PermFileExecutable = 0755 // rwxr-xr-x (executable files, scripts)
+
+	// Directory permissions
+	PermDirDefault = 0755 // rwxr-xr-x (regular directories)
+	PermDirSecure  = 0700 // rwx------ (secure directories)
+
+	// Special permissions
+	PermExecutableBit = 0111 // --x--x--x (executable bit mask)
 )
 
 // FileExists checks if a file exists and is not a directory
@@ -137,4 +153,138 @@ func IsPathInPATH(dirPath, pathEnv string) bool {
 	}
 
 	return false
+}
+
+// EnsureDir creates a directory and all parent directories if they don't exist.
+// Equivalent to mkdir -p. Uses 0755 permissions.
+func EnsureDir(path string) error {
+	return os.MkdirAll(path, PermDirDefault)
+}
+
+// EnsureDirWithContext creates a directory and all parent directories with contextual error handling.
+// This is a convenience wrapper around os.MkdirAll that provides consistent error messages
+// using the errors.FailedTo() pattern. The context parameter describes what operation
+// required the directory creation (e.g., "create cache directory", "create config directory").
+//
+// Example:
+//
+//	if err := EnsureDirWithContext(cacheDir, "create cache directory"); err != nil {
+//	    return err
+//	}
+func EnsureDirWithContext(path string, context string) error {
+	if err := os.MkdirAll(path, PermDirDefault); err != nil {
+		return fmt.Errorf("failed to %s: %w", context, err)
+	}
+	return nil
+}
+
+// WriteFileWithContext writes data to a file with contextual error handling.
+// This helper standardizes file writing across the codebase with consistent error messages.
+func WriteFileWithContext(path string, data []byte, perm os.FileMode, context string) error {
+	if err := os.WriteFile(path, data, perm); err != nil {
+		return fmt.Errorf("failed to %s: %w", context, err)
+	}
+	return nil
+}
+
+// ReadFileWithContext reads a file with contextual error handling.
+// This helper standardizes file reading across the codebase with consistent error messages.
+// The wrapped error preserves os.IsNotExist checks via errors.Is().
+func ReadFileWithContext(path string, context string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to %s: %w", context, err)
+	}
+	return data, nil
+}
+
+// EnsureDirForFile creates the parent directory for a file path if it doesn't exist.
+// Useful when creating files to ensure the directory structure is in place.
+func EnsureDirForFile(filePath string) error {
+	return os.MkdirAll(filepath.Dir(filePath), PermDirDefault)
+}
+
+// FileNotExists checks if a file does not exist.
+// Returns true if the file doesn't exist, false if it exists or if there's a different error.
+func FileNotExists(path string) bool {
+	_, err := os.Stat(path)
+	return os.IsNotExist(err)
+}
+
+// IsExecutableFile checks if a path exists, is a file (not directory), and is executable.
+// On Windows, all files are considered executable if they exist.
+// On Unix, checks for the executable bit in file permissions.
+func IsExecutableFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	if info.IsDir() {
+		return false
+	}
+	return IsWindows() || HasExecutableBit(info)
+}
+
+// StatWithExistence performs os.Stat and returns both the FileInfo and existence status.
+// This is useful when you need the FileInfo but also want to distinguish between
+// "doesn't exist" and other errors.
+// Returns:
+//   - info: FileInfo if stat succeeded, nil otherwise
+//   - exists: true if path exists (stat succeeded)
+//   - err: the error from os.Stat if it's not os.IsNotExist, nil otherwise
+func StatWithExistence(path string) (info os.FileInfo, exists bool, err error) {
+	info, err = os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return info, true, nil
+}
+
+// GetFileSize returns the size of a file in bytes.
+// Returns 0 if the file doesn't exist or there's an error.
+func GetFileSize(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return info.Size()
+}
+
+// GetFileModTime returns the modification time of a file.
+// Returns zero time if the file doesn't exist or there's an error.
+func GetFileModTime(path string) time.Time {
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
+}
+
+// GetFileSizeAndModTime returns both the size and modification time of a file.
+// This is more efficient than calling GetFileSize and GetFileModTime separately
+// since it only performs one os.Stat call.
+// Returns (0, zero time) if the file doesn't exist or there's an error.
+func GetFileSizeAndModTime(path string) (size int64, modTime time.Time) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, time.Time{}
+	}
+	return info.Size(), info.ModTime()
+}
+
+// IsDir checks if a path exists and is a directory.
+// Returns true only if the path exists and is a directory.
+// This is an alias for DirExists() for consistency with filepath package naming.
+func IsDir(path string) bool {
+	return DirExists(path)
+}
+
+// IsFile checks if a path exists and is a regular file (not a directory).
+// Returns true only if the path exists and is a file.
+// This is an alias for FileExists() for consistency with filepath package naming.
+func IsFile(path string) bool {
+	return FileExists(path)
 }

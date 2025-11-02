@@ -1,7 +1,6 @@
 package hooks
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -146,11 +145,7 @@ func TestCheckDiskSpaceAction_Execute(t *testing.T) {
 	action := &CheckDiskSpaceAction{}
 
 	// Create a temp directory to test against
-	tempDir, err := os.MkdirTemp("", "goenv-disk-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	tests := []struct {
 		name      string
@@ -224,11 +219,7 @@ func TestCheckDiskSpaceAction_Execute(t *testing.T) {
 func TestCheckDiskSpaceAction_ExecuteFloatConversion(t *testing.T) {
 	action := &CheckDiskSpaceAction{}
 
-	tempDir, err := os.MkdirTemp("", "goenv-disk-float-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
 	// Test that float64 min_free_mb works (common when parsing YAML)
 	ctx := &HookContext{

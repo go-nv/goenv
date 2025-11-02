@@ -1,12 +1,14 @@
 package legacy
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
 )
 
@@ -25,12 +27,10 @@ func TestLocalCommand(t *testing.T) {
 			args: []string{},
 			setup: func(t *testing.T, root string) (string, func()) {
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
-				if err := os.WriteFile(filepath.Join(workDir, ".go-version"), []byte("1.2.3\n"), 0644); err != nil {
-					t.Fatalf("failed to seed local version: %v", err)
-				}
+				testutil.WriteTestFile(t, filepath.Join(workDir, ".go-version"), []byte("1.2.3\n"), utils.PermFileDefault, "failed to seed local version")
 				return workDir, nil
 			},
 			expectOutput: "1.2.3",
@@ -40,7 +40,7 @@ func TestLocalCommand(t *testing.T) {
 			args: []string{},
 			setup: func(t *testing.T, root string) (string, func()) {
 				workDir := filepath.Join(root, "empty")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
 				return workDir, nil
@@ -53,7 +53,7 @@ func TestLocalCommand(t *testing.T) {
 			setup: func(t *testing.T, root string) (string, func()) {
 				cmdtest.CreateTestVersion(t, root, "1.2.3")
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
 				return workDir, nil
@@ -68,7 +68,7 @@ func TestLocalCommand(t *testing.T) {
 				cmdtest.CreateTestVersion(t, root, "1.10.9")
 				cmdtest.CreateTestVersion(t, root, "1.9.10")
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
 				return workDir, nil
@@ -83,7 +83,7 @@ func TestLocalCommand(t *testing.T) {
 				cmdtest.CreateTestVersion(t, root, "1.2.9")
 				cmdtest.CreateTestVersion(t, root, "4.5.6")
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
 				return workDir, nil
@@ -99,7 +99,7 @@ func TestLocalCommand(t *testing.T) {
 				cmdtest.CreateTestVersion(t, root, "1.3.11")
 				cmdtest.CreateTestVersion(t, root, "4.5.2")
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
 				return workDir, nil
@@ -116,7 +116,7 @@ func TestLocalCommand(t *testing.T) {
 				cmdtest.CreateTestVersion(t, root, "1.3.11")
 				cmdtest.CreateTestVersion(t, root, "2.1.2")
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
 				return workDir, nil
@@ -130,7 +130,7 @@ func TestLocalCommand(t *testing.T) {
 				cmdtest.CreateTestVersion(t, root, "1.2.9")
 				cmdtest.CreateTestVersion(t, root, "4.5.10")
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
 				return workDir, nil
@@ -142,12 +142,10 @@ func TestLocalCommand(t *testing.T) {
 			args: []string{"--unset"},
 			setup: func(t *testing.T, root string) (string, func()) {
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
-				if err := os.WriteFile(filepath.Join(workDir, ".go-version"), []byte("1.2.3\n"), 0644); err != nil {
-					t.Fatalf("failed to seed local version: %v", err)
-				}
+				testutil.WriteTestFile(t, filepath.Join(workDir, ".go-version"), []byte("1.2.3\n"), utils.PermFileDefault, "failed to seed local version")
 				return workDir, nil
 			},
 			expectFileMissing: true,
@@ -157,7 +155,7 @@ func TestLocalCommand(t *testing.T) {
 			args: []string{"--unset"},
 			setup: func(t *testing.T, root string) (string, func()) {
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
 				return workDir, nil
@@ -170,12 +168,10 @@ func TestLocalCommand(t *testing.T) {
 			setup: func(t *testing.T, root string) (string, func()) {
 				parentDir := filepath.Join(root, "project")
 				subDir := filepath.Join(parentDir, "sub")
-				if err := os.MkdirAll(subDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(subDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create dirs: %v", err)
 				}
-				if err := os.WriteFile(filepath.Join(parentDir, ".go-version"), []byte("1.2.3\n"), 0644); err != nil {
-					t.Fatalf("failed to seed parent local version: %v", err)
-				}
+				testutil.WriteTestFile(t, filepath.Join(parentDir, ".go-version"), []byte("1.2.3\n"), utils.PermFileDefault, "failed to seed parent local version")
 				return subDir, nil
 			},
 			expectOutput: "1.2.3",
@@ -185,22 +181,18 @@ func TestLocalCommand(t *testing.T) {
 			args: []string{},
 			setup: func(t *testing.T, root string) (string, func()) {
 				workDir := filepath.Join(root, "project")
-				if err := os.MkdirAll(workDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(workDir, "create test directory"); err != nil {
 					t.Fatalf("failed to create workdir: %v", err)
 				}
-				if err := os.WriteFile(filepath.Join(workDir, ".go-version"), []byte("1.2.3\n"), 0644); err != nil {
-					t.Fatalf("failed to seed local version: %v", err)
-				}
+				testutil.WriteTestFile(t, filepath.Join(workDir, ".go-version"), []byte("1.2.3\n"), utils.PermFileDefault, "failed to seed local version")
 
-				home := os.Getenv("HOME")
-				if err := os.MkdirAll(home, 0755); err != nil {
+				home := os.Getenv(utils.EnvVarHome)
+				if err := utils.EnsureDirWithContext(home, "create test directory"); err != nil {
 					t.Fatalf("failed to create home dir: %v", err)
 				}
-				if err := os.WriteFile(filepath.Join(home, ".go-version"), []byte("1.4-home\n"), 0644); err != nil {
-					t.Fatalf("failed to seed home version: %v", err)
-				}
+				testutil.WriteTestFile(t, filepath.Join(home, ".go-version"), []byte("1.4-home\n"), utils.PermFileDefault, "failed to seed home version")
 
-				if err := os.Setenv("GOENV_DIR", home); err != nil {
+				if err := os.Setenv(utils.GoenvEnvVarDir.String(), home); err != nil {
 					t.Fatalf("failed to set GOENV_DIR: %v", err)
 				}
 				return workDir, func() {
@@ -216,11 +208,11 @@ func TestLocalCommand(t *testing.T) {
 			testRoot, cleanup := cmdtest.SetupTestEnv(t)
 			defer cleanup()
 
-			oldGoenvVersion := os.Getenv("GOENV_VERSION")
+			oldGoenvVersion := os.Getenv(utils.GoenvEnvVarVersion.String())
 			os.Unsetenv("GOENV_VERSION")
 			defer func() {
 				if oldGoenvVersion != "" {
-					os.Setenv("GOENV_VERSION", oldGoenvVersion)
+					os.Setenv(utils.GoenvEnvVarVersion.String(), oldGoenvVersion)
 				}
 			}()
 
@@ -292,10 +284,8 @@ func TestLocalCommand(t *testing.T) {
 			}
 
 			if tt.expectFileMissing {
-				if _, err := os.Stat(filepath.Join(workDir, ".go-version")); err == nil {
+				if utils.PathExists(filepath.Join(workDir, ".go-version")) {
 					t.Fatalf("expected .go-version to be removed")
-				} else if !os.IsNotExist(err) {
-					t.Fatalf("unexpected error checking .go-version: %v", err)
 				}
 			}
 		})

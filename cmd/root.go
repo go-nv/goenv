@@ -5,9 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/go-nv/goenv/internal/workflow"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +25,7 @@ const (
 	GroupIntegrations   CommandGroup = "integrations"
 	GroupAdvanced       CommandGroup = "advanced"
 	GroupMeta           CommandGroup = "meta"
+	GroupLegacy         CommandGroup = "legacy"
 )
 
 // Store the default help function to call for subcommands
@@ -51,8 +53,7 @@ var RootCmd = &cobra.Command{
 		// Check for .go-version or go.mod in current directory
 		cwd, err := os.Getwd()
 		if err == nil {
-			cfg := config.Load()
-			mgr := manager.NewManager(cfg)
+			cfg, mgr := cmdutil.SetupContext()
 
 			// Check if GOENV_AUTO_INSTALL is enabled
 			autoInstall := utils.GoenvEnvVarAutoInstall.IsTrue()
@@ -69,7 +70,8 @@ var RootCmd = &cobra.Command{
 					WorkingDir:      cwd,
 					AdditionalFlags: additionalFlags,
 					VSCodeUpdate: func(version string) error {
-						return nil // TODO: Wire up VSCode integration without import cycle
+						gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
+						return vscode.UpdateSettingsForVersion(cwd, cfg.Root, version, gopathPrefix)
 					},
 					InstallCallback: func(version string) error {
 						// Find install command
@@ -120,7 +122,8 @@ var RootCmd = &cobra.Command{
 				Stdin:      os.Stdin,
 				WorkingDir: cwd,
 				VSCodeUpdate: func(version string) error {
-					return nil // TODO: Wire up VSCode integration without import cycle
+					gopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
+					return vscode.UpdateSettingsForVersion(cwd, cfg.Root, version, gopathPrefix)
 				},
 			}
 
@@ -182,7 +185,7 @@ func Execute() {
 // isVersionLike checks if a string looks like a version number
 func isVersionLike(s string) bool {
 	// Match patterns like: 1.21.0, 1.21, 1, latest, system
-	if s == "latest" || s == "system" {
+	if s == manager.LatestVersion || s == manager.SystemVersion {
 		return true
 	}
 
@@ -222,7 +225,7 @@ func customHelpFunc(cmd *cobra.Command, args []string) {
 	}
 
 	// This is the root command - check for first-run scenario
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 	hasVersions := utils.HasAnyVersionsInstalled(cfg.Root)
 
 	if !hasVersions {
@@ -364,12 +367,21 @@ func init() {
 			ID:    string(GroupMeta),
 			Title: "Meta Commands:",
 		},
+		&cobra.Group{
+			ID:    string(GroupLegacy),
+			Title: "Legacy Commands (for compatibility):",
+		},
 	)
 
 	// Add global flags here if needed
 	RootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "Enable debug mode")
 	RootCmd.PersistentFlags().BoolVar(&NoColor, "no-color", false, "Disable colored output")
 	RootCmd.PersistentFlags().BoolVar(&Plain, "plain", false, "Plain output (no colors, no emojis)")
+
+	// Interactive mode flags (for commands that support interactive features)
+	RootCmd.PersistentFlags().BoolVar(&Interactive, "interactive", false, "Enable guided interactive mode with helpful prompts")
+	RootCmd.PersistentFlags().BoolVarP(&Yes, "yes", "y", false, "Auto-confirm all prompts (non-interactive mode)")
+	RootCmd.PersistentFlags().BoolVarP(&Quiet, "quiet", "q", false, "Suppress progress output (only show errors)")
 
 	// Add version flag
 	var showVersion bool
@@ -392,6 +404,11 @@ func init() {
 var Debug bool
 var NoColor bool
 var Plain bool
+
+// Interactive mode flags
+var Interactive bool // --interactive: Enable guided mode with helpful prompts
+var Yes bool         // --yes/-y: Auto-confirm all prompts
+var Quiet bool       // --quiet/-q: Suppress progress output
 
 // Version information
 var (

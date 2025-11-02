@@ -1,9 +1,11 @@
 package manager
 
 import (
-	"os"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestValidateVersionString(t *testing.T) {
@@ -338,9 +340,7 @@ func TestParseGoModVersion(t *testing.T) {
 			// Create temp file
 			tmpDir := t.TempDir()
 			goModPath := tmpDir + "/go.mod"
-			if err := os.WriteFile(goModPath, []byte(tt.goModContent), 0644); err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			testutil.WriteTestFile(t, goModPath, []byte(tt.goModContent), utils.PermFileDefault, "Failed to create test file")
 
 			result, err := ParseGoModVersion(goModPath)
 

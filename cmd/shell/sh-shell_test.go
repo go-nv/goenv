@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 
 	"github.com/spf13/cobra"
@@ -83,7 +82,7 @@ func TestShShellCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.2.3")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -97,7 +96,7 @@ func TestShShellCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.2.3")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -111,7 +110,7 @@ func TestShShellCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.2.3")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -125,7 +124,7 @@ func TestShShellCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.2.3")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -150,7 +149,7 @@ func TestShShellCommand(t *testing.T) {
 			setupFunc: func(t *testing.T, tmpDir string) {
 				// Create a test version
 				versionDir := filepath.Join(tmpDir, "versions", "1.10.0")
-				if err := os.MkdirAll(versionDir, 0755); err != nil {
+				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create version directory: %v", err)
 				}
 			},
@@ -160,8 +159,9 @@ func TestShShellCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Run setup function if provided
 			if tt.setupFunc != nil {

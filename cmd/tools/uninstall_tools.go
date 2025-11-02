@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -80,6 +81,9 @@ type toolUninstallTarget struct {
 }
 
 func runUninstall(cfg *config.Config, toolNames []string) error {
+	mgr := manager.NewManager(cfg)
+	toolsMgr := toolspkg.NewManager(cfg, mgr)
+
 	// Parse tool names (strip @version if present, we remove the binary regardless)
 	var cleanToolNames []string
 	for _, name := range toolNames {
@@ -101,7 +105,7 @@ func runUninstall(cfg *config.Config, toolNames []string) error {
 		targets = append(targets, findAllVersionToolTargets(cfg, cleanToolNames)...)
 	} else {
 		// Current Go version only
-		targets = append(targets, findCurrentVersionToolTargets(cfg, cleanToolNames)...)
+		targets = append(targets, findCurrentVersionToolTargets(cfg, mgr, cleanToolNames)...)
 	}
 
 	if len(targets) == 0 {
@@ -145,11 +149,10 @@ func runUninstall(cfg *config.Config, toolNames []string) error {
 	}
 
 	// Execute uninstalls
-	return executeUninstalls(existingTargets)
+	return executeUninstalls(toolsMgr, existingTargets)
 }
 
-func findCurrentVersionToolTargets(cfg *config.Config, toolNames []string) []toolUninstallTarget {
-	mgr := manager.NewManager(cfg)
+func findCurrentVersionToolTargets(cfg *config.Config, mgr *manager.Manager, toolNames []string) []toolUninstallTarget {
 	currentVersion, _, err := mgr.GetCurrentVersion()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s Failed to get current Go version: %v\n",
@@ -157,7 +160,7 @@ func findCurrentVersionToolTargets(cfg *config.Config, toolNames []string) []too
 		return nil
 	}
 
-	if currentVersion == "" || currentVersion == "system" {
+	if currentVersion == "" || currentVersion == manager.SystemVersion {
 		fmt.Fprintf(os.Stderr, "%s Cannot uninstall tools from system Go\n",
 			utils.EmojiOr("⚠️  ", ""))
 		fmt.Fprintf(os.Stderr, "   Use --global to uninstall from global GOPATH\n")
@@ -205,7 +208,7 @@ func findAllVersionToolTargets(cfg *config.Config, toolNames []string) []toolUni
 		binPath := filepath.Join(gopath, "bin")
 
 		// Check if bin directory exists
-		if _, err := os.Stat(binPath); os.IsNotExist(err) {
+		if !utils.DirExists(binPath) {
 			continue
 		}
 
@@ -266,7 +269,7 @@ func findToolBinaries(binPath, toolName string) []string {
 	var binaries []string
 
 	// Check if bin directory exists
-	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+	if !utils.DirExists(binPath) {
 		return binaries
 	}
 
@@ -357,7 +360,7 @@ func showUninstallPlan(targets []toolUninstallTarget) error {
 	return nil
 }
 
-func executeUninstalls(targets []toolUninstallTarget) error {
+func executeUninstalls(toolsMgr *toolspkg.Manager, targets []toolUninstallTarget) error {
 	fmt.Fprintf(os.Stdout, "\n%s %s\n\n",
 		utils.EmojiOr("🗑️  ", ""),
 		utils.BoldBlue("Uninstalling Tools"))
@@ -373,32 +376,56 @@ func executeUninstalls(targets []toolUninstallTarget) error {
 			label = fmt.Sprintf("%s (global)", target.ToolName)
 		}
 
-		// Remove all binary files
-		failed := false
-		for _, binFile := range target.BinaryFiles {
-			if err := os.Remove(binFile); err != nil {
+		// Use manager API for Go version uninstalls, manual removal for global
+		if target.GoVersion != "" {
+			// Use manager API for Go version uninstalls
+			if err := toolsMgr.UninstallSingleTool(target.GoVersion, target.ToolName); err != nil {
 				fmt.Fprintf(os.Stderr, "%s Failed to remove %s: %v\n",
 					utils.Red("✗"),
 					utils.Yellow(label),
 					err)
-				failed = true
-				break
+				failureCount++
+			} else {
+				if uninstallVerbose {
+					for _, binFile := range target.BinaryFiles {
+						fmt.Fprintf(os.Stdout, "  %s Removed %s\n",
+							utils.Gray("→"),
+							utils.Gray(filepath.Base(binFile)))
+					}
+				}
+				fmt.Fprintf(os.Stdout, "%s Uninstalled %s\n",
+					utils.Green("✓"),
+					utils.BoldWhite(label))
+				successCount++
 			}
-
-			if uninstallVerbose {
-				fmt.Fprintf(os.Stdout, "  %s Removed %s\n",
-					utils.Gray("→"),
-					utils.Gray(filepath.Base(binFile)))
-			}
-		}
-
-		if failed {
-			failureCount++
 		} else {
-			fmt.Fprintf(os.Stdout, "%s Uninstalled %s\n",
-				utils.Green("✓"),
-				utils.BoldWhite(label))
-			successCount++
+			// Manual removal for global GOPATH (manager doesn't support this)
+			failed := false
+			for _, binFile := range target.BinaryFiles {
+				if err := os.Remove(binFile); err != nil {
+					fmt.Fprintf(os.Stderr, "%s Failed to remove %s: %v\n",
+						utils.Red("✗"),
+						utils.Yellow(label),
+						err)
+					failed = true
+					break
+				}
+
+				if uninstallVerbose {
+					fmt.Fprintf(os.Stdout, "  %s Removed %s\n",
+						utils.Gray("→"),
+						utils.Gray(filepath.Base(binFile)))
+				}
+			}
+
+			if failed {
+				failureCount++
+			} else {
+				fmt.Fprintf(os.Stdout, "%s Uninstalled %s\n",
+					utils.Green("✓"),
+					utils.BoldWhite(label))
+				successCount++
+			}
 		}
 	}
 

@@ -80,7 +80,7 @@ func TestShouldUseEmojis(t *testing.T) {
 			// Set test conditions
 			SetOutputOptions(tt.noColor, tt.plain)
 			if tt.noColorEnv != "" {
-				os.Setenv("NO_COLOR", tt.noColorEnv)
+				os.Setenv(EnvVarNoColor, tt.noColorEnv)
 			}
 
 			result := ShouldUseEmojis()
@@ -164,7 +164,7 @@ func TestEmoji(t *testing.T) {
 			// Set test conditions
 			SetOutputOptions(false, tt.plain)
 			if tt.noColorEnv != "" {
-				os.Setenv("NO_COLOR", tt.noColorEnv)
+				os.Setenv(EnvVarNoColor, tt.noColorEnv)
 			}
 
 			result := Emoji(tt.emoji)
@@ -260,7 +260,7 @@ func TestEmojiOr(t *testing.T) {
 			// Set test conditions
 			SetOutputOptions(false, tt.plain)
 			if tt.noColorEnv != "" {
-				os.Setenv("NO_COLOR", tt.noColorEnv)
+				os.Setenv(EnvVarNoColor, tt.noColorEnv)
 			}
 
 			result := EmojiOr(tt.emoji, tt.fallback)
@@ -338,7 +338,7 @@ func TestShouldUseColor(t *testing.T) {
 			// Set test conditions
 			SetOutputOptions(tt.noColor, tt.plain)
 			if tt.noColorEnv != "" {
-				os.Setenv("NO_COLOR", tt.noColorEnv)
+				os.Setenv(EnvVarNoColor, tt.noColorEnv)
 			}
 
 			result := ShouldUseColor()
@@ -436,7 +436,7 @@ func TestEmojiSuppression_Integration(t *testing.T) {
 	}
 
 	// Test NO_COLOR=1
-	os.Setenv("NO_COLOR", "1")
+	os.Setenv(EnvVarNoColor, "1")
 	if ShouldUseEmojis() {
 		t.Error("NO_COLOR=1 should disable emojis")
 	} else {
@@ -453,7 +453,7 @@ func TestEmojiSuppression_Integration(t *testing.T) {
 	}
 
 	// Test that Emoji() returns empty string when suppressed
-	os.Setenv("NO_COLOR", "1")
+	os.Setenv(EnvVarNoColor, "1")
 	if result := Emoji("✓ "); result != "" {
 		t.Errorf("Emoji() should return empty string when NO_COLOR=1, got %q", result)
 	}
@@ -498,7 +498,7 @@ func TestEmojiInPipeline(t *testing.T) {
 
 // BenchmarkEmoji benchmarks the Emoji function
 func BenchmarkEmoji(b *testing.B) {
-	os.Setenv("NO_COLOR", "1") // Ensure consistent behavior
+	os.Setenv(EnvVarNoColor, "1") // Ensure consistent behavior
 	defer os.Unsetenv("NO_COLOR")
 
 	for i := 0; i < b.N; i++ {
@@ -508,7 +508,7 @@ func BenchmarkEmoji(b *testing.B) {
 
 // BenchmarkEmojiOr benchmarks the EmojiOr function
 func BenchmarkEmojiOr(b *testing.B) {
-	os.Setenv("NO_COLOR", "1")
+	os.Setenv(EnvVarNoColor, "1")
 	defer os.Unsetenv("NO_COLOR")
 
 	for i := 0; i < b.N; i++ {
@@ -518,7 +518,7 @@ func BenchmarkEmojiOr(b *testing.B) {
 
 // BenchmarkShouldUseEmojis benchmarks the ShouldUseEmojis function
 func BenchmarkShouldUseEmojis(b *testing.B) {
-	os.Setenv("NO_COLOR", "1")
+	os.Setenv(EnvVarNoColor, "1")
 	defer os.Unsetenv("NO_COLOR")
 
 	for i := 0; i < b.N; i++ {
@@ -635,7 +635,7 @@ func TestColorFunctions(t *testing.T) {
 			// Set test conditions
 			SetOutputOptions(tt.noColor, tt.plain)
 			if tt.envColor != "" {
-				os.Setenv("NO_COLOR", tt.envColor)
+				os.Setenv(EnvVarNoColor, tt.envColor)
 			}
 
 			result := tt.colorFn(tt.input)
@@ -677,7 +677,7 @@ func TestGrayAndCyan(t *testing.T) {
 
 	// Reset state and disable colors for consistent testing
 	globalOptions = OutputOptions{}
-	os.Setenv("NO_COLOR", "1")
+	os.Setenv(EnvVarNoColor, "1")
 
 	tests := []struct {
 		name    string
@@ -741,7 +741,7 @@ func TestColorSuppression_Integration(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 
 	// Test NO_COLOR=1
-	os.Setenv("NO_COLOR", "1")
+	os.Setenv(EnvVarNoColor, "1")
 	if result := Red("error"); result != "error" {
 		t.Errorf("NO_COLOR=1 should disable colors, got %q", result)
 	} else {
@@ -768,7 +768,7 @@ func TestColorSuppression_Integration(t *testing.T) {
 
 // BenchmarkColorFunctions benchmarks the color functions
 func BenchmarkColorFunctions(b *testing.B) {
-	os.Setenv("NO_COLOR", "1") // Ensure consistent behavior
+	os.Setenv(EnvVarNoColor, "1") // Ensure consistent behavior
 	defer os.Unsetenv("NO_COLOR")
 
 	b.Run("Red", func(b *testing.B) {

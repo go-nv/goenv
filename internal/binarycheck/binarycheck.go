@@ -3,9 +3,9 @@ package binarycheck
 import (
 	"debug/elf"
 	"fmt"
+	"github.com/go-nv/goenv/internal/osinfo"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/utils"
@@ -131,7 +131,7 @@ func CheckCompatibility(info *BinaryInfo) []CompatibilityIssue {
 			shebangParts := strings.Fields(info.Shebang)
 			if len(shebangParts) > 0 {
 				interpreterPath := shebangParts[0]
-				if _, err := os.Stat(interpreterPath); os.IsNotExist(err) {
+				if utils.FileNotExists(interpreterPath) {
 					issues = append(issues, CompatibilityIssue{
 						Severity: "error",
 						Message:  fmt.Sprintf("Script interpreter not found: %s", interpreterPath),
@@ -145,7 +145,7 @@ func CheckCompatibility(info *BinaryInfo) []CompatibilityIssue {
 
 	// Check ELF class (32-bit vs 64-bit)
 	hostBits := "64-bit"
-	if runtime.GOARCH == "386" || runtime.GOARCH == "arm" {
+	if osinfo.Arch() == "386" || osinfo.Arch() == "arm" {
 		hostBits = "32-bit"
 	}
 
@@ -160,7 +160,7 @@ func CheckCompatibility(info *BinaryInfo) []CompatibilityIssue {
 	// Check interpreter (glibc vs musl)
 	if info.Interpreter != "" {
 		// Check if interpreter exists
-		if _, err := os.Stat(info.Interpreter); os.IsNotExist(err) {
+		if utils.FileNotExists(info.Interpreter) {
 			// Try to determine what's wrong
 			isMusl := strings.Contains(info.Interpreter, "musl")
 			isGlibc := strings.Contains(info.Interpreter, "ld-linux")
@@ -185,7 +185,7 @@ func CheckCompatibility(info *BinaryInfo) []CompatibilityIssue {
 			})
 		} else {
 			// Interpreter exists, but let's check if it's the expected type
-			if runtime.GOOS == "linux" {
+			if osinfo.IsLinux() {
 				expectedMusl := isMuslSystem()
 				hasMusl := strings.Contains(info.Interpreter, "musl")
 
@@ -218,7 +218,7 @@ type LibcInfo struct {
 
 // DetectLibc detects the system's C library type and version
 func DetectLibc() *LibcInfo {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		return &LibcInfo{Type: "unknown"}
 	}
 
@@ -232,7 +232,7 @@ func DetectLibc() *LibcInfo {
 		"/lib/ld-musl-i386.so.1",
 	}
 	for _, path := range muslPaths {
-		if _, err := os.Stat(path); err == nil {
+		if utils.PathExists(path) {
 			info.Type = "musl"
 			info.Path = path
 			// Try to get version by executing the loader
@@ -261,7 +261,7 @@ func DetectLibc() *LibcInfo {
 		"/lib/arm-linux-gnueabihf/libc.so.6",
 	}
 	for _, path := range glibcPaths {
-		if _, err := os.Stat(path); err == nil {
+		if utils.PathExists(path) {
 			info.Type = "glibc"
 			info.Path = path
 			// Try to get version

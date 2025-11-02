@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 
 	"github.com/spf13/cobra"
 )
@@ -122,12 +123,12 @@ func TestPrefixCommand(t *testing.T) {
 
 			// Setup system go if needed
 			var systemBinDir string
-			oldPath := os.Getenv("PATH")
-			defer os.Setenv("PATH", oldPath)
+			oldPath := os.Getenv(utils.EnvVarPath)
+			defer os.Setenv(utils.EnvVarPath, oldPath)
 
 			if tt.setupSystemGo {
 				systemBinDir = filepath.Join(testRoot, "system_bin")
-				os.MkdirAll(systemBinDir, 0755)
+				_ = utils.EnsureDirWithContext(systemBinDir, "create test directory")
 				systemGo := filepath.Join(systemBinDir, "go")
 				var content string
 				if utils.IsWindows() {
@@ -137,26 +138,20 @@ func TestPrefixCommand(t *testing.T) {
 					content = "#!/bin/sh\necho go version go1.20.1 linux/amd64\n"
 				}
 
-				err := os.WriteFile(systemGo, []byte(content), 0755)
-				if err != nil {
-					t.Fatalf("Failed to create system go: %v", err)
-				}
+				testutil.WriteTestFile(t, systemGo, []byte(content), utils.PermFileExecutable, "Failed to create system go")
 
 				// Add to PATH
 				pathSep := string(os.PathListSeparator)
-				os.Setenv("PATH", systemBinDir+pathSep+oldPath)
+				os.Setenv(utils.EnvVarPath, systemBinDir+pathSep+oldPath)
 			} else {
 				// Explicitly set PATH to empty directory to ensure no system Go found
 				emptyDir := filepath.Join(testRoot, "empty-bin")
-				os.MkdirAll(emptyDir, 0755)
-				os.Setenv("PATH", emptyDir)
+				_ = utils.EnsureDirWithContext(emptyDir, "create test directory")
+				os.Setenv(utils.EnvVarPath, emptyDir)
 			} // Set local version if specified
 			if tt.localVersion != "" {
 				localFile := filepath.Join(testRoot, ".go-version")
-				err := os.WriteFile(localFile, []byte(tt.localVersion), 0644)
-				if err != nil {
-					t.Fatalf("Failed to set local version: %v", err)
-				}
+				testutil.WriteTestFile(t, localFile, []byte(tt.localVersion), utils.PermFileDefault, "Failed to set local version")
 				// Change to test root so local version is found
 				oldDir, _ := os.Getwd()
 				defer os.Chdir(oldDir)
@@ -165,15 +160,7 @@ func TestPrefixCommand(t *testing.T) {
 
 			// Set environment version if specified
 			if tt.envVersion != "" {
-				oldEnv := os.Getenv("GOENV_VERSION")
-				os.Setenv("GOENV_VERSION", tt.envVersion)
-				defer func() {
-					if oldEnv != "" {
-						os.Setenv("GOENV_VERSION", oldEnv)
-					} else {
-						os.Unsetenv("GOENV_VERSION")
-					}
-				}()
+				t.Setenv(utils.GoenvEnvVarVersion.String(), tt.envVersion)
 			}
 
 			// Create and execute command

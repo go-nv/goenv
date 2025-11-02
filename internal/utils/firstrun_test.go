@@ -1,22 +1,13 @@
 package utils
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestIsFirstRun(t *testing.T) {
-	// Save original env
-	origShell := os.Getenv("GOENV_SHELL")
-	defer func() {
-		if origShell != "" {
-			os.Setenv("GOENV_SHELL", origShell)
-		} else {
-			os.Unsetenv("GOENV_SHELL")
-		}
-	}()
-
 	tests := []struct {
 		name           string
 		setupFunc      func(dir string)
@@ -34,7 +25,7 @@ func TestIsFirstRun(t *testing.T) {
 		{
 			name: "first run - empty versions dir, no shell",
 			setupFunc: func(dir string) {
-				os.MkdirAll(filepath.Join(dir, "versions"), 0755)
+				EnsureDir(filepath.Join(dir, "versions"))
 			},
 			shellSet:       false,
 			expectedResult: true,
@@ -43,7 +34,7 @@ func TestIsFirstRun(t *testing.T) {
 			name: "not first run - has versions, no shell",
 			setupFunc: func(dir string) {
 				versionsDir := filepath.Join(dir, "versions")
-				os.MkdirAll(filepath.Join(versionsDir, "1.21.5"), 0755)
+				EnsureDir(filepath.Join(versionsDir, "1.21.5"))
 			},
 			shellSet:       false,
 			expectedResult: false,
@@ -60,7 +51,7 @@ func TestIsFirstRun(t *testing.T) {
 			name: "not first run - has versions, shell initialized",
 			setupFunc: func(dir string) {
 				versionsDir := filepath.Join(dir, "versions")
-				os.MkdirAll(filepath.Join(versionsDir, "1.21.5"), 0755)
+				EnsureDir(filepath.Join(versionsDir, "1.21.5"))
 			},
 			shellSet:       true,
 			expectedResult: false,
@@ -75,11 +66,12 @@ func TestIsFirstRun(t *testing.T) {
 			// Setup test conditions
 			tt.setupFunc(tmpDir)
 
-			// Set or unset shell
+			// Set shell environment for this subtest
 			if tt.shellSet {
-				os.Setenv("GOENV_SHELL", "bash")
+				t.Setenv(GoenvEnvVarShell.String(), "bash")
 			} else {
-				os.Unsetenv("GOENV_SHELL")
+				// Ensure GOENV_SHELL is unset for this subtest
+				t.Setenv(GoenvEnvVarShell.String(), "")
 			}
 
 			// Test
@@ -92,16 +84,6 @@ func TestIsFirstRun(t *testing.T) {
 }
 
 func TestIsShellInitialized(t *testing.T) {
-	// Save original env
-	origShell := os.Getenv("GOENV_SHELL")
-	defer func() {
-		if origShell != "" {
-			os.Setenv("GOENV_SHELL", origShell)
-		} else {
-			os.Unsetenv("GOENV_SHELL")
-		}
-	}()
-
 	tests := []struct {
 		name     string
 		shellVal string
@@ -127,9 +109,10 @@ func TestIsShellInitialized(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.shellVal != "" {
-				os.Setenv("GOENV_SHELL", tt.shellVal)
+				t.Setenv(GoenvEnvVarShell.String(), tt.shellVal)
 			} else {
-				os.Unsetenv("GOENV_SHELL")
+				// Ensure GOENV_SHELL is unset for this subtest
+				t.Setenv(GoenvEnvVarShell.String(), "")
 			}
 
 			result := IsShellInitialized()
@@ -156,7 +139,7 @@ func TestHasAnyVersionsInstalled(t *testing.T) {
 		{
 			name: "empty versions directory",
 			setupFunc: func(dir string) {
-				os.MkdirAll(filepath.Join(dir, "versions"), 0755)
+				EnsureDir(filepath.Join(dir, "versions"))
 			},
 			expected: false,
 		},
@@ -164,7 +147,7 @@ func TestHasAnyVersionsInstalled(t *testing.T) {
 			name: "one version installed",
 			setupFunc: func(dir string) {
 				versionsDir := filepath.Join(dir, "versions")
-				os.MkdirAll(filepath.Join(versionsDir, "1.21.5"), 0755)
+				EnsureDir(filepath.Join(versionsDir, "1.21.5"))
 			},
 			expected: true,
 		},
@@ -172,8 +155,8 @@ func TestHasAnyVersionsInstalled(t *testing.T) {
 			name: "multiple versions installed",
 			setupFunc: func(dir string) {
 				versionsDir := filepath.Join(dir, "versions")
-				os.MkdirAll(filepath.Join(versionsDir, "1.21.5"), 0755)
-				os.MkdirAll(filepath.Join(versionsDir, "1.22.0"), 0755)
+				EnsureDir(filepath.Join(versionsDir, "1.21.5"))
+				EnsureDir(filepath.Join(versionsDir, "1.22.0"))
 			},
 			expected: true,
 		},
@@ -181,9 +164,9 @@ func TestHasAnyVersionsInstalled(t *testing.T) {
 			name: "only files in versions directory",
 			setupFunc: func(dir string) {
 				versionsDir := filepath.Join(dir, "versions")
-				os.MkdirAll(versionsDir, 0755)
+				_ = EnsureDirWithContext(versionsDir, "create test directory")
 				// Create a file, not a directory
-				os.WriteFile(filepath.Join(versionsDir, "somefile.txt"), []byte("test"), 0644)
+				testutil.WriteTestFile(t, filepath.Join(versionsDir, "somefile.txt"), []byte("test"), PermFileDefault)
 			},
 			expected: false,
 		},

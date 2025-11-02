@@ -3,8 +3,9 @@ package envdetect
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/osinfo"
 
 	"github.com/go-nv/goenv/internal/utils"
 )
@@ -42,7 +43,7 @@ func TestDetectMountType_NonExistentPath(t *testing.T) {
 }
 
 func TestDetectLinuxMount(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		t.Skip("Linux mount detection only works on Linux")
 	}
 
@@ -64,7 +65,7 @@ func TestDetectLinuxMount(t *testing.T) {
 }
 
 func TestDetectDarwinMount(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("Darwin mount detection only works on macOS")
 	}
 
@@ -86,7 +87,7 @@ func TestCheckCacheOnProblemMount(t *testing.T) {
 	tmpDir := t.TempDir()
 	cachePath := filepath.Join(tmpDir, "cache")
 
-	if err := os.MkdirAll(cachePath, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(cachePath, "create test directory"); err != nil {
 		t.Fatalf("Failed to create cache directory: %v", err)
 	}
 
@@ -108,7 +109,7 @@ func TestCheckCacheOnProblemMount_NonExistent(t *testing.T) {
 }
 
 func TestIsInContainer(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if !osinfo.IsLinux() {
 		// Should return false on non-Linux
 		result := IsInContainer()
 		if result {
@@ -126,7 +127,7 @@ func TestIsInContainer(t *testing.T) {
 
 	// Check for common container indicators
 	hasDockerEnv := false
-	if _, err := os.Stat("/.dockerenv"); err == nil {
+	if utils.PathExists("/.dockerenv") {
 		hasDockerEnv = true
 	}
 

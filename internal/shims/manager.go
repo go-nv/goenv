@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 )
@@ -26,20 +27,20 @@ func (s *ShimManager) Rehash() error {
 	shimsDir := s.config.ShimsDir()
 
 	// Ensure shims directory exists
-	if err := os.MkdirAll(shimsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create shims directory: %w", err)
+	if err := utils.EnsureDirWithContext(shimsDir, "create shims directory"); err != nil {
+		return err
 	}
 
 	// Clear existing shims
 	if err := s.clearShims(); err != nil {
-		return fmt.Errorf("failed to clear existing shims: %w", err)
+		return errors.FailedTo("clear existing shims", err)
 	}
 
 	// Get all installed versions
 	mgr := manager.NewManager(s.config)
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return fmt.Errorf("failed to list installed versions: %w", err)
+		return errors.FailedTo("list installed versions", err)
 	}
 
 	// Collect all unique binaries across versions
@@ -54,7 +55,7 @@ func (s *ShimManager) Rehash() error {
 		}
 
 		for _, entry := range entries {
-			if !entry.IsDir() && isExecutable(filepath.Join(versionBinDir, entry.Name())) {
+			if !entry.IsDir() && utils.IsExecutableFile(filepath.Join(versionBinDir, entry.Name())) {
 				binaryName := entry.Name()
 				// On Windows, strip executable extensions from shim name
 				if utils.IsWindows() {
@@ -75,7 +76,7 @@ func (s *ShimManager) Rehash() error {
 			gopathEntries, err := os.ReadDir(gopathBinDir)
 			if err == nil {
 				for _, entry := range gopathEntries {
-					if !entry.IsDir() && isExecutable(filepath.Join(gopathBinDir, entry.Name())) {
+					if !entry.IsDir() && utils.IsExecutableFile(filepath.Join(gopathBinDir, entry.Name())) {
 						binaryName := entry.Name()
 						// On Windows, strip executable extensions from shim name
 						if utils.IsWindows() {
@@ -116,7 +117,7 @@ func (s *ShimManager) ListShims() ([]string, error) {
 		if os.IsNotExist(err) {
 			return []string{}, nil
 		}
-		return nil, fmt.Errorf("failed to read shims directory: %w", err)
+		return nil, errors.FailedTo("read shims directory", err)
 	}
 
 	var shims []string
@@ -149,7 +150,7 @@ func (s *ShimManager) WhichBinary(command string) (string, error) {
 		return "", fmt.Errorf("no version set: %w", err)
 	}
 
-	if version == "system" {
+	if version == manager.SystemVersion {
 		// Use system binary
 		return command, nil
 	}
@@ -188,7 +189,7 @@ func (s *ShimManager) WhenceVersions(command string) ([]string, error) {
 	mgr := manager.NewManager(s.config)
 	allVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list versions: %w", err)
+		return nil, errors.FailedTo("list versions", err)
 	}
 
 	var versionsWithCommand []string
@@ -294,8 +295,8 @@ else
 fi
 `, binaryName)
 
-	if err := os.WriteFile(shimPath, []byte(shimContent), 0755); err != nil {
-		return fmt.Errorf("failed to write shim file: %w", err)
+	if err := utils.WriteFileWithContext(shimPath, []byte(shimContent), utils.PermFileExecutable, "write shim file"); err != nil {
+		return err
 	}
 
 	return nil
@@ -339,8 +340,8 @@ if "%%program%%"=="goenv" (
 )
 `, binaryName)
 
-	if err := os.WriteFile(shimPath, []byte(shimContent), 0666); err != nil {
-		return fmt.Errorf("failed to write shim file: %w", err)
+	if err := utils.WriteFileWithContext(shimPath, []byte(shimContent), 0666, "write shim file"); err != nil {
+		return err
 	}
 
 	return nil
@@ -363,26 +364,4 @@ func (s *ShimManager) getGopathBinDir(version string) string {
 	}
 
 	return filepath.Join(home, "go", version, "bin")
-}
-
-// isExecutable checks if a file is executable
-func isExecutable(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-
-	// On Windows, check file extension
-	if utils.IsWindows() {
-		ext := filepath.Ext(path)
-		for _, validExt := range utils.WindowsExecutableExtensions() {
-			if ext == validExt {
-				return true
-			}
-		}
-		return false
-	}
-
-	// On Unix, check execute bit
-	return utils.HasExecutableBit(info)
 }

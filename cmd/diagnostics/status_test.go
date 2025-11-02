@@ -6,15 +6,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 func TestStatusCommand_NotInitialized(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Unset GOENV_SHELL to simulate not initialized
-	os.Unsetenv("GOENV_SHELL")
+	t.Setenv(utils.GoenvEnvVarShell.String(), "")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
@@ -33,13 +35,13 @@ func TestStatusCommand_NotInitialized(t *testing.T) {
 
 func TestStatusCommand_Initialized(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	// Create necessary directories
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 
@@ -63,19 +65,19 @@ func TestStatusCommand_Initialized(t *testing.T) {
 
 func TestStatusCommand_WithInstalledVersions(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	// Create versions directory with some installed versions
 	versionsDir := filepath.Join(tmpDir, "versions")
 	version1 := filepath.Join(versionsDir, "1.21.5")
 	version2 := filepath.Join(versionsDir, "1.22.3")
 
-	if err := os.MkdirAll(filepath.Join(version1, "bin"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(version1, "bin")); err != nil {
 		t.Fatalf("Failed to create version1: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(version2, "bin"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(version2, "bin")); err != nil {
 		t.Fatalf("Failed to create version2: %v", err)
 	}
 
@@ -96,15 +98,15 @@ func TestStatusCommand_WithInstalledVersions(t *testing.T) {
 
 func TestStatusCommand_WithCurrentVersion(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
-	t.Setenv("GOENV_VERSION", "1.21.5")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
+	t.Setenv(utils.GoenvEnvVarVersion.String(), "1.21.5")
 
 	// Create version directory
 	versionsDir := filepath.Join(tmpDir, "versions")
 	versionDir := filepath.Join(versionsDir, "1.21.5")
-	if err := os.MkdirAll(filepath.Join(versionDir, "bin"), 0755); err != nil {
+	if err := utils.EnsureDir(filepath.Join(versionDir, "bin")); err != nil {
 		t.Fatalf("Failed to create version directory: %v", err)
 	}
 
@@ -125,14 +127,14 @@ func TestStatusCommand_WithCurrentVersion(t *testing.T) {
 
 func TestStatusCommand_SystemVersion(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
-	t.Setenv("GOENV_VERSION", "system")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
+	t.Setenv(utils.GoenvEnvVarVersion.String(), "system")
 
 	// Create versions directory (can be empty)
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 
@@ -153,13 +155,13 @@ func TestStatusCommand_SystemVersion(t *testing.T) {
 
 func TestStatusCommand_NoVersions(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	// Create empty versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 
@@ -182,17 +184,17 @@ func TestStatusCommand_NoVersions(t *testing.T) {
 func TestStatusCommand_WithGoenvDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "project")
-	if err := os.MkdirAll(projectDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(projectDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create project directory: %v", err)
 	}
 
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", projectDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), projectDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	// Create versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create versions directory: %v", err)
 	}
 
@@ -241,8 +243,8 @@ func TestStatusCommand_MissingGoenvRoot(t *testing.T) {
 	tmpDir := t.TempDir()
 	nonExistent := filepath.Join(tmpDir, "does-not-exist")
 
-	t.Setenv("GOENV_ROOT", nonExistent)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), nonExistent)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
@@ -264,22 +266,22 @@ func TestStatusCommand_MissingGoenvRoot(t *testing.T) {
 
 func TestStatusCommand_PathConfiguration(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("GOENV_ROOT", tmpDir)
-	t.Setenv("GOENV_DIR", tmpDir)
-	t.Setenv("GOENV_SHELL", "bash")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	// Add goenv directories to PATH
 	shimsDir := filepath.Join(tmpDir, "shims")
 	binDir := filepath.Join(tmpDir, "bin")
-	oldPath := os.Getenv("PATH")
+	oldPath := os.Getenv(utils.EnvVarPath)
 	newPath := shimsDir + string(os.PathListSeparator) + binDir + string(os.PathListSeparator) + oldPath
-	t.Setenv("PATH", newPath)
+	t.Setenv(utils.EnvVarPath, newPath)
 
 	// Create directories
-	if err := os.MkdirAll(shimsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(shimsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create shims directory: %v", err)
 	}
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
 

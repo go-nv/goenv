@@ -3,10 +3,13 @@ package tools
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
+	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -56,33 +59,33 @@ func init() {
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, mgr := cmdutil.SetupContext()
+	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	// Normalize package paths (add @latest if missing)
-	packages := normalizePackagePaths(args)
+	packages := toolspkg.NormalizePackagePaths(args)
 
 	// Determine target versions
 	var targetVersions []string
 	if installAllVersions {
-		versions, err := getInstalledVersions(cfg)
+		versions, err := mgr.ListInstalledVersions()
 		if err != nil {
-			return err
+			return errors.FailedTo("list installed versions", err)
 		}
 		if len(versions) == 0 {
-			return fmt.Errorf("no Go versions installed")
+			return errors.NoVersionsInstalled()
 		}
 		targetVersions = versions
 	} else {
-		mgr := manager.NewManager(cfg)
 		currentVersion, source, err := mgr.GetCurrentVersion()
 		if err != nil {
-			return fmt.Errorf("no Go version set: %w", err)
+			return errors.FailedTo("determine Go version", err)
 		}
-		if currentVersion == "system" {
+		if currentVersion == manager.SystemVersion {
 			return fmt.Errorf("cannot install tools for system Go - please use a goenv-managed version")
 		}
 		if err := mgr.ValidateVersion(currentVersion); err != nil {
-			return fmt.Errorf("go version %s not installed (set by %s)", currentVersion, source)
+			return errors.VersionNotInstalled(currentVersion, source)
 		}
 		targetVersions = []string{currentVersion}
 	}
@@ -92,7 +95,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		utils.EmojiOr("📦 ", ""),
 		utils.BoldBlue("Installation Plan"))
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Tools to install: %s\n", utils.Cyan(strings.Join(extractToolNames(packages), ", ")))
+	fmt.Fprintf(cmd.OutOrStdout(), "Tools to install: %s\n", utils.Cyan(strings.Join(toolspkg.ExtractToolNames(packages), ", ")))
 	fmt.Fprintf(cmd.OutOrStdout(), "Target versions:  %s\n", utils.Cyan(strings.Join(targetVersions, ", ")))
 	fmt.Fprintf(cmd.OutOrStdout(), "Total operations: %s\n\n",
 		utils.Yellow(fmt.Sprintf("%d", len(packages)*len(targetVersions))))
@@ -103,11 +106,24 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Execute installations
+	// Execute installations using tools.Manager
 	fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n\n",
 		utils.EmojiOr("🔧 ", ""),
 		utils.BoldBlue("Installing Tools"))
 
+	opts := toolspkg.InstallOptions{
+		Packages: packages,
+		Versions: targetVersions,
+		DryRun:   false, // Already checked above
+		Verbose:  installVerbose,
+	}
+
+	result, err := toolsMgr.Install(opts)
+	if err != nil {
+		return errors.FailedTo("install tools", err)
+	}
+
+	// Display results per version
 	successCount := 0
 	failureCount := 0
 
@@ -119,28 +135,24 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 
 		for _, pkg := range packages {
-			toolName := extractToolName(pkg)
+			toolName := toolspkg.ExtractToolName(pkg)
+			installedKey := fmt.Sprintf("%s@%s", toolName, version)
+			failedKey := fmt.Sprintf("%s@%s", toolName, version)
 
-			if installVerbose {
-				fmt.Fprintf(cmd.OutOrStdout(), "  Installing %s... ", utils.Cyan(toolName))
-			}
-
-			err := installToolForVersion(cfg, version, pkg, installVerbose)
-			if err != nil {
-				if installVerbose {
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\n", utils.Red("✗"))
-				}
-				fmt.Fprintf(cmd.ErrOrStderr(), "  %s Failed to install %s for Go %s: %v\n",
-					utils.Red("✗"), toolName, version, err)
-				failureCount++
-			} else {
-				if installVerbose {
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\n", utils.Green("✓"))
-				} else {
-					fmt.Fprintf(cmd.OutOrStdout(), "  %s Installed %s\n",
-						utils.Green("✓"), utils.BoldWhite(toolName))
-				}
+			if slices.Contains(result.Installed, installedKey) {
+				fmt.Fprintf(cmd.OutOrStdout(), "  %s Installed %s\n",
+					utils.Green("✓"), utils.BoldWhite(toolName))
 				successCount++
+			} else if slices.Contains(result.Failed, failedKey) {
+				// Find the error
+				for i, failed := range result.Failed {
+					if failed == failedKey && i < len(result.Errors) {
+						fmt.Fprintf(cmd.ErrOrStderr(), "  %s Failed to install %s: %v\n",
+							utils.Red("✗"), toolName, result.Errors[i])
+						break
+					}
+				}
+				failureCount++
 			}
 		}
 
@@ -164,7 +176,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	if !installAllVersions && len(packages) == 1 {
 		// Show usage hint for single tool, single version
-		toolName := extractToolName(packages[0])
+		toolName := toolspkg.ExtractToolName(packages[0])
 		fmt.Fprintln(cmd.OutOrStdout())
 		fmt.Fprintf(cmd.OutOrStdout(), "%sUsage:\n", utils.Emoji("💡 "))
 		fmt.Fprintf(cmd.OutOrStdout(), "   %s [args...]  # Automatically uses the right version\n", toolName)

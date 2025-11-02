@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ func init() {
 }
 
 func runGoenvRoot(cmd *cobra.Command, args []string) error {
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 	fmt.Fprintln(cmd.OutOrStdout(), cfg.Root)
 	return nil
 }

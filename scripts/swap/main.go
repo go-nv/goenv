@@ -7,6 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/go-nv/goenv/internal/platform"
+	"github.com/go-nv/goenv/internal/utils"
 )
 
 // Colors
@@ -44,7 +47,7 @@ func init() {
 	repoRoot := filepath.Dir(filepath.Dir(scriptDir)) // Go up 2 levels
 
 	goBinary = filepath.Join(repoRoot, "goenv")
-	if runtime.GOOS == "windows" {
+	if platform.IsWindows() {
 		goBinary += ".exe"
 	}
 
@@ -120,7 +123,7 @@ func detectAllGoenv() []string {
 	locations := []string{}
 
 	// Method 2: Homebrew locations
-	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+	if platform.IsMacOS() || platform.IsLinux() {
 		locations = append(locations,
 			"/opt/homebrew/bin/goenv",              // ARM Mac
 			"/usr/local/bin/goenv",                 // Intel Mac / Linux Homebrew
@@ -132,7 +135,7 @@ func detectAllGoenv() []string {
 	locations = append(locations, filepath.Join(homeDir, ".goenv", "bin", "goenv"))
 
 	// Method 4: System locations (Unix)
-	if runtime.GOOS != "windows" {
+	if !platform.IsWindows() {
 		locations = append(locations,
 			"/usr/bin/goenv",
 			"/usr/local/bin/goenv",
@@ -141,7 +144,7 @@ func detectAllGoenv() []string {
 	}
 
 	// Method 5: Windows locations
-	if runtime.GOOS == "windows" {
+	if platform.IsWindows() {
 		locations = append(locations,
 			filepath.Join(homeDir, "bin", "goenv.exe"),
 			filepath.Join(homeDir, ".goenv", "bin", "goenv.exe"),
@@ -162,7 +165,7 @@ func detectAllGoenv() []string {
 
 	// Check all locations
 	for _, loc := range locations {
-		if stat, err := os.Stat(loc); err == nil && !stat.IsDir() {
+		if utils.FileExists(loc) {
 			// Resolve symlinks
 			resolved := loc
 			if r, err := filepath.EvalSymlinks(loc); err == nil {
@@ -186,12 +189,10 @@ func detectShellOverrides() []string {
 	shells := []string{"bash", "zsh"}
 	for _, shell := range shells {
 		if _, err := exec.LookPath(shell); err == nil {
-			cmd := exec.Command(shell, "-c", "type -t goenv 2>/dev/null")
-			if output, err := cmd.Output(); err == nil {
-				outStr := string(output)
-				if outStr == "function\n" {
+			if output, err := utils.RunCommandOutput(shell, "-c", "type -t goenv 2>/dev/null"); err == nil {
+				if output == "function\n" {
 					warnings = append(warnings, fmt.Sprintf("Shell function 'goenv' detected in %s", shell))
-				} else if outStr == "alias\n" {
+				} else if output == "alias\n" {
 					warnings = append(warnings, fmt.Sprintf("Shell alias 'goenv' detected in %s", shell))
 				}
 			}
@@ -231,31 +232,25 @@ func cmdBuild() {
 	repoRoot := scriptDir
 	for i := 0; i < 3; i++ { // Go up max 3 levels
 		makefilePath := filepath.Join(repoRoot, "Makefile")
-		if _, err := os.Stat(makefilePath); err == nil {
+		if utils.PathExists(makefilePath) {
 			break
 		}
 		repoRoot = filepath.Dir(repoRoot)
 	}
 
 	log(fmt.Sprintf("Running: make build (in %s)", repoRoot))
-	cmd := exec.Command("make", "build")
-	cmd.Dir = repoRoot // Set working directory
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := utils.RunCommandWithIOInDir(repoRoot, "make", []string{"build"}, os.Stdout, os.Stderr); err != nil {
 		errorExit("Build failed")
 	}
 
-	if _, err := os.Stat(goBinary); os.IsNotExist(err) {
+	if utils.FileNotExists(goBinary) {
 		errorExit(fmt.Sprintf("Build completed but binary not found: %s", goBinary))
 	}
 
 	success(fmt.Sprintf("Built: %s", goBinary))
 
 	// Show version
-	cmd = exec.Command(goBinary, "--version")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+	_ = utils.RunCommandWithIO(goBinary, []string{"--version"}, os.Stdout, nil)
 }
 
 func cmdStatus() {
@@ -263,7 +258,7 @@ func cmdStatus() {
 	fmt.Println("  goenv Status")
 	fmt.Println("═══════════════════════════════════════")
 
-	log(fmt.Sprintf("System: %s %s", runtime.GOOS, runtime.GOARCH))
+	log(fmt.Sprintf("System: %s %s", platform.OS(), platform.Arch()))
 	fmt.Println()
 
 	installations := detectAllGoenv()
@@ -293,8 +288,9 @@ func cmdStatus() {
 
 	fmt.Println()
 	log(fmt.Sprintf("Go binary: %s", goBinary))
-	if stat, err := os.Stat(goBinary); err == nil {
-		success(fmt.Sprintf("Exists (size: %d bytes)", stat.Size()))
+	if utils.PathExists(goBinary) {
+		size := utils.GetFileSize(goBinary)
+		success(fmt.Sprintf("Exists (size: %d bytes)", size))
 	} else {
 		warn("Not built yet (run: swap build)")
 	}
@@ -302,7 +298,7 @@ func cmdStatus() {
 	fmt.Println()
 	log(fmt.Sprintf("Backup: %s", backupDir))
 	backupFile := filepath.Join(backupDir, "goenv.bash")
-	if _, err := os.Stat(backupFile); err == nil {
+	if utils.PathExists(backupFile) {
 		success("Exists")
 	} else {
 		warn("No backup (will create on first swap)")
@@ -311,9 +307,9 @@ func cmdStatus() {
 }
 
 func showGoenvInfo(path string) {
-	if fileInfo, err := os.Stat(path); err == nil {
+	if utils.PathExists(path) {
 		// Check if it's a binary or script
-		if fileInfo.Mode()&0111 != 0 {
+		if utils.IsExecutableFile(path) {
 			// Read first bytes to determine type
 			f, err := os.Open(path)
 			if err == nil {
@@ -337,9 +333,8 @@ func showGoenvInfo(path string) {
 		}
 
 		// Show version
-		cmd := exec.Command(path, "--version")
-		if output, err := cmd.Output(); err == nil {
-			fmt.Printf("     Version: %s", string(output))
+		if output, err := utils.RunCommandOutput(path, "--version"); err == nil {
+			fmt.Printf("     Version: %s", output)
 		}
 	}
 }
@@ -358,7 +353,7 @@ Options:
 	}
 
 	// Check if Go binary exists
-	if _, err := os.Stat(goBinary); os.IsNotExist(err) {
+	if utils.FileNotExists(goBinary) {
 		warn("Go binary not built. Building now...")
 		cmdBuild()
 	}
@@ -425,9 +420,9 @@ Options:
 func swapGoenvBinary(target string) {
 	// Create backup if it doesn't exist
 	backupFile := filepath.Join(backupDir, filepath.Base(target)+".bash")
-	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
+	if utils.FileNotExists(backupFile) {
 		log("Creating backup...")
-		os.MkdirAll(backupDir, 0755)
+		utils.EnsureDir(backupDir)
 
 		src, err := os.Open(target)
 		if err != nil {
@@ -460,10 +455,9 @@ func swapGoenvBinary(target string) {
 	dst, err := os.Create(target)
 	if err != nil {
 		// Try with sudo if regular copy fails (Unix only)
-		if runtime.GOOS != "windows" {
+		if !platform.IsWindows() {
 			log("Regular copy failed, trying with sudo...")
-			cmd := exec.Command("sudo", "cp", goBinary, target)
-			if err := cmd.Run(); err == nil {
+			if err := utils.RunCommand("sudo", "cp", goBinary, target); err == nil {
 				success(fmt.Sprintf("Copied: %s → %s (with sudo)", goBinary, target))
 			} else {
 				errorExit(fmt.Sprintf("Cannot copy to %s\n\nTry manually:\n  sudo cp %s %s", target, goBinary, target))
@@ -476,22 +470,23 @@ func swapGoenvBinary(target string) {
 		if _, err := io.Copy(dst, src); err != nil {
 			errorExit(fmt.Sprintf("Copy failed: %v", err))
 		}
-		dst.Chmod(0755)
+		dst.Chmod(utils.PermFileExecutable)
 		success(fmt.Sprintf("Copied: %s → %s", goBinary, target))
 
 		// Make executable (Unix only - Windows uses file extension)
-		if runtime.GOOS != "windows" {
-			if err := os.Chmod(target, 0755); err != nil {
+		if !platform.IsWindows() {
+			if err := os.Chmod(target, utils.PermFileExecutable); err != nil {
 				warn(fmt.Sprintf("Could not set executable permission: %v", err))
 			}
 		}
 	}
 
 	// Verify file was copied
-	if stat, err := os.Stat(target); err == nil {
-		success(fmt.Sprintf("Binary installed (%d bytes)", stat.Size()))
+	if utils.PathExists(target) {
+		size := utils.GetFileSize(target)
+		success(fmt.Sprintf("Binary installed (%d bytes)", size))
 	} else {
-		errorExit(fmt.Sprintf("Verification failed: %v", err))
+		errorExit("Verification failed: file not found")
 	}
 }
 
@@ -503,17 +498,14 @@ func cmdBash() {
 	backupFile := filepath.Join(backupDir, "goenv.bash")
 
 	// Check if backup exists
-	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
+	if utils.FileNotExists(backupFile) {
 		warn("No backup found.")
 
 		// Try reinstalling from package manager
-		if runtime.GOOS == "darwin" {
+		if platform.IsMacOS() {
 			if _, err := exec.LookPath("brew"); err == nil {
 				log("Reinstalling from Homebrew...")
-				cmd := exec.Command("brew", "reinstall", "goenv")
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err == nil {
+				if err := utils.RunCommandWithIO("brew", []string{"reinstall", "goenv"}, os.Stdout, os.Stderr); err == nil {
 					success("Reinstalled from Homebrew")
 					return
 				}
@@ -535,10 +527,9 @@ func cmdBash() {
 	dst, err := os.Create(goenvPath)
 	if err != nil {
 		// Try with sudo
-		if runtime.GOOS != "windows" {
+		if !platform.IsWindows() {
 			log("Regular copy failed, trying with sudo...")
-			cmd := exec.Command("sudo", "cp", backupFile, goenvPath)
-			if err := cmd.Run(); err == nil {
+			if err := utils.RunCommand("sudo", "cp", backupFile, goenvPath); err == nil {
 				success(fmt.Sprintf("Restored: %s → %s (with sudo)", backupFile, goenvPath))
 			} else {
 				errorExit(fmt.Sprintf("Cannot restore to %s", goenvPath))
@@ -551,7 +542,7 @@ func cmdBash() {
 		if _, err := io.Copy(dst, src); err != nil {
 			errorExit(fmt.Sprintf("Restore failed: %v", err))
 		}
-		dst.Chmod(0755)
+		dst.Chmod(utils.PermFileExecutable)
 		success(fmt.Sprintf("Restored: %s → %s", backupFile, goenvPath))
 	}
 

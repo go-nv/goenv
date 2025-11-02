@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 
 	"github.com/spf13/cobra"
 )
@@ -96,22 +97,23 @@ func TestVersionFileWriteCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			goenvRoot, cleanup := cmdtest.SetupTestEnv(t)
-			defer cleanup()
+			tmpDir := t.TempDir()
+			t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+			t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 			// Setup test versions
 			for _, version := range tt.setupVersions {
-				cmdtest.CreateTestVersion(t, goenvRoot, version)
+				cmdtest.CreateMockGoVersion(t, tmpDir, version)
 			}
 
 			// Setup system Go if needed, or explicitly remove it
-			originalPath := os.Getenv("PATH")
-			defer os.Setenv("PATH", originalPath)
+			originalPath := os.Getenv(utils.EnvVarPath)
+			defer os.Setenv(utils.EnvVarPath, originalPath)
 
 			if tt.setupSystemGo {
 				// Create a bin directory in PATH with go executable
-				binDir := filepath.Join(goenvRoot, "system-bin")
-				if err := os.MkdirAll(binDir, 0755); err != nil {
+				binDir := filepath.Join(tmpDir, "system-bin")
+				if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 					t.Fatalf("Failed to create bin directory: %v", err)
 				}
 				goExec := filepath.Join(binDir, "go")
@@ -123,26 +125,22 @@ func TestVersionFileWriteCommand(t *testing.T) {
 					content = "#!/bin/sh\necho go version go1.21.0 linux/amd64\n"
 				}
 
-				if err := os.WriteFile(goExec, []byte(content), 0755); err != nil {
-					t.Fatalf("Failed to create go executable: %v", err)
-				}
+				testutil.WriteTestFile(t, goExec, []byte(content), utils.PermFileExecutable)
 				// Add to PATH
 				pathSep := string(os.PathListSeparator)
-				os.Setenv("PATH", binDir+pathSep+originalPath)
+				os.Setenv(utils.EnvVarPath, binDir+pathSep+originalPath)
 			} else {
 				// Explicitly set PATH to an empty/non-existent directory to ensure no system Go is found
-				emptyDir := filepath.Join(goenvRoot, "empty-bin")
-				os.MkdirAll(emptyDir, 0755)
-				os.Setenv("PATH", emptyDir)
+				emptyDir := filepath.Join(tmpDir, "empty-bin")
+				_ = utils.EnsureDirWithContext(emptyDir, "create test directory")
+				os.Setenv(utils.EnvVarPath, emptyDir)
 			}
 
 			// Create existing file if specified
 			var testFilePath string
 			if tt.existingFile != "" {
-				testFilePath = filepath.Join(goenvRoot, tt.existingFile)
-				if err := os.WriteFile(testFilePath, []byte(tt.existingContent), 0644); err != nil {
-					t.Fatalf("Failed to create existing file: %v", err)
-				}
+				testFilePath = filepath.Join(tmpDir, tt.existingFile)
+				testutil.WriteTestFile(t, testFilePath, []byte(tt.existingContent), utils.PermFileDefault)
 			}
 
 			// Prepare args with full paths
@@ -150,7 +148,7 @@ func TestVersionFileWriteCommand(t *testing.T) {
 			for i, arg := range tt.args {
 				if i == 0 {
 					// First arg is the filename
-					args[i] = filepath.Join(goenvRoot, arg)
+					args[i] = filepath.Join(tmpDir, arg)
 					if testFilePath == "" {
 						testFilePath = args[i]
 					}
@@ -208,7 +206,7 @@ func TestVersionFileWriteCommand(t *testing.T) {
 
 			// Check file removal
 			if tt.checkFileRemoved {
-				if _, err := os.Stat(testFilePath); !os.IsNotExist(err) {
+				if utils.PathExists(testFilePath) {
 					t.Errorf("Expected file to be removed, but it still exists")
 				}
 			}

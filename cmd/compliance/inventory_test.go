@@ -3,26 +3,25 @@ package compliance
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestInventoryGo_NoVersions(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Set GOENV_ROOT
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Unsetenv("GOENV_ROOT")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Create versions directory (but empty)
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := os.MkdirAll(versionsDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create versions dir: %v", err)
 	}
 
@@ -47,25 +46,25 @@ func TestInventoryGo_WithVersions(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Set GOENV_ROOT
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Unsetenv("GOENV_ROOT")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+
+	// Create config for helper methods
+	cfg := &config.Config{Root: tmpDir}
 
 	// Create mock Go installations
 	versions := []string{"1.21.0", "1.22.0"}
 	for _, version := range versions {
-		versionPath := filepath.Join(tmpDir, "versions", version, "bin")
-		if err := os.MkdirAll(versionPath, 0755); err != nil {
+		versionPath := cfg.VersionBinDir(version)
+		if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
 			t.Fatalf("Failed to create version dir: %v", err)
 		}
 
 		// Create mock go binary
-		goBinary := filepath.Join(versionPath, "go")
+		goBinary := cfg.VersionGoBinary(version)
 		if utils.IsWindows() {
 			goBinary += ".exe"
 		}
-		if err := os.WriteFile(goBinary, []byte("mock go binary"), 0755); err != nil {
-			t.Fatalf("Failed to create go binary: %v", err)
-		}
+		testutil.WriteTestFile(t, goBinary, []byte("mock go binary"), utils.PermFileExecutable)
 	}
 
 	// Run command (text output)
@@ -99,23 +98,23 @@ func TestInventoryGo_JSON(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Set GOENV_ROOT
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Unsetenv("GOENV_ROOT")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+
+	// Create config for helper methods
+	cfg := &config.Config{Root: tmpDir}
 
 	// Create mock Go installation
 	version := "1.21.0"
-	versionPath := filepath.Join(tmpDir, "versions", version, "bin")
-	if err := os.MkdirAll(versionPath, 0755); err != nil {
+	versionPath := cfg.VersionBinDir(version)
+	if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
 		t.Fatalf("Failed to create version dir: %v", err)
 	}
 
-	goBinary := filepath.Join(versionPath, "go")
+	goBinary := cfg.VersionGoBinary(version)
 	if utils.IsWindows() {
 		goBinary += ".exe"
 	}
-	if err := os.WriteFile(goBinary, []byte("mock go binary"), 0755); err != nil {
-		t.Fatalf("Failed to create go binary: %v", err)
-	}
+	testutil.WriteTestFile(t, goBinary, []byte("mock go binary"), utils.PermFileExecutable)
 
 	// Run command (JSON output)
 	cmd := inventoryGoCmd
@@ -146,12 +145,12 @@ func TestInventoryGo_JSON(t *testing.T) {
 		t.Errorf("Expected version %s, got %s", version, install.Version)
 	}
 
-	if install.OS != runtime.GOOS {
-		t.Errorf("Expected OS %s, got %s", runtime.GOOS, install.OS)
+	if install.OS != platform.OS() {
+		t.Errorf("Expected OS %s, got %s", platform.OS(), install.OS)
 	}
 
-	if install.Arch != runtime.GOARCH {
-		t.Errorf("Expected arch %s, got %s", runtime.GOARCH, install.Arch)
+	if install.Arch != platform.Arch() {
+		t.Errorf("Expected arch %s, got %s", platform.Arch(), install.Arch)
 	}
 
 	// Checksum should be empty (not requested)
@@ -164,23 +163,23 @@ func TestInventoryGo_WithChecksums(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Set GOENV_ROOT
-	os.Setenv("GOENV_ROOT", tmpDir)
-	defer os.Unsetenv("GOENV_ROOT")
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+
+	// Create config for helper methods
+	cfg := &config.Config{Root: tmpDir}
 
 	// Create mock Go installation
 	version := "1.21.0"
-	versionPath := filepath.Join(tmpDir, "versions", version, "bin")
-	if err := os.MkdirAll(versionPath, 0755); err != nil {
+	versionPath := cfg.VersionBinDir(version)
+	if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
 		t.Fatalf("Failed to create version dir: %v", err)
 	}
 
-	goBinary := filepath.Join(versionPath, "go")
+	goBinary := cfg.VersionGoBinary(version)
 	if utils.IsWindows() {
 		goBinary += ".exe"
 	}
-	if err := os.WriteFile(goBinary, []byte("mock go binary"), 0755); err != nil {
-		t.Fatalf("Failed to create go binary: %v", err)
-	}
+	testutil.WriteTestFile(t, goBinary, []byte("mock go binary"), utils.PermFileExecutable)
 
 	// Run command with checksums
 	cmd := inventoryGoCmd
@@ -223,18 +222,16 @@ func TestCollectGoInstallation(t *testing.T) {
 
 	// Create mock version
 	version := "1.21.0"
-	versionPath := filepath.Join(cfg.VersionsDir(), version, "bin")
-	if err := os.MkdirAll(versionPath, 0755); err != nil {
+	versionPath := cfg.VersionBinDir(version)
+	if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
 		t.Fatalf("Failed to create version dir: %v", err)
 	}
 
-	goBinary := filepath.Join(versionPath, "go")
+	goBinary := cfg.VersionGoBinary(version)
 	if utils.IsWindows() {
 		goBinary += ".exe"
 	}
-	if err := os.WriteFile(goBinary, []byte("test content"), 0755); err != nil {
-		t.Fatalf("Failed to create go binary: %v", err)
-	}
+	testutil.WriteTestFile(t, goBinary, []byte("test content"), utils.PermFileExecutable)
 
 	// Collect without checksum
 	install := collectGoInstallation(cfg, version, false)
@@ -261,12 +258,10 @@ func TestComputeSHA256(t *testing.T) {
 	// Create test file
 	testFile := filepath.Join(tmpDir, "test.txt")
 	content := []byte("test content")
-	if err := os.WriteFile(testFile, content, 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, testFile, content, utils.PermFileDefault)
 
 	// Compute checksum
-	checksum, err := computeSHA256(testFile)
+	checksum, err := utils.SHA256File(testFile)
 	if err != nil {
 		t.Fatalf("Failed to compute checksum: %v", err)
 	}
@@ -277,7 +272,7 @@ func TestComputeSHA256(t *testing.T) {
 	}
 
 	// Verify it's consistent
-	checksum2, err := computeSHA256(testFile)
+	checksum2, err := utils.SHA256File(testFile)
 	if err != nil {
 		t.Fatalf("Failed to compute checksum again: %v", err)
 	}

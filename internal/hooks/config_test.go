@@ -1,10 +1,13 @@
 package hooks
 
 import (
-	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestConfigValidation(t *testing.T) {
@@ -123,7 +126,7 @@ func TestConfigValidation(t *testing.T) {
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("Validate() expected error containing %q, got nil", tt.errorMsg)
-				} else if tt.errorMsg != "" && !contains(err.Error(), tt.errorMsg) {
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("Validate() error = %v, want error containing %q", err, tt.errorMsg)
 				}
 			} else {
@@ -238,9 +241,7 @@ hooks:
       file: /tmp/test.log
 `
 
-	if err := os.WriteFile(configPath, []byte(validConfig), 0644); err != nil {
-		t.Fatalf("Failed to create test config: %v", err)
-	}
+	testutil.WriteTestFile(t, configPath, []byte(validConfig), utils.PermFileDefault, "Failed to create test config file")
 
 	// Test loading valid config
 	config, err := LoadConfig(configPath)
@@ -272,9 +273,7 @@ hooks:
 
 	// Test loading invalid YAML
 	invalidPath := filepath.Join(tmpDir, "invalid.yaml")
-	if err := os.WriteFile(invalidPath, []byte("invalid: yaml: content:"), 0644); err != nil {
-		t.Fatalf("Failed to create invalid config: %v", err)
-	}
+	testutil.WriteTestFile(t, invalidPath, []byte("invalid: yaml: content:"), utils.PermFileDefault)
 	_, err = LoadConfig(invalidPath)
 	if err == nil {
 		t.Error("LoadConfig() expected error for invalid YAML, got nil")
@@ -286,24 +285,10 @@ func TestDefaultConfigPath(t *testing.T) {
 	if path == "" {
 		t.Error("DefaultConfigPath() returned empty string")
 	}
-	if !contains(path, ".goenv") {
+	if !strings.Contains(path, ".goenv") {
 		t.Errorf("DefaultConfigPath() = %q, expected to contain .goenv", path)
 	}
-	if !contains(path, "hooks.yaml") {
+	if !strings.Contains(path, "hooks.yaml") {
 		t.Errorf("DefaultConfigPath() = %q, expected to contain hooks.yaml", path)
 	}
-}
-
-// Helper function
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsSubstring(s, substr))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

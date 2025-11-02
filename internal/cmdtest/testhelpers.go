@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -13,6 +14,7 @@ import (
 // and clean environment variables. Returns the test root directory and a cleanup function.
 // Exported for use by subpackage tests.
 func SetupTestEnv(t *testing.T) (string, func()) {
+	t.Helper()
 	// Create temporary test directory
 	testDir, err := os.MkdirTemp("", "goenv_test_")
 	if err != nil {
@@ -29,20 +31,20 @@ func SetupTestEnv(t *testing.T) (string, func()) {
 	testHome := filepath.Join(testDir, "home")
 
 	utils.GoenvEnvVarRoot.Set(testRoot)
-	os.Setenv("HOME", testHome)
+	os.Setenv(utils.EnvVarHome, testHome)
 	// Clear PATH to ensure no system go is found unless explicitly added by test
 	if utils.IsWindows() {
-		os.Setenv("PATH", "C:\\Windows\\System32")
+		os.Setenv(utils.EnvVarPath, "C:\\Windows\\System32")
 	} else {
-		os.Setenv("PATH", "/usr/bin:/bin")
+		os.Setenv(utils.EnvVarPath, "/usr/bin:/bin")
 	}
 	// Clear GOENV_VERSION to ensure clean test environment
-	os.Unsetenv("GOENV_VERSION")
+	os.Unsetenv(utils.GoenvEnvVarVersion.String())
 
 	// Create necessary directories
-	os.MkdirAll(testRoot, 0755)
-	os.MkdirAll(testHome, 0755)
-	os.MkdirAll(filepath.Join(testRoot, "versions"), 0755)
+	_ = utils.EnsureDirWithContext(testRoot, "create test directory")
+	_ = utils.EnsureDirWithContext(testHome, "create test directory")
+	utils.EnsureDir(filepath.Join(testRoot, "versions"))
 
 	// Change to testHome to avoid picking up any .go-version files from the repository
 	oldDir, _ := os.Getwd()
@@ -56,8 +58,8 @@ func SetupTestEnv(t *testing.T) (string, func()) {
 	cleanup := func() {
 		os.Chdir(oldDir)
 		utils.GoenvEnvVarRoot.Set(oldGoenvRoot)
-		os.Setenv("HOME", oldHome)
-		os.Setenv("PATH", oldPath)
+		os.Setenv(utils.EnvVarHome, oldHome)
+		os.Setenv(utils.EnvVarPath, oldPath)
 		utils.GoenvEnvVarDir.Set(oldGoenvDir)
 		if oldGoenvVersion != "" {
 			utils.GoenvEnvVarVersion.Set(oldGoenvVersion)
@@ -72,6 +74,7 @@ func SetupTestEnv(t *testing.T) (string, func()) {
 // that echoes version information when executed.
 // Exported for use by subpackage tests.
 func CreateTestVersion(t *testing.T, root, version string) {
+	t.Helper()
 	CreateTestBinary(t, root, version, "go")
 }
 
@@ -80,13 +83,14 @@ func CreateTestVersion(t *testing.T, root, version string) {
 // commands that need to interact with version-specific binaries.
 // Exported for use by subpackage tests.
 func CreateTestBinary(t *testing.T, root, version, binaryName string) {
+	t.Helper()
 	versionDir := filepath.Join(root, "versions", version)
-	if err := os.MkdirAll(versionDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create test version directory: %v", err)
 	}
 
 	binDir := filepath.Join(versionDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create test bin directory: %v", err)
 	}
 
@@ -108,7 +112,7 @@ func CreateTestBinary(t *testing.T, root, version, binaryName string) {
 		}
 	}
 
-	if err := os.WriteFile(binaryPath, []byte(content), 0755); err != nil {
+	if err := utils.WriteFileWithContext(binaryPath, []byte(content), utils.PermFileExecutable, "create test binary %s"); err != nil {
 		t.Fatalf("Failed to create test binary %s: %v", binaryName, err)
 	}
 }
@@ -119,6 +123,7 @@ func CreateTestBinary(t *testing.T, root, version, binaryName string) {
 // Otherwise, it's treated as a version name under $GOENV_ROOT/versions.
 // Exported for use by subpackage tests.
 func CreateExecutable(t *testing.T, testRoot, version, execName string) {
+	t.Helper()
 	var binDir string
 	if strings.Contains(version, "/") {
 		// Absolute path like "${GOENV_TEST_DIR}/bin"
@@ -128,7 +133,7 @@ func CreateExecutable(t *testing.T, testRoot, version, execName string) {
 		binDir = filepath.Join(testRoot, "versions", version, "bin")
 	}
 
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
 
@@ -138,7 +143,7 @@ func CreateExecutable(t *testing.T, testRoot, version, execName string) {
 		execPath += ".bat"
 		content = "@echo off\necho mock executable\n"
 	}
-	if err := os.WriteFile(execPath, []byte(content), 0755); err != nil {
+	if err := utils.WriteFileWithContext(execPath, []byte(content), utils.PermFileExecutable, "create executable"); err != nil {
 		t.Fatalf("Failed to create executable: %v", err)
 	}
 }
@@ -146,6 +151,7 @@ func CreateExecutable(t *testing.T, testRoot, version, execName string) {
 // CreateTestAlias creates a version alias in the test environment.
 // Exported for use by subpackage tests.
 func CreateTestAlias(t *testing.T, root, name, target string) {
+	t.Helper()
 	aliasesFile := filepath.Join(root, "aliases")
 
 	// Read existing aliases if file exists
@@ -157,7 +163,7 @@ func CreateTestAlias(t *testing.T, root, name, target string) {
 	// Append new alias
 	content += name + "=" + target + "\n"
 
-	if err := os.WriteFile(aliasesFile, []byte(content), 0644); err != nil {
+	if err := utils.WriteFileWithContext(aliasesFile, []byte(content), utils.PermFileDefault, "create alias"); err != nil {
 		t.Fatalf("Failed to create alias: %v", err)
 	}
 }
@@ -167,7 +173,8 @@ func CreateTestAlias(t *testing.T, root, name, target string) {
 // where you need a go binary but don't need a full version installation.
 // Exported for use by subpackage tests.
 func CreateGoExecutable(t *testing.T, binDir string) string {
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	t.Helper()
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
 
@@ -178,7 +185,7 @@ func CreateGoExecutable(t *testing.T, binDir string) string {
 		content = "@echo off\necho go version go1.21.0 windows/amd64\n"
 	}
 
-	if err := os.WriteFile(binaryPath, []byte(content), 0755); err != nil {
+	if err := utils.WriteFileWithContext(binaryPath, []byte(content), utils.PermFileExecutable, "create go binary"); err != nil {
 		t.Fatalf("Failed to create go binary: %v", err)
 	}
 
@@ -189,7 +196,8 @@ func CreateGoExecutable(t *testing.T, binDir string) string {
 // This is useful for testing tool commands without needing actual tool installations.
 // Exported for use by subpackage tests.
 func CreateToolExecutable(t *testing.T, binDir, toolName string) string {
-	if err := os.MkdirAll(binDir, 0755); err != nil {
+	t.Helper()
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create bin directory: %v", err)
 	}
 
@@ -200,15 +208,42 @@ func CreateToolExecutable(t *testing.T, binDir, toolName string) string {
 		content = "@echo off\necho mock " + toolName + "\n"
 	}
 
-	if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
+	if err := utils.WriteFileWithContext(toolPath, []byte(content), utils.PermFileExecutable, "create tool binary"); err != nil {
 		t.Fatalf("Failed to create tool binary: %v", err)
 	}
 
 	return toolPath
 }
 
+// WriteTestFile writes a file for testing purposes with standardized error handling.
+// If the write fails, it immediately fails the test with t.Fatalf.
+// The optional msg parameter allows specifying a custom error message context.
+// If not provided, defaults to "Failed to write test file <path>".
+//
+// DEPRECATED: Use testing/testutil.WriteTestFile instead for better import cycle avoidance.
+// This wrapper is kept for backward compatibility but will be removed in a future version.
+//
+// Example:
+//
+//	WriteTestFile(t, path, data, utils.PermFileDefault)  // Default error message
+//	WriteTestFile(t, path, data, utils.PermFileDefault, "Failed to create config file")  // Custom message
+func WriteTestFile(tb testing.TB, path string, content []byte, perm os.FileMode, msg ...string) {
+	tb.Helper()
+	if err := os.WriteFile(path, content, perm); err != nil {
+		if len(msg) > 0 && msg[0] != "" {
+			tb.Fatalf("%s: %v", msg[0], err)
+		} else {
+			tb.Fatalf("Failed to write test file %s: %v", path, err)
+		}
+	}
+}
+
 // StripDeprecationWarning removes deprecation warnings from command output.
 // This is useful for testing legacy commands that now show deprecation warnings.
+//
+// DEPRECATED: Use testing/testutil.StripDeprecationWarning instead for better import cycle avoidance.
+// This wrapper is kept for backward compatibility but will be removed in a future version.
+//
 // The deprecation warning format is:
 //
 //	Deprecation warning: ...
@@ -218,7 +253,6 @@ func CreateToolExecutable(t *testing.T, binDir, toolName string) string {
 //	[actual output]
 //
 // This function removes the warning block and returns only the actual output.
-// Exported for use by subpackage tests.
 func StripDeprecationWarning(output string) string {
 	// Check if output contains a deprecation warning
 	if !strings.Contains(output, "Deprecation warning:") {
@@ -250,4 +284,81 @@ func StripDeprecationWarning(output string) string {
 	result := strings.Join(lines[blankLineIdx+1:], "\n")
 	// Only trim trailing whitespace to preserve formatting of the output
 	return strings.TrimRight(result, " \t\n\r")
+}
+
+// CreateMockGoVersion creates a complete mock Go version installation.
+// This includes:
+//   - Version directory (versions/{version})
+//   - Bin directory (versions/{version}/bin)
+//   - Go binary (versions/{version}/bin/go[.exe])
+//
+// The go binary is executable and will echo version information when run.
+// Returns the path to the version directory.
+//
+// This is the recommended way to set up test versions as it uses Config helpers
+// for consistent path construction across all tests.
+func CreateMockGoVersion(t *testing.T, tmpDir, version string) string {
+	t.Helper()
+
+	cfg := &config.Config{Root: tmpDir}
+
+	// Create bin directory
+	binDir := cfg.VersionBinDir(version)
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
+		t.Fatalf("Failed to create version bin dir: %v", err)
+	}
+
+	// Create go binary
+	goBinary := cfg.VersionGoBinary(version)
+	if utils.IsWindows() {
+		goBinary += ".exe"
+	}
+
+	// Create executable mock binary
+	var content string
+	if utils.IsWindows() {
+		content = "@echo off\necho go version go" + version + " windows/amd64\n"
+	} else {
+		content = "#!/bin/sh\necho go version go" + version + " linux/amd64\n"
+	}
+
+	if err := utils.WriteFileWithContext(goBinary, []byte(content), utils.PermFileExecutable, "create go binary"); err != nil {
+		t.Fatalf("Failed to create go binary: %v", err)
+	}
+
+	return cfg.VersionDir(version)
+}
+
+// CreateMockGoVersions creates multiple mock Go version installations.
+// This is a convenience wrapper for creating several versions at once.
+//
+// Example:
+//
+//	CreateMockGoVersions(t, tmpDir, "1.21.0", "1.22.0", "1.23.0")
+func CreateMockGoVersions(t *testing.T, tmpDir string, versions ...string) {
+	t.Helper()
+	for _, v := range versions {
+		CreateMockGoVersion(t, tmpDir, v)
+	}
+}
+
+// CreateMockGoVersionWithTools creates a mock Go version with gopath/bin directory.
+// This is useful for testing tool installations, as tools are installed to
+// versions/{version}/gopath/bin.
+//
+// Returns the path to the version directory.
+func CreateMockGoVersionWithTools(t *testing.T, tmpDir, version string) string {
+	t.Helper()
+
+	// Create base version
+	versionPath := CreateMockGoVersion(t, tmpDir, version)
+
+	// Create gopath/bin directory
+	cfg := &config.Config{Root: tmpDir}
+	gopathBin := cfg.VersionGopathBin(version)
+	if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
+		t.Fatalf("Failed to create gopath bin: %v", err)
+	}
+
+	return versionPath
 }

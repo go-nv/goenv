@@ -3,8 +3,10 @@ package hooks
 import (
 	"fmt"
 	"os/exec"
-	"runtime"
 	"strings"
+
+	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/platform"
 )
 
 // NotifyDesktopAction sends desktop notifications using OS-native notification systems
@@ -75,7 +77,7 @@ func (a *NotifyDesktopAction) Execute(ctx *HookContext, params map[string]interf
 
 // sendNotification sends a notification using OS-specific methods
 func sendNotification(title, message, level string) error {
-	switch runtime.GOOS {
+	switch platform.OS() {
 	case "darwin":
 		return sendMacNotification(title, message, level)
 	case "linux":
@@ -83,7 +85,7 @@ func sendNotification(title, message, level string) error {
 	case "windows":
 		return sendWindowsNotification(title, message, level)
 	default:
-		return fmt.Errorf("desktop notifications not supported on %s", runtime.GOOS)
+		return fmt.Errorf("desktop notifications not supported on %s", platform.OS())
 	}
 }
 
@@ -97,7 +99,7 @@ func sendMacNotification(title, message, level string) error {
 
 	cmd := exec.Command("osascript", "-e", script)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to send macOS notification: %w", err)
+		return errors.FailedTo("send macOS notification", err)
 	}
 	return nil
 }
@@ -119,12 +121,15 @@ func sendLinuxNotification(title, message, level string) error {
 
 	cmd := exec.Command("notify-send", "-u", urgency, title, message)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to send Linux notification: %w", err)
+		return errors.FailedTo("send Linux notification", err)
 	}
 	return nil
 }
 
 // sendWindowsNotification sends a notification on Windows using PowerShell
+// Note: Toast notifications require Windows 10+ and may not work on Windows Server
+// or in environments with restricted execution policies. Fallback to console output
+// is recommended in hooks configuration.
 func sendWindowsNotification(title, message, level string) error {
 	// Use PowerShell to show a Windows notification
 	// This creates a toast notification
@@ -152,7 +157,8 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
 
 	cmd := exec.Command("powershell", "-Command", script)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to send Windows notification: %w", err)
+		// Provide more helpful error message for common Windows notification failures
+		return fmt.Errorf("failed to send Windows notification (requires Windows 10+ and may not work on Windows Server or with restricted policies): %w", err)
 	}
 	return nil
 }

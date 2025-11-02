@@ -2,13 +2,11 @@ package core
 
 import (
 	"fmt"
-	"path/filepath"
 	"time"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/lifecycle"
-	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -44,8 +42,7 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	version1 := args[0]
 	version2 := args[1]
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Resolve version specs
 	resolvedV1, err1 := mgr.ResolveVersionSpec(version1)
@@ -105,8 +102,8 @@ func runCompare(cmd *cobra.Command, args []string) error {
 
 	// Size comparison (if both installed)
 	if installed1 && installed2 {
-		size1, _ := calculateDirSize(filepath.Join(cfg.VersionsDir(), resolvedV1))
-		size2, _ := calculateDirSize(filepath.Join(cfg.VersionsDir(), resolvedV2))
+		size1, _ := calculateDirSize(cfg.VersionDir(resolvedV1))
+		size2, _ := calculateDirSize(cfg.VersionDir(resolvedV2))
 
 		printComparisonRow(cmd, "Size",
 			formatSize(size1),

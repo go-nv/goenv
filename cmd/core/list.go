@@ -7,7 +7,8 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -78,7 +79,7 @@ func runListInstalled(cmd *cobra.Command) error {
 
 // runListRemote shows available versions from golang.org
 func runListRemote(cmd *cobra.Command) error {
-	cfg := config.Load()
+	cfg, _ := cmdutil.SetupContext()
 	if cfg.Debug {
 		fmt.Println("Debug: Fetching available Go versions...")
 	}
@@ -90,7 +91,7 @@ func runListRemote(cmd *cobra.Command) error {
 	// Fetch all versions (from cache or Railway API)
 	versions, err := fetcher.FetchAllVersions()
 	if err != nil {
-		return fmt.Errorf("failed to fetch versions: %w", err)
+		return errors.FailedTo("fetch versions", err)
 	}
 
 	// Filter stable versions if requested

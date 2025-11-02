@@ -4,15 +4,16 @@
 package hooks
 
 import (
-	"fmt"
 	"syscall"
+
+	"github.com/go-nv/goenv/internal/errors"
 )
 
 // getDiskSpace returns free and total disk space in MB for the given path (Unix)
 func getDiskSpace(path string) (freeMB, totalMB int64, err error) {
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(path, &stat); err != nil {
-		return 0, 0, fmt.Errorf("failed to get filesystem stats: %w", err)
+		return 0, 0, errors.FailedTo("get filesystem stats", err)
 	}
 
 	// Calculate available space in MB

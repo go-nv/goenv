@@ -8,7 +8,7 @@ import (
 	cmdpkg "github.com/go-nv/goenv/cmd"
 	"github.com/go-nv/goenv/cmd/shell"
 
-	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
@@ -34,8 +34,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	cfg, mgr := cmdutil.SetupContext()
 
 	// Determine shell type
 	shellType := shell.ResolveShell("", true)
@@ -61,7 +60,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	currentVersion, _, _ := mgr.GetCurrentVersion()
 
 	// If version is "system", don't export GOPATH/GOROOT
-	if currentVersion == "system" || currentVersion == "" {
+	if currentVersion == manager.SystemVersion || currentVersion == "" {
 		return nil
 	}
 

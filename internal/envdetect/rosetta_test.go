@@ -3,12 +3,15 @@ package envdetect
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/osinfo"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestIsAppleSilicon(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		// Should return false on non-macOS
 		result := IsAppleSilicon()
 		if result {
@@ -21,18 +24,18 @@ func TestIsAppleSilicon(t *testing.T) {
 	result := IsAppleSilicon()
 	t.Logf("IsAppleSilicon returned: %v", result)
 
-	// We can verify this matches runtime.GOARCH on native execution
-	if result && runtime.GOARCH != "arm64" {
-		t.Log("Detected Apple Silicon but runtime.GOARCH is not arm64 - may be running under Rosetta")
+	// We can verify this matches osinfo.Arch() on native execution
+	if result && osinfo.Arch() != "arm64" {
+		t.Log("Detected Apple Silicon but osinfo.Arch() is not arm64 - may be running under Rosetta")
 	}
 
-	if !result && runtime.GOARCH == "arm64" {
+	if !result && osinfo.Arch() == "arm64" {
 		t.Error("Should detect Apple Silicon when running on arm64")
 	}
 }
 
 func TestGetBinaryArchitecture(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		// Should return empty on non-macOS
 		result := GetBinaryArchitecture("/any/path")
 		if result != "" {
@@ -54,14 +57,14 @@ func TestGetBinaryArchitecture(t *testing.T) {
 
 	t.Logf("Current executable architecture: %s", arch)
 
-	// The architecture should match runtime.GOARCH (assuming native build)
-	if arch != runtime.GOARCH {
-		t.Logf("Binary arch (%s) differs from runtime.GOARCH (%s) - may be expected", arch, runtime.GOARCH)
+	// The architecture should match osinfo.Arch() (assuming native build)
+	if arch != osinfo.Arch() {
+		t.Logf("Binary arch (%s) differs from osinfo.Arch() (%s) - may be expected", arch, osinfo.Arch())
 	}
 }
 
 func TestGetBinaryArchitecture_NonExistent(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("macOS-specific test")
 	}
 
@@ -72,16 +75,14 @@ func TestGetBinaryArchitecture_NonExistent(t *testing.T) {
 }
 
 func TestGetBinaryArchitecture_NonBinary(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("macOS-specific test")
 	}
 
 	// Create a text file
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "textfile.txt")
-	if err := os.WriteFile(tmpFile, []byte("hello world"), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	testutil.WriteTestFile(t, tmpFile, []byte("hello world"), utils.PermFileDefault, "Failed to create test file")
 
 	arch := GetBinaryArchitecture(tmpFile)
 	// Should return empty or not crash
@@ -89,7 +90,7 @@ func TestGetBinaryArchitecture_NonBinary(t *testing.T) {
 }
 
 func TestCheckRosettaMixedArchitecture(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		// Should return empty on non-macOS
 		result := CheckRosettaMixedArchitecture("/any/path")
 		if result != "" {
@@ -123,7 +124,7 @@ func TestCheckRosettaMixedArchitecture(t *testing.T) {
 }
 
 func TestCheckRosettaMixedArchitecture_DifferentArchs(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("macOS-specific test")
 	}
 
@@ -140,7 +141,7 @@ func TestCheckRosettaMixedArchitecture_DifferentArchs(t *testing.T) {
 }
 
 func TestCheckRosettaMixedArchitecture_NonExistent(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("macOS-specific test")
 	}
 
@@ -154,7 +155,7 @@ func TestCheckRosettaMixedArchitecture_NonExistent(t *testing.T) {
 }
 
 func TestCheckRosettaMixedArchitecture_IntelMac(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("macOS-specific test")
 	}
 
@@ -175,7 +176,7 @@ func TestCheckRosettaMixedArchitecture_IntelMac(t *testing.T) {
 }
 
 func TestGetBinaryArchitecture_MultiArchBinary(t *testing.T) {
-	if runtime.GOOS != "darwin" {
+	if !osinfo.IsMacOS() {
 		t.Skip("macOS-specific test")
 	}
 
@@ -187,7 +188,7 @@ func TestGetBinaryArchitecture_MultiArchBinary(t *testing.T) {
 	}
 
 	for _, binary := range binaries {
-		if _, err := os.Stat(binary); err != nil {
+		if utils.FileNotExists(binary) {
 			continue // Binary doesn't exist, skip
 		}
 

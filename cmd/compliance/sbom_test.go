@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
 )
 
 func TestSBOMProject_FlagValidation(t *testing.T) {
@@ -59,7 +60,7 @@ func TestSBOMProject_FlagValidation(t *testing.T) {
 
 			// Create temp directory for test
 			tmpDir := t.TempDir()
-			os.Setenv("GOENV_ROOT", tmpDir)
+			os.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 			defer os.Unsetenv("GOENV_ROOT")
 
 			// Run command
@@ -92,7 +93,7 @@ func TestResolveSBOMTool(t *testing.T) {
 
 	// Create host bin directory
 	hostBinDir := cfg.HostBinDir()
-	if err := os.MkdirAll(hostBinDir, 0755); err != nil {
+	if err := utils.EnsureDirWithContext(hostBinDir, "create test directory"); err != nil {
 		t.Fatalf("Failed to create host bin dir: %v", err)
 	}
 
@@ -107,9 +108,7 @@ func TestResolveSBOMTool(t *testing.T) {
 		content = "#!/bin/sh\necho mock"
 	}
 
-	if err := os.WriteFile(toolPath, []byte(content), 0755); err != nil {
-		t.Fatalf("Failed to create mock tool: %v", err)
-	}
+	testutil.WriteTestFile(t, toolPath, []byte(content), utils.PermFileExecutable)
 
 	// Test resolution
 	resolvedPath, err := resolveSBOMTool(cfg, toolName)

@@ -3,7 +3,6 @@ package manager
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -14,14 +13,14 @@ import (
 
 // IsVersionCorrupted checks if an installed version is missing its go binary
 func (m *Manager) IsVersionCorrupted(version string) bool {
-	if version == "system" {
+	if version == SystemVersion {
 		return false
 	}
 
 	versionDir := filepath.Join(m.config.VersionsDir(), version)
 
 	// Check if version directory exists
-	if _, err := os.Stat(versionDir); os.IsNotExist(err) {
+	if utils.FileNotExists(versionDir) {
 		return false // Not installed, not corrupted
 	}
 

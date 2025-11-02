@@ -2,7 +2,6 @@ package goenv
 
 import (
 	"encoding/json"
-	"os/exec"
 	"strings"
 	"sync"
 
@@ -44,8 +43,7 @@ func GetABIVariables(goBinaryPath string) ([]ABIVariable, error) {
 	abiVarsCacheMutex.RUnlock()
 
 	// Run go env -json to get all environment variables
-	cmd := exec.Command(goBinaryPath, "env", "-json")
-	output, err := cmd.Output()
+	output, err := utils.RunCommandOutput(goBinaryPath, "env", "-json")
 	if err != nil {
 		// Fallback to known variables if go env fails
 		return knownABIVars, nil
@@ -53,7 +51,7 @@ func GetABIVariables(goBinaryPath string) ([]ABIVariable, error) {
 
 	// Parse JSON output
 	var envVars map[string]string
-	if err := json.Unmarshal(output, &envVars); err != nil {
+	if err := json.Unmarshal([]byte(output), &envVars); err != nil {
 		return knownABIVars, nil
 	}
 
