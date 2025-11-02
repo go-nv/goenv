@@ -3,6 +3,8 @@ package utils
 import (
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShouldUseEmojis(t *testing.T) {
@@ -96,9 +98,7 @@ func TestShouldUseEmojis(t *testing.T) {
 				return
 			}
 
-			if result != tt.expected {
-				t.Errorf("%s: ShouldUseEmojis() = %v, expected %v", tt.description, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, ": ShouldUseEmojis() = , expected %v", tt.description)
 		})
 	}
 }
@@ -178,9 +178,7 @@ func TestEmoji(t *testing.T) {
 				return
 			}
 
-			if result != tt.expected {
-				t.Errorf("Emoji(%q) = %q, expected %q", tt.emoji, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "Emoji() = , expected %v", tt.emoji)
 		})
 	}
 }
@@ -270,16 +268,11 @@ func TestEmojiOr(t *testing.T) {
 				t.Logf("EmojiOr(%q, %q) = %q (depends on TTY: would be emoji with TTY, fallback in pipeline)",
 					tt.emoji, tt.fallback, result)
 				// In a pipeline, we expect the fallback
-				if result != tt.fallback {
-					t.Errorf("EmojiOr(%q, %q) = %q, expected %q (in non-TTY environment)",
-						tt.emoji, tt.fallback, result, tt.fallback)
-				}
+				assert.Equal(t, tt.fallback, result, "EmojiOr(, ) = , expected (in non-TTY environment) %v", tt.emoji)
 				return
 			}
 
-			if result != tt.expected {
-				t.Errorf("EmojiOr(%q, %q) = %q, expected %q", tt.emoji, tt.fallback, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "EmojiOr(, ) = , expected %v %v", tt.emoji, tt.fallback)
 		})
 	}
 }
@@ -349,9 +342,7 @@ func TestShouldUseColor(t *testing.T) {
 				return
 			}
 
-			if result != tt.expected {
-				t.Errorf("ShouldUseColor() = %v, expected %v", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "ShouldUseColor() = , expected")
 		})
 	}
 }
@@ -404,12 +395,8 @@ func TestSetOutputOptions(t *testing.T) {
 
 			SetOutputOptions(tt.noColor, tt.plain)
 
-			if globalOptions.NoColor != tt.expectedNoColor {
-				t.Errorf("globalOptions.NoColor = %v, expected %v", globalOptions.NoColor, tt.expectedNoColor)
-			}
-			if globalOptions.Plain != tt.expectedPlain {
-				t.Errorf("globalOptions.Plain = %v, expected %v", globalOptions.Plain, tt.expectedPlain)
-			}
+			assert.Equal(t, tt.expectedNoColor, globalOptions.NoColor, "globalOptions.NoColor = , expected")
+			assert.Equal(t, tt.expectedPlain, globalOptions.Plain, "globalOptions.Plain = , expected")
 		})
 	}
 }
@@ -642,9 +629,7 @@ func TestColorFunctions(t *testing.T) {
 
 			// When colors are disabled, should return plain text
 			if tt.noColor || tt.plain || tt.envColor != "" {
-				if result != tt.wantPlain {
-					t.Errorf("Expected plain text %q, got %q", tt.wantPlain, result)
-				}
+				assert.Equal(t, tt.wantPlain, result, "Expected plain text")
 				return
 			}
 
@@ -720,9 +705,7 @@ func TestGrayAndCyan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.colorFn(tt.input)
-			if result != tt.want {
-				t.Errorf("%s = %q, want %q", tt.name, result, tt.want)
-			}
+			assert.Equal(t, tt.want, result, "= %v", tt.name)
 		})
 	}
 }

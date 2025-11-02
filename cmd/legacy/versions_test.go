@@ -11,6 +11,8 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spf13/cobra"
 )
@@ -178,10 +180,7 @@ func TestVersionsCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+			assert.NoError(t, err)
 
 			if len(tt.expectedOutput) > 0 {
 				got := cmdtest.StripDeprecationWarning(output.String())
@@ -197,22 +196,14 @@ func TestVersionsCommand(t *testing.T) {
 					expectedLines = append([]string{"  system"}, expectedLines...)
 				}
 
-				if len(gotLines) != len(expectedLines) {
-					t.Errorf("Expected %d lines, got %d:\nExpected:\n%s\nGot:\n%s",
-						len(expectedLines), len(gotLines),
-						strings.Join(expectedLines, "\n"), got)
-					return
-				}
+				assert.Len(t, gotLines, len(expectedLines), "Expected lines %v %v", strings.Join(expectedLines, "\n"), got)
 
 				for i, expectedLine := range expectedLines {
 					if i >= len(gotLines) {
 						t.Errorf("Missing expected line %d: '%s'", i, expectedLine)
 						continue
 					}
-					if gotLines[i] != expectedLine {
-						t.Errorf("Line %d: expected '%s', got '%s' (bare=%v)",
-							i, expectedLine, gotLines[i], VersionsFlags.Bare)
-					}
+					assert.Equal(t, expectedLine, gotLines[i])
 				}
 			}
 		})
@@ -220,6 +211,7 @@ func TestVersionsCommand(t *testing.T) {
 }
 
 func TestVersionsWithLocalVersion(t *testing.T) {
+	var err error
 	testRoot, cleanup := cmdtest.SetupTestEnv(t)
 	defer cleanup()
 
@@ -238,9 +230,7 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 
 	// Create local version file in current directory
 	tempDir, err := os.MkdirTemp("", "goenv_local_test_")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
+	require.NoError(t, err, "Failed to create temp directory")
 	defer os.RemoveAll(tempDir)
 
 	localFile := filepath.Join(tempDir, ".go-version")
@@ -270,9 +260,7 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 	cmd.SetArgs([]string{})
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Errorf("Versions command failed: %v", err)
-	}
+	assert.NoError(t, err, "Versions command failed")
 
 	got := cmdtest.StripDeprecationWarning(output.String())
 	got = strings.TrimRight(got, "\n")
@@ -286,10 +274,7 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 		expectedLines = 3
 	}
 
-	if len(gotLines) != expectedLines {
-		t.Errorf("Expected %d lines, got %d:\nGot:\n%s", expectedLines, len(gotLines), got)
-		return
-	}
+	assert.Len(t, gotLines, expectedLines, "Expected lines %v", got)
 
 	// Adjust line indices if system Go is present
 	offset := 0
@@ -297,24 +282,18 @@ func TestVersionsWithLocalVersion(t *testing.T) {
 		// System Go appears first, so our versions are offset by 1
 		offset = 1
 		// Verify system line is present
-		if !strings.Contains(gotLines[0], "system") {
-			t.Errorf("Line 0: expected system line, got '%s'", gotLines[0])
-		}
+		assert.Contains(t, gotLines[0], "system", "Line 0: expected system line %v", gotLines)
 	}
 
 	// Check line: non-current version
-	if gotLines[0+offset] != "  1.21.5" {
-		t.Errorf("Line %d: expected '  1.21.5', got '%s'", 0+offset, gotLines[0+offset])
-	}
+	assert.Equal(t, "  1.21.5", gotLines[0+offset], "Line : expected ' 1.21.5'")
 
 	// Check line: current version with suffix (also the latest version)
 	expectedPrefix := "* 1.22.2 (set by "
 	expectedContains := ".go-version)"
 	expectedSuffix := "[latest]" // latest version tag
 	normalizedLine := filepath.ToSlash(gotLines[1+offset])
-	if !strings.HasPrefix(normalizedLine, expectedPrefix) || !strings.Contains(normalizedLine, expectedContains) || !strings.HasSuffix(normalizedLine, expectedSuffix) {
-		t.Errorf("Line %d: expected to match '* 1.22.2 (set by .../.go-version) [latest]', got '%s'", 1+offset, gotLines[1+offset])
-	}
+	assert.False(t, !strings.HasPrefix(normalizedLine, expectedPrefix) || !strings.Contains(normalizedLine, expectedContains) || !strings.HasSuffix(normalizedLine, expectedSuffix), "Line : expected to match '* 1.22.2 (set by .../.go-version) [latest]'")
 }
 
 func TestVersionsNoVersionsInstalled(t *testing.T) {
@@ -356,14 +335,9 @@ func TestVersionsNoVersionsInstalled(t *testing.T) {
 	err := cmd.Execute()
 
 	// Should fail with warning when no versions installed and no system go
-	if err == nil {
-		t.Error("Expected error when no versions installed and no system go")
-		return
-	}
+	assert.Error(t, err, "Expected error when no versions installed and no system go")
 
-	if !strings.Contains(err.Error(), "Warning: no Go detected") {
-		t.Errorf("Expected 'Warning: no Go detected' error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "Warning: no Go detected", "Expected 'Warning: no Go detected' error %v", err)
 }
 
 func TestVersionsSystemGoOnly(t *testing.T) {
@@ -414,16 +388,12 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 	cmd.SetArgs([]string{})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	got := cmdtest.StripDeprecationWarning(output.String())
 	expected := "* system"
 
-	if got != expected {
-		t.Errorf("Expected output '%s', got '%s'", expected, got)
-	}
+	assert.Equal(t, expected, got)
 }
 
 // hasSystemGoInTest checks if system Go is available during test execution
@@ -434,6 +404,7 @@ func hasSystemGoInTest() bool {
 }
 
 func TestVersionsUsedFlag(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -443,16 +414,14 @@ func TestVersionsUsedFlag(t *testing.T) {
 
 	// Project 1: .go-version
 	proj1 := filepath.Join(tmpDir, "proj1")
-	if err := utils.EnsureDirWithContext(proj1, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(proj1, "create test directory")
+	require.NoError(t, err)
 	testutil.WriteTestFile(t, filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), utils.PermFileDefault)
 
 	// Project 2: go.mod
 	proj2 := filepath.Join(tmpDir, "proj2")
-	if err := utils.EnsureDirWithContext(proj2, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(proj2, "create test directory")
+	require.NoError(t, err)
 	gomodContent := "module test\n\ngo 1.22.3\n"
 	testutil.WriteTestFile(t, filepath.Join(proj2, "go.mod"), []byte(gomodContent), utils.PermFileDefault)
 
@@ -492,10 +461,8 @@ func TestVersionsUsedFlag(t *testing.T) {
 	cmd.SetErr(output)
 	cmd.SetArgs([]string{})
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v\nOutput: %s", err, output.String())
-	}
+	err = cmd.Execute()
+	require.NoError(t, err, "Unexpected error: \\nOutput")
 
 	result := output.String()
 
@@ -503,30 +470,18 @@ func TestVersionsUsedFlag(t *testing.T) {
 	result = cmdtest.StripDeprecationWarning(result)
 
 	// Verify output contains expected elements
-	if !strings.Contains(result, "Scanning for Go projects") {
-		t.Errorf("Expected scanning message in output. Got:\n%s", result)
-	}
+	assert.Contains(t, result, "Scanning for Go projects", "Expected scanning message in output. Got:\\n %v", result)
 
-	if !strings.Contains(result, "Installed versions:") {
-		t.Errorf("Expected 'Installed versions:' section. Got:\n%s", result)
-	}
+	assert.Contains(t, result, "Installed versions:", "Expected 'Installed versions:' section. Got:\\n %v", result)
 
-	if !strings.Contains(result, "Projects found:") {
-		t.Errorf("Expected 'Projects found:' section. Got:\n%s", result)
-	}
+	assert.Contains(t, result, "Projects found:", "Expected 'Projects found:' section. Got:\\n %v", result)
 
-	if !strings.Contains(result, "proj1") {
-		t.Errorf("Expected proj1 in output. Got:\n%s", result)
-	}
+	assert.Contains(t, result, "proj1", "Expected proj1 in output. Got:\\n %v", result)
 
-	if !strings.Contains(result, "proj2") {
-		t.Errorf("Expected proj2 in output. Got:\n%s", result)
-	}
+	assert.Contains(t, result, "proj2", "Expected proj2 in output. Got:\\n %v", result)
 
 	// Check for tips section
-	if !strings.Contains(result, "Tips:") {
-		t.Errorf("Expected tips section in output. Got:\n%s", result)
-	}
+	assert.Contains(t, result, "Tips:", "Expected tips section in output. Got:\\n %v", result)
 }
 
 func TestVersionsUsedDepthFlag(t *testing.T) {
@@ -580,19 +535,13 @@ func TestVersionsUsedDepthFlag(t *testing.T) {
 	cmd.SetErr(output)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v\nOutput: %s", err, output.String())
-	}
+	require.NoError(t, err, "Unexpected error: \\nOutput")
 
 	result := cmdtest.StripDeprecationWarning(output.String())
 
 	// Should find proj1
-	if !strings.Contains(result, "proj1") {
-		t.Errorf("Expected to find proj1 at depth 1. Got:\n%s", result)
-	}
+	assert.Contains(t, result, "proj1", "Expected to find proj1 at depth 1. Got:\\n %v", result)
 
 	// Should NOT find proj2 (it's at depth 3)
-	if strings.Contains(result, "proj2") {
-		t.Errorf("Should not find proj2 at depth 3 with --depth 1. Got:\n%s", result)
-	}
+	assert.NotContains(t, result, "proj2", "Should not find proj2 at depth 3 with --depth 1. Got:\\n %v", result)
 }

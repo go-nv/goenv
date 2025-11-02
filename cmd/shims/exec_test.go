@@ -11,6 +11,8 @@ import (
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spf13/cobra"
 )
@@ -138,9 +140,7 @@ func TestExecCommand(t *testing.T) {
 			if tt.localVersion != "" {
 				var err error
 				tempDir, err = os.MkdirTemp("", "goenv_exec_test_")
-				if err != nil {
-					t.Fatalf("Failed to create temp directory: %v", err)
-				}
+				require.NoError(t, err, "Failed to create temp directory")
 				defer os.RemoveAll(tempDir)
 
 				localFile := filepath.Join(tempDir, ".go-version")
@@ -205,16 +205,11 @@ func TestExecCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+			assert.NoError(t, err)
 
 			if tt.expectedOutput != "" {
 				got := strings.TrimSpace(output.String())
-				if got != tt.expectedOutput {
-					t.Errorf("Expected output '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got)
 			}
 		})
 	}
@@ -238,14 +233,10 @@ func TestExecUsage(t *testing.T) {
 	cmd.SetErr(output)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Help command failed: %v", err)
-	}
+	assert.NoError(t, err, "Help command failed")
 
 	helpOutput := output.String()
-	if !strings.Contains(helpOutput, "Usage:") {
-		t.Error("Help output should contain usage information")
-	}
+	assert.Contains(t, helpOutput, "Usage:", "Help output should contain usage information")
 }
 
 func TestExecEnvironmentVariables(t *testing.T) {
@@ -285,17 +276,13 @@ func TestExecEnvironmentVariables(t *testing.T) {
 	cmd.SetArgs([]string{"env-test"})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Exec command failed: %v", err)
-	}
+	assert.NoError(t, err, "Exec command failed")
 
 	got := output.String()
 
 	// Should set GOROOT to the version directory
 	expectedGoroot := filepath.Join(testRoot, "versions", version)
-	if !strings.Contains(got, "GOROOT="+expectedGoroot) {
-		t.Errorf("Expected GOROOT to be set to '%s', output: %s", expectedGoroot, got)
-	}
+	assert.Contains(t, got, "GOROOT="+expectedGoroot)
 }
 
 func TestExecWithShims(t *testing.T) {
@@ -313,9 +300,7 @@ func TestExecWithShims(t *testing.T) {
 	// Create shims directory and shim
 	shimsDir := filepath.Join(testRoot, "shims")
 	err := utils.EnsureDirWithContext(shimsDir, "create test directory")
-	if err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
+	require.NoError(t, err, "Failed to create shims directory")
 
 	shimPath := filepath.Join(shimsDir, "go")
 	var shimContent string
@@ -340,12 +325,8 @@ func TestExecWithShims(t *testing.T) {
 	cmd.SetArgs([]string{"go", "version"})
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Errorf("Exec command failed: %v", err)
-	}
+	assert.NoError(t, err, "Exec command failed")
 
 	got := strings.TrimSpace(output.String())
-	if !strings.Contains(got, "go1.21.5") {
-		t.Errorf("Expected output to contain version info, got: %s", got)
-	}
+	assert.Contains(t, got, "go1.21.5", "Expected output to contain version info %v", got)
 }

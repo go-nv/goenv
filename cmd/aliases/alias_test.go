@@ -11,6 +11,7 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAliasCommand(t *testing.T) {
@@ -144,33 +145,22 @@ func TestAliasCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+			assert.NoError(t, err)
 
 			if tt.expectedOutput != "" {
 				got := strings.TrimSpace(stdout.String())
-				if got != tt.expectedOutput {
-					t.Errorf("Expected output '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got)
 			}
 
 			// For set operations, verify the file was written correctly
 			if len(tt.args) == 2 && tt.expectedError == "" {
 				aliasesFile := filepath.Join(tmpDir, "aliases")
 				content, err := os.ReadFile(aliasesFile)
-				if err != nil {
-					t.Errorf("Failed to read aliases file: %v", err)
-					return
-				}
+				assert.NoError(t, err, "Failed to read aliases file")
 
 				// Check that alias was written
 				expectedLine := tt.args[0] + "=" + tt.args[1]
-				if !strings.Contains(string(content), expectedLine) {
-					t.Errorf("Expected aliases file to contain '%s', got:\n%s",
-						expectedLine, string(content))
-				}
+				assert.Contains(t, string(content), expectedLine)
 			}
 		})
 	}
@@ -259,33 +249,22 @@ func TestUnaliasCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+			assert.NoError(t, err)
 
 			// Verify the alias was removed from the file
 			if len(tt.args) == 1 && tt.expectedError == "" {
 				aliasesFile := filepath.Join(tmpDir, "aliases")
 				content, err := os.ReadFile(aliasesFile)
-				if err != nil {
-					t.Errorf("Failed to read aliases file: %v", err)
-					return
-				}
+				assert.NoError(t, err, "Failed to read aliases file")
 
 				// Check that alias was removed
 				removedAlias := tt.args[0]
-				if strings.Contains(string(content), removedAlias+"=") {
-					t.Errorf("Expected alias '%s' to be removed, but it still exists in:\n%s",
-						removedAlias, string(content))
-				}
+				assert.NotContains(t, string(content), removedAlias+"=")
 
 				// Check that other aliases are still present
 				for name := range tt.setupAliases {
 					if name != removedAlias {
-						if !strings.Contains(string(content), name+"=") {
-							t.Errorf("Expected alias '%s' to still exist", name)
-						}
+						assert.Contains(t, string(content), name+"=")
 					}
 				}
 			}
@@ -347,23 +326,15 @@ func TestAliasResolution(t *testing.T) {
 				cmd.SetArgs([]string{tt.aliasName})
 
 				err := cmd.Execute()
-				if err != nil {
-					t.Errorf("Failed to set global with alias: %v", err)
-					return
-				}
+				assert.NoError(t, err, "Failed to set global with alias")
 
 				// Verify the resolved version was written
 				globalFile := filepath.Join(tmpDir, "version")
 				content, err := os.ReadFile(globalFile)
-				if err != nil {
-					t.Errorf("Failed to read global version file: %v", err)
-					return
-				}
+				assert.NoError(t, err, "Failed to read global version file")
 
 				got := strings.TrimSpace(string(content))
-				if got != tt.expectedOutput {
-					t.Errorf("Expected global version to be '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got)
 			}
 
 			if tt.useLocal {
@@ -380,10 +351,7 @@ func TestAliasResolution(t *testing.T) {
 				cmd.SetArgs([]string{tt.aliasName})
 
 				err := cmd.Execute()
-				if err != nil {
-					t.Errorf("Failed to set local with alias: %v", err)
-					return
-				}
+				assert.NoError(t, err, "Failed to set local with alias")
 
 				// Verify the resolved version was written
 				// setupTestEnv changes to testHome directory, so local file should be there
@@ -391,15 +359,10 @@ func TestAliasResolution(t *testing.T) {
 				localFile := filepath.Join(cwd, ".go-version")
 
 				content, err := os.ReadFile(localFile)
-				if err != nil {
-					t.Errorf("Failed to read local version file: %v", err)
-					return
-				}
+				assert.NoError(t, err, "Failed to read local version file")
 
 				got := strings.TrimSpace(string(content))
-				if got != tt.expectedOutput {
-					t.Errorf("Expected local version to be '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got)
 			}
 		})
 	}

@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInstallCommand_FlagValidation(t *testing.T) {
@@ -93,9 +95,7 @@ func TestInstallHelp(t *testing.T) {
 
 	// Get help text
 	err := cmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 
@@ -114,9 +114,7 @@ func TestInstallHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q", expected)
-		}
+		assert.Contains(t, output, expected, "Help output missing %v", expected)
 	}
 }
 
@@ -143,9 +141,7 @@ func TestInstallCommand_SkipExisting(t *testing.T) {
 	err := runInstall(installCmd, []string{"1.21.0"})
 
 	// Should not error when skipping
-	if err != nil {
-		t.Errorf("Unexpected error with skip-existing: %v", err)
-	}
+	assert.NoError(t, err, "Unexpected error with skip-existing")
 
 	// Reset flags
 	installFlags.skipExisting = false

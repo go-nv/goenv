@@ -3,6 +3,8 @@ package cache
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseByteSize(t *testing.T) {
@@ -30,18 +32,11 @@ func TestParseByteSize(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			result, err := ParseByteSize(tt.input)
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("ParseByteSize(%q) expected error, got nil", tt.input)
-				}
+				assert.Error(t, err, "ParseByteSize() expected error")
 				return
 			}
-			if err != nil {
-				t.Errorf("ParseByteSize(%q) unexpected error: %v", tt.input, err)
-				return
-			}
-			if result != tt.expected {
-				t.Errorf("ParseByteSize(%q) = %d, want %d", tt.input, result, tt.expected)
-			}
+			assert.NoError(t, err, "ParseByteSize() unexpected error")
+			assert.Equal(t, tt.expected, result, "ParseByteSize() = %v", tt.input)
 		})
 	}
 }
@@ -68,18 +63,11 @@ func TestParseDuration(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			result, err := ParseDuration(tt.input)
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("ParseDuration(%q) expected error, got nil", tt.input)
-				}
+				assert.Error(t, err, "ParseDuration() expected error")
 				return
 			}
-			if err != nil {
-				t.Errorf("ParseDuration(%q) unexpected error: %v", tt.input, err)
-				return
-			}
-			if result != tt.expected {
-				t.Errorf("ParseDuration(%q) = %v, want %v", tt.input, result, tt.expected)
-			}
+			assert.NoError(t, err, "ParseDuration() unexpected error")
+			assert.Equal(t, tt.expected, result, "ParseDuration() = %v", tt.input)
 		})
 	}
 }
@@ -140,26 +128,15 @@ func TestParseABIFromCacheName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			goos, goarch, abi := ParseABIFromCacheName(tt.cacheName)
 
-			if goos != tt.expectedGOOS {
-				t.Errorf("GOOS = %q, want %q", goos, tt.expectedGOOS)
-			}
-			if goarch != tt.expectedGOARCH {
-				t.Errorf("GOARCH = %q, want %q", goarch, tt.expectedGOARCH)
-			}
+			assert.Equal(t, tt.expectedGOOS, goos, "GOOS =")
+			assert.Equal(t, tt.expectedGOARCH, goarch, "GOARCH =")
 
 			if tt.expectedABI == nil {
-				if abi != nil {
-					t.Errorf("ABI = %v, want nil", abi)
-				}
+				assert.Nil(t, abi, "ABI =")
 			} else {
-				if abi == nil {
-					t.Errorf("ABI = nil, want %v", tt.expectedABI)
-					return
-				}
+				assert.NotNil(t, abi, "ABI = nil")
 				for k, v := range tt.expectedABI {
-					if abi[k] != v {
-						t.Errorf("ABI[%q] = %q, want %q", k, abi[k], v)
-					}
+					assert.Equal(t, v, abi[k], "ABI[] =")
 				}
 			}
 		})
@@ -181,9 +158,7 @@ func TestFormatNumber(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			result := FormatNumber(tt.input)
-			if result != tt.expected {
-				t.Errorf("FormatNumber(%d) = %q, want %q", tt.input, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "FormatNumber() = %v", tt.input)
 		})
 	}
 }
@@ -203,9 +178,7 @@ func TestFormatFileCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			result := FormatFileCount(tt.n, tt.approximate)
-			if result != tt.expected {
-				t.Errorf("FormatFileCount(%d, %v) = %q, want %q", tt.n, tt.approximate, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "FormatFileCount(, ) = %v %v", tt.n, tt.approximate)
 		})
 	}
 }
@@ -226,9 +199,7 @@ func TestFormatBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			result := FormatBytes(tt.input)
-			if result != tt.expected {
-				t.Errorf("FormatBytes(%d) = %q, want %q", tt.input, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "FormatBytes() = %v", tt.input)
 		})
 	}
 }

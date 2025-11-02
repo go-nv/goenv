@@ -4,21 +4,20 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetEnvAction_Name(t *testing.T) {
 	action := &SetEnvAction{}
-	if action.Name() != ActionSetEnv {
-		t.Errorf("Name() = %v, want %v", action.Name(), ActionSetEnv)
-	}
+	assert.Equal(t, ActionSetEnv, action.Name(), "Name() =")
 }
 
 func TestSetEnvAction_Description(t *testing.T) {
 	action := &SetEnvAction{}
 	desc := action.Description()
-	if desc == "" {
-		t.Error("Description() returned empty string")
-	}
+	assert.NotEmpty(t, desc, "Description() returned empty string")
 }
 
 func TestSetEnvAction_Validate(t *testing.T) {
@@ -193,15 +192,14 @@ func TestSetEnvAction_Validate(t *testing.T) {
 					t.Errorf("Validate() error = %q, want error containing %q", err.Error(), tt.errMsg)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Validate() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Validate() unexpected error")
 			}
 		})
 	}
 }
 
 func TestSetEnvAction_ExecuteHookScope(t *testing.T) {
+	var err error
 	action := &SetEnvAction{}
 
 	ctx := &HookContext{
@@ -219,25 +217,19 @@ func TestSetEnvAction_ExecuteHookScope(t *testing.T) {
 		"scope": "hook",
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 
 	// Verify variables were added to context
-	if ctx.Variables["NEW_VAR"] != "new_value" {
-		t.Errorf("NEW_VAR not set in context, got %q", ctx.Variables["NEW_VAR"])
-	}
-	if ctx.Variables["ANOTHER_VAR"] != "another_value" {
-		t.Errorf("ANOTHER_VAR not set in context, got %q", ctx.Variables["ANOTHER_VAR"])
-	}
+	assert.Equal(t, "new_value", ctx.Variables["NEW_VAR"], "NEW_VAR not set in context")
+	assert.Equal(t, "another_value", ctx.Variables["ANOTHER_VAR"], "ANOTHER_VAR not set in context")
 
 	// Verify existing variable is still there
-	if ctx.Variables["existing"] != "value" {
-		t.Error("Existing variable was modified")
-	}
+	assert.Equal(t, "value", ctx.Variables["existing"], "Existing variable was modified")
 }
 
 func TestSetEnvAction_ExecuteProcessScope(t *testing.T) {
+	var err error
 	action := &SetEnvAction{}
 
 	// Use unique variable names to avoid conflicts
@@ -260,9 +252,8 @@ func TestSetEnvAction_ExecuteProcessScope(t *testing.T) {
 		"scope": "process",
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 
 	// Verify variable was set in process environment
 	if got := os.Getenv(varName); got != varValue {
@@ -271,6 +262,7 @@ func TestSetEnvAction_ExecuteProcessScope(t *testing.T) {
 }
 
 func TestSetEnvAction_ExecuteDefaultScope(t *testing.T) {
+	var err error
 	action := &SetEnvAction{}
 
 	ctx := &HookContext{
@@ -285,17 +277,15 @@ func TestSetEnvAction_ExecuteDefaultScope(t *testing.T) {
 		// No scope specified - should default to "hook"
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 
 	// Verify variable was added to context (default scope is hook)
-	if ctx.Variables["MY_VAR"] != "value" {
-		t.Errorf("MY_VAR not set in context with default scope")
-	}
+	assert.Equal(t, "value", ctx.Variables["MY_VAR"], "MY_VAR not set in context with default scope")
 }
 
 func TestSetEnvAction_ExecuteInterpolation(t *testing.T) {
+	var err error
 	action := &SetEnvAction{}
 
 	ctx := &HookContext{
@@ -314,9 +304,8 @@ func TestSetEnvAction_ExecuteInterpolation(t *testing.T) {
 		"scope": "hook",
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 
 	// Verify interpolation worked
 	if got := ctx.Variables["INSTALL_PATH"]; got != "/usr/local/go/1.21.0" {
@@ -432,9 +421,7 @@ func TestValidateEnvVarName(t *testing.T) {
 					t.Errorf("validateEnvVarName() error = %q, want error containing %q", err.Error(), tt.errMsg)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("validateEnvVarName() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "validateEnvVarName() unexpected error")
 			}
 		})
 	}

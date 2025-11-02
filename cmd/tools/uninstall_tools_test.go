@@ -2,7 +2,6 @@ package tools
 
 import (
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -12,9 +11,12 @@ import (
 	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFindToolBinaries(t *testing.T) {
+	var err error
 	tests := []struct {
 		name          string
 		toolName      string
@@ -64,9 +66,8 @@ func TestFindToolBinaries(t *testing.T) {
 			// Create temp directory
 			tmpDir := t.TempDir()
 			binPath := filepath.Join(tmpDir, "bin")
-			if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			err = utils.EnsureDirWithContext(binPath, "create test directory")
+			require.NoError(t, err)
 
 			// Create test files
 			for _, file := range tt.files {
@@ -78,9 +79,7 @@ func TestFindToolBinaries(t *testing.T) {
 			binaries := findToolBinaries(binPath, tt.toolName)
 
 			// Check count
-			if len(binaries) != tt.expectedCount {
-				t.Errorf("unexpected number of binaries found: expected length %v, got %v", tt.expectedCount, len(binaries))
-			}
+			assert.Len(t, binaries, tt.expectedCount, "unexpected number of binaries found: expected length")
 
 			// Check expected files are present
 			foundNames := make(map[string]bool)
@@ -89,9 +88,7 @@ func TestFindToolBinaries(t *testing.T) {
 			}
 
 			for _, expected := range tt.expectedFiles {
-				if !foundNames[expected] {
-					t.Errorf("expected file %s not found", expected)
-				}
+				assert.True(t, foundNames[expected], "expected file not found")
 			}
 		})
 	}
@@ -100,9 +97,7 @@ func TestFindToolBinaries(t *testing.T) {
 func TestFindToolBinaries_NonExistentDir(t *testing.T) {
 	binPath := "/nonexistent/path/bin"
 	binaries := findToolBinaries(binPath, "gopls")
-	if len(binaries) != 0 {
-		t.Errorf("should return empty slice for non-existent directory: expected length %v, got %v", 0, len(binaries))
-	}
+	assert.Len(t, binaries, 0, "should return empty slice for non-existent directory: expected length")
 }
 
 func TestFindCurrentVersionToolTargets(t *testing.T) {
@@ -137,37 +132,21 @@ func TestFindCurrentVersionToolTargets(t *testing.T) {
 	}
 
 	// Check gopls
-	if !reflect.DeepEqual("gopls", targets[0].ToolName) {
-		t.Errorf("expected %v, got %v", "gopls", targets[0].ToolName)
-	}
-	if !reflect.DeepEqual(version, targets[0].GoVersion) {
-		t.Errorf("expected %v, got %v", version, targets[0].GoVersion)
-	}
-	if !(targets[0].Exists) {
-		t.Errorf("expected true")
-	}
-	if len(targets[0].BinaryFiles) != 1 {
-		t.Errorf("expected length %v, got %v", 1, len(targets[0].BinaryFiles))
-	}
+	assert.Equal(t, "gopls", targets[0].ToolName)
+	assert.Equal(t, version, targets[0].GoVersion)
+	assert.True(t, (targets[0].Exists))
+	assert.Len(t, targets[0].BinaryFiles, 1)
 
 	// Check staticcheck
-	if !reflect.DeepEqual("staticcheck", targets[1].ToolName) {
-		t.Errorf("expected %v, got %v", "staticcheck", targets[1].ToolName)
-	}
-	if !(targets[1].Exists) {
-		t.Errorf("expected true")
-	}
+	assert.Equal(t, "staticcheck", targets[1].ToolName)
+	assert.True(t, (targets[1].Exists))
 
 	// Check nonexistent
-	if !reflect.DeepEqual("nonexistent", targets[2].ToolName) {
-		t.Errorf("expected %v, got %v", "nonexistent", targets[2].ToolName)
-	}
+	assert.Equal(t, "nonexistent", targets[2].ToolName)
 	if targets[2].Exists {
 		t.Errorf("expected false")
 	}
-	if len(targets[2].BinaryFiles) != 0 {
-		t.Errorf("expected length %v, got %v", 0, len(targets[2].BinaryFiles))
-	}
+	assert.Len(t, targets[2].BinaryFiles, 0)
 }
 
 func TestFindAllVersionToolTargets(t *testing.T) {
@@ -196,36 +175,25 @@ func TestFindAllVersionToolTargets(t *testing.T) {
 
 	// Find gopls across all versions
 	goplsTargets := findAllVersionToolTargets(cfg, []string{"gopls"})
-	if len(goplsTargets) != 3 {
-		t.Errorf("gopls should be found in all 3 versions: expected length %v, got %v", 3, len(goplsTargets))
-	}
+	assert.Len(t, goplsTargets, 3, "gopls should be found in all 3 versions: expected length")
 
 	for _, target := range goplsTargets {
-		if !reflect.DeepEqual("gopls", target.ToolName) {
-			t.Errorf("expected %v, got %v", "gopls", target.ToolName)
-		}
-		if !(target.Exists) {
-			t.Errorf("expected true")
-		}
-		if !utils.SliceContains(versions, target.GoVersion) {
-			t.Errorf("expected slice to contain %v", target.GoVersion)
-		}
+		assert.Equal(t, "gopls", target.ToolName)
+		assert.True(t, (target.Exists))
+		assert.True(t, utils.SliceContains(versions, target.GoVersion), "expected slice to contain")
 	}
 
 	// Find staticcheck (only in 2 versions)
 	staticTargets := findAllVersionToolTargets(cfg, []string{"staticcheck"})
-	if len(staticTargets) != 2 {
-		t.Errorf("staticcheck should be found in 2 versions: expected length %v, got %v", 2, len(staticTargets))
-	}
+	assert.Len(t, staticTargets, 2, "staticcheck should be found in 2 versions: expected length")
 
 	// Find nonexistent tool
 	noneTargets := findAllVersionToolTargets(cfg, []string{"nonexistent"})
-	if len(noneTargets) != 0 {
-		t.Errorf("nonexistent tool should return no targets: expected length %v, got %v", 0, len(noneTargets))
-	}
+	assert.Len(t, noneTargets, 0, "nonexistent tool should return no targets: expected length")
 }
 
 func TestFindGlobalToolTargets(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -233,9 +201,8 @@ func TestFindGlobalToolTargets(t *testing.T) {
 
 	globalGopath := filepath.Join(tmpDir, "global-go")
 	binPath := filepath.Join(globalGopath, "bin")
-	if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err = utils.EnsureDirWithContext(binPath, "create test directory")
+	require.NoError(t, err)
 
 	// Create test tool
 	goplsPath := filepath.Join(binPath, "gopls")
@@ -252,20 +219,12 @@ func TestFindGlobalToolTargets(t *testing.T) {
 	}
 
 	// Check gopls
-	if !reflect.DeepEqual("gopls", targets[0].ToolName) {
-		t.Errorf("expected %v, got %v", "gopls", targets[0].ToolName)
-	}
-	if !reflect.DeepEqual("", targets[0].GoVersion) {
-		t.Errorf("expected %v, got %v", "", targets[0].GoVersion)
-	} // Empty for global
-	if !(targets[0].Exists) {
-		t.Errorf("expected true")
-	}
+	assert.Equal(t, "gopls", targets[0].ToolName)
+	assert.Equal(t, "", targets[0].GoVersion) // Empty for global
+	assert.True(t, (targets[0].Exists))
 
 	// Check nonexistent
-	if !reflect.DeepEqual("nonexistent", targets[1].ToolName) {
-		t.Errorf("expected %v, got %v", "nonexistent", targets[1].ToolName)
-	}
+	assert.Equal(t, "nonexistent", targets[1].ToolName)
 	if targets[1].Exists {
 		t.Errorf("expected false")
 	}
@@ -292,9 +251,7 @@ func TestRunUninstall_StripVersionSuffix(t *testing.T) {
 	if idx := strings.Index(toolName, "@"); idx != -1 {
 		toolName = toolName[:idx]
 	}
-	if !reflect.DeepEqual("gopls", toolName) {
-		t.Errorf("expected %v, got %v", "gopls", toolName)
-	}
+	assert.Equal(t, "gopls", toolName)
 
 	// Now verify findCurrentVersionToolTargets works with the clean name
 	mgr := manager.NewManager(cfg)
@@ -302,12 +259,8 @@ func TestRunUninstall_StripVersionSuffix(t *testing.T) {
 	if len(targets) != 1 {
 		t.Fatalf("expected length %v, got %v", 1, len(targets))
 	}
-	if !reflect.DeepEqual("gopls", targets[0].ToolName) {
-		t.Errorf("expected %v, got %v", "gopls", targets[0].ToolName)
-	}
-	if !(targets[0].Exists) {
-		t.Errorf("expected true")
-	}
+	assert.Equal(t, "gopls", targets[0].ToolName)
+	assert.True(t, (targets[0].Exists))
 }
 
 func TestExecuteUninstalls(t *testing.T) {
@@ -342,9 +295,7 @@ func TestExecuteUninstalls(t *testing.T) {
 	uninstallForce = true
 
 	err := executeUninstalls(toolsMgr, targets)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	// Verify files are removed
 	if utils.PathExists(gopls) {
@@ -394,9 +345,7 @@ func TestExecuteUninstalls_MultipleTools(t *testing.T) {
 	uninstallForce = true
 
 	err := executeUninstalls(toolsMgr, targets)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	// Verify both removed
 	if utils.PathExists(gopls) {
@@ -445,12 +394,8 @@ func TestExecuteUninstalls_PartialFailure(t *testing.T) {
 	uninstallForce = true
 
 	err := executeUninstalls(toolsMgr, targets)
-	if err == nil {
-		t.Errorf("should return error when some tools fail")
-	}
-	if err != nil && !strings.Contains(err.Error(), "failed to uninstall") {
-		t.Errorf("expected error to contain 'failed to uninstall'")
-	}
+	assert.Error(t, err, "should return error when some tools fail")
+	assert.False(t, err != nil && !strings.Contains(err.Error(), "failed to uninstall"), "expected error to contain 'failed to uninstall'")
 
 	// First tool should still be removed
 	if utils.PathExists(gopls) {
@@ -459,6 +404,7 @@ func TestExecuteUninstalls_PartialFailure(t *testing.T) {
 }
 
 func TestShowUninstallPlan(t *testing.T) {
+	var err error
 	targets := []toolUninstallTarget{
 		{
 			ToolName:    "gopls",
@@ -478,17 +424,13 @@ func TestShowUninstallPlan(t *testing.T) {
 
 	// Test without verbose
 	uninstallVerbose = false
-	err := showUninstallPlan(targets)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	err = showUninstallPlan(targets)
+	assert.NoError(t, err)
 
 	// Test with verbose
 	uninstallVerbose = true
 	err = showUninstallPlan(targets)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestShowUninstallPlan_Global(t *testing.T) {
@@ -504,12 +446,11 @@ func TestShowUninstallPlan_Global(t *testing.T) {
 
 	uninstallVerbose = false
 	err := showUninstallPlan(targets)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestRunUninstall_Integration(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -537,10 +478,8 @@ func TestRunUninstall_Integration(t *testing.T) {
 	uninstallAllVersions = false
 	uninstallGlobal = false
 
-	err := runUninstall(cfg, []string{"gopls"})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	err = runUninstall(cfg, []string{"gopls"})
+	assert.NoError(t, err)
 
 	// Files should still exist after dry-run
 	if utils.FileNotExists(gopls) {
@@ -550,9 +489,7 @@ func TestRunUninstall_Integration(t *testing.T) {
 	// Run actual uninstall
 	uninstallDryRun = false
 	err = runUninstall(cfg, []string{"gopls"})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	// gopls should be removed
 	if utils.PathExists(gopls) {
@@ -580,9 +517,7 @@ func TestRunUninstall_NoToolsFound(t *testing.T) {
 	err := runUninstall(cfg, []string{"nonexistent"})
 
 	// Should not return error, just print message
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestParseToolNames(t *testing.T) {
@@ -602,13 +537,7 @@ func TestParseToolNames(t *testing.T) {
 		cleanNames = append(cleanNames, name)
 	}
 
-	if !reflect.DeepEqual("gopls", cleanNames[0]) {
-		t.Errorf("expected %v, got %v", "gopls", cleanNames[0])
-	}
-	if !reflect.DeepEqual("staticcheck", cleanNames[1]) {
-		t.Errorf("expected %v, got %v", "staticcheck", cleanNames[1])
-	}
-	if !reflect.DeepEqual("golangci-lint", cleanNames[2]) {
-		t.Errorf("expected %v, got %v", "golangci-lint", cleanNames[2])
-	}
+	assert.Equal(t, "gopls", cleanNames[0])
+	assert.Equal(t, "staticcheck", cleanNames[1])
+	assert.Equal(t, "golangci-lint", cleanNames[2])
 }

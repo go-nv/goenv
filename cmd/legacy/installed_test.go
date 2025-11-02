@@ -9,6 +9,7 @@ import (
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/spf13/cobra"
 )
@@ -126,24 +127,16 @@ func TestInstalledCommand(t *testing.T) {
 
 			// Check error expectations
 			if tt.expectErrorCode {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				}
-				if tt.expectedError != "" && !strings.Contains(err.Error(), tt.expectedError) {
-					t.Errorf("Expected error to contain %q, got %q", tt.expectedError, err.Error())
-				}
+				assert.Error(t, err, "Expected error but got none")
+				assert.False(t, tt.expectedError != "" && !strings.Contains(err.Error(), tt.expectedError), "Expected error to contain")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				assert.NoError(t, err)
 			}
 
 			// Check output
 			got := strings.TrimSpace(output.String())
 			if tt.expectedOutput != "" {
-				if got != tt.expectedOutput {
-					t.Errorf("Expected output %q, got %q", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got, "Expected output")
 			}
 		})
 	}
@@ -174,16 +167,12 @@ func TestInstalledCompletion(t *testing.T) {
 	cmd.SetArgs([]string{})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	got := output.String()
 	expectedLines := []string{"latest", "system", "1.10.9", "1.9.10"}
 
 	for _, expected := range expectedLines {
-		if !strings.Contains(got, expected) {
-			t.Errorf("Expected output to contain %q, got %q", expected, got)
-		}
+		assert.Contains(t, got, expected, "Expected output to contain %v %v", expected, got)
 	}
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShimsCommand(t *testing.T) {
@@ -85,9 +87,7 @@ func TestShimsCommand(t *testing.T) {
 			cmd.SetArgs([]string{})
 
 			err := cmd.Execute()
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
+			assert.NoError(t, err)
 
 			// Parse output
 			got := strings.TrimSpace(output.String())
@@ -98,9 +98,7 @@ func TestShimsCommand(t *testing.T) {
 
 			// Verify output
 			if len(tt.expectedOutput) == 0 {
-				if got != "" {
-					t.Errorf("Expected empty output, got %q", got)
-				}
+				assert.Empty(t, got, "Expected empty output")
 			} else {
 				// Sort both for comparison (they should already be sorted)
 				sort.Strings(gotLines)
@@ -108,9 +106,7 @@ func TestShimsCommand(t *testing.T) {
 				copy(expectedSorted, tt.expectedOutput)
 				sort.Strings(expectedSorted)
 
-				if len(gotLines) != len(expectedSorted) {
-					t.Errorf("Expected %d lines, got %d lines", len(expectedSorted), len(gotLines))
-				}
+				assert.Len(t, gotLines, len(expectedSorted), "Expected lines")
 
 				for i, expected := range expectedSorted {
 					if i >= len(gotLines) {
@@ -121,13 +117,9 @@ func TestShimsCommand(t *testing.T) {
 						// Normalize path separators for cross-platform comparison
 						normalizedGot := filepath.ToSlash(gotLines[i])
 						normalizedExpected := filepath.ToSlash(expected)
-						if !strings.HasSuffix(normalizedGot, normalizedExpected) {
-							t.Errorf("Line %d: expected to end with %q, got %q", i, normalizedExpected, normalizedGot)
-						}
+						assert.True(t, strings.HasSuffix(normalizedGot, normalizedExpected), "Line : expected to end with")
 					} else {
-						if gotLines[i] != expected {
-							t.Errorf("Line %d: expected %q, got %q", i, expected, gotLines[i])
-						}
+						assert.Equal(t, expected, gotLines[i], "Line : expected")
 					}
 				}
 			}
@@ -157,26 +149,22 @@ func TestShimsCompletion(t *testing.T) {
 	cmd.SetArgs([]string{})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	assert.NoError(t, err)
 
 	got := strings.TrimSpace(output.String())
-	if got != "--short" {
-		t.Errorf("Expected completion output to be '--short', got %q", got)
-	}
+	assert.Equal(t, "--short", got, "Expected completion output to be '--short'")
 }
 
 func TestFindInSystemPath(t *testing.T) {
+	var err error
 	// Create a temporary directory structure for testing
 	tmpDir := t.TempDir()
 
 	// Create GOENV_ROOT/shims directory
 	goenvRoot := filepath.Join(tmpDir, "goenv")
 	shimsDir := filepath.Join(goenvRoot, "shims")
-	if err := utils.EnsureDirWithContext(shimsDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(shimsDir, "create test directory")
+	require.NoError(t, err)
 
 	// Create other directories with similar names (edge cases)
 	similarDir := filepath.Join(tmpDir, "goenv_shims_backup") // Contains "shims" substring
@@ -184,9 +172,8 @@ func TestFindInSystemPath(t *testing.T) {
 	nestedShimsDir := filepath.Join(shimsDir, "subdir")       // Subdirectory of shims
 
 	for _, dir := range []string{similarDir, otherDir, nestedShimsDir} {
-		if err := utils.EnsureDirWithContext(dir, "create test directory"); err != nil {
-			t.Fatal(err)
-		}
+		err = utils.EnsureDirWithContext(dir, "create test directory")
+		require.NoError(t, err)
 	}
 
 	// Create test executables in different directories
@@ -271,14 +258,10 @@ func TestFindInSystemPath(t *testing.T) {
 					// Normalize both paths for comparison
 					expectedAbs, _ := filepath.Abs(expectedPrefix)
 					foundAbs, _ := filepath.Abs(foundDir)
-					if expectedAbs != foundAbs {
-						t.Errorf("Expected to find in %s, but found in %s (full path: %s)", expectedAbs, foundAbs, foundPath)
-					}
+					assert.Equal(t, expectedAbs, foundAbs, "Expected to find in , but found in (full path: ) %v", foundPath)
 				}
 			} else {
-				if err == nil {
-					t.Errorf("Expected error (not found), but found: %s", foundPath)
-				}
+				assert.Error(t, err, "Expected error (not found), but found %v", foundPath)
 			}
 		})
 	}

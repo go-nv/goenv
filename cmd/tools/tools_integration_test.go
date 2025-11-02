@@ -9,11 +9,14 @@ import (
 	"github.com/go-nv/goenv/internal/manager"
 	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestMultiVersionToolManagement is a comprehensive integration test
 // that verifies tool management across multiple Go versions
 func TestMultiVersionToolManagement(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -32,9 +35,8 @@ func TestMultiVersionToolManagement(t *testing.T) {
 		// Create GOPATH/bin directory
 		versionPath := filepath.Join(tmpDir, "versions", v)
 		gopath := filepath.Join(versionPath, "gopath", "bin")
-		if err := utils.EnsureDirWithContext(gopath, "create test directory"); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		err = utils.EnsureDirWithContext(gopath, "create test directory")
+		require.NoError(t, err)
 	}
 
 	// Install different tools in different versions
@@ -54,22 +56,14 @@ func TestMultiVersionToolManagement(t *testing.T) {
 	// Test 1: Verify ListInstalledVersions
 	mgr := manager.NewManager(cfg)
 	installedVersions, err := mgr.ListInstalledVersions()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(installedVersions) != 3 {
-		t.Errorf("expected length %v, got %v", 3, len(installedVersions))
-	}
-	if !utils.SlicesEqual(versions, installedVersions) {
-		t.Errorf("slices not equal: expected %v, got %v", versions, installedVersions)
-	}
+	require.NoError(t, err)
+	assert.Len(t, installedVersions, 3)
+	assert.True(t, utils.SlicesEqual(versions, installedVersions), "slices not equal: expected")
 
 	// Test 2: Verify tools for each version
 	for version, expectedTools := range toolInstallations {
 		toolList, err := toolspkg.ListForVersion(cfg, version)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 
 		// Extract tool names
 		var toolNames []string
@@ -77,32 +71,20 @@ func TestMultiVersionToolManagement(t *testing.T) {
 			toolNames = append(toolNames, tool.Name)
 		}
 
-		if !utils.SlicesEqual(expectedTools, toolNames) {
-			t.Errorf("Tools for version %s don't match: expected %v, got %v", version, expectedTools, toolNames)
-		}
+		assert.True(t, utils.SlicesEqual(expectedTools, toolNames), "Tools for version don't match: expected")
 	}
 
 	// Test 3: Collect all unique tools
 	allTools := make(map[string]bool)
 	for _, version := range versions {
 		toolList, err := toolspkg.ListForVersion(cfg, version)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 		for _, tool := range toolList {
 			allTools[tool.Name] = true
 		}
 	}
-	if len(allTools) != 3 {
-		t.Errorf("Should have 3 unique tools: expected length %v, got %v", 3, len(allTools))
-	}
-	if !allTools["gopls"] {
-		t.Errorf("expected gopls in all tools")
-	}
-	if !allTools["staticcheck"] {
-		t.Errorf("expected staticcheck in all tools")
-	}
-	if !allTools["gofmt"] {
-		t.Errorf("expected gofmt in all tools")
-	}
+	assert.Len(t, allTools, 3, "Should have 3 unique tools: expected length")
+	assert.True(t, allTools["gopls"], "expected gopls in all tools")
+	assert.True(t, allTools["staticcheck"], "expected staticcheck in all tools")
+	assert.True(t, allTools["gofmt"], "expected gofmt in all tools")
 }

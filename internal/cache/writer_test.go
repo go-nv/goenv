@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewAtomicWriter(t *testing.T) {
@@ -14,9 +16,7 @@ func TestNewAtomicWriter(t *testing.T) {
 	t.Run("creates cache directory", func(t *testing.T) {
 		cacheDir := filepath.Join(tmpDir, "cache")
 		writer, err := NewAtomicWriter(cacheDir)
-		if err != nil {
-			t.Fatalf("Failed to create atomic writer: %v", err)
-		}
+		require.NoError(t, err, "Failed to create atomic writer")
 		defer writer.Close()
 
 		// Verify cache directory was created
@@ -40,9 +40,7 @@ func TestNewAtomicWriter(t *testing.T) {
 	t.Run("prevents concurrent access", func(t *testing.T) {
 		cacheDir := filepath.Join(tmpDir, "cache-concurrent")
 		writer1, err := NewAtomicWriter(cacheDir)
-		if err != nil {
-			t.Fatalf("Failed to create first writer: %v", err)
-		}
+		require.NoError(t, err, "Failed to create first writer")
 		defer writer1.Close()
 
 		// Try to create second writer - should fail because of lock
@@ -52,9 +50,7 @@ func TestNewAtomicWriter(t *testing.T) {
 			t.Fatal("Expected error when creating second writer, got nil")
 		}
 
-		if !isLockError(err) {
-			t.Errorf("Expected lock error, got: %v", err)
-		}
+		assert.True(t, isLockError(err), "Expected lock error")
 	})
 }
 
@@ -63,9 +59,7 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 
 	cacheDir := filepath.Join(tmpDir, "cache")
 	writer, err := NewAtomicWriter(cacheDir)
-	if err != nil {
-		t.Fatalf("Failed to create atomic writer: %v", err)
-	}
+	require.NoError(t, err, "Failed to create atomic writer")
 	defer writer.Close()
 
 	t.Run("writes file atomically", func(t *testing.T) {
@@ -73,19 +67,13 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 		data := []byte("test data")
 
 		err := writer.WriteFile(targetPath, data, utils.PermFileDefault)
-		if err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
+		require.NoError(t, err, "Failed to write file")
 
 		// Verify file was written
 		readData, err := os.ReadFile(targetPath)
-		if err != nil {
-			t.Fatalf("Failed to read file: %v", err)
-		}
+		require.NoError(t, err, "Failed to read file")
 
-		if string(readData) != string(data) {
-			t.Errorf("Expected %q, got %q", string(data), string(readData))
-		}
+		assert.Equal(t, string(data), string(readData))
 	})
 
 	t.Run("creates target directory if needed", func(t *testing.T) {
@@ -93,9 +81,7 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 		data := []byte("nested data")
 
 		err := writer.WriteFile(targetPath, data, utils.PermFileDefault)
-		if err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
+		require.NoError(t, err, "Failed to write file")
 
 		// Verify nested directories were created
 		if utils.FileNotExists(filepath.Dir(targetPath)) {
@@ -104,13 +90,9 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 
 		// Verify file was written
 		readData, err := os.ReadFile(targetPath)
-		if err != nil {
-			t.Fatalf("Failed to read file: %v", err)
-		}
+		require.NoError(t, err, "Failed to read file")
 
-		if string(readData) != string(data) {
-			t.Errorf("Expected %q, got %q", string(data), string(readData))
-		}
+		assert.Equal(t, string(data), string(readData))
 	})
 
 	t.Run("overwrites existing file", func(t *testing.T) {
@@ -119,26 +101,18 @@ func TestAtomicWriter_WriteFile(t *testing.T) {
 		// Write initial data
 		initialData := []byte("initial")
 		err := writer.WriteFile(targetPath, initialData, utils.PermFileDefault)
-		if err != nil {
-			t.Fatalf("Failed to write initial file: %v", err)
-		}
+		require.NoError(t, err, "Failed to write initial file")
 
 		// Overwrite with new data
 		newData := []byte("overwritten")
 		err = writer.WriteFile(targetPath, newData, utils.PermFileDefault)
-		if err != nil {
-			t.Fatalf("Failed to overwrite file: %v", err)
-		}
+		require.NoError(t, err, "Failed to overwrite file")
 
 		// Verify new data
 		readData, err := os.ReadFile(targetPath)
-		if err != nil {
-			t.Fatalf("Failed to read file: %v", err)
-		}
+		require.NoError(t, err, "Failed to read file")
 
-		if string(readData) != string(newData) {
-			t.Errorf("Expected %q, got %q", string(newData), string(readData))
-		}
+		assert.Equal(t, string(newData), string(readData))
 	})
 
 	t.Run("handles concurrent writes with unique temp files", func(t *testing.T) {
@@ -179,35 +153,25 @@ func TestAtomicWriter_CreateDirectory(t *testing.T) {
 
 	cacheDir := filepath.Join(tmpDir, "cache")
 	writer, err := NewAtomicWriter(cacheDir)
-	if err != nil {
-		t.Fatalf("Failed to create atomic writer: %v", err)
-	}
+	require.NoError(t, err, "Failed to create atomic writer")
 	defer writer.Close()
 
 	t.Run("creates directory", func(t *testing.T) {
 		dirPath := filepath.Join(cacheDir, "testdir")
 		err := writer.CreateDirectory(dirPath, utils.PermFileExecutable)
-		if err != nil {
-			t.Fatalf("Failed to create directory: %v", err)
-		}
+		require.NoError(t, err, "Failed to create directory")
 
 		// Verify directory was created
-		if !utils.DirExists(dirPath) {
-			t.Fatal("Directory was not created")
-		}
+		require.True(t, utils.DirExists(dirPath), "Directory was not created")
 	})
 
 	t.Run("creates nested directories", func(t *testing.T) {
 		dirPath := filepath.Join(cacheDir, "nested", "sub", "dir")
 		err := writer.CreateDirectory(dirPath, utils.PermFileExecutable)
-		if err != nil {
-			t.Fatalf("Failed to create nested directory: %v", err)
-		}
+		require.NoError(t, err, "Failed to create nested directory")
 
 		// Verify directory was created
-		if !utils.DirExists(dirPath) {
-			t.Fatal("Nested directory was not created")
-		}
+		require.True(t, utils.DirExists(dirPath), "Nested directory was not created")
 	})
 }
 
@@ -216,21 +180,15 @@ func TestAtomicWriter_Close(t *testing.T) {
 
 	cacheDir := filepath.Join(tmpDir, "cache")
 	writer, err := NewAtomicWriter(cacheDir)
-	if err != nil {
-		t.Fatalf("Failed to create atomic writer: %v", err)
-	}
+	require.NoError(t, err, "Failed to create atomic writer")
 
 	// Close the writer
 	err = writer.Close()
-	if err != nil {
-		t.Fatalf("Failed to close writer: %v", err)
-	}
+	require.NoError(t, err, "Failed to close writer")
 
 	// After closing, another writer should be able to acquire the lock
 	writer2, err := NewAtomicWriter(cacheDir)
-	if err != nil {
-		t.Fatalf("Failed to create second writer after close: %v", err)
-	}
+	require.NoError(t, err, "Failed to create second writer after close")
 	defer writer2.Close()
 
 	// Multiple closes will return an error (file already closed), which is acceptable
@@ -244,29 +202,21 @@ func TestTryNewAtomicWriter(t *testing.T) {
 	t.Run("succeeds when cache is available", func(t *testing.T) {
 		cacheDir := filepath.Join(tmpDir, "cache-try")
 		writer, err := TryNewAtomicWriter(cacheDir)
-		if err != nil {
-			t.Fatalf("TryNewAtomicWriter failed: %v", err)
-		}
+		require.NoError(t, err, "TryNewAtomicWriter failed")
 		defer writer.Close()
 
-		if writer == nil {
-			t.Error("Expected non-nil writer")
-		}
+		assert.NotNil(t, writer, "Expected non-nil writer")
 	})
 
 	t.Run("returns nil when cache is locked", func(t *testing.T) {
 		cacheDir := filepath.Join(tmpDir, "cache-try-locked")
 		writer1, err := NewAtomicWriter(cacheDir)
-		if err != nil {
-			t.Fatalf("Failed to create first writer: %v", err)
-		}
+		require.NoError(t, err, "Failed to create first writer")
 		defer writer1.Close()
 
 		// Try to create second writer - should return nil without error
 		writer2, err := TryNewAtomicWriter(cacheDir)
-		if err != nil {
-			t.Fatalf("TryNewAtomicWriter returned error: %v", err)
-		}
+		require.NoError(t, err, "TryNewAtomicWriter returned error")
 
 		if writer2 != nil {
 			writer2.Close()

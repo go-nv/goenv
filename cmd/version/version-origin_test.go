@@ -9,6 +9,7 @@ import (
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/spf13/cobra"
 )
@@ -104,10 +105,7 @@ func TestVersionOriginCommand(t *testing.T) {
 			cmd.SetArgs([]string{})
 
 			err := cmd.Execute()
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+			assert.NoError(t, err)
 
 			got := strings.TrimSpace(output.String())
 
@@ -131,9 +129,7 @@ func TestVersionOriginCommand(t *testing.T) {
 				expected = expectedResolved
 			}
 
-			if got != expected {
-				t.Errorf("Expected %q, got %q", expected, got)
-			}
+			assert.Equal(t, expected, got)
 		})
 	}
 }

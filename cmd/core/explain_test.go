@@ -2,11 +2,12 @@ package core
 
 import (
 	"bytes"
-	"github.com/go-nv/goenv/internal/utils"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/go-nv/goenv/testing/testutil"
 )
@@ -134,18 +135,12 @@ func TestExplainCommand(t *testing.T) {
 			err := runExplain(explainCmd, []string{})
 
 			// Verify results
-			if tt.expectError && err == nil {
-				t.Error("Expected error but got none")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
+			assert.False(t, tt.expectError && err == nil, "Expected error but got none")
+			assert.False(t, !tt.expectError && err != nil)
 
 			output := buf.String()
 			for _, expected := range tt.expectedOutput {
-				if !strings.Contains(output, expected) {
-					t.Errorf("Expected output to contain %q, but it didn't.\nOutput:\n%s", expected, output)
-				}
+				assert.Contains(t, output, expected, "Expected output to contain , but it didn't.\\nOutput:\\n %v %v", expected, output)
 			}
 		})
 	}
@@ -165,11 +160,7 @@ func TestExplainArgs(t *testing.T) {
 	// Test with invalid argument
 	err := runExplain(explainCmd, []string{"1.22.0"})
 
-	if err == nil {
-		t.Error("Expected error with positional argument, but got none")
-	}
+	assert.Error(t, err, "Expected error with positional argument, but got none")
 
-	if !strings.Contains(err.Error(), "usage") {
-		t.Errorf("Expected usage error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "usage", "Expected usage error %v", err)
 }

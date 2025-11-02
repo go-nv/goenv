@@ -8,26 +8,20 @@ import (
 	"github.com/go-nv/goenv/internal/osinfo"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetPlatformInfo(t *testing.T) {
 	info := GetPlatformInfo()
 
-	if info == nil {
-		t.Fatal("GetPlatformInfo returned nil")
-	}
+	require.NotNil(t, info, "GetPlatformInfo returned nil")
 
-	if info.OS != osinfo.OS() {
-		t.Errorf("Expected OS %s, got %s", osinfo.OS(), info.OS)
-	}
+	assert.Equal(t, osinfo.OS(), info.OS, "Expected OS")
 
-	if info.Arch != osinfo.Arch() {
-		t.Errorf("Expected Arch %s, got %s", osinfo.Arch(), info.Arch)
-	}
+	assert.Equal(t, osinfo.Arch(), info.Arch, "Expected Arch")
 
-	if info.Details == nil {
-		t.Error("Details map should not be nil")
-	}
+	assert.NotNil(t, info.Details, "Details map should not be nil")
 
 	t.Logf("Platform: %s/%s", info.OS, info.Arch)
 	for k, v := range info.Details {
@@ -71,18 +65,14 @@ func TestCheckWindowsCompiler(t *testing.T) {
 
 	info, issues := CheckWindowsCompiler()
 
-	if info == nil {
-		t.Fatal("CheckWindowsCompiler returned nil on Windows")
-	}
+	require.NotNil(t, info, "CheckWindowsCompiler returned nil on Windows")
 
 	t.Logf("Compiler: %s", info.Compiler)
 	t.Logf("Has cl.exe: %v", info.HasCLExe)
 	t.Logf("Has VC Runtime: %v", info.HasVCRuntime)
 
 	// Should detect at least one compiler or report it
-	if info.Compiler == "unknown" && len(issues) == 0 {
-		t.Error("No compiler detected but no issues reported")
-	}
+	assert.False(t, info.Compiler == "unknown" && len(issues) == 0, "No compiler detected but no issues reported")
 
 	if len(issues) > 0 {
 		t.Log("Issues found:")
@@ -99,9 +89,7 @@ func TestCheckWindowsARM64(t *testing.T) {
 
 	info, issues := CheckWindowsARM64()
 
-	if info == nil {
-		t.Fatal("CheckWindowsARM64 returned nil on Windows")
-	}
+	require.NotNil(t, info, "CheckWindowsARM64 returned nil on Windows")
 
 	t.Logf("Process Mode: %s", info.ProcessMode)
 	t.Logf("Is ARM64EC: %v", info.IsARM64EC)
@@ -121,9 +109,7 @@ func TestCheckLinuxKernelVersion(t *testing.T) {
 
 	info, issues := CheckLinuxKernelVersion()
 
-	if info == nil {
-		t.Fatal("CheckLinuxKernelVersion returned nil on Linux")
-	}
+	require.NotNil(t, info, "CheckLinuxKernelVersion returned nil on Linux")
 
 	t.Logf("Kernel Version: %s", info.KernelVersion)
 	t.Logf("Kernel Major: %d", info.KernelMajor)
@@ -133,9 +119,7 @@ func TestCheckLinuxKernelVersion(t *testing.T) {
 	t.Logf("Glibc Version: %s", info.GlibcVersion)
 
 	// Basic sanity checks
-	if info.KernelVersion == "" {
-		t.Error("Kernel version should not be empty")
-	}
+	assert.NotEmpty(t, info.KernelVersion, "Kernel version should not be empty")
 
 	if info.KernelMajor < 2 {
 		t.Error("Kernel major version seems too low")
@@ -161,9 +145,7 @@ func TestCheckWindowsScriptShims(t *testing.T) {
 
 	// On Windows, should suggest creating wrapper
 	if utils.IsWindows() {
-		if len(issues) == 0 {
-			t.Error("Expected issues for script without .cmd/.ps1 extension on Windows")
-		}
+		assert.NotEqual(t, 0, len(issues), "Expected issues for script without .cmd/.ps1 extension on Windows")
 
 		hasWrapperSuggestion := false
 		for _, issue := range issues {
@@ -173,14 +155,10 @@ func TestCheckWindowsScriptShims(t *testing.T) {
 			t.Logf("[%s] %s: %s", issue.Severity, issue.Message, issue.Hint)
 		}
 
-		if !hasWrapperSuggestion {
-			t.Error("Expected warning about wrapper shim on Windows")
-		}
+		assert.True(t, hasWrapperSuggestion, "Expected warning about wrapper shim on Windows")
 	} else {
 		// On non-Windows, should return nil
-		if issues != nil {
-			t.Error("Expected nil issues on non-Windows platforms")
-		}
+		assert.Nil(t, issues, "Expected nil issues on non-Windows platforms")
 	}
 }
 
@@ -230,15 +208,11 @@ func TestSuggestGlibcCompatibility(t *testing.T) {
 			issues := SuggestGlibcCompatibility(tt.requiredGlibc, tt.currentGlibc)
 
 			hasIssues := len(issues) > 0
-			if hasIssues != tt.expectIssues {
-				t.Errorf("Expected issues: %v, got issues: %v", tt.expectIssues, hasIssues)
-			}
+			assert.Equal(t, tt.expectIssues, hasIssues, "Expected issues")
 
 			if tt.expectIssues && len(issues) > 0 {
 				// Check first issue has expected severity
-				if issues[0].Severity != tt.expectSeverity {
-					t.Errorf("Expected severity %s, got %s", tt.expectSeverity, issues[0].Severity)
-				}
+				assert.Equal(t, tt.expectSeverity, issues[0].Severity, "Expected severity")
 
 				// Should suggest container-based build
 				foundContainerSuggestion := false
@@ -249,9 +223,7 @@ func TestSuggestGlibcCompatibility(t *testing.T) {
 					t.Logf("[%s] %s: %s", issue.Severity, issue.Message, issue.Hint)
 				}
 
-				if !foundContainerSuggestion {
-					t.Error("Expected suggestion to build in older container")
-				}
+				assert.True(t, foundContainerSuggestion, "Expected suggestion to build in older container")
 			}
 		})
 	}
@@ -275,9 +247,7 @@ func TestIsVersionCompatible(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.current+"_vs_"+tt.minimum, func(t *testing.T) {
 			result := isVersionCompatible(tt.current, tt.minimum)
-			if result != tt.expected {
-				t.Errorf("isVersionCompatible(%s, %s) = %v, want %v", tt.current, tt.minimum, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "isVersionCompatible(, ) = %v %v", tt.current, tt.minimum)
 		})
 	}
 }
@@ -296,14 +266,9 @@ func TestParseVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.version, func(t *testing.T) {
 			result := parseVersion(tt.version)
-			if len(result) != len(tt.expected) {
-				t.Errorf("parseVersion(%s) length = %d, want %d", tt.version, len(result), len(tt.expected))
-				return
-			}
+			assert.Len(t, result, len(tt.expected), "parseVersion() length = %v", tt.version)
 			for i := range result {
-				if result[i] != tt.expected[i] {
-					t.Errorf("parseVersion(%s)[%d] = %d, want %d", tt.version, i, result[i], tt.expected[i])
-				}
+				assert.Equal(t, tt.expected[i], result[i], "parseVersion()[] = %v", tt.version)
 			}
 		})
 	}

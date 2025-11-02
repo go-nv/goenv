@@ -9,6 +9,7 @@ import (
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 )
 
 // Helper to create an executable in a version's bin directory
@@ -151,17 +152,12 @@ func TestWhichCommand(t *testing.T) {
 				// Check error output for additional messages
 				if tt.checkContains && tt.expectedOutput != "" {
 					combined := err.Error() + errOutput.String()
-					if !strings.Contains(combined, tt.expectedOutput) {
-						t.Errorf("Expected error output to contain '%s', got:\n%s\nError: %v", tt.expectedOutput, errOutput.String(), err)
-					}
+					assert.Contains(t, combined, tt.expectedOutput)
 				}
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v\nStderr: %s", err, errOutput.String())
-				return
-			}
+			assert.NoError(t, err, "Unexpected error: \\nStderr")
 
 			got := strings.TrimSpace(output.String())
 
@@ -169,13 +165,9 @@ func TestWhichCommand(t *testing.T) {
 				// Normalize paths for cross-platform comparison
 				normalizedGot := filepath.ToSlash(got)
 				normalizedExpected := filepath.ToSlash(tt.expectedOutput)
-				if !strings.Contains(normalizedGot, normalizedExpected) {
-					t.Errorf("Expected output to contain '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Contains(t, normalizedGot, normalizedExpected)
 			} else {
-				if got != tt.expectedOutput {
-					t.Errorf("Expected '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got)
 			}
 		})
 	}

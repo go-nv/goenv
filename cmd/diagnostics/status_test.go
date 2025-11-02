@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStatusCommand_NotInitialized(t *testing.T) {
@@ -23,9 +25,7 @@ func TestStatusCommand_NotInitialized(t *testing.T) {
 	statusCmd.SetErr(buf)
 
 	err := runStatus(statusCmd, []string{})
-	if err != nil {
-		t.Fatalf("runStatus() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
 	if !strings.Contains(output, "not initialized") && !strings.Contains(output, "Not initialized") {
@@ -34,6 +34,7 @@ func TestStatusCommand_NotInitialized(t *testing.T) {
 }
 
 func TestStatusCommand_Initialized(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -41,29 +42,23 @@ func TestStatusCommand_Initialized(t *testing.T) {
 
 	// Create necessary directories
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
 	statusCmd.SetErr(buf)
 
-	err := runStatus(statusCmd, []string{})
-	if err != nil {
-		t.Fatalf("runStatus() unexpected error: %v", err)
-	}
+	err = runStatus(statusCmd, []string{})
+	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
-	if !strings.Contains(output, "Status") {
-		t.Errorf("Expected 'Status' header in output, got: %s", output)
-	}
-	if !strings.Contains(output, "Shell") || !strings.Contains(output, "bash") {
-		t.Errorf("Expected shell information, got: %s", output)
-	}
+	assert.Contains(t, output, "Status", "Expected 'Status' header in output %v", output)
+	assert.False(t, !strings.Contains(output, "Shell") || !strings.Contains(output, "bash"), "Expected shell information")
 }
 
 func TestStatusCommand_WithInstalledVersions(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -74,29 +69,24 @@ func TestStatusCommand_WithInstalledVersions(t *testing.T) {
 	version1 := filepath.Join(versionsDir, "1.21.5")
 	version2 := filepath.Join(versionsDir, "1.22.3")
 
-	if err := utils.EnsureDir(filepath.Join(version1, "bin")); err != nil {
-		t.Fatalf("Failed to create version1: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(version2, "bin")); err != nil {
-		t.Fatalf("Failed to create version2: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(version1, "bin"))
+	require.NoError(t, err, "Failed to create version1")
+	err = utils.EnsureDir(filepath.Join(version2, "bin"))
+	require.NoError(t, err, "Failed to create version2")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
 	statusCmd.SetErr(buf)
 
-	err := runStatus(statusCmd, []string{})
-	if err != nil {
-		t.Fatalf("runStatus() unexpected error: %v", err)
-	}
+	err = runStatus(statusCmd, []string{})
+	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
-	if !strings.Contains(output, "2") {
-		t.Errorf("Expected to show 2 installed versions, got: %s", output)
-	}
+	assert.Contains(t, output, "2", "Expected to show 2 installed versions %v", output)
 }
 
 func TestStatusCommand_WithCurrentVersion(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -106,26 +96,22 @@ func TestStatusCommand_WithCurrentVersion(t *testing.T) {
 	// Create version directory
 	versionsDir := filepath.Join(tmpDir, "versions")
 	versionDir := filepath.Join(versionsDir, "1.21.5")
-	if err := utils.EnsureDir(filepath.Join(versionDir, "bin")); err != nil {
-		t.Fatalf("Failed to create version directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(versionDir, "bin"))
+	require.NoError(t, err, "Failed to create version directory")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
 	statusCmd.SetErr(buf)
 
-	err := runStatus(statusCmd, []string{})
-	if err != nil {
-		t.Fatalf("runStatus() unexpected error: %v", err)
-	}
+	err = runStatus(statusCmd, []string{})
+	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
-	if !strings.Contains(output, "1.21.5") {
-		t.Errorf("Expected current version 1.21.5 in output, got: %s", output)
-	}
+	assert.Contains(t, output, "1.21.5", "Expected current version 1.21.5 in output %v", output)
 }
 
 func TestStatusCommand_SystemVersion(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -134,26 +120,22 @@ func TestStatusCommand_SystemVersion(t *testing.T) {
 
 	// Create versions directory (can be empty)
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
 	statusCmd.SetErr(buf)
 
-	err := runStatus(statusCmd, []string{})
-	if err != nil {
-		t.Fatalf("runStatus() unexpected error: %v", err)
-	}
+	err = runStatus(statusCmd, []string{})
+	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
-	if !strings.Contains(output, "system") {
-		t.Errorf("Expected 'system' in output, got: %s", output)
-	}
+	assert.Contains(t, output, "system", "Expected 'system' in output %v", output)
 }
 
 func TestStatusCommand_NoVersions(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -161,32 +143,27 @@ func TestStatusCommand_NoVersions(t *testing.T) {
 
 	// Create empty versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
 	statusCmd.SetErr(buf)
 
-	err := runStatus(statusCmd, []string{})
-	if err != nil {
-		t.Fatalf("runStatus() unexpected error: %v", err)
-	}
+	err = runStatus(statusCmd, []string{})
+	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
 	// Should indicate no versions installed
-	if !strings.Contains(output, "0") && !strings.Contains(output, "none") && !strings.Contains(output, "No") {
-		t.Errorf("Expected indication of no versions, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "0") && !strings.Contains(output, "none") && !strings.Contains(output, "No"), "Expected indication of no versions")
 }
 
 func TestStatusCommand_WithGoenvDir(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "project")
-	if err := utils.EnsureDirWithContext(projectDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create project directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(projectDir, "create test directory")
+	require.NoError(t, err, "Failed to create project directory")
 
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), projectDir)
@@ -194,18 +171,15 @@ func TestStatusCommand_WithGoenvDir(t *testing.T) {
 
 	// Create versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
 	statusCmd.SetErr(buf)
 
-	err := runStatus(statusCmd, []string{})
-	if err != nil {
-		t.Fatalf("runStatus() unexpected error: %v", err)
-	}
+	err = runStatus(statusCmd, []string{})
+	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
 	// Should show project directory
@@ -220,9 +194,7 @@ func TestStatusHelp(t *testing.T) {
 	statusCmd.SetErr(buf)
 
 	err := statusCmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 	expectedStrings := []string{
@@ -232,9 +204,7 @@ func TestStatusHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q", expected)
-		}
+		assert.Contains(t, output, expected, "Help output missing %v", expected)
 	}
 }
 
@@ -259,12 +229,11 @@ func TestStatusCommand_MissingGoenvRoot(t *testing.T) {
 
 	output := buf.String()
 	// Should show some indication of issue
-	if output == "" {
-		t.Error("Expected some output even for missing GOENV_ROOT")
-	}
+	assert.NotEmpty(t, output, "Expected some output even for missing GOENV_ROOT")
 }
 
 func TestStatusCommand_PathConfiguration(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -278,21 +247,17 @@ func TestStatusCommand_PathConfiguration(t *testing.T) {
 	t.Setenv(utils.EnvVarPath, newPath)
 
 	// Create directories
-	if err := utils.EnsureDirWithContext(shimsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(shimsDir, "create test directory")
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err, "Failed to create bin directory")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
 	statusCmd.SetErr(buf)
 
-	err := runStatus(statusCmd, []string{})
-	if err != nil {
-		t.Fatalf("runStatus() unexpected error: %v", err)
-	}
+	err = runStatus(statusCmd, []string{})
+	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
 	// Should show PATH configuration status

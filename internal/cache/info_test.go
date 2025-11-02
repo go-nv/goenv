@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCacheKindString(t *testing.T) {
@@ -21,9 +23,7 @@ func TestCacheKindString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			result := tt.kind.String()
-			if result != tt.expected {
-				t.Errorf("CacheKind.String() = %q, want %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "CacheKind.String() =")
 		})
 	}
 }
@@ -77,30 +77,23 @@ func TestDetectCacheKind(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := DetectCacheKind(tt.path)
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("DetectCacheKind(%q) expected error, got nil", tt.path)
-				}
+				assert.Error(t, err, "DetectCacheKind() expected error")
 				return
 			}
-			if err != nil {
-				t.Errorf("DetectCacheKind(%q) unexpected error: %v", tt.path, err)
-				return
-			}
-			if result != tt.expected {
-				t.Errorf("DetectCacheKind(%q) = %q, want %q", tt.path, result, tt.expected)
-			}
+			assert.NoError(t, err, "DetectCacheKind() unexpected error")
+			assert.Equal(t, tt.expected, result, "DetectCacheKind() = %v", tt.path)
 		})
 	}
 }
 
 func TestGetCacheInfo(t *testing.T) {
+	var err error
 	// Create a temporary test cache directory
 	tempDir := t.TempDir()
 	goenvRoot := filepath.Join(tempDir, "goenv")
 	versionPath := filepath.Join(goenvRoot, "versions", "1.23.2", "pkg")
-	if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
-		t.Fatalf("Failed to create test directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionPath, "create test directory")
+	require.NoError(t, err, "Failed to create test directory")
 
 	tests := []struct {
 		name          string
@@ -130,9 +123,8 @@ func TestGetCacheInfo(t *testing.T) {
 			kind:      CacheKindBuild,
 			setupFunc: func(path string) {
 				// Create cache dir with a test file
-				if err := utils.EnsureDirWithContext(path, "create test directory"); err != nil {
-					t.Fatal(err)
-				}
+				err = utils.EnsureDirWithContext(path, "create test directory")
+				require.NoError(t, err)
 				testFile := filepath.Join(path, "test.cache")
 				testutil.WriteTestFile(t, testFile, []byte("test data"), utils.PermFileDefault)
 			},
@@ -159,13 +151,11 @@ func TestGetCacheInfo(t *testing.T) {
 			kind:      CacheKindMod,
 			setupFunc: func(path string) {
 				// Create cache dir with nested structure
-				if err := utils.EnsureDirWithContext(path, "create test directory"); err != nil {
-					t.Fatal(err)
-				}
+				err = utils.EnsureDirWithContext(path, "create test directory")
+				require.NoError(t, err)
 				testFile := filepath.Join(path, "cache", "test.mod")
-				if err := utils.EnsureDirWithContext(filepath.Dir(testFile), "create test directory"); err != nil {
-					t.Fatal(err)
-				}
+				err = utils.EnsureDirWithContext(filepath.Dir(testFile), "create test directory")
+				require.NoError(t, err)
 				testutil.WriteTestFile(t, testFile, []byte("module test"), utils.PermFileDefault)
 			},
 			fast:          false,
@@ -184,42 +174,26 @@ func TestGetCacheInfo(t *testing.T) {
 
 			// Get cache info
 			info, err := GetCacheInfo(cachePath, tt.kind, tt.fast)
-			if err != nil {
-				t.Fatalf("GetCacheInfo() error: %v", err)
-			}
+			require.NoError(t, err, "GetCacheInfo() error")
 
 			// Verify basic fields
-			if info.Kind != tt.kind {
-				t.Errorf("Kind = %v, want %v", info.Kind, tt.kind)
-			}
-			if info.Path != cachePath {
-				t.Errorf("Path = %q, want %q", info.Path, cachePath)
-			}
-			if info.GoVersion != tt.expectVersion {
-				t.Errorf("GoVersion = %q, want %q", info.GoVersion, tt.expectVersion)
-			}
+			assert.Equal(t, tt.kind, info.Kind, "Kind =")
+			assert.Equal(t, cachePath, info.Path, "Path =")
+			assert.Equal(t, tt.expectVersion, info.GoVersion, "GoVersion =")
 
 			// Verify old format detection
-			if info.OldFormat != tt.expectOldFmt {
-				t.Errorf("OldFormat = %v, want %v", info.OldFormat, tt.expectOldFmt)
-			}
+			assert.Equal(t, tt.expectOldFmt, info.OldFormat, "OldFormat =")
 
 			// Verify target info
 			if tt.expectTarget {
 				if info.Target == nil {
 					t.Error("Expected Target info, got nil")
 				} else {
-					if info.Target.GOOS == "" {
-						t.Error("Expected GOOS to be set")
-					}
-					if info.Target.GOARCH == "" {
-						t.Error("Expected GOARCH to be set")
-					}
+					assert.NotEmpty(t, info.Target.GOOS, "Expected GOOS to be set")
+					assert.NotEmpty(t, info.Target.GOARCH, "Expected GOARCH to be set")
 				}
 			} else {
-				if tt.kind == CacheKindBuild && info.Target != nil && !info.OldFormat {
-					t.Errorf("Expected Target to be nil for mod cache or old format, got %+v", info.Target)
-				}
+				assert.False(t, tt.kind == CacheKindBuild && info.Target != nil && !info.OldFormat, "Expected Target to be nil for mod cache or old format")
 			}
 
 			// Verify size is calculated
@@ -229,9 +203,7 @@ func TestGetCacheInfo(t *testing.T) {
 
 			// Verify file count behavior
 			if tt.fast {
-				if info.Files != -1 {
-					t.Errorf("Fast mode should return Files=-1, got %d", info.Files)
-				}
+				assert.Equal(t, -1, info.Files, "Fast mode should return Files=-1")
 			}
 		})
 	}
@@ -239,12 +211,11 @@ func TestGetCacheInfo(t *testing.T) {
 
 func TestGetCacheInfoNonExistent(t *testing.T) {
 	_, err := GetCacheInfo("/non/existent/path", CacheKindBuild, false)
-	if err == nil {
-		t.Error("GetCacheInfo() with non-existent path should return error")
-	}
+	assert.Error(t, err, "GetCacheInfo() with non-existent path should return error")
 }
 
 func TestGetCacheStatus(t *testing.T) {
+	var err error
 	// Create a temporary test goenv structure
 	tempDir := t.TempDir()
 	goenvRoot := tempDir
@@ -262,15 +233,13 @@ func TestGetCacheStatus(t *testing.T) {
 
 	for _, v := range versions {
 		versionPath := filepath.Join(goenvRoot, "versions", v.version, "pkg")
-		if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
-			t.Fatalf("Failed to create version directory: %v", err)
-		}
+		err = utils.EnsureDirWithContext(versionPath, "create test directory")
+		require.NoError(t, err, "Failed to create version directory")
 
 		// Create build cache
 		buildPath := filepath.Join(versionPath, v.buildCache)
-		if err := utils.EnsureDirWithContext(buildPath, "create test directory"); err != nil {
-			t.Fatalf("Failed to create build cache: %v", err)
-		}
+		err = utils.EnsureDirWithContext(buildPath, "create test directory")
+		require.NoError(t, err, "Failed to create build cache")
 		// Add a test file
 		testFile := filepath.Join(buildPath, "test.o")
 		testutil.WriteTestFile(t, testFile, []byte("compiled object"), utils.PermFileDefault, "Failed to write test file")
@@ -278,9 +247,8 @@ func TestGetCacheStatus(t *testing.T) {
 		// Create mod cache if specified
 		if v.hasModCache {
 			modPath := filepath.Join(versionPath, "mod")
-			if err := utils.EnsureDirWithContext(modPath, "create test directory"); err != nil {
-				t.Fatalf("Failed to create mod cache: %v", err)
-			}
+			err = utils.EnsureDirWithContext(modPath, "create test directory")
+			require.NoError(t, err, "Failed to create mod cache")
 			modFile := filepath.Join(modPath, "test.mod")
 			testutil.WriteTestFile(t, modFile, []byte("module cache"), utils.PermFileDefault, "Failed to write mod file")
 		}
@@ -288,19 +256,13 @@ func TestGetCacheStatus(t *testing.T) {
 
 	// Get cache status
 	status, err := GetCacheStatus(goenvRoot, false)
-	if err != nil {
-		t.Fatalf("GetCacheStatus() error: %v", err)
-	}
+	require.NoError(t, err, "GetCacheStatus() error")
 
 	// Verify build caches
-	if len(status.BuildCaches) != 3 {
-		t.Errorf("Expected 3 build caches, got %d", len(status.BuildCaches))
-	}
+	assert.Len(t, status.BuildCaches, 3, "Expected 3 build caches")
 
 	// Verify mod caches
-	if len(status.ModCaches) != 2 {
-		t.Errorf("Expected 2 mod caches, got %d", len(status.ModCaches))
-	}
+	assert.Len(t, status.ModCaches, 2, "Expected 2 mod caches")
 
 	// Verify total size is positive
 	if status.TotalSize <= 0 {
@@ -308,32 +270,20 @@ func TestGetCacheStatus(t *testing.T) {
 	}
 
 	// Verify version grouping
-	if len(status.ByVersion) != 3 {
-		t.Errorf("Expected 3 versions in ByVersion, got %d", len(status.ByVersion))
-	}
+	assert.Len(t, status.ByVersion, 3, "Expected 3 versions in ByVersion")
 
 	// Verify specific version has correct caches
 	if v122, exists := status.ByVersion["1.22.0"]; exists {
-		if len(v122.BuildCaches) != 1 {
-			t.Errorf("Version 1.22.0 should have 1 build cache, got %d", len(v122.BuildCaches))
-		}
-		if v122.ModCache == nil {
-			t.Error("Version 1.22.0 should have mod cache")
-		}
-		if v122.BuildCaches[0].OldFormat != true {
-			t.Error("Version 1.22.0 build cache should be old format")
-		}
+		assert.Len(t, v122.BuildCaches, 1, "Version 1.22.0 should have 1 build cache")
+		assert.NotNil(t, v122.ModCache, "Version 1.22.0 should have mod cache")
+		assert.Equal(t, true, v122.BuildCaches[0].OldFormat, "Version 1.22.0 build cache should be old format")
 	} else {
 		t.Error("Expected version 1.22.0 in ByVersion map")
 	}
 
 	if v123, exists := status.ByVersion["1.23.2"]; exists {
-		if v123.ModCache != nil {
-			t.Error("Version 1.23.2 should not have mod cache")
-		}
-		if len(v123.BuildCaches) != 1 {
-			t.Errorf("Version 1.23.2 should have 1 build cache, got %d", len(v123.BuildCaches))
-		}
+		assert.Nil(t, v123.ModCache, "Version 1.23.2 should not have mod cache")
+		assert.Len(t, v123.BuildCaches, 1, "Version 1.23.2 should have 1 build cache")
 	}
 }
 
@@ -342,39 +292,30 @@ func TestGetCacheStatusEmpty(t *testing.T) {
 	tempDir := t.TempDir()
 
 	status, err := GetCacheStatus(tempDir, false)
-	if err != nil {
-		t.Fatalf("GetCacheStatus() with empty root should not error: %v", err)
-	}
+	require.NoError(t, err, "GetCacheStatus() with empty root should not error")
 
-	if len(status.BuildCaches) != 0 {
-		t.Errorf("Expected 0 build caches, got %d", len(status.BuildCaches))
-	}
-	if len(status.ModCaches) != 0 {
-		t.Errorf("Expected 0 mod caches, got %d", len(status.ModCaches))
-	}
-	if status.TotalSize != 0 {
-		t.Errorf("Expected TotalSize=0, got %d", status.TotalSize)
-	}
+	assert.Len(t, status.BuildCaches, 0, "Expected 0 build caches")
+	assert.Len(t, status.ModCaches, 0, "Expected 0 mod caches")
+	assert.Equal(t, int64(0), status.TotalSize, "Expected TotalSize=0")
 }
 
 func TestGetVersionCaches(t *testing.T) {
+	var err error
 	// Create a temporary test structure
 	tempDir := t.TempDir()
 	goenvRoot := tempDir
 	version := "1.23.2"
 
 	versionPath := filepath.Join(goenvRoot, "versions", version, "pkg")
-	if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
-		t.Fatalf("Failed to create version directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionPath, "create test directory")
+	require.NoError(t, err, "Failed to create version directory")
 
 	// Create multiple build caches
 	buildCaches := []string{"go-build", "go-build-darwin-arm64", "go-build-linux-amd64"}
 	for _, cacheName := range buildCaches {
 		cachePath := filepath.Join(versionPath, cacheName)
-		if err := utils.EnsureDirWithContext(cachePath, "create test directory"); err != nil {
-			t.Fatalf("Failed to create cache: %v", err)
-		}
+		err = utils.EnsureDirWithContext(cachePath, "create test directory")
+		require.NoError(t, err, "Failed to create cache")
 		// Add test file
 		testFile := filepath.Join(cachePath, "test.o")
 		testutil.WriteTestFile(t, testFile, []byte("test"), utils.PermFileDefault, "Failed to write test file")
@@ -382,20 +323,15 @@ func TestGetVersionCaches(t *testing.T) {
 
 	// Create mod cache
 	modPath := filepath.Join(versionPath, "mod")
-	if err := utils.EnsureDirWithContext(modPath, "create test directory"); err != nil {
-		t.Fatalf("Failed to create mod cache: %v", err)
-	}
+	err = utils.EnsureDirWithContext(modPath, "create test directory")
+	require.NoError(t, err, "Failed to create mod cache")
 
 	// Get caches
 	caches, err := GetVersionCaches(goenvRoot, version, false)
-	if err != nil {
-		t.Fatalf("GetVersionCaches() error: %v", err)
-	}
+	require.NoError(t, err, "GetVersionCaches() error")
 
 	// Should have 3 build + 1 mod = 4 total
-	if len(caches) != 4 {
-		t.Errorf("Expected 4 caches, got %d", len(caches))
-	}
+	assert.Len(t, caches, 4, "Expected 4 caches")
 
 	// Count by kind
 	buildCount := 0
@@ -409,21 +345,15 @@ func TestGetVersionCaches(t *testing.T) {
 		}
 	}
 
-	if buildCount != 3 {
-		t.Errorf("Expected 3 build caches, got %d", buildCount)
-	}
-	if modCount != 1 {
-		t.Errorf("Expected 1 mod cache, got %d", modCount)
-	}
+	assert.Equal(t, 3, buildCount, "Expected 3 build caches")
+	assert.Equal(t, 1, modCount, "Expected 1 mod cache")
 }
 
 func TestGetVersionCachesNonExistent(t *testing.T) {
 	tempDir := t.TempDir()
 
 	_, err := GetVersionCaches(tempDir, "99.99.99", false)
-	if err == nil {
-		t.Error("GetVersionCaches() with non-existent version should return error")
-	}
+	assert.Error(t, err, "GetVersionCaches() with non-existent version should return error")
 }
 
 func TestTargetInfo(t *testing.T) {
@@ -436,15 +366,9 @@ func TestTargetInfo(t *testing.T) {
 		},
 	}
 
-	if target.GOOS != "linux" {
-		t.Errorf("GOOS = %q, want %q", target.GOOS, "linux")
-	}
-	if target.GOARCH != "amd64" {
-		t.Errorf("GOARCH = %q, want %q", target.GOARCH, "amd64")
-	}
-	if target.ABI["GOAMD64"] != "v3" {
-		t.Errorf("ABI[GOAMD64] = %q, want %q", target.ABI["GOAMD64"], "v3")
-	}
+	assert.Equal(t, "linux", target.GOOS, "GOOS =")
+	assert.Equal(t, "amd64", target.GOARCH, "GOARCH =")
+	assert.Equal(t, "v3", target.ABI["GOAMD64"], "ABI[GOAMD64] =")
 }
 
 func TestCGOToolchainInfo(t *testing.T) {
@@ -457,21 +381,17 @@ func TestCGOToolchainInfo(t *testing.T) {
 		LDFLAGS:  []string{"-lpthread"},
 	}
 
-	if cgoInfo.CC != "/usr/bin/gcc" {
-		t.Errorf("CC = %q, want %q", cgoInfo.CC, "/usr/bin/gcc")
-	}
-	if len(cgoInfo.CFLAGS) != 2 {
-		t.Errorf("Expected 2 CFLAGS, got %d", len(cgoInfo.CFLAGS))
-	}
+	assert.Equal(t, "/usr/bin/gcc", cgoInfo.CC, "CC =")
+	assert.Len(t, cgoInfo.CFLAGS, 2, "Expected 2 CFLAGS")
 }
 
 func TestCacheInfoModTime(t *testing.T) {
+	var err error
 	// Create test cache and verify ModTime is set
 	tempDir := t.TempDir()
 	cachePath := filepath.Join(tempDir, "goenv", "versions", "1.23.2", "pkg", "go-build")
-	if err := utils.EnsureDirWithContext(cachePath, "create test directory"); err != nil {
-		t.Fatalf("Failed to create cache: %v", err)
-	}
+	err = utils.EnsureDirWithContext(cachePath, "create test directory")
+	require.NoError(t, err, "Failed to create cache")
 
 	// Write a file and wait a tiny bit to ensure time difference
 	testFile := filepath.Join(cachePath, "test")
@@ -480,9 +400,7 @@ func TestCacheInfoModTime(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	info, err := GetCacheInfo(cachePath, CacheKindBuild, false)
-	if err != nil {
-		t.Fatalf("GetCacheInfo() error: %v", err)
-	}
+	require.NoError(t, err, "GetCacheInfo() error")
 
 	if info.ModTime.IsZero() {
 		t.Error("Expected ModTime to be set, got zero time")

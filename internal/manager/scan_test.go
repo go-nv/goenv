@@ -6,45 +6,41 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestScanProjects(t *testing.T) {
+	var err error
 	// Create test directory structure
 	tmpDir := t.TempDir()
 
 	// Project 1: .go-version
 	proj1 := filepath.Join(tmpDir, "proj1")
-	if err := utils.EnsureDirWithContext(proj1, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(proj1, "create test directory")
+	require.NoError(t, err)
 	testutil.WriteTestFile(t, filepath.Join(proj1, ".go-version"), []byte("1.21.5\n"), utils.PermFileDefault)
 
 	// Project 2: go.mod
 	proj2 := filepath.Join(tmpDir, "proj2")
-	if err := utils.EnsureDirWithContext(proj2, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(proj2, "create test directory")
+	require.NoError(t, err)
 	gomodContent := "module test\n\ngo 1.22.3\n"
 	testutil.WriteTestFile(t, filepath.Join(proj2, "go.mod"), []byte(gomodContent), utils.PermFileDefault)
 
 	// Project 3: go.mod with toolchain
 	proj3 := filepath.Join(tmpDir, "proj3")
-	if err := utils.EnsureDirWithContext(proj3, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(proj3, "create test directory")
+	require.NoError(t, err)
 	gomodWithToolchain := "module test3\n\ngo 1.21.0\n\ntoolchain go1.23.2\n"
 	testutil.WriteTestFile(t, filepath.Join(proj3, "go.mod"), []byte(gomodWithToolchain), utils.PermFileDefault)
 
 	// Scan with no depth limit
 	projects, err := ScanProjects(tmpDir, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Verify we found all projects
-	if len(projects) != 3 {
-		t.Errorf("Expected 3 projects, got %d", len(projects))
-	}
+	assert.Len(t, projects, 3, "Expected 3 projects")
 
 	// Build map for easier verification
 	versionMap := make(map[string]string) // path -> version
@@ -78,6 +74,7 @@ func TestScanProjects(t *testing.T) {
 }
 
 func TestScanProjectsWithDepthLimit(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 
 	// Project at depth 1
@@ -97,30 +94,20 @@ func TestScanProjectsWithDepthLimit(t *testing.T) {
 
 	// Scan with depth 3 - should find proj1 and proj2, but not proj3
 	projects, err := ScanProjects(tmpDir, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if len(projects) != 2 {
-		t.Errorf("With depth 3, expected 2 projects, got %d", len(projects))
-	}
+	assert.Len(t, projects, 2, "With depth 3, expected 2 projects")
 
 	// Verify we didn't find the deep project
 	for _, proj := range projects {
-		if proj.Path == proj3 {
-			t.Error("Should not have found project at depth 5 with maxDepth=3")
-		}
+		assert.NotEqual(t, proj3, proj.Path, "Should not have found project at depth 5 with maxDepth=3")
 	}
 
 	// Scan with depth 5 - should find all
 	projects, err = ScanProjects(tmpDir, 5)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if len(projects) != 3 {
-		t.Errorf("With depth 5, expected 3 projects, got %d", len(projects))
-	}
+	assert.Len(t, projects, 3, "With depth 5, expected 3 projects")
 }
 
 func TestScanProjectsSkipsCommonDirs(t *testing.T) {
@@ -146,18 +133,12 @@ func TestScanProjectsSkipsCommonDirs(t *testing.T) {
 
 	// Scan
 	projects, err := ScanProjects(tmpDir, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Should only find the root project
-	if len(projects) != 1 {
-		t.Errorf("Expected 1 project (skipping node_modules, vendor, .git), got %d", len(projects))
-	}
+	assert.Len(t, projects, 1, "Expected 1 project (skipping node_modules, vendor, .git)")
 
-	if len(projects) > 0 && projects[0].Version != "1.20.5" {
-		t.Errorf("Expected to find root project with version 1.20.5, got %s", projects[0].Version)
-	}
+	assert.False(t, len(projects) > 0 && projects[0].Version != "1.20.5", "Expected to find root project with version 1.20.5")
 }
 
 func TestScanProjectsEmpty(t *testing.T) {
@@ -165,13 +146,9 @@ func TestScanProjectsEmpty(t *testing.T) {
 
 	// Empty directory
 	projects, err := ScanProjects(tmpDir, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if len(projects) != 0 {
-		t.Errorf("Expected 0 projects in empty directory, got %d", len(projects))
-	}
+	assert.Len(t, projects, 0, "Expected 0 projects in empty directory")
 }
 
 func TestScanProjectsWithComments(t *testing.T) {
@@ -188,17 +165,13 @@ func TestScanProjectsWithComments(t *testing.T) {
 
 	// Scan
 	projects, err := ScanProjects(tmpDir, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	if len(projects) != 1 {
 		t.Fatalf("Expected 1 project, got %d", len(projects))
 	}
 
-	if projects[0].Version != "1.21.5" {
-		t.Errorf("Expected version 1.21.5, got %s", projects[0].Version)
-	}
+	assert.Equal(t, "1.21.5", projects[0].Version, "Expected version 1.21.5")
 }
 
 func TestReadVersionFile(t *testing.T) {
@@ -245,13 +218,9 @@ func TestReadVersionFile(t *testing.T) {
 			testutil.WriteTestFile(t, tmpFile, []byte(tt.content), utils.PermFileDefault)
 
 			version, err := readVersionFile(tmpFile)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
-			if version != tt.expected {
-				t.Errorf("Expected %q, got %q", tt.expected, version)
-			}
+			assert.Equal(t, tt.expected, version)
 		})
 	}
 }
@@ -262,10 +231,6 @@ func TestScanProjectsNonexistentDir(t *testing.T) {
 	projects, _ := ScanProjects("/nonexistent/path/that/should/not/exist", 0)
 
 	// Should return empty slice (not nil)
-	if projects == nil {
-		t.Error("Expected non-nil slice even for nonexistent directory")
-	}
-	if len(projects) != 0 {
-		t.Errorf("Expected 0 projects for nonexistent directory, got %d", len(projects))
-	}
+	assert.NotNil(t, projects, "Expected non-nil slice even for nonexistent directory")
+	assert.Len(t, projects, 0, "Expected 0 projects for nonexistent directory")
 }

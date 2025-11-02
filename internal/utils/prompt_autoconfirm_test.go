@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPromptYesNo_AutoConfirmField(t *testing.T) {
@@ -32,16 +34,12 @@ func TestPromptYesNo_AutoConfirmField(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("PromptYesNo() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "PromptYesNo() =")
 
 			// When AutoConfirm is true, prompt should NOT be displayed
 			if tt.autoConfirm {
 				output := writer.String()
-				if output != "" {
-					t.Errorf("Prompt should not be displayed when AutoConfirm=true, got: %s", output)
-				}
+				assert.Empty(t, output, "Prompt should not be displayed when AutoConfirm=true")
 			}
 		})
 	}
@@ -82,15 +80,11 @@ func TestPromptYesNo_EnvironmentVariable(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("PromptYesNo() with GOENV_ASSUME_YES=%s = %v, want %v", tt.envVal, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "PromptYesNo() with GOENV_ASSUME_YES= = %v", tt.envVal)
 
 			// When GOENV_ASSUME_YES=1/true/yes, prompt should NOT be displayed
 			output := writer.String()
-			if tt.want && output != "" {
-				t.Errorf("Prompt should not be displayed when GOENV_ASSUME_YES=%s, got: %s", tt.envVal, output)
-			}
+			assert.False(t, tt.want && output != "", "Prompt should not be displayed when GOENV_ASSUME_YES=")
 		})
 	}
 }
@@ -113,15 +107,11 @@ func TestPromptYesNo_AutoConfirmFieldTakesPrecedence(t *testing.T) {
 	}
 
 	got := PromptYesNo(config)
-	if !got {
-		t.Errorf("PromptYesNo() with AutoConfirm=true should return true regardless of env var")
-	}
+	assert.True(t, got, "PromptYesNo() with AutoConfirm=true should return true regardless of env var")
 
 	// Prompt should not be displayed
 	output := writer.String()
-	if output != "" {
-		t.Errorf("Prompt should not be displayed when AutoConfirm=true, got: %s", output)
-	}
+	assert.Empty(t, output, "Prompt should not be displayed when AutoConfirm=true")
 }
 
 func TestPromptYesNo_EnvironmentVariableInvalidValues(t *testing.T) {
@@ -162,16 +152,11 @@ func TestPromptYesNo_EnvironmentVariableInvalidValues(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.expectedBool {
-				t.Errorf("PromptYesNo() with invalid GOENV_ASSUME_YES=%q = %v, want %v (should use input)",
-					tt.envVal, got, tt.expectedBool)
-			}
+			assert.Equal(t, tt.expectedBool, got, "PromptYesNo() with invalid GOENV_ASSUME_YES= = %v", tt.envVal)
 
 			// Should show prompt since env var is invalid
 			output := writer.String()
-			if tt.shouldPrompt && output == "" {
-				t.Errorf("Prompt should be displayed when GOENV_ASSUME_YES has invalid value %q", tt.envVal)
-			}
+			assert.False(t, tt.shouldPrompt && output == "", "Prompt should be displayed when GOENV_ASSUME_YES has invalid value")
 		})
 	}
 }
@@ -218,16 +203,11 @@ func TestPromptYesNo_DefaultYesIgnoredWhenAutoConfirm(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("PromptYesNo(AutoConfirm=%v, DefaultYes=%v, env=%q) = %v, want %v",
-					tt.autoConfirm, tt.defaultYes, tt.envValue, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "PromptYesNo(AutoConfirm=, DefaultYes=, env=) = %v %v %v", tt.autoConfirm, tt.defaultYes, tt.envValue)
 
 			// Prompt should never be displayed when auto-confirming
 			output := writer.String()
-			if output != "" {
-				t.Errorf("Prompt should not be displayed when auto-confirming, got: %s", output)
-			}
+			assert.Empty(t, output, "Prompt should not be displayed when auto-confirming")
 		})
 	}
 }
@@ -279,19 +259,12 @@ func TestPromptYesNo_EnvVarOnlyWhenFieldNotSet(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("PromptYesNo(AutoConfirm=%v, env=%q) = %v, want %v",
-					tt.autoConfirm, tt.envValue, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "PromptYesNo(AutoConfirm=, env=) = %v %v", tt.autoConfirm, tt.envValue)
 
 			// Check if prompt was displayed as expected
 			output := writer.String()
-			if tt.shouldPrompt && output == "" {
-				t.Errorf("Expected prompt to be displayed, but it wasn't")
-			}
-			if !tt.shouldPrompt && output != "" {
-				t.Errorf("Expected no prompt, but got: %s", output)
-			}
+			assert.False(t, tt.shouldPrompt && output == "", "Expected prompt to be displayed, but it wasn't")
+			assert.False(t, !tt.shouldPrompt && output != "", "Expected no prompt, but")
 		})
 	}
 }
@@ -314,9 +287,7 @@ func TestPromptYesNo_CompleteEnvVarPrecedenceRules(t *testing.T) {
 			ErrWriter:   &bytes.Buffer{},
 		}
 
-		if !PromptYesNo(config) {
-			t.Error("AutoConfirm field should take precedence over everything")
-		}
+		assert.True(t, PromptYesNo(config), "AutoConfirm field should take precedence over everything")
 	})
 
 	t.Run("Precedence level 2: GOENV_ASSUME_YES env var", func(t *testing.T) {
@@ -331,9 +302,7 @@ func TestPromptYesNo_CompleteEnvVarPrecedenceRules(t *testing.T) {
 			ErrWriter:   &bytes.Buffer{},
 		}
 
-		if !PromptYesNo(config) {
-			t.Error("GOENV_ASSUME_YES should take precedence over user input")
-		}
+		assert.True(t, PromptYesNo(config), "GOENV_ASSUME_YES should take precedence over user input")
 	})
 
 	t.Run("Precedence level 3: Normal prompting", func(t *testing.T) {
@@ -349,13 +318,9 @@ func TestPromptYesNo_CompleteEnvVarPrecedenceRules(t *testing.T) {
 			ErrWriter:   &bytes.Buffer{},
 		}
 
-		if !PromptYesNo(config) {
-			t.Error("Should respect user input when no auto-confirm is active")
-		}
+		assert.True(t, PromptYesNo(config), "Should respect user input when no auto-confirm is active")
 
 		// Verify prompt was actually shown
-		if !strings.Contains(writer.String(), "Test?") {
-			t.Error("Prompt should be displayed in normal mode")
-		}
+		assert.Contains(t, writer.String(), "Test?", "Prompt should be displayed in normal mode")
 	})
 }

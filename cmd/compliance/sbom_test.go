@@ -9,6 +9,8 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSBOMProject_FlagValidation(t *testing.T) {
@@ -76,15 +78,14 @@ func TestSBOMProject_FlagValidation(t *testing.T) {
 				}
 			} else if !tt.expectError && err != nil {
 				// For valid cases, we expect tool-not-found error (since we don't have tools installed in test)
-				if !strings.Contains(err.Error(), "not found") {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				assert.Contains(t, err.Error(), "not found")
 			}
 		})
 	}
 }
 
 func TestResolveSBOMTool(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 
 	cfg := &config.Config{
@@ -93,9 +94,8 @@ func TestResolveSBOMTool(t *testing.T) {
 
 	// Create host bin directory
 	hostBinDir := cfg.HostBinDir()
-	if err := utils.EnsureDirWithContext(hostBinDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create host bin dir: %v", err)
-	}
+	err = utils.EnsureDirWithContext(hostBinDir, "create test directory")
+	require.NoError(t, err, "Failed to create host bin dir")
 
 	// Create mock tool
 	toolName := "cyclonedx-gomod"
@@ -112,13 +112,9 @@ func TestResolveSBOMTool(t *testing.T) {
 
 	// Test resolution
 	resolvedPath, err := resolveSBOMTool(cfg, toolName)
-	if err != nil {
-		t.Fatalf("Failed to resolve tool: %v", err)
-	}
+	require.NoError(t, err, "Failed to resolve tool")
 
-	if resolvedPath != toolPath {
-		t.Errorf("Expected path %q, got %q", toolPath, resolvedPath)
-	}
+	assert.Equal(t, toolPath, resolvedPath, "Expected path")
 }
 
 func TestResolveSBOMTool_NotFound(t *testing.T) {
@@ -130,17 +126,11 @@ func TestResolveSBOMTool_NotFound(t *testing.T) {
 
 	// Test resolution for non-existent tool
 	_, err := resolveSBOMTool(cfg, "nonexistent-tool")
-	if err == nil {
-		t.Error("Expected error for non-existent tool")
-	}
+	assert.Error(t, err, "Expected error for non-existent tool")
 
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("Expected 'not found' error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "not found", "Expected 'not found' error %v", err)
 
-	if !strings.Contains(err.Error(), "goenv tools install") {
-		t.Errorf("Expected installation instructions in error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "goenv tools install", "Expected installation instructions in error %v", err)
 }
 
 func TestBuildCycloneDXCommand(t *testing.T) {
@@ -187,15 +177,11 @@ func TestBuildCycloneDXCommand(t *testing.T) {
 			cmd, err := buildCycloneDXCommand("/mock/tool", cfg)
 
 			if tt.expectError {
-				if err == nil {
-					t.Error("Expected error, got nil")
-				}
+				assert.Error(t, err, "Expected error, got nil")
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			// Check args
 			for _, expectedArg := range tt.expectArgs {
@@ -206,9 +192,7 @@ func TestBuildCycloneDXCommand(t *testing.T) {
 						break
 					}
 				}
-				if !found {
-					t.Errorf("Expected arg %q not found in %v", expectedArg, cmd.Args)
-				}
+				assert.True(t, found, "Expected arg not found in")
 			}
 		})
 	}
@@ -261,15 +245,11 @@ func TestBuildSyftCommand(t *testing.T) {
 			cmd, err := buildSyftCommand("/mock/syft", cfg)
 
 			if tt.expectError {
-				if err == nil {
-					t.Error("Expected error, got nil")
-				}
+				assert.Error(t, err, "Expected error, got nil")
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			// Check args
 			for _, expectedArg := range tt.expectArgs {
@@ -280,9 +260,7 @@ func TestBuildSyftCommand(t *testing.T) {
 						break
 					}
 				}
-				if !found {
-					t.Errorf("Expected arg %q not found in %v", expectedArg, cmd.Args)
-				}
+				assert.True(t, found, "Expected arg not found in")
 			}
 		})
 	}

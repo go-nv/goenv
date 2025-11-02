@@ -9,6 +9,7 @@ import (
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/spf13/cobra"
 )
@@ -144,24 +145,16 @@ func TestVersionNameCommand(t *testing.T) {
 
 			// Check error expectations
 			if tt.expectErrorCode {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				}
-				if tt.expectedError != "" && !strings.Contains(errOutput.String(), tt.expectedError) {
-					t.Errorf("Expected error to contain %q, got %q", tt.expectedError, errOutput.String())
-				}
+				assert.Error(t, err, "Expected error but got none")
+				assert.False(t, tt.expectedError != "" && !strings.Contains(errOutput.String(), tt.expectedError), "Expected error to contain")
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v\nStderr: %s", err, errOutput.String())
-				}
+				assert.NoError(t, err, "Unexpected error: \\nStderr")
 			}
 
 			// Check output
 			got := strings.TrimSpace(output.String())
 			if tt.expectedOutput != "" {
-				if got != tt.expectedOutput {
-					t.Errorf("Expected output %q, got %q", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got, "Expected output")
 			}
 		})
 	}

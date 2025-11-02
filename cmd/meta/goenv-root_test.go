@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGoenvRootCommand(t *testing.T) {
@@ -49,16 +51,12 @@ func TestGoenvRootCommand(t *testing.T) {
 			cmd.SetArgs([]string{})
 
 			err := cmd.Execute()
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			// Check output (normalize paths for cross-platform comparison)
 			got := filepath.ToSlash(strings.TrimSpace(output.String()))
 			expected := filepath.ToSlash(tt.expectedOutput)
-			if got != expected {
-				t.Errorf("Expected output %q, got %q", expected, got)
-			}
+			assert.Equal(t, expected, got, "Expected output")
 		})
 	}
 }

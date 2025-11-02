@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/osinfo"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsMinGW(t *testing.T) {
@@ -108,9 +109,7 @@ func TestIsMinGW(t *testing.T) {
 			}
 
 			result := IsMinGW()
-			if result != tt.expectedResult {
-				t.Errorf("IsMinGW() = %v, want %v (GOOS=%s)", result, tt.expectedResult, osinfo.OS())
-			}
+			assert.Equal(t, tt.expectedResult, result, "IsMinGW() = %v", osinfo.OS())
 		})
 	}
 }
@@ -151,9 +150,7 @@ func TestGetEnvValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GetEnvValue(tt.env, tt.key)
-			if result != tt.expected {
-				t.Errorf("GetEnvValue() = %q, want %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "GetEnvValue() =")
 		})
 	}
 }

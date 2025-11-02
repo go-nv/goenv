@@ -2,10 +2,13 @@ package core
 
 import (
 	"bytes"
-	"github.com/go-nv/goenv/internal/utils"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/spf13/cobra"
@@ -17,14 +20,10 @@ func TestUseCommand_NoArgs(t *testing.T) {
 	// that the argument parsing accepts 0 args
 
 	// Test 1: Verify command definition allows optional version
-	if !strings.Contains(useCmd.Use, "[version]") {
-		t.Errorf("Command Use should show [version] as optional, got: %s", useCmd.Use)
-	}
+	assert.Contains(t, useCmd.Use, "[version]", "Command Use should show [version] as optional %v", useCmd.Use)
 
 	// Test 2: Verify help text documents no-args behavior
-	if !strings.Contains(useCmd.Long, "If no version is specified") {
-		t.Error("Long description should document no-args behavior")
-	}
+	assert.Contains(t, useCmd.Long, "If no version is specified", "Long description should document no-args behavior")
 
 	// Test 3: Verify Args validator accepts 0 or 1 arguments
 	// cobra.MaximumNArgs(1) would allow 0 or 1
@@ -38,14 +37,10 @@ func TestUseCommand_WithVersion(t *testing.T) {
 
 	// Verify the command accepts string arguments (version spec)
 	// The Use pattern should indicate an optional argument
-	if strings.Contains(useCmd.Use, "<version>") {
-		t.Error("Use should show [version] not <version> since it's optional")
-	}
+	assert.NotContains(t, useCmd.Use, "<version>", "Use should show [version] not <version> since it's optional")
 
 	// Verify examples include version usage
-	if !strings.Contains(useCmd.Long, "goenv use 1.23.2") {
-		t.Error("Examples should show usage with version argument")
-	}
+	assert.Contains(t, useCmd.Long, "goenv use 1.23.2", "Examples should show usage with version argument")
 }
 
 func TestUseCommand_TooManyArgs(t *testing.T) {
@@ -57,29 +52,20 @@ func TestUseCommand_TooManyArgs(t *testing.T) {
 
 	// Since we can't easily mock the full command execution, we verify
 	// the documentation is clear about accepting 0 or 1 arguments
-	if !strings.Contains(useCmd.Use, "[version]") {
-		t.Error("Use pattern should indicate single optional argument")
-	}
+	assert.Contains(t, useCmd.Use, "[version]", "Use pattern should indicate single optional argument")
 }
 
 func TestUseCommand_GlobalFlag(t *testing.T) {
 	// Verify --global flag is defined
 	globalFlag := useCmd.Flags().Lookup("global")
-	if globalFlag == nil {
-		t.Error("--global flag should be defined")
-		return
-	}
+	assert.NotNil(t, globalFlag, "--global flag should be defined")
 
 	// Verify short flag -g exists
 	shortFlag := useCmd.Flags().ShorthandLookup("g")
-	if shortFlag == nil {
-		t.Error("-g shorthand should be defined for --global")
-	}
+	assert.NotNil(t, shortFlag, "-g shorthand should be defined for --global")
 
 	// Verify it's a boolean flag
-	if globalFlag.Value.Type() != "bool" {
-		t.Errorf("--global should be a boolean flag, got: %s", globalFlag.Value.Type())
-	}
+	assert.Equal(t, "bool", globalFlag.Value.Type(), "--global should be a boolean flag")
 }
 
 func TestUseCommand_NoArgsWithGlobalFlag(t *testing.T) {
@@ -87,23 +73,17 @@ func TestUseCommand_NoArgsWithGlobalFlag(t *testing.T) {
 	// This should use latest version globally
 
 	// Check that the example is documented
-	if !strings.Contains(useCmd.Long, "goenv use --global") {
-		t.Error("Examples should include 'goenv use --global' (no version specified)")
-	}
+	assert.Contains(t, useCmd.Long, "goenv use --global", "Examples should include 'goenv use --global' (no version specified)")
 }
 
 func TestUseCommand_QuietFlag(t *testing.T) {
 	// Verify --quiet flag is defined
 	quietFlag := useCmd.Flags().Lookup("quiet")
-	if quietFlag == nil {
-		t.Error("--quiet flag should be defined")
-	}
+	assert.NotNil(t, quietFlag, "--quiet flag should be defined")
 
 	// Verify short flag -q exists
 	shortFlag := useCmd.Flags().ShorthandLookup("q")
-	if shortFlag == nil {
-		t.Error("-q shorthand should be defined for --quiet")
-	}
+	assert.NotNil(t, shortFlag, "-q shorthand should be defined for --quiet")
 }
 
 func TestUseCommand_HelpText(t *testing.T) {
@@ -111,19 +91,13 @@ func TestUseCommand_HelpText(t *testing.T) {
 	cmd := useCmd
 
 	// Check Use field shows version as optional
-	if !strings.Contains(cmd.Use, "[version]") {
-		t.Errorf("Use field should show version as optional [version], got: %s", cmd.Use)
-	}
+	assert.Contains(t, cmd.Use, "[version]", "Use field should show version as optional [version] %v", cmd.Use)
 
 	// Check Long description mentions no-args behavior
-	if !strings.Contains(cmd.Long, "If no version is specified") {
-		t.Errorf("Long description should document no-args behavior")
-	}
+	assert.Contains(t, cmd.Long, "If no version is specified", "Long description should document no-args behavior")
 
 	// Check examples include no-args usage
-	if !strings.Contains(cmd.Long, "goenv use                     # Use latest stable") {
-		t.Errorf("Examples should include no-args usage")
-	}
+	assert.Contains(t, cmd.Long, "goenv use                     # Use latest stable", "Examples should include no-args usage")
 }
 
 func TestUseCommand_VersionResolution(t *testing.T) {
@@ -132,15 +106,11 @@ func TestUseCommand_VersionResolution(t *testing.T) {
 
 	for _, spec := range specs {
 		found := strings.Contains(useCmd.Long, spec)
-		if !found && spec != "stable" { // stable is optional in docs
-			t.Errorf("Examples should include version spec: %s", spec)
-		}
+		assert.False(t, !found && spec != "stable", "Examples should include version spec")
 	}
 
 	// Verify "latest" is the default
-	if !strings.Contains(useCmd.Long, "If no version is specified") {
-		t.Error("Should document that no args defaults to latest")
-	}
+	assert.Contains(t, useCmd.Long, "If no version is specified", "Should document that no args defaults to latest")
 }
 
 func TestUseCommand_Flags(t *testing.T) {
@@ -150,9 +120,7 @@ func TestUseCommand_Flags(t *testing.T) {
 	for _, flagName := range flags {
 		t.Run("flag_"+flagName, func(t *testing.T) {
 			flag := useCmd.Flags().Lookup(flagName)
-			if flag == nil {
-				t.Errorf("Expected flag --%s to be defined", flagName)
-			}
+			assert.NotNil(t, flag, "Expected flag -- to be defined")
 		})
 	}
 
@@ -164,12 +132,10 @@ func TestUseCommand_Flags(t *testing.T) {
 		"q": "quiet",
 	}
 
-	for short, long := range shortFlags {
+	for short := range shortFlags {
 		t.Run("shortflag_"+short, func(t *testing.T) {
 			flag := useCmd.Flags().ShorthandLookup(short)
-			if flag == nil {
-				t.Errorf("Expected short flag -%s for --%s to be defined", short, long)
-			}
+			assert.NotNil(t, flag, "Expected short flag - for -- to be defined")
 		})
 	}
 }
@@ -177,28 +143,19 @@ func TestUseCommand_Flags(t *testing.T) {
 func TestUseCommand_ConfigLoading(t *testing.T) {
 	// Verify config can be loaded (basic smoke test)
 	cfg := config.Load()
-	if cfg == nil {
-		t.Error("Config should load successfully")
-		return
-	}
+	assert.NotNil(t, cfg, "Config should load successfully")
 
 	// Config should have a root directory
-	if cfg.Root == "" {
-		t.Error("Config root should not be empty")
-	}
+	assert.NotEmpty(t, cfg.Root, "Config root should not be empty")
 }
 
 func TestUseCommand_ErrorMessages(t *testing.T) {
 	// Verify the command documents proper usage in help text
-	if !strings.Contains(useCmd.Use, "[version]") {
-		t.Error("Command should document optional version argument")
-	}
+	assert.Contains(t, useCmd.Use, "[version]", "Command should document optional version argument")
 
 	// The runUse function checks: if len(args) > 1 { return fmt.Errorf("usage:...") }
 	// We trust this logic and verify the documentation is clear
-	if !strings.Contains(useCmd.Long, "goenv use") {
-		t.Error("Long description should include usage examples")
-	}
+	assert.Contains(t, useCmd.Long, "goenv use", "Long description should include usage examples")
 }
 
 // Integration Tests - These test actual command execution
@@ -222,25 +179,21 @@ func TestUseCommand_Integration_TooManyArgs(t *testing.T) {
 
 	// Execute - should fail with usage error
 	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("Expected error for too many arguments, got nil")
-	}
+	assert.Error(t, err, "Expected error for too many arguments, got nil")
 
-	if !strings.Contains(err.Error(), "usage:") {
-		t.Errorf("Expected usage error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "usage:", "Expected usage error %v", err)
 }
 
 func TestUseCommand_Integration_NoArgsDefaultsToLatest(t *testing.T) {
+	var err error
 	// Setup isolated environment
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Create versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions dir: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions dir")
 
 	// Create a fresh command instance
 	cmd := &cobra.Command{
@@ -258,12 +211,10 @@ func TestUseCommand_Integration_NoArgsDefaultsToLatest(t *testing.T) {
 	cmd.SetErr(&buf)
 
 	// Execute - will fail (no versions available) but should accept no args
-	err := cmd.Execute()
+	err = cmd.Execute()
 
 	// The command should NOT complain about argument count
-	if err != nil && strings.Contains(err.Error(), "usage: goenv use") {
-		t.Errorf("Command should accept no arguments, got usage error: %v", err)
-	}
+	assert.False(t, err != nil && strings.Contains(err.Error(), "usage: goenv use"), "Command should accept no arguments")
 
 	// The error should be about versions not being available, not argument count
 	if err != nil && !strings.Contains(err.Error(), "usage:") {
@@ -273,6 +224,7 @@ func TestUseCommand_Integration_NoArgsDefaultsToLatest(t *testing.T) {
 }
 
 func TestUseCommand_Integration_FlagValidation(t *testing.T) {
+	var err error
 	// Test that flags are properly registered and work
 	tests := []struct {
 		name string
@@ -318,9 +270,8 @@ func TestUseCommand_Integration_FlagValidation(t *testing.T) {
 
 			// Create versions directory
 			versionsDir := filepath.Join(tmpDir, "versions")
-			if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-				t.Fatalf("Failed to create versions dir: %v", err)
-			}
+			err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+			require.NoError(t, err, "Failed to create versions dir")
 
 			// Create a fresh command instance with all flags
 			cmd := &cobra.Command{
@@ -347,36 +298,28 @@ func TestUseCommand_Integration_FlagValidation(t *testing.T) {
 			// Verify the flag was parsed (checking the struct value)
 			switch tt.flag {
 			case "global":
-				if !useFlags.global {
-					t.Error("--global flag not set")
-				}
+				assert.True(t, useFlags.global, "--global flag not set")
 			case "force":
-				if !useFlags.force {
-					t.Error("--force flag not set")
-				}
+				assert.True(t, useFlags.force, "--force flag not set")
 			case "yes":
-				if !useFlags.yes {
-					t.Error("--yes flag not set")
-				}
+				assert.True(t, useFlags.yes, "--yes flag not set")
 			case "vscode":
-				if !useFlags.vscode {
-					t.Error("--vscode flag not set")
-				}
+				assert.True(t, useFlags.vscode, "--vscode flag not set")
 			}
 		})
 	}
 }
 
 func TestUseCommand_Integration_QuietMode(t *testing.T) {
+	var err error
 	// Setup isolated environment
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
 	// Create versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions dir: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions dir")
 
 	// Test WITHOUT quiet flag
 	t.Run("verbose_mode", func(t *testing.T) {
@@ -422,8 +365,6 @@ func TestUseCommand_Integration_QuietMode(t *testing.T) {
 
 		output := buf.String()
 		// In quiet mode, should NOT show "No version specified" message
-		if strings.Contains(output, "No version specified") {
-			t.Errorf("Quiet mode should suppress info messages, got: %s", output)
-		}
+		assert.NotContains(t, output, "No version specified", "Quiet mode should suppress info messages %v", output)
 	})
 }

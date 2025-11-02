@@ -2,12 +2,12 @@ package envdetect
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/osinfo"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsWSL(t *testing.T) {
@@ -69,27 +69,21 @@ func TestIsWindowsBinary(t *testing.T) {
 			testutil.WriteTestFile(t, tmpFile, tt.content, utils.PermFileDefault, "Failed to create test file")
 
 			result := IsWindowsBinary(tmpFile)
-			if result != tt.expected {
-				t.Errorf("IsWindowsBinary(%s) = %v, expected %v", tt.name, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "IsWindowsBinary() = , expected %v", tt.name)
 		})
 	}
 }
 
 func TestIsWindowsBinary_NonExistentFile(t *testing.T) {
 	result := IsWindowsBinary("/nonexistent/path/to/binary")
-	if result {
-		t.Error("IsWindowsBinary should return false for non-existent files")
-	}
+	assert.False(t, result, "IsWindowsBinary should return false for non-existent files")
 }
 
 func TestCheckWSLCrossExecution(t *testing.T) {
 	if !osinfo.IsLinux() {
 		// On non-Linux systems, should always return empty
 		result := CheckWSLCrossExecution("/any/path")
-		if result != "" {
-			t.Error("CheckWSLCrossExecution should return empty string on non-Linux systems")
-		}
+		assert.Empty(t, result, "CheckWSLCrossExecution should return empty string on non-Linux systems")
 		return
 	}
 
@@ -125,21 +119,13 @@ func TestCheckWSLCrossExecution_WindowsBinary(t *testing.T) {
 	// If we're in WSL, we should get a warning
 	// If we're on regular Linux, we should get empty (not WSL)
 	if IsWSL() {
-		if result == "" {
-			t.Error("Expected warning when running Windows binary in WSL")
-		}
+		assert.NotEmpty(t, result, "Expected warning when running Windows binary in WSL")
 		// Verify the warning includes the actual host architecture
-		if !strings.Contains(result, osinfo.Arch()) {
-			t.Errorf("Warning message should include host architecture %q, but got: %q", osinfo.Arch(), result)
-		}
+		assert.Contains(t, result, osinfo.Arch(), "Warning message should include host architecture , but %v %v", osinfo.Arch(), result)
 		// Verify it suggests the correct GOOS
-		if !strings.Contains(result, "GOOS=linux") {
-			t.Errorf("Warning message should suggest GOOS=linux, but got: %q", result)
-		}
+		assert.Contains(t, result, "GOOS=linux", "Warning message should suggest GOOS=linux, but %v", result)
 		t.Logf("WSL warning message: %s", result)
 	}
 
-	if !IsWSL() && result != "" {
-		t.Error("Should not warn about Windows binary on regular Linux (not WSL)")
-	}
+	assert.False(t, !IsWSL() && result != "", "Should not warn about Windows binary on regular Linux (not WSL)")
 }

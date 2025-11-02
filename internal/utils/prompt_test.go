@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPromptYesNo_Yes(t *testing.T) {
@@ -40,23 +42,15 @@ func TestPromptYesNo_Yes(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("PromptYesNo() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "PromptYesNo() =")
 
 			// Verify prompt was displayed
 			output := writer.String()
-			if !strings.Contains(output, "Test question?") {
-				t.Errorf("Prompt not displayed: %s", output)
-			}
+			assert.Contains(t, output, "Test question?", "Prompt not displayed %v", output)
 
 			// Verify correct default indicator
-			if tt.defaultYes && !strings.Contains(output, "[Y/n]") {
-				t.Errorf("Expected [Y/n] indicator, got: %s", output)
-			}
-			if !tt.defaultYes && !strings.Contains(output, "[y/N]") {
-				t.Errorf("Expected [y/N] indicator, got: %s", output)
-			}
+			assert.False(t, tt.defaultYes && !strings.Contains(output, "[Y/n]"), "Expected [Y/n] indicator")
+			assert.True(t, tt.defaultYes || strings.Contains(output, "[y/N]"), "Expected [y/N] indicator")
 		})
 	}
 }
@@ -80,14 +74,10 @@ func TestPromptYesNo_NonInteractive(t *testing.T) {
 
 	// Since we're using a non-os.Stdin reader, it should proceed normally
 	got := PromptYesNo(config)
-	if !got {
-		t.Errorf("Expected true for 'yes' input, got false")
-	}
+	assert.True(t, got, "Expected true for 'yes' input, got false")
 
 	// Should not show non-interactive error since reader is not os.Stdin
-	if strings.Contains(errWriter.String(), "non-interactive") {
-		t.Errorf("Should not show non-interactive error for custom reader")
-	}
+	assert.NotContains(t, errWriter.String(), "non-interactive", "Should not show non-interactive error for custom reader")
 }
 
 func TestPromptYesNo_ReadError(t *testing.T) {
@@ -105,9 +95,7 @@ func TestPromptYesNo_ReadError(t *testing.T) {
 	}
 
 	got := PromptYesNo(config)
-	if got {
-		t.Errorf("Expected false on read error, got true")
-	}
+	assert.False(t, got, "Expected false on read error, got true")
 }
 
 func TestPromptYesNoSimple(t *testing.T) {
@@ -150,9 +138,7 @@ func TestPromptYesNoSimple(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("PromptYesNoSimple behavior for %q: got %v, want %v", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "PromptYesNoSimple behavior for %v", tt.input)
 		})
 	}
 }
@@ -191,9 +177,7 @@ func TestPromptYesNo_DefaultYesVariations(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("Input %q: got %v, want %v", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "Input %v", tt.input)
 		})
 	}
 }
@@ -225,9 +209,7 @@ func TestPromptYesNo_DefaultNoVariations(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("Input %q: got %v, want %v", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "Input %v", tt.input)
 		})
 	}
 }
@@ -299,9 +281,7 @@ func TestPromptYesNo_EdgeCases(t *testing.T) {
 			}
 
 			got := PromptYesNo(config)
-			if got != tt.want {
-				t.Errorf("Input %q (defaultYes=%v): got %v, want %v", tt.input, tt.defaultYes, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "Input (defaultYes=) %v %v", tt.input, tt.defaultYes)
 		})
 	}
 }
@@ -336,9 +316,7 @@ func TestPromptYesNo_QuestionFormatting(t *testing.T) {
 			_ = PromptYesNo(config)
 
 			output := writer.String()
-			if output != tt.wantPrompt+" " {
-				t.Errorf("Expected prompt %q, got %q", tt.wantPrompt, strings.TrimSpace(output))
-			}
+			assert.Equal(t, tt.wantPrompt+" ", output, "Expected prompt %v", strings.TrimSpace(output))
 		})
 	}
 }
@@ -364,7 +342,5 @@ func TestPromptYesNo_NonInteractiveHelp(t *testing.T) {
 	// This test verifies that the help text fields are accepted
 	// and don't cause panics (actual non-interactive detection requires os.Stdin)
 	got := PromptYesNo(config)
-	if !got {
-		t.Errorf("Expected true for 'yes' input, got false")
-	}
+	assert.True(t, got, "Expected true for 'yes' input, got false")
 }

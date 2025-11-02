@@ -9,11 +9,14 @@ import (
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spf13/cobra"
 )
 
 func TestVersionFileWriteCommand(t *testing.T) {
+	var err error
 	tests := []struct {
 		name             string
 		args             []string
@@ -113,9 +116,8 @@ func TestVersionFileWriteCommand(t *testing.T) {
 			if tt.setupSystemGo {
 				// Create a bin directory in PATH with go executable
 				binDir := filepath.Join(tmpDir, "system-bin")
-				if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create bin directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(binDir, "create test directory")
+				require.NoError(t, err, "Failed to create bin directory")
 				goExec := filepath.Join(binDir, "go")
 				var content string
 				if utils.IsWindows() {
@@ -172,7 +174,7 @@ func TestVersionFileWriteCommand(t *testing.T) {
 			cmd.SetOut(output)
 			cmd.SetArgs(args)
 
-			err := cmd.Execute()
+			err = cmd.Execute()
 
 			// Check error
 			if tt.expectedError != "" {
@@ -184,15 +186,11 @@ func TestVersionFileWriteCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			// Check output
 			got := output.String()
-			if tt.expectedOutput != "" && got != tt.expectedOutput {
-				t.Errorf("Expected output %q, got %q", tt.expectedOutput, got)
-			}
+			assert.False(t, tt.expectedOutput != "" && got != tt.expectedOutput, "Expected output")
 
 			// Check file content
 			if tt.checkFileContent != "" {

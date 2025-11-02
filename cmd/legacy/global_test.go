@@ -11,6 +11,8 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGlobalCommand(t *testing.T) {
@@ -97,32 +99,21 @@ func TestGlobalCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+			assert.NoError(t, err)
 
 			if tt.expectedOutput != "" {
 				got := cmdtest.StripDeprecationWarning(stdout.String())
-				if got != tt.expectedOutput {
-					t.Errorf("Expected output '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got)
 			}
 
 			// For set operations, verify the file was written correctly
 			if len(tt.args) > 0 && tt.args[0] != "__complete" && tt.expectedError == "" {
 				globalFile := filepath.Join(testRoot, "version")
 				content, err := os.ReadFile(globalFile)
-				if err != nil {
-					t.Errorf("Failed to read global version file: %v", err)
-					return
-				}
+				assert.NoError(t, err, "Failed to read global version file")
 
 				expected := tt.args[0]
-				if strings.TrimSpace(string(content)) != expected {
-					t.Errorf("Expected global version file to contain '%s', got '%s'",
-						expected, strings.TrimSpace(string(content)))
-				}
+				assert.Equal(t, expected, strings.TrimSpace(string(content)))
 			}
 		})
 	}
@@ -146,14 +137,10 @@ func TestGlobalUsage(t *testing.T) {
 	cmd.SetErr(output)
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Help command failed: %v", err)
-	}
+	assert.NoError(t, err, "Help command failed")
 
 	helpOutput := output.String()
-	if !strings.Contains(helpOutput, "Usage:") {
-		t.Error("Help output should contain usage information")
-	}
+	assert.Contains(t, helpOutput, "Usage:", "Help output should contain usage information")
 }
 
 func TestGlobalWithLocalOverride(t *testing.T) {
@@ -172,9 +159,7 @@ func TestGlobalWithLocalOverride(t *testing.T) {
 
 	// Create local version file in current directory
 	tempDir, err := os.MkdirTemp("", "goenv_local_test_")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
+	require.NoError(t, err, "Failed to create temp directory")
 	defer os.RemoveAll(tempDir)
 
 	localFile := filepath.Join(tempDir, ".go-version")
@@ -198,14 +183,10 @@ func TestGlobalWithLocalOverride(t *testing.T) {
 	cmd.SetArgs([]string{})
 
 	err = cmd.Execute()
-	if err != nil {
-		t.Errorf("Global command failed: %v", err)
-	}
+	assert.NoError(t, err, "Global command failed")
 
 	got := cmdtest.StripDeprecationWarning(output.String())
-	if got != "1.21.5" {
-		t.Errorf("Global command should show global version '1.21.5', got '%s'", got)
-	}
+	assert.Equal(t, "1.21.5", got, "Global command should show global version '1.21.5'")
 }
 
 func TestGlobalCommandRejectsExtraArguments(t *testing.T) {
@@ -232,12 +213,7 @@ func TestGlobalCommandRejectsExtraArguments(t *testing.T) {
 	err := cmd.Execute()
 
 	// Should error with usage message
-	if err == nil {
-		t.Error("Expected error when extra arguments provided, got nil")
-		return
-	}
+	assert.Error(t, err, "Expected error when extra arguments provided, got nil")
 
-	if !strings.Contains(err.Error(), "usage: goenv global [version]") {
-		t.Errorf("Expected usage error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "usage: goenv global [version]", "Expected usage error %v", err)
 }

@@ -4,18 +4,16 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSetupContext(t *testing.T) {
 	cfg, mgr := SetupContext()
 
-	if cfg == nil {
-		t.Error("SetupContext returned nil config")
-	}
+	assert.NotNil(t, cfg, "SetupContext returned nil config")
 
-	if mgr == nil {
-		t.Error("SetupContext returned nil manager")
-	}
+	assert.NotNil(t, mgr, "SetupContext returned nil manager")
 }
 
 func TestOutputJSON(t *testing.T) {
@@ -45,10 +43,7 @@ func TestOutputJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			err := OutputJSON(&buf, tt.data)
-			if err != nil {
-				t.Errorf("OutputJSON() error = %v", err)
-				return
-			}
+			assert.NoError(t, err, "OutputJSON() error =")
 
 			output := buf.String()
 			// Remove whitespace for comparison
@@ -56,9 +51,7 @@ func TestOutputJSON(t *testing.T) {
 			output = strings.ReplaceAll(output, "\n", "")
 			contains := strings.ReplaceAll(tt.contains, " ", "")
 
-			if !strings.Contains(output, contains) {
-				t.Errorf("OutputJSON() output = %v, should contain %v", output, contains)
-			}
+			assert.Contains(t, output, contains, "OutputJSON() output = , should contain %v %v", output, contains)
 		})
 	}
 }
@@ -104,9 +97,7 @@ func TestValidateExactArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateExactArgs(tt.args, tt.expected, tt.argName)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateExactArgs() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			assert.Equal(t, tt.wantErr, (err != nil), "ValidateExactArgs() error = , wantErr")
 		})
 	}
 }
@@ -145,9 +136,7 @@ func TestValidateMinArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateMinArgs(tt.args, tt.min, tt.description)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateMinArgs() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			assert.Equal(t, tt.wantErr, (err != nil), "ValidateMinArgs() error = , wantErr")
 		})
 	}
 }
@@ -186,9 +175,7 @@ func TestValidateMaxArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateMaxArgs(tt.args, tt.max, tt.description)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateMaxArgs() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			assert.Equal(t, tt.wantErr, (err != nil), "ValidateMaxArgs() error = , wantErr")
 		})
 	}
 }
@@ -235,9 +222,7 @@ func TestRequireInstalledVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := RequireInstalledVersion(mgr, tt.version)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("RequireInstalledVersion() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			assert.Equal(t, tt.wantErr, (err != nil), "RequireInstalledVersion() error = , wantErr")
 		})
 	}
 }
@@ -270,13 +255,8 @@ func TestMustGetVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			version, err := MustGetVersion(tt.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("MustGetVersion() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && version != tt.wantVersion {
-				t.Errorf("MustGetVersion() version = %v, want %v", version, tt.wantVersion)
-			}
+			assert.Equal(t, tt.wantErr, (err != nil), "MustGetVersion() error = , wantErr")
+			assert.False(t, !tt.wantErr && version != tt.wantVersion, "MustGetVersion() version =")
 		})
 	}
 }

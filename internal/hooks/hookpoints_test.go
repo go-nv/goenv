@@ -2,6 +2,8 @@ package hooks
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHookPointString(t *testing.T) {
@@ -33,9 +35,7 @@ func TestAllHookPoints(t *testing.T) {
 	hookPoints := AllHookPoints()
 
 	// Should have exactly 8 hook points
-	if len(hookPoints) != 8 {
-		t.Errorf("AllHookPoints() returned %d hook points, want 8", len(hookPoints))
-	}
+	assert.Len(t, hookPoints, 8, "AllHookPoints() returned hook points")
 
 	// Verify all expected hook points are present
 	expected := []HookPoint{
@@ -53,9 +53,7 @@ func TestAllHookPoints(t *testing.T) {
 				break
 			}
 		}
-		if !found {
-			t.Errorf("AllHookPoints() missing expected hook point: %s", exp)
-		}
+		assert.True(t, found, "AllHookPoints() missing expected hook point")
 	}
 }
 
@@ -107,8 +105,6 @@ func TestHookPointConstants(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if string(tt.constant) != tt.value {
-			t.Errorf("HookPoint constant %v has value %q, want %q", tt.constant, string(tt.constant), tt.value)
-		}
+		assert.Equal(t, tt.value, string(tt.constant), "HookPoint constant has value %v", tt.constant)
 	}
 }

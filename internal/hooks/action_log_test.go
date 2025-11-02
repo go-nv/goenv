@@ -5,21 +5,20 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogToFileAction_Name(t *testing.T) {
 	action := &LogToFileAction{}
-	if action.Name() != ActionLogToFile {
-		t.Errorf("Name() = %v, want %v", action.Name(), ActionLogToFile)
-	}
+	assert.Equal(t, ActionLogToFile, action.Name(), "Name() =")
 }
 
 func TestLogToFileAction_Description(t *testing.T) {
 	action := &LogToFileAction{}
 	desc := action.Description()
-	if desc == "" {
-		t.Error("Description() returned empty string")
-	}
+	assert.NotEmpty(t, desc, "Description() returned empty string")
 }
 
 func TestLogToFileAction_Validate(t *testing.T) {
@@ -88,9 +87,7 @@ func TestLogToFileAction_Validate(t *testing.T) {
 					t.Errorf("Validate() error = %q, want error containing %q", err.Error(), tt.errMsg)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Validate() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Validate() unexpected error")
 			}
 		})
 	}
@@ -185,13 +182,9 @@ func TestLogToFileAction_Execute(t *testing.T) {
 
 			err := action.Execute(ctx, tt.params)
 			if tt.wantErr {
-				if err == nil {
-					t.Error("Execute() expected error, got nil")
-				}
+				assert.Error(t, err, "Execute() expected error, got nil")
 			} else {
-				if err != nil {
-					t.Errorf("Execute() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Execute() unexpected error")
 
 				if tt.checkContent {
 					file := tt.params["file"].(string)
@@ -203,9 +196,7 @@ func TestLogToFileAction_Execute(t *testing.T) {
 					}
 
 					// Verify file ends with newline
-					if len(content) > 0 && content[len(content)-1] != '\n' {
-						t.Error("Log file does not end with newline")
-					}
+					assert.False(t, len(content) > 0 && content[len(content)-1] != '\n', "Log file does not end with newline")
 				}
 			}
 		})
@@ -213,6 +204,7 @@ func TestLogToFileAction_Execute(t *testing.T) {
 }
 
 func TestLogToFileAction_ExecuteAppendMode(t *testing.T) {
+	var err error
 	// Create temp directory
 	tempDir := t.TempDir()
 
@@ -231,9 +223,8 @@ func TestLogToFileAction_ExecuteAppendMode(t *testing.T) {
 		"append": true,
 	}
 
-	if err := action.Execute(ctx1, params); err != nil {
-		t.Fatalf("First Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx1, params)
+	require.NoError(t, err, "First Execute() failed")
 
 	// Write second entry
 	ctx2 := &HookContext{
@@ -243,26 +234,20 @@ func TestLogToFileAction_ExecuteAppendMode(t *testing.T) {
 		},
 	}
 
-	if err := action.Execute(ctx2, params); err != nil {
-		t.Fatalf("Second Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx2, params)
+	require.NoError(t, err, "Second Execute() failed")
 
 	// Verify both entries exist
 	content, err := os.ReadFile(logFile)
-	if err != nil {
-		t.Fatalf("Failed to read log file: %v", err)
-	}
+	require.NoError(t, err, "Failed to read log file")
 
 	contentStr := string(content)
-	if !strings.Contains(contentStr, "First entry") {
-		t.Error("First entry not found in log file")
-	}
-	if !strings.Contains(contentStr, "Second entry") {
-		t.Error("Second entry not found in log file")
-	}
+	assert.Contains(t, contentStr, "First entry", "First entry not found in log file")
+	assert.Contains(t, contentStr, "Second entry", "Second entry not found in log file")
 }
 
 func TestLogToFileAction_ExecuteTruncateMode(t *testing.T) {
+	var err error
 	// Create temp directory
 	tempDir := t.TempDir()
 
@@ -281,9 +266,8 @@ func TestLogToFileAction_ExecuteTruncateMode(t *testing.T) {
 		"append": false, // Truncate mode
 	}
 
-	if err := action.Execute(ctx1, params); err != nil {
-		t.Fatalf("First Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx1, params)
+	require.NoError(t, err, "First Execute() failed")
 
 	// Write second entry (should replace first)
 	ctx2 := &HookContext{
@@ -293,26 +277,20 @@ func TestLogToFileAction_ExecuteTruncateMode(t *testing.T) {
 		},
 	}
 
-	if err := action.Execute(ctx2, params); err != nil {
-		t.Fatalf("Second Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx2, params)
+	require.NoError(t, err, "Second Execute() failed")
 
 	// Verify only second entry exists
 	content, err := os.ReadFile(logFile)
-	if err != nil {
-		t.Fatalf("Failed to read log file: %v", err)
-	}
+	require.NoError(t, err, "Failed to read log file")
 
 	contentStr := string(content)
-	if strings.Contains(contentStr, "First entry") {
-		t.Error("First entry should not exist in truncate mode")
-	}
-	if !strings.Contains(contentStr, "Second entry") {
-		t.Error("Second entry not found in log file")
-	}
+	assert.NotContains(t, contentStr, "First entry", "First entry should not exist in truncate mode")
+	assert.Contains(t, contentStr, "Second entry", "Second entry not found in log file")
 }
 
 func TestLogToFileAction_ExecuteTimestamp(t *testing.T) {
+	var err error
 	// Create temp directory
 	tempDir := t.TempDir()
 
@@ -332,29 +310,20 @@ func TestLogToFileAction_ExecuteTimestamp(t *testing.T) {
 		"format": "[{hook}] {message}",
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 
 	// Verify content
 	content, err := os.ReadFile(logFile)
-	if err != nil {
-		t.Fatalf("Failed to read log file: %v", err)
-	}
+	require.NoError(t, err, "Failed to read log file")
 
 	contentStr := string(content)
 
 	// Should contain interpolated values
-	if !strings.Contains(contentStr, "[pre_install]") {
-		t.Errorf("Log file does not contain interpolated hook, content: %s", contentStr)
-	}
-	if !strings.Contains(contentStr, "Test message") {
-		t.Errorf("Log file does not contain message, content: %s", contentStr)
-	}
+	assert.Contains(t, contentStr, "[pre_install]", "Log file does not contain interpolated hook, content %v", contentStr)
+	assert.Contains(t, contentStr, "Test message", "Log file does not contain message, content %v", contentStr)
 	// Verify template variables were interpolated
-	if strings.Contains(contentStr, "{hook}") || strings.Contains(contentStr, "{message}") {
-		t.Errorf("Template variables were not interpolated, content: %s", contentStr)
-	}
+	assert.False(t, strings.Contains(contentStr, "{hook}") || strings.Contains(contentStr, "{message}"), "Template variables were not interpolated, content")
 }
 
 func TestExpandTilde(t *testing.T) {
@@ -389,9 +358,7 @@ func TestExpandTilde(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := expandTilde(tt.path)
-			if !tt.check(result) {
-				t.Errorf("expandTilde(%q) = %q, check failed", tt.path, result)
-			}
+			assert.True(t, tt.check(result), "expandTilde() = , check failed")
 		})
 	}
 }

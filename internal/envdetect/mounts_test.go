@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/osinfo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-nv/goenv/internal/utils"
 )
@@ -14,17 +16,11 @@ func TestDetectMountType(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	info, err := DetectMountType(tmpDir)
-	if err != nil {
-		t.Fatalf("DetectMountType failed: %v", err)
-	}
+	require.NoError(t, err, "DetectMountType failed")
 
-	if info == nil {
-		t.Fatal("DetectMountType returned nil MountInfo")
-	}
+	require.NotNil(t, info, "DetectMountType returned nil MountInfo")
 
-	if info.Path == "" {
-		t.Error("MountInfo.Path should not be empty")
-	}
+	assert.NotEmpty(t, info.Path, "MountInfo.Path should not be empty")
 
 	t.Logf("Detected mount info: Path=%s, Filesystem=%s, IsRemote=%v, IsDocker=%v",
 		info.Path, info.Filesystem, info.IsRemote, info.IsDocker)
@@ -33,13 +29,9 @@ func TestDetectMountType(t *testing.T) {
 func TestDetectMountType_NonExistentPath(t *testing.T) {
 	// Non-existent path should still work (uses abs path)
 	info, err := DetectMountType("/nonexistent/path/testing")
-	if err != nil {
-		t.Fatalf("DetectMountType should handle non-existent paths: %v", err)
-	}
+	require.NoError(t, err, "DetectMountType should handle non-existent paths")
 
-	if info == nil {
-		t.Fatal("DetectMountType returned nil MountInfo")
-	}
+	require.NotNil(t, info, "DetectMountType returned nil MountInfo")
 }
 
 func TestDetectLinuxMount(t *testing.T) {
@@ -49,17 +41,11 @@ func TestDetectLinuxMount(t *testing.T) {
 
 	// Test with root directory
 	info, err := detectLinuxMount("/")
-	if err != nil {
-		t.Fatalf("detectLinuxMount failed: %v", err)
-	}
+	require.NoError(t, err, "detectLinuxMount failed")
 
-	if info == nil {
-		t.Fatal("detectLinuxMount returned nil")
-	}
+	require.NotNil(t, info, "detectLinuxMount returned nil")
 
-	if info.Filesystem == "" {
-		t.Error("Filesystem type should be detected for root")
-	}
+	assert.NotEmpty(t, info.Filesystem, "Filesystem type should be detected for root")
 
 	t.Logf("Root filesystem: %s", info.Filesystem)
 }
@@ -71,25 +57,21 @@ func TestDetectDarwinMount(t *testing.T) {
 
 	// Test with a known path
 	info, err := detectDarwinMount("/tmp")
-	if err != nil {
-		t.Fatalf("detectDarwinMount failed: %v", err)
-	}
+	require.NoError(t, err, "detectDarwinMount failed")
 
-	if info == nil {
-		t.Fatal("detectDarwinMount returned nil")
-	}
+	require.NotNil(t, info, "detectDarwinMount returned nil")
 
 	// Currently returns basic info
 	t.Logf("Mount info for /tmp: %+v", info)
 }
 
 func TestCheckCacheOnProblemMount(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cachePath := filepath.Join(tmpDir, "cache")
 
-	if err := utils.EnsureDirWithContext(cachePath, "create test directory"); err != nil {
-		t.Fatalf("Failed to create cache directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(cachePath, "create test directory")
+	require.NoError(t, err, "Failed to create cache directory")
 
 	warning := CheckCacheOnProblemMount(cachePath)
 
@@ -112,9 +94,7 @@ func TestIsInContainer(t *testing.T) {
 	if !osinfo.IsLinux() {
 		// Should return false on non-Linux
 		result := IsInContainer()
-		if result {
-			t.Error("IsInContainer should return false on non-Linux systems")
-		}
+		assert.False(t, result, "IsInContainer should return false on non-Linux systems")
 		return
 	}
 
@@ -141,9 +121,7 @@ func TestIsInContainer(t *testing.T) {
 
 	t.Logf("Container indicators: dockerenv=%v, cgroup=%v", hasDockerEnv, hasCgroup)
 
-	if hasDockerEnv && !result {
-		t.Error("Should detect container when /.dockerenv exists")
-	}
+	assert.False(t, hasDockerEnv && !result, "Should detect container when /.dockerenv exists")
 }
 
 func TestMountInfo_Fields(t *testing.T) {
@@ -154,13 +132,9 @@ func TestMountInfo_Fields(t *testing.T) {
 		IsDocker:   false,
 	}
 
-	if info.Path != "/test/path" {
-		t.Errorf("Path mismatch: got %s", info.Path)
-	}
+	assert.Equal(t, "/test/path", info.Path, "Path mismatch")
 
-	if info.Filesystem != "ext4" {
-		t.Errorf("Filesystem mismatch: got %s", info.Filesystem)
-	}
+	assert.Equal(t, "ext4", info.Filesystem, "Filesystem mismatch")
 
 	if info.IsRemote {
 		t.Error("IsRemote should be false")
@@ -180,15 +154,9 @@ func TestDetectMountType_Windows(t *testing.T) {
 	tmpDir := t.TempDir()
 	info, err := DetectMountType(tmpDir)
 
-	if err != nil {
-		t.Fatalf("DetectMountType failed on Windows: %v", err)
-	}
+	require.NoError(t, err, "DetectMountType failed on Windows")
 
-	if info == nil {
-		t.Fatal("Should return basic MountInfo on Windows")
-	}
+	require.NotNil(t, info, "Should return basic MountInfo on Windows")
 
-	if info.Path == "" {
-		t.Error("Path should be set")
-	}
+	assert.NotEmpty(t, info.Path, "Path should be set")
 }

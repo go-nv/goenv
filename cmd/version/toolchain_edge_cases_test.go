@@ -8,6 +8,8 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestGoModToolchainEdgeCases tests various edge cases for go.mod parsing
@@ -209,17 +211,11 @@ require (
 			err := cmd.Execute()
 
 			if tt.shouldFail {
-				if err == nil {
-					t.Errorf("Expected error but got none, result: %s", output.String())
-				}
+				assert.Error(t, err)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				assert.NoError(t, err)
 				result := strings.TrimSpace(output.String())
-				if result != tt.expectedOutput {
-					t.Errorf("Expected %q but got %q", tt.expectedOutput, result)
-				}
+				assert.Equal(t, tt.expectedOutput, result)
 			}
 		})
 	}
@@ -227,6 +223,7 @@ require (
 
 // TestGoModWithCommentsAndComplexFormat tests that comments and complex formats don't break parsing
 func TestGoModWithCommentsAndComplexFormat(t *testing.T) {
+	var err error
 	content := `// This is a comment
 module github.com/example/project
 
@@ -266,19 +263,17 @@ replace github.com/old/pkg => github.com/new/pkg v1.0.0
 	cmd.SetOut(output)
 	cmd.SetArgs([]string{gomodPath})
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	err = cmd.Execute()
+	require.NoError(t, err)
 
 	expected := "1.22.5"
 	result := strings.TrimSpace(output.String())
-	if result != expected {
-		t.Errorf("Expected %q but got %q", expected, result)
-	}
+	assert.Equal(t, expected, result)
 }
 
 // TestGoModMinimalFormat tests minimal valid go.mod files
 func TestGoModMinimalFormat(t *testing.T) {
+	var err error
 	tests := []struct {
 		name           string
 		fileContent    string
@@ -328,14 +323,11 @@ go 1.22`,
 			cmd.SetOut(output)
 			cmd.SetArgs([]string{gomodPath})
 
-			if err := cmd.Execute(); err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			err = cmd.Execute()
+			require.NoError(t, err)
 
 			result := strings.TrimSpace(output.String())
-			if result != tt.expectedOutput {
-				t.Errorf("Expected %q but got %q", tt.expectedOutput, result)
-			}
+			assert.Equal(t, tt.expectedOutput, result)
 		})
 	}
 }

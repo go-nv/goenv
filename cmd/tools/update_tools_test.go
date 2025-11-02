@@ -11,6 +11,8 @@ import (
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper struct for test setup
@@ -22,6 +24,7 @@ type testToolInfo struct {
 
 // setupUpdateTestEnv creates a test environment for update tests
 func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shouldCreateVersion bool) string {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -38,9 +41,8 @@ func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shou
 		versionPath := filepath.Join(tmpDir, "versions", version)
 
 		goBinDir := filepath.Join(versionPath, "go", "bin")
-		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
-			t.Fatalf("Failed to create go bin directory: %v", err)
-		}
+		err = utils.EnsureDirWithContext(goBinDir, "create test directory")
+		require.NoError(t, err, "Failed to create go bin directory")
 
 		goBinary := filepath.Join(goBinDir, "go")
 		mockScript := "#!/bin/sh\nexit 0"
@@ -51,9 +53,8 @@ func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shou
 		testutil.WriteTestFile(t, goBinary, []byte(mockScript), utils.PermFileExecutable)
 
 		gopathBin := filepath.Join(versionPath, "gopath", "bin")
-		if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
-			t.Fatalf("Failed to create GOPATH/bin: %v", err)
-		}
+		err = utils.EnsureDirWithContext(gopathBin, "create test directory")
+		require.NoError(t, err, "Failed to create GOPATH/bin")
 
 		for _, tool := range tools {
 			cmdtest.CreateToolExecutable(t, gopathBin, tool.name)
@@ -148,14 +149,10 @@ func TestUpdateTools_BasicOperation(t *testing.T) {
 
 			err := runUpdateTools(updateToolsCmd, []string{})
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
+			assert.NoError(t, err)
 
 			output := buf.String()
-			if !strings.Contains(output, tt.expectedOutput) {
-				t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, output)
-			}
+			assert.Contains(t, output, tt.expectedOutput, "Expected output to contain , got:\\n %v %v", tt.expectedOutput, output)
 
 			updateToolsFlags.check = false
 			updateToolsFlags.dryRun = false
@@ -210,14 +207,10 @@ func TestUpdateTools_Modes(t *testing.T) {
 
 			err := runUpdateTools(updateToolsCmd, []string{})
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
+			assert.NoError(t, err)
 
 			output := buf.String()
-			if !strings.Contains(output, tt.expectedOutput) {
-				t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, output)
-			}
+			assert.Contains(t, output, tt.expectedOutput, "Expected output to contain , got:\\n %v %v", tt.expectedOutput, output)
 
 			updateToolsFlags.check = false
 			updateToolsFlags.dryRun = false
@@ -291,9 +284,7 @@ func TestUpdateTools_ToolSelection(t *testing.T) {
 
 			if tt.expectedOutput != "" {
 				output := buf.String()
-				if !strings.Contains(output, tt.expectedOutput) {
-					t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, output)
-				}
+				assert.Contains(t, output, tt.expectedOutput, "Expected output to contain , got:\\n %v %v", tt.expectedOutput, output)
 			}
 
 			updateToolsFlags.check = false
@@ -309,9 +300,7 @@ func TestUpdateToolsHelp(t *testing.T) {
 	cmd.SetErr(buf)
 
 	err := cmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 
@@ -325,9 +314,7 @@ func TestUpdateToolsHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q, got:\n%s", expected, output)
-		}
+		assert.Contains(t, output, expected, "Help output missing , got:\\n %v %v", expected, output)
 	}
 }
 
@@ -360,9 +347,7 @@ func TestUpdateToolsVersionFlag(t *testing.T) {
 	cmd.SetErr(output)
 
 	err := runUpdateTools(cmd, []string{})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	t.Log("✓ Update tools command executed successfully")
 

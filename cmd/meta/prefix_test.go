@@ -9,6 +9,7 @@ import (
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/spf13/cobra"
 )
@@ -190,10 +191,7 @@ func TestPrefixCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+			assert.NoError(t, err)
 
 			got := strings.TrimSpace(output.String())
 
@@ -202,21 +200,15 @@ func TestPrefixCommand(t *testing.T) {
 					// Normalize paths for cross-platform comparison
 					normalizedGot := filepath.ToSlash(got)
 					normalizedExpected := filepath.ToSlash(tt.expectedOutput)
-					if !strings.Contains(normalizedGot, normalizedExpected) {
-						t.Errorf("Expected output to contain '%s', got '%s'", tt.expectedOutput, got)
-					}
+					assert.Contains(t, normalizedGot, normalizedExpected)
 				}
 				if tt.setupSystemGo && systemBinDir != "" {
 					// For system go, should return parent of bin dir
 					expectedDir := filepath.Dir(systemBinDir)
-					if !strings.Contains(got, expectedDir) {
-						t.Errorf("Expected output to contain system dir '%s', got '%s'", expectedDir, got)
-					}
+					assert.Contains(t, got, expectedDir)
 				}
 			} else {
-				if got != tt.expectedOutput {
-					t.Errorf("Expected '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got)
 			}
 		})
 	}
@@ -249,10 +241,7 @@ func TestPrefixCompletion(t *testing.T) {
 	cmd.SetArgs([]string{"--complete"})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
+	assert.NoError(t, err)
 
 	got := strings.TrimSpace(output.String())
 	gotLines := strings.Split(got, "\n")
@@ -260,14 +249,9 @@ func TestPrefixCompletion(t *testing.T) {
 	// Should include: latest, system, and all installed versions
 	expectedLines := []string{"latest", "system", "1.10.9", "1.9.10"}
 
-	if len(gotLines) != len(expectedLines) {
-		t.Errorf("Expected %d lines, got %d:\n%s", len(expectedLines), len(gotLines), got)
-		return
-	}
+	assert.Len(t, gotLines, len(expectedLines), "Expected lines %v", got)
 
 	for i, expected := range expectedLines {
-		if gotLines[i] != expected {
-			t.Errorf("Line %d: expected '%s', got '%s'", i, expected, gotLines[i])
-		}
+		assert.Equal(t, expected, gotLines[i])
 	}
 }

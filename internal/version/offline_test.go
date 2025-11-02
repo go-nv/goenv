@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOfflineMode(t *testing.T) {
@@ -15,25 +17,17 @@ func TestOfflineMode(t *testing.T) {
 
 	// Fetch versions - should use embedded data
 	versions, err := fetcher.FetchAllVersions()
-	if err != nil {
-		t.Fatalf("FetchAllVersions failed in offline mode: %v", err)
-	}
+	require.NoError(t, err, "FetchAllVersions failed in offline mode")
 
 	// Verify we got versions
-	if len(versions) == 0 {
-		t.Fatal("Expected versions in offline mode, got none")
-	}
+	require.NotEmpty(t, versions, "Expected versions in offline mode, got none")
 
 	// Verify we're getting embedded versions (should match EmbeddedVersions length)
-	if len(versions) != len(EmbeddedVersions) {
-		t.Errorf("Expected %d embedded versions, got %d", len(EmbeddedVersions), len(versions))
-	}
+	assert.Len(t, versions, len(EmbeddedVersions), "Expected embedded versions")
 
 	// Verify first version matches
 	if len(versions) > 0 && len(EmbeddedVersions) > 0 {
-		if versions[0] != EmbeddedVersions[0].Version {
-			t.Errorf("First version mismatch: got %s, want %s", versions[0], EmbeddedVersions[0].Version)
-		}
+		assert.Equal(t, EmbeddedVersions[0].Version, versions[0], "First version mismatch")
 	}
 }
 
@@ -46,19 +40,13 @@ func TestOfflineModeFetchWithFallback(t *testing.T) {
 
 	// Use FetchWithFallback - should skip network and use embedded
 	releases, err := fetcher.FetchWithFallback("/tmp/test-goenv-offline")
-	if err != nil {
-		t.Fatalf("FetchWithFallback failed in offline mode: %v", err)
-	}
+	require.NoError(t, err, "FetchWithFallback failed in offline mode")
 
 	// Verify we got releases
-	if len(releases) == 0 {
-		t.Fatal("Expected releases in offline mode, got none")
-	}
+	require.NotEmpty(t, releases, "Expected releases in offline mode, got none")
 
 	// Verify we're getting embedded versions
-	if len(releases) != len(EmbeddedVersions) {
-		t.Errorf("Expected %d embedded releases, got %d", len(EmbeddedVersions), len(releases))
-	}
+	assert.Len(t, releases, len(EmbeddedVersions), "Expected embedded releases")
 }
 
 func TestNormalModeStillWorks(t *testing.T) {

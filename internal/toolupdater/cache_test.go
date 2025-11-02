@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCache(t *testing.T) {
@@ -15,22 +17,14 @@ func TestNewCache(t *testing.T) {
 
 	cache := NewCache(cfg)
 
-	if cache == nil {
-		t.Fatal("NewCache returned nil")
-	}
+	require.NotNil(t, cache, "NewCache returned nil")
 
-	if cache.cfg != cfg {
-		t.Error("Cache config not set correctly")
-	}
+	assert.Equal(t, cfg, cache.cfg, "Cache config not set correctly")
 
-	if cache.ttl != DefaultCacheTTL {
-		t.Errorf("Expected TTL %v, got %v", DefaultCacheTTL, cache.ttl)
-	}
+	assert.Equal(t, DefaultCacheTTL, cache.ttl, "Expected TTL")
 
 	expectedPath := filepath.Join(tmpDir, "cache", "tool-updates")
-	if cache.cachePath != expectedPath {
-		t.Errorf("Expected cache path %s, got %s", expectedPath, cache.cachePath)
-	}
+	assert.Equal(t, expectedPath, cache.cachePath, "Expected cache path")
 }
 
 func TestNewCacheWithTTL(t *testing.T) {
@@ -40,9 +34,7 @@ func TestNewCacheWithTTL(t *testing.T) {
 
 	cache := NewCacheWithTTL(cfg, customTTL)
 
-	if cache.ttl != customTTL {
-		t.Errorf("Expected TTL %v, got %v", customTTL, cache.ttl)
-	}
+	assert.Equal(t, customTTL, cache.ttl, "Expected TTL")
 }
 
 func TestCacheSetAndGet(t *testing.T) {
@@ -55,19 +47,13 @@ func TestCacheSetAndGet(t *testing.T) {
 
 	// Set a value
 	err := cache.SetLatestVersion(packagePath, version)
-	if err != nil {
-		t.Fatalf("SetLatestVersion failed: %v", err)
-	}
+	require.NoError(t, err, "SetLatestVersion failed")
 
 	// Get the value immediately (should be valid)
 	got, found := cache.GetLatestVersion(packagePath)
-	if !found {
-		t.Fatal("Expected to find cached version")
-	}
+	require.True(t, found, "Expected to find cached version")
 
-	if got != version {
-		t.Errorf("Expected version %s, got %s", version, got)
-	}
+	assert.Equal(t, version, got, "Expected version")
 }
 
 func TestCacheGetNonExistent(t *testing.T) {
@@ -76,9 +62,7 @@ func TestCacheGetNonExistent(t *testing.T) {
 	cache := NewCache(cfg)
 
 	_, found := cache.GetLatestVersion("nonexistent/package")
-	if found {
-		t.Error("Expected not to find non-existent package")
-	}
+	assert.False(t, found, "Expected not to find non-existent package")
 }
 
 func TestCacheExpiration(t *testing.T) {
@@ -91,18 +75,14 @@ func TestCacheExpiration(t *testing.T) {
 
 	// Set a value
 	err := cache.SetLatestVersion(packagePath, version)
-	if err != nil {
-		t.Fatalf("SetLatestVersion failed: %v", err)
-	}
+	require.NoError(t, err, "SetLatestVersion failed")
 
 	// Wait for expiration
 	time.Sleep(150 * time.Millisecond)
 
 	// Should not find expired entry
 	_, found := cache.GetLatestVersion(packagePath)
-	if found {
-		t.Error("Expected not to find expired cached version")
-	}
+	assert.False(t, found, "Expected not to find expired cached version")
 }
 
 func TestCachePersistence(t *testing.T) {
@@ -115,25 +95,20 @@ func TestCachePersistence(t *testing.T) {
 	// Create cache and set value
 	cache1 := NewCache(cfg)
 	err := cache1.SetLatestVersion(packagePath, version)
-	if err != nil {
-		t.Fatalf("SetLatestVersion failed: %v", err)
-	}
+	require.NoError(t, err, "SetLatestVersion failed")
 
 	// Create new cache instance (simulates process restart)
 	cache2 := NewCache(cfg)
 
 	// Should find value from disk
 	got, found := cache2.GetLatestVersion(packagePath)
-	if !found {
-		t.Fatal("Expected to find cached version from disk")
-	}
+	require.True(t, found, "Expected to find cached version from disk")
 
-	if got != version {
-		t.Errorf("Expected version %s, got %s", version, got)
-	}
+	assert.Equal(t, version, got, "Expected version")
 }
 
 func TestCacheClear(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 	cache := NewCache(cfg)
@@ -146,15 +121,13 @@ func TestCacheClear(t *testing.T) {
 	}
 
 	for pkg, ver := range packages {
-		if err := cache.SetLatestVersion(pkg, ver); err != nil {
-			t.Fatalf("SetLatestVersion failed: %v", err)
-		}
+		err = cache.SetLatestVersion(pkg, ver)
+		require.NoError(t, err, "SetLatestVersion failed")
 	}
 
 	// Clear cache
-	if err := cache.Clear(); err != nil {
-		t.Fatalf("Clear failed: %v", err)
-	}
+	err = cache.Clear()
+	require.NoError(t, err, "Clear failed")
 
 	// All entries should be gone
 	for pkg := range packages {
@@ -168,12 +141,11 @@ func TestCacheClear(t *testing.T) {
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatalf("Failed to read cache directory: %v", err)
 	}
-	if len(entries) > 0 {
-		t.Errorf("Expected empty cache directory, found %d entries", len(entries))
-	}
+	assert.Empty(t, entries, "Expected empty cache directory, found entries")
 }
 
 func TestCacheClearPackage(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 	cache := NewCache(cfg)
@@ -185,9 +157,8 @@ func TestCacheClearPackage(t *testing.T) {
 	cache.SetLatestVersion(pkg2, "v1.55.0")
 
 	// Clear only pkg1
-	if err := cache.ClearPackage(pkg1); err != nil {
-		t.Fatalf("ClearPackage failed: %v", err)
-	}
+	err = cache.ClearPackage(pkg1)
+	require.NoError(t, err, "ClearPackage failed")
 
 	// pkg1 should be gone
 	if _, found := cache.GetLatestVersion(pkg1); found {
@@ -216,9 +187,7 @@ func TestCacheGetAllEntries(t *testing.T) {
 
 	entries := cache.GetAllEntries()
 
-	if len(entries) != len(packages) {
-		t.Errorf("Expected %d entries, got %d", len(packages), len(entries))
-	}
+	assert.Len(t, entries, len(packages), "Expected entries")
 
 	for pkg, expectedVer := range packages {
 		entry, ok := entries[pkg]
@@ -227,13 +196,9 @@ func TestCacheGetAllEntries(t *testing.T) {
 			continue
 		}
 
-		if entry.LatestVersion != expectedVer {
-			t.Errorf("Expected version %s for %s, got %s", expectedVer, pkg, entry.LatestVersion)
-		}
+		assert.Equal(t, expectedVer, entry.LatestVersion, "Expected version for %v", pkg)
 
-		if entry.PackagePath != pkg {
-			t.Errorf("Expected package path %s, got %s", pkg, entry.PackagePath)
-		}
+		assert.Equal(t, pkg, entry.PackagePath, "Expected package path")
 	}
 }
 
@@ -250,24 +215,17 @@ func TestCacheGetStats(t *testing.T) {
 
 	stats := cache.GetStats()
 
-	if stats.TotalEntries != 2 {
-		t.Errorf("Expected 2 total entries, got %d", stats.TotalEntries)
-	}
+	assert.Equal(t, 2, stats.TotalEntries, "Expected 2 total entries")
 
-	if stats.ValidEntries != 1 {
-		t.Errorf("Expected 1 valid entry, got %d", stats.ValidEntries)
-	}
+	assert.Equal(t, 1, stats.ValidEntries, "Expected 1 valid entry")
 
-	if stats.ExpiredEntries != 1 {
-		t.Errorf("Expected 1 expired entry, got %d", stats.ExpiredEntries)
-	}
+	assert.Equal(t, 1, stats.ExpiredEntries, "Expected 1 expired entry")
 
-	if stats.TTL != 100*time.Millisecond {
-		t.Errorf("Expected TTL %v, got %v", 100*time.Millisecond, stats.TTL)
-	}
+	assert.Equal(t, 100*time.Millisecond, stats.TTL, "Expected TTL")
 }
 
 func TestCachePrune(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 	cache := NewCacheWithTTL(cfg, 50*time.Millisecond)
@@ -278,21 +236,17 @@ func TestCachePrune(t *testing.T) {
 	cache.SetLatestVersion("pkg2", "v2.0.0") // Fresh entry
 
 	// Prune expired entries
-	if err := cache.Prune(); err != nil {
-		t.Fatalf("Prune failed: %v", err)
-	}
+	err = cache.Prune()
+	require.NoError(t, err, "Prune failed")
 
 	stats := cache.GetStats()
-	if stats.TotalEntries != 1 {
-		t.Errorf("Expected 1 entry after prune, got %d", stats.TotalEntries)
-	}
+	assert.Equal(t, 1, stats.TotalEntries, "Expected 1 entry after prune")
 
-	if stats.ExpiredEntries != 0 {
-		t.Errorf("Expected 0 expired entries after prune, got %d", stats.ExpiredEntries)
-	}
+	assert.Equal(t, 0, stats.ExpiredEntries, "Expected 0 expired entries after prune")
 }
 
 func TestCacheLoadAll(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 
@@ -303,9 +257,8 @@ func TestCacheLoadAll(t *testing.T) {
 
 	// Create new cache instance and load all
 	cache2 := NewCache(cfg)
-	if err := cache2.LoadAll(); err != nil {
-		t.Fatalf("LoadAll failed: %v", err)
-	}
+	err = cache2.LoadAll()
+	require.NoError(t, err, "LoadAll failed")
 
 	// Check entries loaded
 	if _, found := cache2.GetLatestVersion("pkg1"); !found {
@@ -323,16 +276,12 @@ func TestCacheSetAndGetTTL(t *testing.T) {
 	cache := NewCache(cfg)
 
 	initialTTL := cache.GetTTL()
-	if initialTTL != DefaultCacheTTL {
-		t.Errorf("Expected initial TTL %v, got %v", DefaultCacheTTL, initialTTL)
-	}
+	assert.Equal(t, DefaultCacheTTL, initialTTL, "Expected initial TTL")
 
 	newTTL := 2 * time.Hour
 	cache.SetTTL(newTTL)
 
-	if cache.GetTTL() != newTTL {
-		t.Errorf("Expected TTL %v, got %v", newTTL, cache.GetTTL())
-	}
+	assert.Equal(t, newTTL, cache.GetTTL(), "Expected TTL")
 }
 
 func TestCacheGetLastCheckTime(t *testing.T) {
@@ -342,9 +291,7 @@ func TestCacheGetLastCheckTime(t *testing.T) {
 
 	// Initially should be zero
 	lastCheck := cache.GetLastCheckTime()
-	if !lastCheck.IsZero() {
-		t.Error("Expected zero last check time for empty cache")
-	}
+	assert.True(t, lastCheck.IsZero(), "Expected zero last check time for empty cache")
 
 	// Add an entry
 	before := time.Now()
@@ -352,9 +299,7 @@ func TestCacheGetLastCheckTime(t *testing.T) {
 	after := time.Now()
 
 	lastCheck = cache.GetLastCheckTime()
-	if lastCheck.Before(before) || lastCheck.After(after) {
-		t.Errorf("Last check time %v not in expected range [%v, %v]", lastCheck, before, after)
-	}
+	assert.False(t, lastCheck.Before(before) || lastCheck.After(after), "Last check time not in expected range [, ]")
 }
 
 func TestCacheConcurrency(t *testing.T) {

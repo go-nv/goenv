@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/osinfo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-nv/goenv/internal/utils"
 )
@@ -12,18 +14,12 @@ import (
 func TestDetect(t *testing.T) {
 	info := Detect()
 
-	if info == nil {
-		t.Fatal("Detect() returned nil")
-	}
+	require.NotNil(t, info, "Detect() returned nil")
 
 	// Basic sanity checks
-	if info.Type == "" {
-		t.Error("Type should not be empty")
-	}
+	assert.NotEmpty(t, info.Type, "Type should not be empty")
 
-	if info.Warnings == nil {
-		t.Error("Warnings should be initialized, not nil")
-	}
+	assert.NotNil(t, info.Warnings, "Warnings should be initialized, not nil")
 }
 
 func TestDetectWSL(t *testing.T) {
@@ -36,9 +32,7 @@ func TestDetectWSL(t *testing.T) {
 	// We can't assume we're running in WSL, so just check the return values are valid
 	if version != "" {
 		t.Logf("Detected WSL version: %s, distro: %s", version, distro)
-		if version != "1" && version != "2" {
-			t.Errorf("Invalid WSL version: %s (expected '1' or '2')", version)
-		}
+		assert.False(t, version != "1" && version != "2", "Invalid WSL version: (expected '1' or '2')")
 	} else {
 		t.Log("Not running in WSL")
 	}
@@ -57,9 +51,7 @@ func TestDetectContainer(t *testing.T) {
 			"lxc":        true,
 			"buildkit":   true,
 		}
-		if !validTypes[containerType] {
-			t.Errorf("Unknown container type: %s", containerType)
-		}
+		assert.True(t, validTypes[containerType], "Unknown container type")
 	} else {
 		t.Log("Not running in container")
 	}
@@ -70,18 +62,12 @@ func TestDetectFilesystem(t *testing.T) {
 
 	info := DetectFilesystem(tmpDir)
 
-	if info == nil {
-		t.Fatal("DetectFilesystem() returned nil")
-	}
+	require.NotNil(t, info, "DetectFilesystem() returned nil")
 
-	if info.FilesystemPath != tmpDir {
-		t.Errorf("FilesystemPath = %s, want %s", info.FilesystemPath, tmpDir)
-	}
+	assert.Equal(t, tmpDir, info.FilesystemPath, "FilesystemPath =")
 
 	// Check that filesystem type was detected
-	if info.FilesystemType == "" {
-		t.Error("FilesystemType should not be empty")
-	}
+	assert.NotEmpty(t, info.FilesystemType, "FilesystemType should not be empty")
 
 	t.Logf("Detected filesystem type: %s for path: %s", info.FilesystemType, tmpDir)
 }
@@ -94,9 +80,7 @@ func TestDetectLinuxFilesystem(t *testing.T) {
 	// Test with /tmp which should always exist
 	fsType := detectLinuxFilesystem("/tmp")
 
-	if fsType == "" {
-		t.Error("detectLinuxFilesystem returned empty string")
-	}
+	assert.NotEmpty(t, fsType, "detectLinuxFilesystem returned empty string")
 
 	t.Logf("Detected filesystem type for /tmp: %s", fsType)
 }
@@ -109,9 +93,7 @@ func TestDetectDarwinFilesystem(t *testing.T) {
 	// Test with /tmp which should always exist
 	fsType := detectDarwinFilesystem("/tmp")
 
-	if fsType == "" {
-		t.Error("detectDarwinFilesystem returned empty string")
-	}
+	assert.NotEmpty(t, fsType, "detectDarwinFilesystem returned empty string")
 
 	t.Logf("Detected filesystem type for /tmp: %s", fsType)
 }
@@ -125,9 +107,7 @@ func TestDetectWindowsFilesystem(t *testing.T) {
 	tmpDir := os.TempDir()
 	fsType := detectWindowsFilesystem(tmpDir)
 
-	if fsType == "" {
-		t.Error("detectWindowsFilesystem returned empty string")
-	}
+	assert.NotEmpty(t, fsType, "detectWindowsFilesystem returned empty string")
 
 	t.Logf("Detected filesystem type for %s: %s", tmpDir, fsType)
 }
@@ -167,9 +147,7 @@ func TestDetectWindowsFilesystemUNC(t *testing.T) {
 			}
 
 			result := detectWindowsFilesystem(tt.path)
-			if result != tt.expected {
-				t.Errorf("detectWindowsFilesystem(%s) = %s, want %s", tt.path, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "detectWindowsFilesystem() = %v", tt.path)
 		})
 	}
 }
@@ -228,9 +206,7 @@ func TestEnvironmentInfoString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.info.String()
-			if got != tt.want {
-				t.Errorf("String() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "String() =")
 		})
 	}
 }
@@ -270,9 +246,7 @@ func TestIsProblematicEnvironment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.info.IsProblematicEnvironment()
-			if got != tt.expected {
-				t.Errorf("IsProblematicEnvironment() = %v, want %v", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "IsProblematicEnvironment() =")
 		})
 	}
 }
@@ -285,14 +259,10 @@ func TestGetWarnings(t *testing.T) {
 	}
 
 	got := info.GetWarnings()
-	if len(got) != len(warnings) {
-		t.Errorf("GetWarnings() returned %d warnings, want %d", len(got), len(warnings))
-	}
+	assert.Len(t, got, len(warnings), "GetWarnings() returned warnings")
 
 	for i, w := range warnings {
-		if got[i] != w {
-			t.Errorf("GetWarnings()[%d] = %q, want %q", i, got[i], w)
-		}
+		assert.Equal(t, w, got[i], "GetWarnings()[] =")
 	}
 }
 
@@ -352,9 +322,7 @@ func TestFilesystemTypeWarnings(t *testing.T) {
 			}
 
 			hasWarnings := len(info.Warnings) > 0
-			if hasWarnings != tt.expectWarnings {
-				t.Errorf("Expected warnings: %v, got: %v (warnings: %v)", tt.expectWarnings, hasWarnings, info.Warnings)
-			}
+			assert.Equal(t, tt.expectWarnings, hasWarnings, "Expected warnings: , got: (warnings: ) %v", info.Warnings)
 		})
 	}
 }
@@ -411,9 +379,7 @@ func TestContainerEnvVars(t *testing.T) {
 			// Detect container
 			containerType := detectContainer()
 
-			if containerType != tt.expected {
-				t.Errorf("detectContainer() = %q, want %q", containerType, tt.expected)
-			}
+			assert.Equal(t, tt.expected, containerType, "detectContainer() =")
 		})
 	}
 }

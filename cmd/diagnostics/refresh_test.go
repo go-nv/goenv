@@ -8,6 +8,8 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRefreshCommand(t *testing.T) {
@@ -67,12 +69,8 @@ func TestRefreshCommand(t *testing.T) {
 			err := runRefresh(cmd, []string{})
 
 			// Check error expectation
-			if tt.expectError && err == nil {
-				t.Error("expected error but got none")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			assert.False(t, tt.expectError && err == nil, "expected error but got none")
+			assert.False(t, !tt.expectError && err != nil)
 
 			// Verify cache files were removed
 			cacheFiles := []string{
@@ -92,6 +90,7 @@ func TestRefreshCommand(t *testing.T) {
 }
 
 func TestRefreshVerboseFlag(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
@@ -108,9 +107,8 @@ func TestRefreshVerboseFlag(t *testing.T) {
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 
-	if err := runRefresh(cmd, []string{}); err != nil {
-		t.Fatalf("command failed: %v", err)
-	}
+	err = runRefresh(cmd, []string{})
+	require.NoError(t, err, "command failed")
 
 	// With verbose flag, we expect to see detailed output
 	// The output is written directly to stdout via fmt.Printf, not through cmd.SetOut

@@ -11,9 +11,12 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUninstallCommand(t *testing.T) {
+	var err error
 	tests := []struct {
 		name           string
 		args           []string
@@ -93,9 +96,8 @@ func TestUninstallCommand(t *testing.T) {
 				versionPath := filepath.Join(tmpDir, "versions", version)
 				goPath := filepath.Join(versionPath, "go")
 
-				if err := utils.EnsureDirWithContext(goPath, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(goPath, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 
 				// Create a marker file to verify existence
 				markerFile := filepath.Join(versionPath, ".installed")
@@ -122,7 +124,7 @@ func TestUninstallCommand(t *testing.T) {
 			os.Stdout = w
 
 			// Execute
-			err := runUninstall(uninstallCmd, tt.args)
+			err = runUninstall(uninstallCmd, tt.args)
 
 			// Restore stdout and read output
 			w.Close()
@@ -146,9 +148,7 @@ func TestUninstallCommand(t *testing.T) {
 			// Check output
 			if tt.expectedOutput != "" {
 				output := combinedOutput
-				if !strings.Contains(output, tt.expectedOutput) {
-					t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, output)
-				}
+				assert.Contains(t, output, tt.expectedOutput, "Expected output to contain , got:\\n %v %v", tt.expectedOutput, output)
 			}
 
 			// Check if version still exists or not
@@ -177,9 +177,7 @@ func TestUninstallHelp(t *testing.T) {
 
 	// Get help text
 	err := cmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 
@@ -191,13 +189,12 @@ func TestUninstallHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q, got:\n%s", expected, output)
-		}
+		assert.Contains(t, output, expected, "Help output missing , got:\\n %v %v", expected, output)
 	}
 }
 
 func TestUninstallCompletion(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	// Set GOENV_DIR to prevent looking in parent directories
@@ -214,9 +211,8 @@ func TestUninstallCompletion(t *testing.T) {
 		versionPath := filepath.Join(tmpDir, "versions", version)
 		binPath := filepath.Join(versionPath, "bin")
 
-		if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-			t.Fatalf("Failed to create bin directory: %v", err)
-		}
+		err = utils.EnsureDirWithContext(binPath, "create test directory")
+		require.NoError(t, err, "Failed to create bin directory")
 
 		// Create go binary for version detection
 		goExe := filepath.Join(binPath, "go")
@@ -244,18 +240,14 @@ func TestUninstallCompletion(t *testing.T) {
 	uninstallCmd.SetErr(buf)
 
 	// Execute
-	err := runUninstall(uninstallCmd, []string{})
-	if err != nil {
-		t.Fatalf("Completion mode failed: %v", err)
-	}
+	err = runUninstall(uninstallCmd, []string{})
+	require.NoError(t, err, "Completion mode failed")
 
 	output := buf.String()
 
 	// Check that all versions are listed
 	for _, version := range versions {
-		if !strings.Contains(output, version) {
-			t.Errorf("Expected completion output to contain %q, got:\n%s", version, output)
-		}
+		assert.Contains(t, output, version, "Expected completion output to contain , got:\\n %v %v", version, output)
 	}
 
 	// Reset flags

@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInstallCommand_NoRehashFlag(t *testing.T) {
@@ -31,9 +33,7 @@ func TestInstallCommand_NoRehashFlag(t *testing.T) {
 	installFlags.skipExisting = true // Skip actual install since already exists
 
 	err := installCmd.RunE(installCmd, []string{"1.21.0"})
-	if err != nil {
-		t.Fatalf("Install command failed: %v", err)
-	}
+	require.NoError(t, err, "Install command failed")
 
 	output := buf.String()
 
@@ -65,9 +65,7 @@ func TestInstallCommand_NoRehashEnv(t *testing.T) {
 	installFlags.skipExisting = true
 
 	err := installCmd.RunE(installCmd, []string{"1.21.0"})
-	if err != nil {
-		t.Fatalf("Install command failed: %v", err)
-	}
+	require.NoError(t, err, "Install command failed")
 
 	output := buf.String()
 
@@ -81,11 +79,7 @@ func TestInstallCommand_NoRehashEnv(t *testing.T) {
 func TestInstallCommand_NoRehashFlagExists(t *testing.T) {
 	// Verify the flag is defined
 	flag := installCmd.Flags().Lookup("no-rehash")
-	if flag == nil {
-		t.Fatal("--no-rehash flag is not defined")
-	}
+	require.NotNil(t, flag, "--no-rehash flag is not defined")
 
-	if flag.DefValue != "false" {
-		t.Errorf("Expected --no-rehash default to be false, got %s", flag.DefValue)
-	}
+	assert.Equal(t, "false", flag.DefValue, "Expected --no-rehash default to be false")
 }

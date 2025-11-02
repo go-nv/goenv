@@ -1,10 +1,12 @@
 package shims
 
 import (
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/spf13/cobra"
 )
@@ -104,41 +106,27 @@ func TestWhenceCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v\nStderr: %s", err, errOutput.String())
-				return
-			}
+			assert.NoError(t, err, "Unexpected error: \\nStderr")
 
 			got := strings.TrimSpace(output.String())
 
 			if len(tt.expectedOutput) == 0 {
-				if got != "" {
-					t.Errorf("Expected empty output, got '%s'", got)
-				}
+				assert.Empty(t, got, "Expected empty output")
 				return
 			}
 
 			gotLines := strings.Split(got, "\n")
 
-			if len(gotLines) != len(tt.expectedOutput) {
-				t.Errorf("Expected %d lines, got %d:\nExpected:\n%s\nGot:\n%s",
-					len(tt.expectedOutput), len(gotLines),
-					strings.Join(tt.expectedOutput, "\n"), got)
-				return
-			}
+			assert.Len(t, gotLines, len(tt.expectedOutput), "Expected lines %v %v", strings.Join(tt.expectedOutput, "\n"), got)
 
 			for i, expected := range tt.expectedOutput {
 				if tt.checkContains {
 					// Normalize paths for cross-platform comparison
 					normalizedGot := filepath.ToSlash(gotLines[i])
 					normalizedExpected := filepath.ToSlash(expected)
-					if !strings.Contains(normalizedGot, normalizedExpected) {
-						t.Errorf("Line %d: expected to contain '%s', got '%s'", i, expected, gotLines[i])
-					}
+					assert.Contains(t, normalizedGot, normalizedExpected)
 				} else {
-					if gotLines[i] != expected {
-						t.Errorf("Line %d: expected '%s', got '%s'", i, expected, gotLines[i])
-					}
+					assert.Equal(t, expected, gotLines[i])
 				}
 			}
 		})
@@ -170,15 +158,10 @@ func TestWhenceCompletion(t *testing.T) {
 	cmd.SetArgs([]string{"--complete"})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
+	assert.NoError(t, err)
 
 	got := strings.TrimSpace(output.String())
 	expected := "--path"
 
-	if got != expected {
-		t.Errorf("Expected '%s', got '%s'", expected, got)
-	}
+	assert.Equal(t, expected, got)
 }

@@ -8,15 +8,15 @@ import (
 	"github.com/go-nv/goenv/internal/osinfo"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsAppleSilicon(t *testing.T) {
 	if !osinfo.IsMacOS() {
 		// Should return false on non-macOS
 		result := IsAppleSilicon()
-		if result {
-			t.Error("IsAppleSilicon should return false on non-macOS systems")
-		}
+		assert.False(t, result, "IsAppleSilicon should return false on non-macOS systems")
 		return
 	}
 
@@ -29,31 +29,23 @@ func TestIsAppleSilicon(t *testing.T) {
 		t.Log("Detected Apple Silicon but osinfo.Arch() is not arm64 - may be running under Rosetta")
 	}
 
-	if !result && osinfo.Arch() == "arm64" {
-		t.Error("Should detect Apple Silicon when running on arm64")
-	}
+	assert.False(t, !result && osinfo.Arch() == "arm64", "Should detect Apple Silicon when running on arm64")
 }
 
 func TestGetBinaryArchitecture(t *testing.T) {
 	if !osinfo.IsMacOS() {
 		// Should return empty on non-macOS
 		result := GetBinaryArchitecture("/any/path")
-		if result != "" {
-			t.Error("GetBinaryArchitecture should return empty string on non-macOS systems")
-		}
+		assert.Empty(t, result, "GetBinaryArchitecture should return empty string on non-macOS systems")
 		return
 	}
 
 	// Test with the current executable
 	exe, err := os.Executable()
-	if err != nil {
-		t.Fatalf("Failed to get executable path: %v", err)
-	}
+	require.NoError(t, err, "Failed to get executable path")
 
 	arch := GetBinaryArchitecture(exe)
-	if arch == "" {
-		t.Error("Should detect architecture for current executable")
-	}
+	assert.NotEmpty(t, arch, "Should detect architecture for current executable")
 
 	t.Logf("Current executable architecture: %s", arch)
 
@@ -69,9 +61,7 @@ func TestGetBinaryArchitecture_NonExistent(t *testing.T) {
 	}
 
 	arch := GetBinaryArchitecture("/nonexistent/binary")
-	if arch != "" {
-		t.Error("Should return empty string for non-existent file")
-	}
+	assert.Empty(t, arch, "Should return empty string for non-existent file")
 }
 
 func TestGetBinaryArchitecture_NonBinary(t *testing.T) {
@@ -93,9 +83,7 @@ func TestCheckRosettaMixedArchitecture(t *testing.T) {
 	if !osinfo.IsMacOS() {
 		// Should return empty on non-macOS
 		result := CheckRosettaMixedArchitecture("/any/path")
-		if result != "" {
-			t.Error("CheckRosettaMixedArchitecture should return empty string on non-macOS")
-		}
+		assert.Empty(t, result, "CheckRosettaMixedArchitecture should return empty string on non-macOS")
 		return
 	}
 
@@ -105,9 +93,7 @@ func TestCheckRosettaMixedArchitecture(t *testing.T) {
 
 	// Get current executable
 	exe, err := os.Executable()
-	if err != nil {
-		t.Fatalf("Failed to get executable path: %v", err)
-	}
+	require.NoError(t, err, "Failed to get executable path")
 
 	// Check with itself - should not warn if both are same architecture
 	result := CheckRosettaMixedArchitecture(exe)
@@ -149,9 +135,7 @@ func TestCheckRosettaMixedArchitecture_NonExistent(t *testing.T) {
 	result := CheckRosettaMixedArchitecture("/nonexistent/tool")
 
 	// Should return empty (can't determine architecture)
-	if result != "" {
-		t.Errorf("Should return empty for non-existent file, got: %q", result)
-	}
+	assert.Empty(t, result, "Should return empty for non-existent file")
 }
 
 func TestCheckRosettaMixedArchitecture_IntelMac(t *testing.T) {
@@ -165,14 +149,10 @@ func TestCheckRosettaMixedArchitecture_IntelMac(t *testing.T) {
 
 	// On Intel Mac, should always return empty
 	exe, err := os.Executable()
-	if err != nil {
-		t.Fatalf("Failed to get executable path: %v", err)
-	}
+	require.NoError(t, err, "Failed to get executable path")
 
 	result := CheckRosettaMixedArchitecture(exe)
-	if result != "" {
-		t.Errorf("Should not warn on Intel Mac, got: %q", result)
-	}
+	assert.Empty(t, result, "Should not warn on Intel Mac")
 }
 
 func TestGetBinaryArchitecture_MultiArchBinary(t *testing.T) {

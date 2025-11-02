@@ -11,9 +11,12 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCISetupPowerShellQuoting(t *testing.T) {
+	var err error
 	tests := []struct {
 		name         string
 		goenvRoot    string
@@ -59,9 +62,8 @@ func TestCISetupPowerShellQuoting(t *testing.T) {
 			}
 
 			// Create test directory
-			if err := utils.EnsureDirWithContext(tt.goenvRoot, "create test directory"); err != nil {
-				t.Fatalf("Failed to create test directory: %v", err)
-			}
+			err = utils.EnsureDirWithContext(tt.goenvRoot, "create test directory")
+			require.NoError(t, err, "Failed to create test directory")
 			defer os.RemoveAll(tt.goenvRoot)
 
 			// Create config with test root
@@ -83,31 +85,23 @@ func TestCISetupPowerShellQuoting(t *testing.T) {
 			output := buf.String()
 
 			// Verify GOENV_ROOT is set correctly
-			if !strings.Contains(output, "$env:GOENV_ROOT = '") {
-				t.Errorf("Output missing GOENV_ROOT assignment:\n%s", output)
-			}
+			assert.Contains(t, output, "$env:GOENV_ROOT = '", "Output missing GOENV_ROOT assignment:\\n %v", output)
 
 			// Verify PATH contains properly quoted paths
-			if !strings.Contains(output, "$env:PATH = \"") {
-				t.Errorf("Output missing PATH assignment:\n%s", output)
-			}
+			assert.Contains(t, output, "$env:PATH = \"", "Output missing PATH assignment:\\n %v", output)
 
 			// Check for proper quote escaping in GOENV_ROOT
 			// Single quotes should be doubled for PowerShell
 			if strings.Contains(tt.goenvRoot, "'") {
 				escapedRoot := strings.ReplaceAll(tt.goenvRoot, "'", "''")
-				if !strings.Contains(output, escapedRoot) {
-					t.Errorf("Single quotes not properly escaped in GOENV_ROOT:\nExpected: %s\nGot:\n%s", escapedRoot, output)
-				}
+				assert.Contains(t, output, escapedRoot, "Single quotes not properly escaped in GOENV_ROOT:\\nExpected: \\nGot:\\n %v %v", escapedRoot, output)
 			}
 
 			// Check for proper backtick escaping in PATH
 			// Double quotes should be backtick-escaped
 			if strings.Contains(tt.goenvRoot, "\"") {
 				escapedPath := strings.ReplaceAll(tt.goenvRoot, "\"", "`\"")
-				if !strings.Contains(output, escapedPath) {
-					t.Errorf("Double quotes not properly escaped in PATH:\nExpected: %s\nGot:\n%s", escapedPath, output)
-				}
+				assert.Contains(t, output, escapedPath, "Double quotes not properly escaped in PATH:\\nExpected: \\nGot:\\n %v %v", escapedPath, output)
 			}
 
 			t.Logf("PowerShell output for %s:\n%s", tt.name, output)
@@ -116,6 +110,7 @@ func TestCISetupPowerShellQuoting(t *testing.T) {
 }
 
 func TestCISetupPowerShellExecution(t *testing.T) {
+	var err error
 	if !utils.IsWindows() {
 		t.Skip("Skipping PowerShell execution test on non-Windows platform")
 	}
@@ -146,12 +141,10 @@ func TestCISetupPowerShellExecution(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test directory structure
-			if err := utils.EnsureDir(filepath.Join(tt.goenvRoot, "bin")); err != nil {
-				t.Fatalf("Failed to create bin directory: %v", err)
-			}
-			if err := utils.EnsureDir(filepath.Join(tt.goenvRoot, "shims")); err != nil {
-				t.Fatalf("Failed to create shims directory: %v", err)
-			}
+			err = utils.EnsureDir(filepath.Join(tt.goenvRoot, "bin"))
+			require.NoError(t, err, "Failed to create bin directory")
+			err = utils.EnsureDir(filepath.Join(tt.goenvRoot, "shims"))
+			require.NoError(t, err, "Failed to create shims directory")
 			defer os.RemoveAll(tt.goenvRoot)
 
 			// Create config with test root
@@ -182,27 +175,16 @@ func TestCISetupPowerShellExecution(t *testing.T) {
 			// Execute PowerShell script
 			cmdExec := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptFile)
 			output, err := cmdExec.CombinedOutput()
-			if err != nil {
-				t.Errorf("PowerShell execution failed: %v\nOutput:\n%s\nScript:\n%s", err, output, script)
-				return
-			}
+			assert.NoError(t, err, "PowerShell execution failed: \\nOutput:\\n\\nScript:\\n")
 
 			outputStr := string(output)
 			t.Logf("PowerShell execution output:\n%s", outputStr)
 
 			// Verify the script executed successfully
-			if !strings.Contains(outputStr, "GOENV_ROOT:") {
-				t.Errorf("GOENV_ROOT not echoed in output:\n%s", outputStr)
-			}
-			if !strings.Contains(outputStr, "True") {
-				t.Errorf("Test-Path did not return True, path may not be accessible:\n%s", outputStr)
-			}
-			if !strings.Contains(outputStr, "PATH contains bin: True") {
-				t.Errorf("PATH does not contain bin directory:\n%s", outputStr)
-			}
-			if !strings.Contains(outputStr, "PATH contains shims: True") {
-				t.Errorf("PATH does not contain shims directory:\n%s", outputStr)
-			}
+			assert.Contains(t, outputStr, "GOENV_ROOT:", "GOENV_ROOT not echoed in output:\\n %v", outputStr)
+			assert.Contains(t, outputStr, "True", "Test-Path did not return True, path may not be accessible:\\n %v", outputStr)
+			assert.Contains(t, outputStr, "PATH contains bin: True", "PATH does not contain bin directory:\\n %v", outputStr)
+			assert.Contains(t, outputStr, "PATH contains shims: True", "PATH does not contain shims directory:\\n %v", outputStr)
 		})
 	}
 }
@@ -285,17 +267,11 @@ func TestCISetupShellFormats(t *testing.T) {
 			output := buf.String()
 
 			// Verify expected patterns
-			if !strings.Contains(output, tt.expectEnvVar) {
-				t.Errorf("Expected environment variable pattern %q not found in output:\n%s", tt.expectEnvVar, output)
-			}
-			if !strings.Contains(output, tt.expectPath) {
-				t.Errorf("Expected PATH pattern %q not found in output:\n%s", tt.expectPath, output)
-			}
+			assert.Contains(t, output, tt.expectEnvVar, "Expected environment variable pattern not found in output:\\n %v %v", tt.expectEnvVar, output)
+			assert.Contains(t, output, tt.expectPath, "Expected PATH pattern not found in output:\\n %v %v", tt.expectPath, output)
 
 			// Verify root path is in output
-			if !strings.Contains(output, testRoot) && !strings.Contains(output, "\\bin") {
-				t.Errorf("Expected root path or bin reference not found in output:\n%s", output)
-			}
+			assert.True(t, strings.Contains(output, testRoot) || strings.Contains(output, "\\bin"), "Expected root path or bin reference not found in output:\\n")
 
 			t.Logf("%s output:\n%s", tt.shell, output)
 		})
@@ -340,10 +316,7 @@ func TestCISetupPowerShellSpecialCharacters(t *testing.T) {
 			output := buf.String()
 
 			// Verify escaping
-			if !strings.Contains(output, tt.expectEscaped) {
-				t.Errorf("Expected escaped pattern %q not found in output:\n%s\nDescription: %s",
-					tt.expectEscaped, output, tt.description)
-			}
+			assert.Contains(t, output, tt.expectEscaped, "Expected escaped pattern not found in output:\\n\\nDescription %v %v %v", tt.expectEscaped, output, tt.description)
 
 			t.Logf("PowerShell output for %s:\n%s", tt.description, output)
 		})

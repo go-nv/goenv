@@ -3,13 +3,14 @@ package hooks
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultRegistry(t *testing.T) {
 	registry := DefaultRegistry()
-	if registry == nil {
-		t.Fatal("DefaultRegistry() returned nil")
-	}
+	require.NotNil(t, registry, "DefaultRegistry() returned nil")
 
 	// Verify all 5 actions are registered
 	expectedActions := []string{
@@ -22,12 +23,8 @@ func TestDefaultRegistry(t *testing.T) {
 
 	for _, actionName := range expectedActions {
 		executor, exists := registry.Get(actionName)
-		if !exists {
-			t.Errorf("DefaultRegistry() missing action: %s", actionName)
-		}
-		if executor == nil {
-			t.Errorf("DefaultRegistry() executor for %s is nil", actionName)
-		}
+		assert.True(t, exists, "DefaultRegistry() missing action")
+		assert.NotNil(t, executor, "DefaultRegistry() executor for is nil")
 	}
 }
 
@@ -39,24 +36,16 @@ func TestRegistryRegister(t *testing.T) {
 
 	// Register an action
 	err := registry.Register(mockExecutor)
-	if err != nil {
-		t.Errorf("Registry.Register() unexpected error: %v", err)
-	}
+	assert.NoError(t, err, "Registry.Register() unexpected error")
 
 	// Verify it can be retrieved
 	executor, exists := registry.Get(mockExecutor.Name().String())
-	if !exists {
-		t.Error("Registry.Get() could not find registered action")
-	}
-	if executor == nil {
-		t.Error("Registry.Get() returned nil executor")
-	}
+	assert.True(t, exists, "Registry.Get() could not find registered action")
+	assert.NotNil(t, executor, "Registry.Get() returned nil executor")
 
 	// Test duplicate registration
 	err = registry.Register(mockExecutor)
-	if err == nil {
-		t.Error("Registry.Register() expected error for duplicate registration, got nil")
-	}
+	assert.Error(t, err, "Registry.Register() expected error for duplicate registration, got nil")
 }
 
 // MockEmptyNameAction is a test action that returns an empty name (zero value)
@@ -135,9 +124,7 @@ func TestRegistryRegisterInvalidNames(t *testing.T) {
 					t.Errorf("Registry.Register() error = %q, want error containing %q", err.Error(), tt.errMsg)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Registry.Register() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Registry.Register() unexpected error")
 			}
 		})
 	}
@@ -161,15 +148,9 @@ func TestRegistryGet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			executor, exists := registry.Get(tt.actionName)
-			if exists != tt.shouldExist {
-				t.Errorf("Registry.Get(%q) exists = %v, want %v", tt.actionName, exists, tt.shouldExist)
-			}
-			if tt.shouldExist && executor == nil {
-				t.Errorf("Registry.Get(%q) returned nil executor", tt.actionName)
-			}
-			if !tt.shouldExist && executor != nil {
-				t.Errorf("Registry.Get(%q) expected nil executor, got %v", tt.actionName, executor)
-			}
+			assert.Equal(t, tt.shouldExist, exists, "Registry.Get() exists = %v", tt.actionName)
+			assert.False(t, tt.shouldExist && executor == nil, "Registry.Get() returned nil executor")
+			assert.False(t, !tt.shouldExist && executor != nil, "Registry.Get() expected nil executor")
 		})
 	}
 }
@@ -184,9 +165,7 @@ func TestRegistryList(t *testing.T) {
 
 	actions := registry.List()
 
-	if len(actions) != 3 {
-		t.Errorf("Registry.List() returned %d actions, want 3", len(actions))
-	}
+	assert.Len(t, actions, 3, "Registry.List() returned actions")
 
 	// Verify all registered actions are in the list
 	expected := map[string]bool{
@@ -201,10 +180,8 @@ func TestRegistryList(t *testing.T) {
 		}
 	}
 
-	for name, found := range expected {
-		if !found {
-			t.Errorf("Registry.List() missing action: %s", name)
-		}
+	for _, found := range expected {
+		assert.True(t, found, "Registry.List() missing action")
 	}
 }
 
@@ -216,9 +193,7 @@ func TestRegistryConcurrency(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			_, exists := registry.Get("log_to_file")
-			if !exists {
-				t.Error("Concurrent Get() failed to find log_to_file")
-			}
+			assert.True(t, exists, "Concurrent Get() failed to find log_to_file")
 			done <- true
 		}()
 	}

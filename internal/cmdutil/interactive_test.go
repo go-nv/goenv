@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewInteractiveContext(t *testing.T) {
@@ -117,15 +118,9 @@ func TestNewInteractiveContext(t *testing.T) {
 			cmd := tt.setupCmd()
 			ctx := NewInteractiveContext(cmd)
 
-			if ctx.Level != tt.expectedLevel {
-				t.Errorf("Level = %v, want %v", ctx.Level, tt.expectedLevel)
-			}
-			if ctx.AssumeYes != tt.expectedYes {
-				t.Errorf("AssumeYes = %v, want %v", ctx.AssumeYes, tt.expectedYes)
-			}
-			if ctx.Quiet != tt.expectedQuiet {
-				t.Errorf("Quiet = %v, want %v", ctx.Quiet, tt.expectedQuiet)
-			}
+			assert.Equal(t, tt.expectedLevel, ctx.Level, "Level =")
+			assert.Equal(t, tt.expectedYes, ctx.AssumeYes, "AssumeYes =")
+			assert.Equal(t, tt.expectedQuiet, ctx.Quiet, "Quiet =")
 		})
 	}
 }
@@ -251,9 +246,7 @@ func TestInteractiveContext_Confirm(t *testing.T) {
 			}
 
 			got := ctx.Confirm("Test question?", tt.defaultYes)
-			if got != tt.want {
-				t.Errorf("Confirm() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "Confirm() =")
 		})
 	}
 }
@@ -328,17 +321,11 @@ func TestInteractiveContext_OfferRepair(t *testing.T) {
 			}
 
 			got := ctx.OfferRepair("Test problem", "Test repair")
-			if got != tt.want {
-				t.Errorf("OfferRepair() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "OfferRepair() =")
 
-			if tt.wantOutputContain != "" && !strings.Contains(stdout.String(), tt.wantOutputContain) {
-				t.Errorf("Output should contain %q, got: %s", tt.wantOutputContain, stdout.String())
-			}
+			assert.False(t, tt.wantOutputContain != "" && !strings.Contains(stdout.String(), tt.wantOutputContain), "Output should contain")
 
-			if tt.wantErrContain != "" && !strings.Contains(stderr.String(), tt.wantErrContain) {
-				t.Errorf("Error output should contain %q, got: %s", tt.wantErrContain, stderr.String())
-			}
+			assert.False(t, tt.wantErrContain != "" && !strings.Contains(stderr.String(), tt.wantErrContain), "Error output should contain")
 		})
 	}
 }
@@ -441,9 +428,7 @@ func TestInteractiveContext_Select(t *testing.T) {
 			}
 
 			got := ctx.Select("Test question?", options)
-			if got != tt.want {
-				t.Errorf("Select() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "Select() =")
 		})
 	}
 }
@@ -468,12 +453,8 @@ func TestInteractiveContext_Printf(t *testing.T) {
 
 			ctx.Printf("test output %s", "here")
 
-			if tt.wantEmpty && stdout.Len() > 0 {
-				t.Errorf("Expected empty output in quiet mode, got: %s", stdout.String())
-			}
-			if !tt.wantEmpty && stdout.Len() == 0 {
-				t.Error("Expected output but got none")
-			}
+			assert.False(t, tt.wantEmpty && stdout.Len() > 0, "Expected empty output in quiet mode")
+			assert.False(t, !tt.wantEmpty && stdout.Len() == 0, "Expected output but got none")
 		})
 	}
 }
@@ -497,9 +478,7 @@ func TestInteractiveContext_ErrorPrintf(t *testing.T) {
 
 			ctx.ErrorPrintf("error output")
 
-			if stderr.Len() == 0 {
-				t.Error("Expected error output but got none")
-			}
+			assert.NotEqual(t, 0, stderr.Len(), "Expected error output but got none")
 		})
 	}
 }
@@ -554,9 +533,7 @@ func TestIsCI(t *testing.T) {
 			// Set the specific CI var
 			t.Setenv(tt.envVar, tt.value)
 
-			if !IsCI() {
-				t.Errorf("IsCI() = false with %s=%s, want true", tt.envVar, tt.value)
-			}
+			assert.True(t, IsCI(), "IsCI() = false with =")
 		})
 	}
 }

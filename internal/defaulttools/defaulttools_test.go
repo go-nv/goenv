@@ -2,27 +2,22 @@ package defaulttools
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
-	if config == nil {
-		t.Fatal("DefaultConfig returned nil")
-	}
+	require.NotNil(t, config, "DefaultConfig returned nil")
 
-	if !config.Enabled {
-		t.Error("Expected default config to be enabled")
-	}
+	assert.True(t, config.Enabled, "Expected default config to be enabled")
 
-	if len(config.Tools) == 0 {
-		t.Error("Expected default config to have tools")
-	}
+	assert.NotEqual(t, 0, len(config.Tools), "Expected default config to have tools")
 
 	// Check for expected default tools
 	expectedTools := []string{"gopls", "golangci-lint", "staticcheck", "delve"}
@@ -32,15 +27,11 @@ func TestDefaultConfig(t *testing.T) {
 		foundTools[tool.Name] = true
 
 		// Verify tool has required fields
-		if tool.Package == "" {
-			t.Errorf("Tool %s has empty package", tool.Name)
-		}
+		assert.NotEmpty(t, tool.Package, "Tool has empty package")
 	}
 
 	for _, expected := range expectedTools {
-		if !foundTools[expected] {
-			t.Errorf("Expected default tool %q not found", expected)
-		}
+		assert.True(t, foundTools[expected], "Expected default tool not found")
 	}
 }
 
@@ -49,18 +40,12 @@ func TestLoadConfig_NonExistent(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "nonexistent.yaml")
 
 	config, err := LoadConfig(configPath)
-	if err != nil {
-		t.Fatalf("LoadConfig failed for non-existent file: %v", err)
-	}
+	require.NoError(t, err, "LoadConfig failed for non-existent file")
 
 	// Should return default config
-	if config == nil {
-		t.Fatal("LoadConfig returned nil for non-existent file")
-	}
+	require.NotNil(t, config, "LoadConfig returned nil for non-existent file")
 
-	if !config.Enabled {
-		t.Error("Expected default config when file doesn't exist")
-	}
+	assert.True(t, config.Enabled, "Expected default config when file doesn't exist")
 }
 
 func TestSaveAndLoadConfig(t *testing.T) {
@@ -87,9 +72,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 
 	// Save config
 	err := SaveConfig(configPath, originalConfig)
-	if err != nil {
-		t.Fatalf("SaveConfig failed: %v", err)
-	}
+	require.NoError(t, err, "SaveConfig failed")
 
 	// Verify file exists
 	if utils.FileNotExists(configPath) {
@@ -98,14 +81,10 @@ func TestSaveAndLoadConfig(t *testing.T) {
 
 	// Load config back
 	loadedConfig, err := LoadConfig(configPath)
-	if err != nil {
-		t.Fatalf("LoadConfig failed: %v", err)
-	}
+	require.NoError(t, err, "LoadConfig failed")
 
 	// Verify loaded config matches original
-	if loadedConfig.Enabled != originalConfig.Enabled {
-		t.Errorf("Enabled mismatch: got %v, want %v", loadedConfig.Enabled, originalConfig.Enabled)
-	}
+	assert.Equal(t, originalConfig.Enabled, loadedConfig.Enabled, "Enabled mismatch")
 
 	if len(loadedConfig.Tools) != len(originalConfig.Tools) {
 		t.Fatalf("Tools count mismatch: got %d, want %d", len(loadedConfig.Tools), len(originalConfig.Tools))
@@ -113,15 +92,9 @@ func TestSaveAndLoadConfig(t *testing.T) {
 
 	for i, tool := range loadedConfig.Tools {
 		orig := originalConfig.Tools[i]
-		if tool.Name != orig.Name {
-			t.Errorf("Tool[%d] Name mismatch: got %q, want %q", i, tool.Name, orig.Name)
-		}
-		if tool.Package != orig.Package {
-			t.Errorf("Tool[%d] Package mismatch: got %q, want %q", i, tool.Package, orig.Package)
-		}
-		if tool.Version != orig.Version {
-			t.Errorf("Tool[%d] Version mismatch: got %q, want %q", i, tool.Version, orig.Version)
-		}
+		assert.Equal(t, orig.Name, tool.Name, "Tool[] Name mismatch %v", i)
+		assert.Equal(t, orig.Package, tool.Package, "Tool[] Package mismatch %v", i)
+		assert.Equal(t, orig.Version, tool.Version, "Tool[] Version mismatch %v", i)
 	}
 }
 
@@ -133,13 +106,9 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 	testutil.WriteTestFile(t, configPath, []byte("not: valid: yaml: content"), utils.PermFileDefault, "Failed to write invalid YAML")
 
 	_, err := LoadConfig(configPath)
-	if err == nil {
-		t.Error("Expected error for invalid YAML, got nil")
-	}
+	assert.Error(t, err, "Expected error for invalid YAML, got nil")
 
-	if !strings.Contains(err.Error(), "failed to parse") {
-		t.Errorf("Expected parse error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "failed to parse", "Expected parse error %v", err)
 }
 
 func TestConfigPath(t *testing.T) {
@@ -147,9 +116,7 @@ func TestConfigPath(t *testing.T) {
 	path := ConfigPath(goenvRoot)
 
 	expected := filepath.Join(goenvRoot, "default-tools.yaml")
-	if path != expected {
-		t.Errorf("ConfigPath mismatch: got %q, want %q", path, expected)
-	}
+	assert.Equal(t, expected, path, "ConfigPath mismatch")
 }
 
 func TestInstallTools_Disabled(t *testing.T) {
@@ -164,9 +131,7 @@ func TestInstallTools_Disabled(t *testing.T) {
 
 	hostGopath := filepath.Join(tmpDir, "host-gopath")
 	err := InstallTools(config, "1.21.0", tmpDir, hostGopath, true)
-	if err != nil {
-		t.Errorf("InstallTools should not error when disabled: %v", err)
-	}
+	assert.NoError(t, err, "InstallTools should not error when disabled")
 }
 
 func TestInstallTools_NoTools(t *testing.T) {
@@ -179,9 +144,7 @@ func TestInstallTools_NoTools(t *testing.T) {
 
 	hostGopath := filepath.Join(tmpDir, "host-gopath")
 	err := InstallTools(config, "1.21.0", tmpDir, hostGopath, true)
-	if err != nil {
-		t.Errorf("InstallTools should not error with no tools: %v", err)
-	}
+	assert.NoError(t, err, "InstallTools should not error with no tools")
 }
 
 func TestInstallTools_GoNotFound(t *testing.T) {
@@ -196,16 +159,13 @@ func TestInstallTools_GoNotFound(t *testing.T) {
 
 	hostGopath := filepath.Join(tmpDir, "host-gopath")
 	err := InstallTools(config, "1.21.0", tmpDir, hostGopath, false)
-	if err == nil {
-		t.Error("Expected error when Go binary not found")
-	}
+	assert.Error(t, err, "Expected error when Go binary not found")
 
-	if !strings.Contains(err.Error(), "go binary not found") {
-		t.Errorf("Expected 'Go binary not found' error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "go binary not found", "Expected 'Go binary not found' error %v", err)
 }
 
 func TestInstallTools_WithMockGo(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	goVersion := "1.21.0"
 
@@ -215,12 +175,10 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 	goBinDir := filepath.Join(versionPath, "bin")
 	gopathBin := filepath.Join(versionPath, "gopath", "bin")
 
-	if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create go bin directory: %v", err)
-	}
-	if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
-		t.Fatalf("Failed to create gopath bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(goBinDir, "create test directory")
+	require.NoError(t, err, "Failed to create go bin directory")
+	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
+	require.NoError(t, err, "Failed to create gopath bin directory")
 
 	// Create mock go binary that succeeds
 	goBinary := filepath.Join(goBinDir, "go")
@@ -244,13 +202,12 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 	}
 
 	hostGopath := filepath.Join(tmpDir, "host-gopath")
-	err := InstallTools(config, goVersion, tmpDir, hostGopath, false)
-	if err != nil {
-		t.Errorf("InstallTools failed: %v", err)
-	}
+	err = InstallTools(config, goVersion, tmpDir, hostGopath, false)
+	assert.NoError(t, err, "InstallTools failed")
 }
 
 func TestInstallTools_Failure(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	goVersion := "1.21.0"
 
@@ -259,9 +216,8 @@ func TestInstallTools_Failure(t *testing.T) {
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
 	goBinDir := filepath.Join(versionPath, "bin")
 
-	if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create go bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(goBinDir, "create test directory")
+	require.NoError(t, err, "Failed to create go bin directory")
 
 	// Create mock go binary that fails
 	goBinary := filepath.Join(goBinDir, "go")
@@ -283,17 +239,14 @@ func TestInstallTools_Failure(t *testing.T) {
 	}
 
 	hostGopath := filepath.Join(tmpDir, "host-gopath")
-	err := InstallTools(config, goVersion, tmpDir, hostGopath, false)
-	if err == nil {
-		t.Error("Expected error when tool installation fails")
-	}
+	err = InstallTools(config, goVersion, tmpDir, hostGopath, false)
+	assert.Error(t, err, "Expected error when tool installation fails")
 
-	if !strings.Contains(err.Error(), "failed to install") {
-		t.Errorf("Expected 'failed to install' error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "failed to install", "Expected 'failed to install' error %v", err)
 }
 
 func TestVerifyTools(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	goVersion := "1.21.0"
 
@@ -301,9 +254,8 @@ func TestVerifyTools(t *testing.T) {
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
 	gopathBin := filepath.Join(versionPath, "gopath", "bin")
 
-	if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
-		t.Fatalf("Failed to create gopath bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
+	require.NoError(t, err, "Failed to create gopath bin directory")
 
 	// Create some tool binaries
 	tool1Binary := filepath.Join(gopathBin, "gopls")
@@ -337,18 +289,12 @@ func TestVerifyTools(t *testing.T) {
 	}
 
 	results, err := VerifyTools(config, goVersion, tmpDir)
-	if err != nil {
-		t.Fatalf("VerifyTools failed: %v", err)
-	}
+	require.NoError(t, err, "VerifyTools failed")
 
 	// Check results
-	if !results["gopls"] {
-		t.Error("Expected gopls to be found")
-	}
+	assert.True(t, results["gopls"], "Expected gopls to be found")
 
-	if !results["delve"] {
-		t.Error("Expected delve to be found")
-	}
+	assert.True(t, results["delve"], "Expected delve to be found")
 
 	if results["missing-tool"] {
 		t.Error("Expected missing-tool to not be found")
@@ -356,6 +302,7 @@ func TestVerifyTools(t *testing.T) {
 }
 
 func TestVerifyTools_NoBinaryName(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	goVersion := "1.21.0"
 
@@ -363,9 +310,8 @@ func TestVerifyTools_NoBinaryName(t *testing.T) {
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
 	gopathBin := filepath.Join(versionPath, "gopath", "bin")
 
-	if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
-		t.Fatalf("Failed to create gopath bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
+	require.NoError(t, err, "Failed to create gopath bin directory")
 
 	// Create tool binary with name extracted from package path
 	toolBinary := filepath.Join(gopathBin, "staticcheck")
@@ -386,13 +332,9 @@ func TestVerifyTools_NoBinaryName(t *testing.T) {
 	}
 
 	results, err := VerifyTools(config, goVersion, tmpDir)
-	if err != nil {
-		t.Fatalf("VerifyTools failed: %v", err)
-	}
+	require.NoError(t, err, "VerifyTools failed")
 
-	if !results["staticcheck"] {
-		t.Error("Expected staticcheck to be found (binary name extracted from package)")
-	}
+	assert.True(t, results["staticcheck"], "Expected staticcheck to be found (binary name extracted from package)")
 }
 
 func TestVerifyTools_EmptyConfig(t *testing.T) {
@@ -403,11 +345,7 @@ func TestVerifyTools_EmptyConfig(t *testing.T) {
 	}
 
 	results, err := VerifyTools(config, "1.21.0", tmpDir)
-	if err != nil {
-		t.Fatalf("VerifyTools failed: %v", err)
-	}
+	require.NoError(t, err, "VerifyTools failed")
 
-	if len(results) != 0 {
-		t.Errorf("Expected empty results for empty config, got %d results", len(results))
-	}
+	assert.Len(t, results, 0, "Expected empty results for empty config")
 }

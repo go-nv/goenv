@@ -9,6 +9,8 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCheckSettings_EnvVars(t *testing.T) {
@@ -25,18 +27,12 @@ func TestCheckSettings_EnvVars(t *testing.T) {
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
-	if !result.HasSettings {
-		t.Error("Expected HasSettings to be true")
-	}
-	if !result.UsesEnvVars {
-		t.Error("Expected UsesEnvVars to be true")
-	}
+	assert.True(t, result.HasSettings, "Expected HasSettings to be true")
+	assert.True(t, result.UsesEnvVars, "Expected UsesEnvVars to be true")
 	if result.Mismatch {
 		t.Error("Expected no mismatch when using env vars")
 	}
-	if result.ConfiguredVersion != "" {
-		t.Errorf("Expected empty ConfiguredVersion, got %q", result.ConfiguredVersion)
-	}
+	assert.Empty(t, result.ConfiguredVersion, "Expected empty ConfiguredVersion")
 }
 
 func TestCheckSettings_EnvHomeWithVersion(t *testing.T) {
@@ -56,18 +52,12 @@ func TestCheckSettings_EnvHomeWithVersion(t *testing.T) {
 	// Current version is 1.24.3, but settings have 1.24.1
 	result := CheckSettings(settingsPath, "1.24.3")
 
-	if !result.HasSettings {
-		t.Error("Expected HasSettings to be true")
-	}
+	assert.True(t, result.HasSettings, "Expected HasSettings to be true")
 	if result.UsesEnvVars {
 		t.Error("Expected UsesEnvVars to be false - hardcoded version in path needs updating")
 	}
-	if result.ConfiguredVersion != "1.24.1" {
-		t.Errorf("Expected ConfiguredVersion to be '1.24.1', got %q", result.ConfiguredVersion)
-	}
-	if !result.Mismatch {
-		t.Error("Expected Mismatch to be true")
-	}
+	assert.Equal(t, "1.24.1", result.ConfiguredVersion, "Expected ConfiguredVersion to be '1.24.1'")
+	assert.True(t, result.Mismatch, "Expected Mismatch to be true")
 }
 
 func TestCheckSettings_UnixPath(t *testing.T) {
@@ -83,15 +73,11 @@ func TestCheckSettings_UnixPath(t *testing.T) {
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
-	if !result.HasSettings {
-		t.Error("Expected HasSettings to be true")
-	}
+	assert.True(t, result.HasSettings, "Expected HasSettings to be true")
 	if result.UsesEnvVars {
 		t.Error("Expected UsesEnvVars to be false")
 	}
-	if result.ConfiguredVersion != "1.23.2" {
-		t.Errorf("Expected ConfiguredVersion to be '1.23.2', got %q", result.ConfiguredVersion)
-	}
+	assert.Equal(t, "1.23.2", result.ConfiguredVersion, "Expected ConfiguredVersion to be '1.23.2'")
 	if result.Mismatch {
 		t.Error("Expected no mismatch")
 	}
@@ -110,15 +96,11 @@ func TestCheckSettings_WindowsPath(t *testing.T) {
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
-	if !result.HasSettings {
-		t.Error("Expected HasSettings to be true")
-	}
+	assert.True(t, result.HasSettings, "Expected HasSettings to be true")
 	if result.UsesEnvVars {
 		t.Error("Expected UsesEnvVars to be false")
 	}
-	if result.ConfiguredVersion != "1.23.2" {
-		t.Errorf("Expected ConfiguredVersion to be '1.23.2', got %q", result.ConfiguredVersion)
-	}
+	assert.Equal(t, "1.23.2", result.ConfiguredVersion, "Expected ConfiguredVersion to be '1.23.2'")
 	if result.Mismatch {
 		t.Error("Expected no mismatch")
 	}
@@ -136,15 +118,9 @@ func TestCheckSettings_VersionMismatch_Unix(t *testing.T) {
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
-	if !result.Mismatch {
-		t.Error("Expected Mismatch to be true")
-	}
-	if result.ConfiguredVersion != "1.22.0" {
-		t.Errorf("Expected ConfiguredVersion to be '1.22.0', got %q", result.ConfiguredVersion)
-	}
-	if result.ExpectedVersion != "1.23.2" {
-		t.Errorf("Expected ExpectedVersion to be '1.23.2', got %q", result.ExpectedVersion)
-	}
+	assert.True(t, result.Mismatch, "Expected Mismatch to be true")
+	assert.Equal(t, "1.22.0", result.ConfiguredVersion, "Expected ConfiguredVersion to be '1.22.0'")
+	assert.Equal(t, "1.23.2", result.ExpectedVersion, "Expected ExpectedVersion to be '1.23.2'")
 }
 
 func TestCheckSettings_VersionMismatch_Windows(t *testing.T) {
@@ -160,12 +136,8 @@ func TestCheckSettings_VersionMismatch_Windows(t *testing.T) {
 
 	result := CheckSettings(settingsPath, "1.23.2")
 
-	if !result.Mismatch {
-		t.Error("Expected Mismatch to be true")
-	}
-	if result.ConfiguredVersion != "1.22.0" {
-		t.Errorf("Expected ConfiguredVersion to be '1.22.0', got %q", result.ConfiguredVersion)
-	}
+	assert.True(t, result.Mismatch, "Expected Mismatch to be true")
+	assert.Equal(t, "1.22.0", result.ConfiguredVersion, "Expected ConfiguredVersion to be '1.22.0'")
 }
 
 func TestCheckSettings_NoSettings(t *testing.T) {
@@ -267,9 +239,7 @@ func TestDetectIndentation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := DetectIndentation(tt.content)
-			if result != tt.expected {
-				t.Errorf("Expected indentation %d, got %d", tt.expected, result)
-			}
+			assert.Equal(t, tt.expected, result, "Expected indentation")
 		})
 	}
 }
@@ -288,14 +258,13 @@ func TestEscapeJSONKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			result := EscapeJSONKey(tt.input)
-			if result != tt.expected {
-				t.Errorf("Expected %q, got %q", tt.expected, result)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestUpdateJSONKeys(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "settings.json")
 
@@ -313,30 +282,22 @@ func TestUpdateJSONKeys(t *testing.T) {
 		"go.toolsGopath": "~/go/tools",
 	}
 
-	if err := UpdateJSONKeys(testFile, updates); err != nil {
-		t.Fatalf("UpdateJSONKeys failed: %v", err)
-	}
+	err = UpdateJSONKeys(testFile, updates)
+	require.NoError(t, err, "UpdateJSONKeys failed")
 
 	// Read back and verify
 	settings, err := ReadExistingSettings(testFile)
-	if err != nil {
-		t.Fatalf("Failed to read updated settings: %v", err)
-	}
+	require.NoError(t, err, "Failed to read updated settings")
 
-	if settings["go.goroot"] != "/new/path" {
-		t.Errorf("Expected go.goroot to be '/new/path', got %v", settings["go.goroot"])
-	}
+	assert.Equal(t, "/new/path", settings["go.goroot"], "Expected go.goroot to be '/new/path'")
 
-	if settings["go.toolsGopath"] != "~/go/tools" {
-		t.Errorf("Expected go.toolsGopath to be '~/go/tools', got %v", settings["go.toolsGopath"])
-	}
+	assert.Equal(t, "~/go/tools", settings["go.toolsGopath"], "Expected go.toolsGopath to be '~/go/tools'")
 
-	if settings["editor.fontSize"].(float64) != 14 {
-		t.Error("Expected editor.fontSize to be preserved")
-	}
+	assert.Equal(t, float64(14), settings["editor.fontSize"].(float64), "Expected editor.fontSize to be preserved")
 }
 
 func TestUpdateJSONKeys_PreservesIndentation(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "settings.json")
 
@@ -351,20 +312,15 @@ func TestUpdateJSONKeys_PreservesIndentation(t *testing.T) {
 		"go.goroot": "/new/path",
 	}
 
-	if err := UpdateJSONKeys(testFile, updates); err != nil {
-		t.Fatalf("UpdateJSONKeys failed: %v", err)
-	}
+	err = UpdateJSONKeys(testFile, updates)
+	require.NoError(t, err, "UpdateJSONKeys failed")
 
 	// Read back and check indentation
 	data, err := os.ReadFile(testFile)
-	if err != nil {
-		t.Fatalf("Failed to read file: %v", err)
-	}
+	require.NoError(t, err, "Failed to read file")
 
 	content := string(data)
-	if !containsFourSpaceIndent(content) {
-		t.Error("Expected 4-space indentation to be preserved")
-	}
+	assert.True(t, containsFourSpaceIndent(content), "Expected 4-space indentation to be preserved")
 }
 
 // Helper function to check for 4-space indentation
@@ -407,38 +363,29 @@ func TestReadExistingSettings_JSONC(t *testing.T) {
 	testutil.WriteTestFile(t, testFile, []byte(content), utils.PermFileDefault)
 
 	settings, err := ReadExistingSettings(testFile)
-	if err != nil {
-		t.Fatalf("ReadExistingSettings failed: %v", err)
-	}
+	require.NoError(t, err, "ReadExistingSettings failed")
 
-	if settings["go.goroot"] != "/path/to/go" {
-		t.Errorf("Expected go.goroot to be '/path/to/go', got %v", settings["go.goroot"])
-	}
+	assert.Equal(t, "/path/to/go", settings["go.goroot"], "Expected go.goroot to be '/path/to/go'")
 
-	if settings["go.toolsGopath"] != "~/go/tools" {
-		t.Errorf("Expected go.toolsGopath to be '~/go/tools', got %v", settings["go.toolsGopath"])
-	}
+	assert.Equal(t, "~/go/tools", settings["go.toolsGopath"], "Expected go.toolsGopath to be '~/go/tools'")
 }
 
 func TestFindSettingsFile(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	vscodeDir := filepath.Join(tmpDir, ".vscode")
-	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .vscode directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(vscodeDir, "create test directory")
+	require.NoError(t, err, "Failed to create .vscode directory")
 
 	settingsPath, err := FindSettingsFile(tmpDir)
-	if err != nil {
-		t.Fatalf("FindSettingsFile failed: %v", err)
-	}
+	require.NoError(t, err, "FindSettingsFile failed")
 
 	expectedPath := filepath.Join(tmpDir, ".vscode", "settings.json")
-	if settingsPath != expectedPath {
-		t.Errorf("Expected settings path %q, got %q", expectedPath, settingsPath)
-	}
+	assert.Equal(t, expectedPath, settingsPath, "Expected settings path")
 }
 
 func TestHasVSCodeDirectory(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 
 	// Should not exist initially
@@ -448,17 +395,15 @@ func TestHasVSCodeDirectory(t *testing.T) {
 
 	// Create .vscode directory
 	vscodeDir := filepath.Join(tmpDir, ".vscode")
-	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .vscode directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(vscodeDir, "create test directory")
+	require.NoError(t, err, "Failed to create .vscode directory")
 
 	// Should exist now
-	if !HasVSCodeDirectory(tmpDir) {
-		t.Error("Expected HasVSCodeDirectory to be true")
-	}
+	assert.True(t, HasVSCodeDirectory(tmpDir), "Expected HasVSCodeDirectory to be true")
 }
 
 func TestWriteJSONFile_PreservesIndentation(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "extensions.json")
 
@@ -543,21 +488,15 @@ func TestWriteJSONFile_PreservesIndentation(t *testing.T) {
 				Recommendations: []string{"golang.go", "dbaeumer.vscode-eslint"},
 			}
 
-			if err := WriteJSONFile(testFile, extensions); err != nil {
-				t.Fatalf("WriteJSONFile failed: %v", err)
-			}
+			err = WriteJSONFile(testFile, extensions)
+			require.NoError(t, err, "WriteJSONFile failed")
 
 			// Read back and verify indentation
 			content, err := os.ReadFile(testFile)
-			if err != nil {
-				t.Fatalf("Failed to read written file: %v", err)
-			}
+			require.NoError(t, err, "Failed to read written file")
 
 			detectedWidth := DetectIndentation(string(content))
-			if detectedWidth != tt.expectedWidth {
-				t.Errorf("Expected indentation width %d, got %d\nContent:\n%s",
-					tt.expectedWidth, detectedWidth, string(content))
-			}
+			assert.Equal(t, tt.expectedWidth, detectedWidth, "Expected indentation width %v", string(content))
 
 			// Verify trailing newlines
 			contentStr := string(content)
@@ -565,21 +504,15 @@ func TestWriteJSONFile_PreservesIndentation(t *testing.T) {
 			for i := len(contentStr) - 1; i >= 0 && contentStr[i] == '\n'; i-- {
 				trailingCount++
 			}
-			if trailingCount != tt.expectedNewlines {
-				t.Errorf("Expected %d trailing newlines, got %d\nContent ends with: %q",
-					tt.expectedNewlines, trailingCount, contentStr[len(contentStr)-10:])
-			}
+			assert.Equal(t, tt.expectedNewlines, trailingCount, "Expected trailing newlines %v %v", contentStr, len(contentStr))
 
 			// Verify content is valid JSON (strip trailing newlines for validation)
 			var result Extensions
 			trimmed := []byte(strings.TrimSpace(contentStr))
-			if err := json.Unmarshal(trimmed, &result); err != nil {
-				t.Fatalf("Written file is not valid JSON: %v", err)
-			}
+			err = json.Unmarshal(trimmed, &result)
+			require.NoError(t, err, "Written file is not valid JSON")
 
-			if len(result.Recommendations) != 2 {
-				t.Errorf("Expected 2 recommendations, got %d", len(result.Recommendations))
-			}
+			assert.Len(t, result.Recommendations, 2, "Expected 2 recommendations")
 		})
 	}
 }
@@ -664,9 +597,7 @@ func TestValidateSettingsKeys(t *testing.T) {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
-			if len(warnings) != tt.wantWarnings {
-				t.Errorf("Expected %d warnings, got %d: %v", tt.wantWarnings, len(warnings), warnings)
-			}
+			assert.Len(t, warnings, tt.wantWarnings, "Expected warnings %v", warnings)
 		})
 	}
 }
@@ -691,9 +622,7 @@ func TestIsGoRelatedKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
 			got := IsGoRelatedKey(tt.key)
-			if got != tt.want {
-				t.Errorf("IsGoRelatedKey(%q) = %v, want %v", tt.key, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "IsGoRelatedKey() = %v", tt.key)
 		})
 	}
 }
@@ -711,9 +640,7 @@ func TestFilterGoKeys(t *testing.T) {
 	result := FilterGoKeys(input)
 
 	// Should only have Go-related keys
-	if len(result) != 3 {
-		t.Errorf("Expected 3 keys, got %d: %v", len(result), result)
-	}
+	assert.Len(t, result, 3, "Expected 3 keys %v", result)
 
 	expectedKeys := []string{"go.goroot", "gopls.formatting.gofumpt", "go.toolsGopath"}
 	for _, key := range expectedKeys {
@@ -817,9 +744,7 @@ func TestConvertToWorkspacePaths(t *testing.T) {
 			resultJSON, _ := json.MarshalIndent(result, "", "  ")
 			expectedJSON, _ := json.MarshalIndent(tt.expected, "", "  ")
 
-			if string(resultJSON) != string(expectedJSON) {
-				t.Errorf("Result mismatch:\nGot:\n%s\n\nExpected:\n%s", resultJSON, expectedJSON)
-			}
+			assert.Equal(t, string(expectedJSON), string(resultJSON), "Result mismatch:\\nGot:\\n\\n\\nExpected:\\n %v %v", resultJSON, expectedJSON)
 		})
 	}
 }

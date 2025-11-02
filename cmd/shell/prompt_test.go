@@ -12,6 +12,8 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPromptCommand(t *testing.T) {
@@ -83,26 +85,16 @@ func TestPromptCommand(t *testing.T) {
 			// Run the prompt command
 			err := runPrompt(cmd, tt.args)
 
-			if tt.shouldFail && err == nil {
-				t.Errorf("expected error but got none")
-			}
-			if !tt.shouldFail && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			assert.False(t, tt.shouldFail && err == nil, "expected error but got none")
+			assert.False(t, !tt.shouldFail && err != nil)
 
 			output := stdout.String()
 
-			if tt.checkNonEmpty && len(strings.TrimSpace(output)) == 0 {
-				t.Errorf("expected non-empty output, got empty string")
-			}
+			assert.False(t, tt.checkNonEmpty && len(strings.TrimSpace(output)) == 0, "expected non-empty output, got empty string")
 
-			if tt.expectedOutput != "" && !strings.Contains(output, tt.expectedOutput) {
-				t.Errorf("expected output to contain %q, got: %s", tt.expectedOutput, output)
-			}
+			assert.False(t, tt.expectedOutput != "" && !strings.Contains(output, tt.expectedOutput), "expected output to contain")
 
-			if tt.unexpectedOutput != "" && strings.Contains(output, tt.unexpectedOutput) {
-				t.Errorf("expected output NOT to contain %q, got: %s", tt.unexpectedOutput, output)
-			}
+			assert.False(t, tt.unexpectedOutput != "" && strings.Contains(output, tt.unexpectedOutput), "expected output NOT to contain")
 		})
 	}
 }
@@ -143,9 +135,7 @@ func TestFormatVersionShort(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := formatVersionShort(tt.version)
-			if got != tt.expected {
-				t.Errorf("formatVersionShort(%q) = %q, want %q", tt.version, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "formatVersionShort() = %v", tt.version)
 		})
 	}
 }
@@ -241,9 +231,7 @@ func TestFormatPromptVersion(t *testing.T) {
 			}
 
 			got := formatPromptVersion(tt.version)
-			if got != tt.expected {
-				t.Errorf("formatPromptVersion(%q) = %q, want %q", tt.version, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "formatPromptVersion() = %v", tt.version)
 		})
 	}
 }
@@ -315,9 +303,7 @@ func TestIsGoProject(t *testing.T) {
 			tt.setupFunc(t, tmpDir)
 
 			got := isGoProject()
-			if got != tt.expected {
-				t.Errorf("isGoProject() = %v, want %v", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "isGoProject() =")
 		})
 	}
 }
@@ -346,22 +332,16 @@ func TestHashString(t *testing.T) {
 			hash := hashString(tt.input)
 
 			// Hash should be 16 hex characters (8 bytes)
-			if len(hash) != 16 {
-				t.Errorf("hashString(%q) length = %d, want 16", tt.input, len(hash))
-			}
+			assert.Len(t, hash, 16, "hashString() length = %v", tt.input)
 
 			// Should be consistent
 			hash2 := hashString(tt.input)
-			if hash != hash2 {
-				t.Errorf("hashString(%q) not consistent: %q != %q", tt.input, hash, hash2)
-			}
+			assert.Equal(t, hash2, hash, "hashString() not consistent: != %v", tt.input)
 
 			// Different inputs should produce different hashes
 			if tt.input != "test" {
 				differentHash := hashString("test")
-				if hash == differentHash {
-					t.Errorf("hashString(%q) produced same hash as 'test'", tt.input)
-				}
+				assert.NotEqual(t, differentHash, hash, "hashString() produced same hash as 'test' %v", tt.input)
 			}
 		})
 	}
@@ -418,9 +398,7 @@ func TestGeneratePromptSetup(t *testing.T) {
 			got := generatePromptSetup(tt.shell)
 
 			for _, expected := range tt.expectedContains {
-				if !strings.Contains(got, expected) {
-					t.Errorf("generatePromptSetup(%v) does not contain %q\nGot:\n%s", tt.shell, expected, got)
-				}
+				assert.Contains(t, got, expected, "generatePromptSetup() does not contain \\nGot:\\n %v %v %v", tt.shell, expected, got)
 			}
 		})
 	}
@@ -462,14 +440,13 @@ func TestGetReloadCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := getReloadCommand(tt.shell)
-			if got != tt.expected {
-				t.Errorf("getReloadCommand(%v) = %q, want %q", tt.shell, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "getReloadCommand() = %v", tt.shell)
 		})
 	}
 }
 
 func TestCacheFunctions(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{}
 	cfg.Root = tmpDir
@@ -479,14 +456,10 @@ func TestCacheFunctions(t *testing.T) {
 		key2 := generateCacheKey()
 
 		// Should be consistent in same directory
-		if key1 != key2 {
-			t.Errorf("generateCacheKey() not consistent: %q != %q", key1, key2)
-		}
+		assert.Equal(t, key2, key1, "generateCacheKey() not consistent: !=")
 
 		// Should be 16 hex characters
-		if len(key1) != 16 {
-			t.Errorf("generateCacheKey() length = %d, want 16", len(key1))
-		}
+		assert.Len(t, key1, 16, "generateCacheKey() length =")
 	})
 
 	t.Run("cache path", func(t *testing.T) {
@@ -494,13 +467,9 @@ func TestCacheFunctions(t *testing.T) {
 		path := getCachePath(cfg, key)
 
 		expectedDir := filepath.Join(tmpDir, "cache", "prompt")
-		if !strings.Contains(path, expectedDir) {
-			t.Errorf("getCachePath() = %q, should contain %q", path, expectedDir)
-		}
+		assert.Contains(t, path, expectedDir, "getCachePath() = , should contain %v %v", path, expectedDir)
 
-		if !strings.HasSuffix(path, key) {
-			t.Errorf("getCachePath() = %q, should end with %q", path, key)
-		}
+		assert.True(t, strings.HasSuffix(path, key), "getCachePath() = , should end with")
 	})
 
 	t.Run("cache read/write", func(t *testing.T) {
@@ -510,19 +479,14 @@ func TestCacheFunctions(t *testing.T) {
 
 		// Write cache
 		version := "1.23.2"
-		if err := writeCache(cachePath, version); err != nil {
-			t.Fatalf("writeCache() failed: %v", err)
-		}
+		err = writeCache(cachePath, version)
+		require.NoError(t, err, "writeCache() failed")
 
 		// Read cache
 		got, err := readCache(cachePath)
-		if err != nil {
-			t.Fatalf("readCache() failed: %v", err)
-		}
+		require.NoError(t, err, "readCache() failed")
 
-		if got != version {
-			t.Errorf("readCache() = %q, want %q", got, version)
-		}
+		assert.Equal(t, version, got, "readCache() =")
 	})
 
 	t.Run("cache validity", func(t *testing.T) {
@@ -539,9 +503,7 @@ func TestCacheFunctions(t *testing.T) {
 		writeCache(cachePath, "1.23.2")
 
 		// Fresh cache should be valid
-		if !isCacheValid(cachePath, 5) {
-			t.Error("isCacheValid() = false for fresh cache, want true")
-		}
+		assert.True(t, isCacheValid(cachePath, 5), "isCacheValid() = false for fresh cache, want true")
 
 		// Zero TTL should be invalid
 		if isCacheValid(cachePath, 0) {
@@ -604,9 +566,7 @@ func TestShouldHideVersion(t *testing.T) {
 			}
 
 			got := shouldHideVersion(tt.version)
-			if got != tt.want {
-				t.Errorf("shouldHideVersion(%q) = %v, want %v", tt.version, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "shouldHideVersion() = %v", tt.version)
 		})
 	}
 }

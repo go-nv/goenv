@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsPathInPATH(t *testing.T) {
@@ -94,9 +97,7 @@ func TestIsPathInPATH(t *testing.T) {
 			}
 
 			got := IsPathInPATH(dirPath, pathEnv)
-			if got != tt.expected {
-				t.Errorf("IsPathInPATH(%q, %q) = %v, want %v", dirPath, pathEnv, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "IsPathInPATH(, ) = %v %v", dirPath, pathEnv)
 		})
 	}
 }
@@ -135,9 +136,7 @@ func TestIsPathInPATH_CaseInsensitiveWindows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsPathInPATH(tt.dirPath, tt.pathEnv)
-			if got != tt.expected {
-				t.Errorf("IsPathInPATH(%q, %q) = %v, want %v", tt.dirPath, tt.pathEnv, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "IsPathInPATH(, ) = %v %v", tt.dirPath, tt.pathEnv)
 		})
 	}
 }
@@ -170,14 +169,13 @@ func TestIsPathInPATH_CaseSensitiveUnix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsPathInPATH(tt.dirPath, tt.pathEnv)
-			if got != tt.expected {
-				t.Errorf("IsPathInPATH(%q, %q) = %v, want %v", tt.dirPath, tt.pathEnv, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "IsPathInPATH(, ) = %v %v", tt.dirPath, tt.pathEnv)
 		})
 	}
 }
 
 func TestIsPathInPATH_RealPaths(t *testing.T) {
+	var err error
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 
@@ -187,9 +185,8 @@ func TestIsPathInPATH_RealPaths(t *testing.T) {
 	bin3 := filepath.Join(tmpDir, "bin3")
 
 	for _, dir := range []string{bin1, bin2, bin3} {
-		if err := EnsureDirWithContext(dir, "create test directory"); err != nil {
-			t.Fatal(err)
-		}
+		err = EnsureDirWithContext(dir, "create test directory")
+		require.NoError(t, err)
 	}
 
 	// Create a PATH with these directories
@@ -225,9 +222,7 @@ func TestIsPathInPATH_RealPaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsPathInPATH(tt.dirPath, pathEnv)
-			if got != tt.expected {
-				t.Errorf("IsPathInPATH(%q, %q) = %v, want %v", tt.dirPath, pathEnv, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "IsPathInPATH(, ) = %v %v", tt.dirPath, pathEnv)
 		})
 	}
 }

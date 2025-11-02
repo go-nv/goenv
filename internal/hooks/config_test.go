@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigValidation(t *testing.T) {
@@ -130,9 +132,7 @@ func TestConfigValidation(t *testing.T) {
 					t.Errorf("Validate() error = %v, want error containing %q", err, tt.errorMsg)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Validate() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Validate() unexpected error")
 			}
 		})
 	}
@@ -192,9 +192,7 @@ func TestConfigGetHooks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actions := config.GetHooks(tt.hookPoint)
-			if len(actions) != tt.expected {
-				t.Errorf("GetHooks(%q) returned %d actions, want %d", tt.hookPoint, len(actions), tt.expected)
-			}
+			assert.Len(t, actions, tt.expected, "GetHooks() returned actions %v", tt.hookPoint)
 		})
 	}
 }
@@ -245,24 +243,14 @@ hooks:
 
 	// Test loading valid config
 	config, err := LoadConfig(configPath)
-	if err != nil {
-		t.Errorf("LoadConfig() unexpected error: %v", err)
-	}
-	if config == nil {
-		t.Fatal("LoadConfig() returned nil config")
-	}
-	if config.Version != 1 {
-		t.Errorf("LoadConfig() version = %d, want 1", config.Version)
-	}
-	if !config.Enabled {
-		t.Error("LoadConfig() enabled = false, want true")
-	}
+	assert.NoError(t, err, "LoadConfig() unexpected error")
+	require.NotNil(t, config, "LoadConfig() returned nil config")
+	assert.Equal(t, 1, config.Version, "LoadConfig() version =")
+	assert.True(t, config.Enabled, "LoadConfig() enabled = false, want true")
 
 	// Test loading non-existent file returns default config
 	defaultCfg, err := LoadConfig(filepath.Join(tmpDir, "nonexistent.yaml"))
-	if err != nil {
-		t.Errorf("LoadConfig() unexpected error for non-existent file: %v", err)
-	}
+	assert.NoError(t, err, "LoadConfig() unexpected error for non-existent file")
 	if defaultCfg == nil {
 		t.Error("LoadConfig() returned nil for non-existent file, expected default config")
 	} else {
@@ -275,20 +263,12 @@ hooks:
 	invalidPath := filepath.Join(tmpDir, "invalid.yaml")
 	testutil.WriteTestFile(t, invalidPath, []byte("invalid: yaml: content:"), utils.PermFileDefault)
 	_, err = LoadConfig(invalidPath)
-	if err == nil {
-		t.Error("LoadConfig() expected error for invalid YAML, got nil")
-	}
+	assert.Error(t, err, "LoadConfig() expected error for invalid YAML, got nil")
 }
 
 func TestDefaultConfigPath(t *testing.T) {
 	path := DefaultConfigPath()
-	if path == "" {
-		t.Error("DefaultConfigPath() returned empty string")
-	}
-	if !strings.Contains(path, ".goenv") {
-		t.Errorf("DefaultConfigPath() = %q, expected to contain .goenv", path)
-	}
-	if !strings.Contains(path, "hooks.yaml") {
-		t.Errorf("DefaultConfigPath() = %q, expected to contain hooks.yaml", path)
-	}
+	assert.NotEmpty(t, path, "DefaultConfigPath() returned empty string")
+	assert.Contains(t, path, ".goenv", "DefaultConfigPath() = , expected to contain .goenv %v", path)
+	assert.Contains(t, path, "hooks.yaml", "DefaultConfigPath() = , expected to contain hooks.yaml %v", path)
 }

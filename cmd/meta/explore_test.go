@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExploreCommand_AllCategories(t *testing.T) {
@@ -12,9 +15,7 @@ func TestExploreCommand_AllCategories(t *testing.T) {
 	exploreCmd.SetErr(buf)
 
 	err := runExplore(exploreCmd, []string{})
-	if err != nil {
-		t.Fatalf("runExplore() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runExplore() unexpected error")
 
 	output := buf.String()
 
@@ -29,9 +30,7 @@ func TestExploreCommand_AllCategories(t *testing.T) {
 	}
 
 	for _, category := range expectedCategories {
-		if !strings.Contains(output, category) {
-			t.Errorf("Expected category %q in output, got: %s", category, output)
-		}
+		assert.Contains(t, output, category, "Expected category in output %v %v", category, output)
 	}
 }
 
@@ -65,17 +64,12 @@ func TestExploreCommand_SpecificCategory(t *testing.T) {
 			exploreCmd.SetErr(buf)
 
 			err := runExplore(exploreCmd, []string{tt.category})
-			if err != nil {
-				t.Fatalf("runExplore(%q) unexpected error: %v", tt.category, err)
-			}
+			require.NoError(t, err, "runExplore() unexpected error")
 
 			output := buf.String()
 
 			for _, cmd := range tt.expectedCommands {
-				if !strings.Contains(output, cmd) {
-					t.Errorf("Expected command %q in category %q output, got: %s",
-						cmd, tt.category, output)
-				}
+				assert.Contains(t, output, cmd, "Expected command in category output %v %v %v", cmd, tt.category, output)
 			}
 		})
 	}
@@ -87,15 +81,10 @@ func TestExploreCommand_InvalidCategory(t *testing.T) {
 	exploreCmd.SetErr(buf)
 
 	err := runExplore(exploreCmd, []string{"nonexistent-category"})
-	if err == nil {
-		t.Error("Expected error for invalid category, got nil")
-	}
+	assert.Error(t, err, "Expected error for invalid category, got nil")
 
 	// Error should mention the invalid category
-	if !strings.Contains(err.Error(), "nonexistent-category") &&
-		!strings.Contains(err.Error(), "unknown") {
-		t.Errorf("Expected error to mention invalid category, got: %v", err)
-	}
+	assert.True(t, strings.Contains(err.Error(), "nonexistent-category") || strings.Contains(err.Error(), "unknown"), "Expected error to mention invalid category")
 }
 
 func TestExploreCommand_CaseSensitive(t *testing.T) {
@@ -106,14 +95,10 @@ func TestExploreCommand_CaseSensitive(t *testing.T) {
 
 	// Lowercase should work
 	err := runExplore(exploreCmd, []string{"versions"})
-	if err != nil {
-		t.Fatalf("runExplore(\"versions\") unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runExplore(\\\"versions\\\") unexpected error")
 
 	output := buf.String()
-	if !strings.Contains(output, "install") {
-		t.Errorf("Expected 'install' command in output, got: %s", output)
-	}
+	assert.Contains(t, output, "install", "Expected 'install' command in output %v", output)
 
 	// Uppercase should error
 	buf.Reset()
@@ -121,9 +106,7 @@ func TestExploreCommand_CaseSensitive(t *testing.T) {
 	exploreCmd.SetErr(buf)
 
 	err = runExplore(exploreCmd, []string{"VERSIONS"})
-	if err == nil {
-		t.Error("Expected error for uppercase category, got nil")
-	}
+	assert.Error(t, err, "Expected error for uppercase category, got nil")
 }
 
 func TestExploreCommand_PartialMatch(t *testing.T) {
@@ -149,9 +132,7 @@ func TestExploreCommand_PartialMatch(t *testing.T) {
 
 			output := buf.String()
 			// Just verify it doesn't crash
-			if output == "" && err == nil {
-				t.Error("Expected either output or error for partial match")
-			}
+			assert.False(t, output == "" && err == nil, "Expected either output or error for partial match")
 		})
 	}
 }
@@ -162,9 +143,7 @@ func TestExploreHelp(t *testing.T) {
 	exploreCmd.SetErr(buf)
 
 	err := exploreCmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 	expectedStrings := []string{
@@ -175,9 +154,7 @@ func TestExploreHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q", expected)
-		}
+		assert.Contains(t, output, expected, "Help output missing %v", expected)
 	}
 }
 
@@ -187,21 +164,15 @@ func TestExploreCommand_ShowsUsefulInfo(t *testing.T) {
 	exploreCmd.SetErr(buf)
 
 	err := runExplore(exploreCmd, []string{})
-	if err != nil {
-		t.Fatalf("runExplore() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runExplore() unexpected error")
 
 	output := buf.String()
 
 	// Should show helpful information
-	if !strings.Contains(output, "goenv") {
-		t.Error("Output should mention 'goenv'")
-	}
+	assert.Contains(t, output, "goenv", "Output should mention 'goenv'")
 
 	// Should have some structure (not just plain text dump)
-	if !strings.Contains(output, "\n\n") {
-		t.Error("Output should have paragraph breaks for readability")
-	}
+	assert.Contains(t, output, "\n\n", "Output should have paragraph breaks for readability")
 }
 
 func TestExploreCommand_MultipleArgs(t *testing.T) {
@@ -216,9 +187,7 @@ func TestExploreCommand_MultipleArgs(t *testing.T) {
 
 	// Just verify it doesn't crash
 	output := buf.String()
-	if output == "" && err == nil {
-		t.Error("Expected output or error for multiple args")
-	}
+	assert.False(t, output == "" && err == nil, "Expected output or error for multiple args")
 }
 
 func TestExploreCommand_FormattingConsistency(t *testing.T) {
@@ -227,9 +196,7 @@ func TestExploreCommand_FormattingConsistency(t *testing.T) {
 	exploreCmd.SetErr(buf)
 
 	err := runExplore(exploreCmd, []string{"versions"})
-	if err != nil {
-		t.Fatalf("runExplore() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runExplore() unexpected error")
 
 	output := buf.String()
 
@@ -243,7 +210,5 @@ func TestExploreCommand_FormattingConsistency(t *testing.T) {
 		}
 	}
 
-	if commandLineCount == 0 {
-		t.Error("Expected at least one goenv command in output")
-	}
+	assert.NotEqual(t, 0, commandLineCount, "Expected at least one goenv command in output")
 }

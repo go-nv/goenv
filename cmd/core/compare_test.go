@@ -2,47 +2,42 @@ package core
 
 import (
 	"bytes"
-	"github.com/go-nv/goenv/internal/utils"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/lifecycle"
 )
 
 func TestCompareCommand_Basic(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	compareCmd.SetOut(buf)
 	compareCmd.SetErr(buf)
 
 	// Test basic comparison
-	err := runCompare(compareCmd, []string{"1.21.0", "1.22.0"})
-	if err != nil {
-		t.Fatalf("runCompare() unexpected error: %v", err)
-	}
+	err = runCompare(compareCmd, []string{"1.21.0", "1.22.0"})
+	require.NoError(t, err, "runCompare() unexpected error")
 
 	output := buf.String()
-	if !strings.Contains(output, "Comparing Go Versions") {
-		t.Errorf("Expected header 'Comparing Go Versions', got: %s", output)
-	}
-	if !strings.Contains(output, "1.21.0") {
-		t.Errorf("Expected version 1.21.0 in output, got: %s", output)
-	}
-	if !strings.Contains(output, "1.22.0") {
-		t.Errorf("Expected version 1.22.0 in output, got: %s", output)
-	}
+	assert.Contains(t, output, "Comparing Go Versions", "Expected header 'Comparing Go Versions' %v", output)
+	assert.Contains(t, output, "1.21.0", "Expected version 1.21.0 in output %v", output)
+	assert.Contains(t, output, "1.22.0", "Expected version 1.22.0 in output %v", output)
 }
 
 func TestCompareCommand_InstalledVersions(t *testing.T) {
@@ -58,15 +53,11 @@ func TestCompareCommand_InstalledVersions(t *testing.T) {
 	compareCmd.SetErr(buf)
 
 	err := runCompare(compareCmd, []string{"1.21.5", "1.22.3"})
-	if err != nil {
-		t.Fatalf("runCompare() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runCompare() unexpected error")
 
 	output := buf.String()
 	// Should show installed status
-	if !strings.Contains(output, "Installed") {
-		t.Errorf("Expected 'Installed' in output, got: %s", output)
-	}
+	assert.Contains(t, output, "Installed", "Expected 'Installed' in output %v", output)
 }
 
 func TestCompareCommand_InvalidArgs(t *testing.T) {
@@ -98,15 +89,9 @@ func TestParseVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			major, minor, patch := parseVersion(tt.version)
 
-			if major != tt.expectMajor {
-				t.Errorf("parseVersion(%q) major = %d, want %d", tt.version, major, tt.expectMajor)
-			}
-			if minor != tt.expectMinor {
-				t.Errorf("parseVersion(%q) minor = %d, want %d", tt.version, minor, tt.expectMinor)
-			}
-			if patch != tt.expectPatch {
-				t.Errorf("parseVersion(%q) patch = %d, want %d", tt.version, patch, tt.expectPatch)
-			}
+			assert.Equal(t, tt.expectMajor, major, "parseVersion() major = %v", tt.version)
+			assert.Equal(t, tt.expectMinor, minor, "parseVersion() minor = %v", tt.version)
+			assert.Equal(t, tt.expectPatch, patch, "parseVersion() patch = %v", tt.version)
 		})
 	}
 }
@@ -182,15 +167,11 @@ func TestFormatInstallStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatInstallStatus(tt.installed)
-			if result == "" {
-				t.Errorf("formatInstallStatus(%v) returned empty string", tt.installed)
-			}
+			assert.NotEmpty(t, result, "formatInstallStatus() returned empty string")
 
 			// Check for reasonable content
-			if tt.installed && !strings.Contains(strings.ToLower(result), "yes") &&
-				!strings.Contains(result, "✓") {
-				t.Errorf("formatInstallStatus(true) = %q, expected positive indicator", result)
-			}
+			assert.False(t, tt.installed && !strings.Contains(strings.ToLower(result), "yes") &&
+				!strings.Contains(result, "✓"), "formatInstallStatus(true) = , expected positive indicator")
 		})
 	}
 }
@@ -199,9 +180,7 @@ func TestFormatAge(t *testing.T) {
 	// Test that formatAge returns non-empty string
 	// Exact output depends on current time, so we just check it doesn't crash
 	result := formatAge(testDate())
-	if result == "" {
-		t.Error("formatAge() returned empty string")
-	}
+	assert.NotEmpty(t, result, "formatAge() returned empty string")
 }
 
 func TestFormatEOLDate(t *testing.T) {
@@ -212,17 +191,13 @@ func TestFormatEOLDate(t *testing.T) {
 		EOLDate: date,
 	}
 	result := formatEOLDate(info)
-	if result == "" {
-		t.Error("formatEOLDate() returned empty string for EOL version")
-	}
+	assert.NotEmpty(t, result, "formatEOLDate() returned empty string for EOL version")
 
 	infoCurrent := lifecycle.VersionInfo{
 		Status: lifecycle.StatusCurrent,
 	}
 	result2 := formatEOLDate(infoCurrent)
-	if result2 == "" {
-		t.Error("formatEOLDate() returned empty string for current version")
-	}
+	assert.NotEmpty(t, result2, "formatEOLDate() returned empty string for current version")
 }
 
 func TestFormatSupportStatus(t *testing.T) {
@@ -240,10 +215,7 @@ func TestFormatSupportStatus(t *testing.T) {
 			result := formatSupportStatus(tt.status)
 
 			// Check for reasonable content based on status
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("formatSupportStatus(%q) = %q, want to contain %q",
-					tt.status, result, tt.expected)
-			}
+			assert.Contains(t, result, tt.expected, "formatSupportStatus() = %v %v %v", tt.status, result, tt.expected)
 		})
 	}
 }
@@ -263,10 +235,7 @@ func TestFormatSizeDiff(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := formatSizeDiff(tt.diff)
 
-			if !strings.Contains(strings.ToLower(result), tt.expected) {
-				t.Errorf("formatSizeDiff(%d) = %q, want to contain %q",
-					tt.diff, result, tt.expected)
-			}
+			assert.Contains(t, strings.ToLower(result), tt.expected, "formatSizeDiff() = %v %v %v", tt.diff, result, tt.expected)
 		})
 	}
 }
@@ -277,9 +246,7 @@ func TestCompareHelp(t *testing.T) {
 	compareCmd.SetErr(buf)
 
 	err := compareCmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 	expectedStrings := []string{
@@ -290,9 +257,7 @@ func TestCompareHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q", expected)
-		}
+		assert.Contains(t, output, expected, "Help output missing %v", expected)
 	}
 }
 

@@ -12,12 +12,15 @@ import (
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestExec_AutoRehashAfterGoInstall tests the end-to-end auto-rehash workflow
 // This is an integration test that verifies shims are automatically created
 // after running 'goenv exec go install <tool>'
 func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
+	var err error
 	// Skip if SHORT test mode (this is an integration test)
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
@@ -63,9 +66,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
 
 	shimsBefore, err := os.ReadDir(shimsDir)
-	if err != nil {
-		t.Fatalf("Failed to read shims directory: %v", err)
-	}
+	require.NoError(t, err, "Failed to read shims directory")
 	shimCountBefore := len(shimsBefore)
 
 	// Test installing a simple tool that compiles quickly
@@ -101,15 +102,12 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	}
 
 	// Now run rehash (simulating what happens after 'go install')
-	if err := shimMgr.Rehash(); err != nil {
-		t.Fatalf("Rehash failed: %v", err)
-	}
+	err = shimMgr.Rehash()
+	require.NoError(t, err, "Rehash failed")
 
 	// Count shims after
 	shimsAfter, err := os.ReadDir(shimsDir)
-	if err != nil {
-		t.Fatalf("Failed to read shims directory after rehash: %v", err)
-	}
+	require.NoError(t, err, "Failed to read shims directory after rehash")
 	shimCountAfter := len(shimsAfter)
 
 	t.Logf("Shims after: %d", shimCountAfter)
@@ -164,6 +162,7 @@ func TestExec_AutoRehashCanBeDisabled(t *testing.T) {
 
 // TestExec_RealGoInstallIntegration tests actual go install command (optional, network-dependent)
 func TestExec_RealGoInstallIntegration(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping real go install integration test in short mode")
 	}
@@ -206,9 +205,8 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 	// Build goenv binary for testing
 	goenvBin := filepath.Join(tempRoot, "goenv-test")
 	cmd := exec.Command("go", "build", "-o", goenvBin, ".")
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("Failed to build goenv: %v", err)
-	}
+	err = cmd.Run()
+	require.NoError(t, err, "Failed to build goenv")
 
 	// Count shims before
 	shimsDir := filepath.Join(cfg.Root, "shims")
@@ -297,12 +295,8 @@ func main() {
 	// Test 1: Direct execution of the tool (sanity check)
 	directCmd := exec.Command(toolBinaryPath)
 	directOutput, err := directCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Direct execution of test tool failed: %v\nOutput: %s", err, directOutput)
-	}
-	if !strings.Contains(string(directOutput), "goenv-exec-test-ok") {
-		t.Fatalf("Test tool didn't produce expected output: %s", directOutput)
-	}
+	require.NoError(t, err, "Direct execution of test tool failed: \\nOutput")
+	assert.Contains(t, string(directOutput), "goenv-exec-test-ok", "Test tool didn't produce expected output %v", directOutput)
 
 	// Test 2: Execution through PATH (simulating shim behavior)
 	// Add our temp directory to PATH
@@ -314,12 +308,8 @@ func main() {
 	// On Windows, we can use "testtool" and the shell will find "testtool.exe"
 	pathCmd := exec.Command("testtool")
 	pathOutput, err := pathCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("PATH-based execution failed: %v\nOutput: %s", err, pathOutput)
-	}
-	if !strings.Contains(string(pathOutput), "goenv-exec-test-ok") {
-		t.Fatalf("PATH execution didn't produce expected output: %s", pathOutput)
-	}
+	require.NoError(t, err, "PATH-based execution failed: \\nOutput")
+	assert.Contains(t, string(pathOutput), "goenv-exec-test-ok", "PATH execution didn't produce expected output %v", pathOutput)
 
 	t.Log("✓ Minimal exec path verification passed")
 	t.Logf("  - Tool compilation: OK")

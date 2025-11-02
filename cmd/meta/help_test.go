@@ -10,9 +10,12 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHelpCommand(t *testing.T) {
+	var err error
 	tests := []struct {
 		name             string
 		args             []string
@@ -51,9 +54,8 @@ func TestHelpCommand(t *testing.T) {
 			// Create command if specified
 			if tt.createCommand {
 				binDir := filepath.Join(goenvRoot, "bin")
-				if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create bin directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(binDir, "create test directory")
+				require.NoError(t, err, "Failed to create bin directory")
 
 				cmdPath := filepath.Join(binDir, "goenv-hello")
 				testutil.WriteTestFile(t, cmdPath, []byte(tt.commandContent), utils.PermFileExecutable)
@@ -83,7 +85,7 @@ func TestHelpCommand(t *testing.T) {
 			// Reset flag
 			helpUsage = false
 
-			err := cmd.Execute()
+			err = cmd.Execute()
 
 			// Check error
 			if tt.expectedError != "" {
@@ -95,24 +97,18 @@ func TestHelpCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			got := output.String()
 
 			// Check contains
 			for _, expected := range tt.expectedContains {
-				if !strings.Contains(got, expected) {
-					t.Errorf("Expected output to contain %q, but it didn't. Output:\n%s", expected, got)
-				}
+				assert.Contains(t, got, expected, "Expected output to contain , but it didn't. Output:\\n %v %v", expected, got)
 			}
 
 			// For --usage tests, ensure extended help is NOT shown
 			if len(tt.args) > 0 && tt.args[0] == "--usage" {
-				if strings.Contains(got, "extended help") {
-					t.Errorf("Expected --usage to not show extended help, but it did. Output:\n%s", got)
-				}
+				assert.NotContains(t, got, "extended help", "Expected --usage to not show extended help, but it did. Output:\\n %v", got)
 			}
 		})
 	}

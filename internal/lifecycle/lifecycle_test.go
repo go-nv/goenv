@@ -1,11 +1,11 @@
 package lifecycle
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExtractMajorMinor(t *testing.T) {
@@ -28,9 +28,7 @@ func TestExtractMajorMinor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := utils.ExtractMajorMinor(tt.version)
-			if got != tt.expected {
-				t.Errorf("utils.ExtractMajorMinor(%q) = %q, want %q", tt.version, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "utils.ExtractMajorMinor() = %v", tt.version)
 		})
 	}
 }
@@ -55,13 +53,9 @@ func TestGetVersionInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			info, found := GetVersionInfo(tt.version)
-			if found != tt.expectFound {
-				t.Errorf("GetVersionInfo(%q) found = %v, want %v", tt.version, found, tt.expectFound)
-			}
+			assert.Equal(t, tt.expectFound, found, "GetVersionInfo() found = %v", tt.version)
 			if found && tt.expectEOL {
-				if info.Status != StatusEOL {
-					t.Errorf("GetVersionInfo(%q) status = %v, want StatusEOL", tt.version, info.Status)
-				}
+				assert.Equal(t, StatusEOL, info.Status, "GetVersionInfo() status = %v", tt.version)
 			}
 		})
 	}
@@ -84,9 +78,7 @@ func TestIsSupported(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsSupported(tt.version)
-			if got != tt.supported {
-				t.Errorf("IsSupported(%q) = %v, want %v", tt.version, got, tt.supported)
-			}
+			assert.Equal(t, tt.supported, got, "IsSupported() = %v", tt.version)
 		})
 	}
 }
@@ -108,9 +100,7 @@ func TestIsEOL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsEOL(tt.version)
-			if got != tt.isEOL {
-				t.Errorf("IsEOL(%q) = %v, want %v", tt.version, got, tt.isEOL)
-			}
+			assert.Equal(t, tt.isEOL, got, "IsEOL() = %v", tt.version)
 		})
 	}
 }
@@ -130,9 +120,7 @@ func TestIsNearEOL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsNearEOL(tt.version)
-			if got != tt.isNearEOL {
-				t.Errorf("IsNearEOL(%q) = %v, want %v", tt.version, got, tt.isNearEOL)
-			}
+			assert.Equal(t, tt.isNearEOL, got, "IsNearEOL() = %v", tt.version)
 		})
 	}
 }
@@ -153,9 +141,7 @@ func TestGetRecommendedVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := GetRecommendedVersion(tt.version)
-			if got != tt.want {
-				t.Errorf("GetRecommendedVersion(%q) = %q, want %q", tt.version, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "GetRecommendedVersion() = %v", tt.version)
 		})
 	}
 }
@@ -194,16 +180,12 @@ func TestFormatWarning(t *testing.T) {
 			got := FormatWarning(tt.version)
 
 			if tt.expectEmpty {
-				if got != "" {
-					t.Errorf("FormatWarning(%q) = %q, want empty string", tt.version, got)
-				}
+				assert.Empty(t, got, "FormatWarning() =")
 				return
 			}
 
 			for _, substr := range tt.expectContains {
-				if !strings.Contains(got, substr) {
-					t.Errorf("FormatWarning(%q) = %q, want to contain %q", tt.version, got, substr)
-				}
+				assert.Contains(t, got, substr, "FormatWarning() = %v %v %v", tt.version, got, substr)
 			}
 		})
 	}
@@ -250,9 +232,7 @@ func TestCalculateStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := calculateStatus(tt.info)
-			if got != tt.expected {
-				t.Errorf("calculateStatus() = %v, want %v", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "calculateStatus() =")
 		})
 	}
 }
@@ -261,9 +241,7 @@ func TestVersionLifecycleData(t *testing.T) {
 	// Verify that lifecycle data is well-formed
 	for version, info := range versionLifecycle {
 		t.Run("version_"+version, func(t *testing.T) {
-			if info.Version != version {
-				t.Errorf("Version key %q doesn't match info.Version %q", version, info.Version)
-			}
+			assert.Equal(t, version, info.Version, "Version key doesn't match info.Version")
 
 			if info.ReleaseDate.IsZero() {
 				t.Errorf("Version %q has zero ReleaseDate", version)
@@ -278,9 +256,7 @@ func TestVersionLifecycleData(t *testing.T) {
 			}
 
 			// EOL versions should have a recommended version
-			if info.Status == StatusEOL && info.Recommended == "" {
-				t.Errorf("EOL version %q has no recommended upgrade", version)
-			}
+			assert.False(t, info.Status == StatusEOL && info.Recommended == "", "EOL version has no recommended upgrade")
 		})
 	}
 }

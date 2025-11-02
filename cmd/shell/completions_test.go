@@ -8,11 +8,14 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spf13/cobra"
 )
 
 func TestCompletionsCommand(t *testing.T) {
+	var err error
 	if utils.IsWindows() {
 		t.Skip("Skipping Unix shell completion test on Windows")
 	}
@@ -91,9 +94,8 @@ fi
 			// Create command if specified
 			if tt.createCommand {
 				binDir := filepath.Join(tmpDir, "bin")
-				if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create bin directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(binDir, "create test directory")
+				require.NoError(t, err, "Failed to create bin directory")
 
 				cmdName := tt.args[0]
 				cmdPath := filepath.Join(binDir, "goenv-"+cmdName)
@@ -119,26 +121,20 @@ fi
 			cmd.SetOut(output)
 			cmd.SetArgs(tt.args)
 
-			err := cmd.Execute()
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			err = cmd.Execute()
+			require.NoError(t, err)
 
 			got := output.String()
 
 			// Check exact output if specified
 			if tt.expectedEquals != "" {
-				if got != tt.expectedEquals {
-					t.Errorf("Expected output %q, got %q", tt.expectedEquals, got)
-				}
+				assert.Equal(t, tt.expectedEquals, got, "Expected output")
 				return
 			}
 
 			// Check contains
 			for _, expected := range tt.expectedContains {
-				if !strings.Contains(got, expected) {
-					t.Errorf("Expected output to contain %q, but it didn't. Output:\n%s", expected, got)
-				}
+				assert.Contains(t, got, expected, "Expected output to contain , but it didn't. Output:\\n %v %v", expected, got)
 			}
 		})
 	}

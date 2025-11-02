@@ -2,14 +2,18 @@ package core
 
 import (
 	"encoding/json"
-	"github.com/go-nv/goenv/internal/cmdtest"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spf13/cobra"
 )
 
 func TestListCommand(t *testing.T) {
+	var err error
 	t.Run("returns multiple versions", func(t *testing.T) {
 		_, cleanup := cmdtest.SetupTestEnv(t)
 		defer cleanup()
@@ -29,10 +33,8 @@ func TestListCommand(t *testing.T) {
 		cmd.SetOut(output)
 		cmd.SetArgs([]string{"--remote"})
 
-		err := cmd.Execute()
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+		err = cmd.Execute()
+		require.NoError(t, err)
 
 		result := output.String()
 		lines := strings.Split(strings.TrimSpace(result), "\n")
@@ -44,12 +46,8 @@ func TestListCommand(t *testing.T) {
 		}
 
 		// Verify we have some known versions
-		if !strings.Contains(result, "1.21") {
-			t.Error("Expected to find version 1.21.x in output")
-		}
-		if !strings.Contains(result, "1.22") {
-			t.Error("Expected to find version 1.22.x in output")
-		}
+		assert.Contains(t, result, "1.21", "Expected to find version 1.21.x in output")
+		assert.Contains(t, result, "1.22", "Expected to find version 1.22.x in output")
 
 		t.Logf("✅ Found %d versions (including embedded versions)", len(lines))
 		t.Logf("First 5 versions: %v", lines[:min(5, len(lines))])
@@ -79,20 +77,14 @@ func TestListCommand(t *testing.T) {
 		cmd.SetOut(output)
 		cmd.SetArgs([]string{"--remote", "--stable"})
 
-		err := cmd.Execute()
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+		err = cmd.Execute()
+		require.NoError(t, err)
 
 		result := output.String()
 
 		// Should NOT contain beta or rc versions when stable flag is set
-		if strings.Contains(result, "beta") {
-			t.Error("Stable flag should filter out beta versions")
-		}
-		if strings.Contains(result, "rc") && !strings.Contains(result, "1.21.0") { // rc in version string is ok
-			t.Error("Stable flag should filter out rc versions")
-		}
+		assert.NotContains(t, result, "beta", "Stable flag should filter out beta versions")
+		assert.False(t, strings.Contains(result, "rc") && !strings.Contains(result, "1.21.0"), "Stable flag should filter out rc versions")
 
 		// Should still have stable versions
 		lines := strings.Split(strings.TrimSpace(result), "\n")
@@ -121,10 +113,8 @@ func TestListCommand(t *testing.T) {
 		cmd.SetOut(output)
 		cmd.SetArgs([]string{"--remote"})
 
-		err := cmd.Execute()
-		if err != nil {
-			t.Fatalf("list command failed: %v", err)
-		}
+		err = cmd.Execute()
+		require.NoError(t, err, "list command failed")
 
 		result := output.String()
 
@@ -164,10 +154,8 @@ func TestListCommand(t *testing.T) {
 		cmd.SetOut(output)
 		cmd.SetArgs([]string{"--remote"})
 
-		err := cmd.Execute()
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+		err = cmd.Execute()
+		require.NoError(t, err)
 
 		result := output.String()
 
@@ -175,9 +163,7 @@ func TestListCommand(t *testing.T) {
 		// Note: The Go implementation doesn't add "(unstable)" markers by design
 		// (see comment in list.go: "no unstable marker for install --list")
 		hasBetaOrRC := strings.Contains(result, "beta") || strings.Contains(result, "rc")
-		if !hasBetaOrRC {
-			t.Error("Expected to find beta or rc versions in the list")
-		}
+		assert.True(t, hasBetaOrRC, "Expected to find beta or rc versions in the list")
 
 		t.Log("✅ Unstable versions (beta/rc) are included in list")
 	})
@@ -198,10 +184,8 @@ func TestListCommand(t *testing.T) {
 		cmd.SetOut(output)
 		cmd.SetArgs([]string{"--remote"})
 
-		err := cmd.Execute()
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+		err = cmd.Execute()
+		require.NoError(t, err)
 
 		result := output.String()
 		lines := strings.Split(strings.TrimSpace(result), "\n")
@@ -245,10 +229,8 @@ func TestListCommand(t *testing.T) {
 		cmd.SetOut(output)
 		cmd.SetArgs([]string{"--remote", "--json"})
 
-		err := cmd.Execute()
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+		err = cmd.Execute()
+		require.NoError(t, err)
 
 		result := output.String()
 
@@ -260,19 +242,14 @@ func TestListCommand(t *testing.T) {
 			Versions      []string `json:"versions"`
 		}
 
-		if err := json.Unmarshal([]byte(result), &data); err != nil {
-			t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, result)
-		}
+		err = json.Unmarshal([]byte(result), &data)
+		require.NoError(t, err, "Failed to parse JSON output: \\nOutput")
 
 		// Verify schema version
-		if data.SchemaVersion != "1" {
-			t.Errorf("Expected schema_version '1', got '%s'", data.SchemaVersion)
-		}
+		assert.Equal(t, "1", data.SchemaVersion, "Expected schema_version '1'")
 
 		// Verify remote flag
-		if !data.Remote {
-			t.Error("Expected remote flag to be true in JSON output")
-		}
+		assert.True(t, data.Remote, "Expected remote flag to be true in JSON output")
 
 		// Verify stable_only flag
 		if data.StableOnly {
@@ -312,10 +289,8 @@ func TestListCommand(t *testing.T) {
 		cmd.SetOut(output)
 		cmd.SetArgs([]string{"--remote", "--stable", "--json"})
 
-		err := cmd.Execute()
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+		err = cmd.Execute()
+		require.NoError(t, err)
 
 		result := output.String()
 
@@ -327,20 +302,15 @@ func TestListCommand(t *testing.T) {
 			Versions      []string `json:"versions"`
 		}
 
-		if err := json.Unmarshal([]byte(result), &data); err != nil {
-			t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, result)
-		}
+		err = json.Unmarshal([]byte(result), &data)
+		require.NoError(t, err, "Failed to parse JSON output: \\nOutput")
 
 		// Verify stable_only flag is set
-		if !data.StableOnly {
-			t.Error("Expected stable_only flag to be true when --stable is used")
-		}
+		assert.True(t, data.StableOnly, "Expected stable_only flag to be true when --stable is used")
 
 		// Verify no prerelease versions
 		for _, v := range data.Versions {
-			if strings.Contains(v, "beta") || strings.Contains(v, "rc") {
-				t.Errorf("Found prerelease version in stable-only list: %s", v)
-			}
+			assert.False(t, strings.Contains(v, "beta") || strings.Contains(v, "rc"), "Found prerelease version in stable-only list")
 		}
 
 		// Should still have plenty of stable versions

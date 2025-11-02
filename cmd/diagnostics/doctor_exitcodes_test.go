@@ -9,9 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDoctorCommand_JSONOutput(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -24,15 +27,12 @@ func TestDoctorCommand_JSONOutput(t *testing.T) {
 	t.Setenv(utils.EnvVarPath, filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
 
 	// Create basic directory structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	// Capture exit code
 	exitCode := -1
@@ -51,7 +51,7 @@ func TestDoctorCommand_JSONOutput(t *testing.T) {
 	doctorCmd.SetOut(buf)
 	doctorCmd.SetErr(buf)
 
-	err := doctorCmd.RunE(doctorCmd, []string{})
+	err = doctorCmd.RunE(doctorCmd, []string{})
 	if err != nil {
 		t.Logf("RunE returned error (expected in some cases): %v", err)
 	}
@@ -78,34 +78,21 @@ func TestDoctorCommand_JSONOutput(t *testing.T) {
 		} `json:"summary"`
 	}
 
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Failed to parse JSON output: %v\nOutput:\n%s", err, output)
-	}
+	err = json.Unmarshal([]byte(output), &result)
+	require.NoError(t, err, "Failed to parse JSON output: \\nOutput:\\n")
 
 	// Verify schema version
-	if result.SchemaVersion != "1" {
-		t.Errorf("Expected schema_version '1', got %s", result.SchemaVersion)
-	}
+	assert.Equal(t, "1", result.SchemaVersion, "Expected schema_version '1'")
 
 	// Verify checks have IDs
-	if len(result.Checks) == 0 {
-		t.Fatal("Expected at least one check in JSON output")
-	}
+	require.NotEmpty(t, result.Checks, "Expected at least one check in JSON output")
 
-	for i, check := range result.Checks {
-		if check.ID == "" {
-			t.Errorf("Check %d (%s) is missing 'id' field", i, check.Name)
-		}
-		if check.Name == "" {
-			t.Errorf("Check %d is missing 'name' field", i)
-		}
-		if check.Status == "" {
-			t.Errorf("Check %d (%s) is missing 'status' field", i, check.Name)
-		}
+	for _, check := range result.Checks {
+		assert.NotEmpty(t, check.ID, "Check () is missing 'id' field")
+		assert.NotEmpty(t, check.Name, "Check is missing 'name' field")
+		assert.NotEmpty(t, check.Status, "Check () is missing 'status' field")
 		// Verify status is one of the valid values
-		if check.Status != "ok" && check.Status != "warning" && check.Status != "error" {
-			t.Errorf("Check %d (%s) has invalid status: %s", i, check.Name, check.Status)
-		}
+		assert.False(t, check.Status != "ok" && check.Status != "warning" && check.Status != "error", "Check () has invalid status")
 	}
 
 	// Verify summary counts match
@@ -123,24 +110,17 @@ func TestDoctorCommand_JSONOutput(t *testing.T) {
 		}
 	}
 
-	if result.Summary.Total != len(result.Checks) {
-		t.Errorf("Summary total (%d) doesn't match check count (%d)", result.Summary.Total, len(result.Checks))
-	}
-	if result.Summary.OK != okCount {
-		t.Errorf("Summary OK count (%d) doesn't match actual (%d)", result.Summary.OK, okCount)
-	}
-	if result.Summary.Warnings != warningCount {
-		t.Errorf("Summary warnings count (%d) doesn't match actual (%d)", result.Summary.Warnings, warningCount)
-	}
-	if result.Summary.Errors != errorCount {
-		t.Errorf("Summary errors count (%d) doesn't match actual (%d)", result.Summary.Errors, errorCount)
-	}
+	assert.Equal(t, len(result.Checks), result.Summary.Total, "Summary total () doesn't match check count ()")
+	assert.Equal(t, okCount, result.Summary.OK, "Summary OK count () doesn't match actual ()")
+	assert.Equal(t, warningCount, result.Summary.Warnings, "Summary warnings count () doesn't match actual ()")
+	assert.Equal(t, errorCount, result.Summary.Errors, "Summary errors count () doesn't match actual ()")
 
 	t.Logf("JSON output verified: %d checks, %d OK, %d warnings, %d errors",
 		result.Summary.Total, result.Summary.OK, result.Summary.Warnings, result.Summary.Errors)
 }
 
 func TestDoctorCommand_ExitCodes(t *testing.T) {
+	var err error
 	tests := []struct {
 		name         string
 		failOn       FailOn
@@ -222,18 +202,15 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 
 			// Create directories for non-error tests
 			if !tt.forceError {
-				if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-					t.Fatalf("Failed to create bin directory: %v", err)
-				}
-				if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-					t.Fatalf("Failed to create shims directory: %v", err)
-				}
+				err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+				require.NoError(t, err, "Failed to create bin directory")
+				err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+				require.NoError(t, err, "Failed to create shims directory")
 				// Only create versions directory if not forcing warnings
 				// (empty versions directory triggers "no versions installed" warning)
 				if !tt.forceWarning {
-					if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-						t.Fatalf("Failed to create versions directory: %v", err)
-					}
+					err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+					require.NoError(t, err, "Failed to create versions directory")
 				}
 			}
 
@@ -264,14 +241,12 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 			doctorCmd.SetOut(buf)
 			doctorCmd.SetErr(buf)
 
-			err := doctorCmd.RunE(doctorCmd, []string{})
+			err = doctorCmd.RunE(doctorCmd, []string{})
 			if err != nil {
 				t.Logf("RunE returned error (may be expected): %v", err)
 			}
 
-			if exitCode != tt.expectedExit {
-				t.Errorf("Expected exit code %d, got %d\nOutput:\n%s", tt.expectedExit, exitCode, buf.String())
-			}
+			assert.Equal(t, tt.expectedExit, exitCode, "Expected exit code %v", buf.String())
 
 			// Parse JSON to verify the check results
 			var result struct {
@@ -280,9 +255,8 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 					Errors   int `json:"errors"`
 				} `json:"summary"`
 			}
-			if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-				t.Fatalf("Failed to parse JSON: %v", err)
-			}
+			err = json.Unmarshal(buf.Bytes(), &result)
+			require.NoError(t, err, "Failed to parse JSON")
 
 			t.Logf("Exit code: %d, Warnings: %d, Errors: %d", exitCode, result.Summary.Warnings, result.Summary.Errors)
 		})
@@ -290,6 +264,7 @@ func TestDoctorCommand_ExitCodes(t *testing.T) {
 }
 
 func TestDoctorCommand_CheckIDsConsistent(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -302,15 +277,12 @@ func TestDoctorCommand_CheckIDsConsistent(t *testing.T) {
 	t.Setenv(utils.EnvVarPath, filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
 
 	// Create basic structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	// Override exit
 	oldExit := doctorExit
@@ -337,16 +309,13 @@ func TestDoctorCommand_CheckIDsConsistent(t *testing.T) {
 		} `json:"checks"`
 	}
 
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("Failed to parse JSON: %v", err)
-	}
+	err = json.Unmarshal(buf.Bytes(), &result)
+	require.NoError(t, err, "Failed to parse JSON")
 
 	// Verify all checks have IDs
 	seenIDs := make(map[string]bool)
 	for _, check := range result.Checks {
-		if check.ID == "" {
-			t.Errorf("Check '%s' is missing ID field", check.Name)
-		}
+		assert.NotEmpty(t, check.ID)
 
 		// Check for duplicate IDs (some checks may have same ID if they're conditional)
 		if seenIDs[check.ID] {
@@ -355,9 +324,7 @@ func TestDoctorCommand_CheckIDsConsistent(t *testing.T) {
 		seenIDs[check.ID] = true
 
 		// Verify ID follows naming convention (lowercase, hyphen-separated)
-		if !isValidCheckID(check.ID) {
-			t.Errorf("Check ID '%s' doesn't follow naming convention (should be lowercase-with-hyphens)", check.ID)
-		}
+		assert.True(t, isValidCheckID(check.ID))
 	}
 
 	t.Logf("Verified %d checks, %d unique IDs", len(result.Checks), len(seenIDs))
@@ -381,6 +348,7 @@ func isValidCheckID(id string) bool {
 }
 
 func TestDoctorCommand_HumanReadableOutput(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -393,15 +361,12 @@ func TestDoctorCommand_HumanReadableOutput(t *testing.T) {
 	t.Setenv(utils.EnvVarPath, filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
 
 	// Create directory structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	// Override exit
 	oldExit := doctorExit
@@ -430,13 +395,9 @@ func TestDoctorCommand_HumanReadableOutput(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Expected %q in human-readable output", expected)
-		}
+		assert.Contains(t, output, expected, "Expected in human-readable output %v", expected)
 	}
 
 	// Should not contain JSON markers
-	if strings.Contains(output, `"schema_version"`) {
-		t.Error("Human-readable output should not contain JSON")
-	}
+	assert.NotContains(t, output, `"schema_version"`, "Human-readable output should not contain JSON")
 }

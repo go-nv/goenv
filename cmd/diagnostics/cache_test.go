@@ -8,8 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-nv/goenv/testing/testutil"
 	"time"
+
+	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-nv/goenv/internal/cache"
 	"github.com/go-nv/goenv/internal/platform"
@@ -17,6 +20,7 @@ import (
 )
 
 func TestCacheStatusCommand(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -32,12 +36,10 @@ func TestCacheStatusCommand(t *testing.T) {
 	v1BuildCache := filepath.Join(v1Dir, "go-build")
 	v1ModCache := filepath.Join(v1Dir, "go-mod")
 
-	if err := utils.EnsureDirWithContext(v1BuildCache, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
-	if err := utils.EnsureDirWithContext(v1ModCache, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(v1BuildCache, "create test directory")
+	require.NoError(t, err)
+	err = utils.EnsureDirWithContext(v1ModCache, "create test directory")
+	require.NoError(t, err)
 
 	// Add some test files
 	testutil.WriteTestFile(t, filepath.Join(v1BuildCache, "test1.a"), []byte("test data"), utils.PermFileDefault)
@@ -50,15 +52,12 @@ func TestCacheStatusCommand(t *testing.T) {
 	v2BuildCacheLinux := filepath.Join(v2Dir, "go-build-linux-amd64")
 	v2ModCache := filepath.Join(v2Dir, "go-mod")
 
-	if err := utils.EnsureDirWithContext(v2BuildCacheHost, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
-	if err := utils.EnsureDirWithContext(v2BuildCacheLinux, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
-	if err := utils.EnsureDirWithContext(v2ModCache, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(v2BuildCacheHost, "create test directory")
+	require.NoError(t, err)
+	err = utils.EnsureDirWithContext(v2BuildCacheLinux, "create test directory")
+	require.NoError(t, err)
+	err = utils.EnsureDirWithContext(v2ModCache, "create test directory")
+	require.NoError(t, err)
 
 	// Add test files
 	testutil.WriteTestFile(t, filepath.Join(v2BuildCacheHost, "test1.a"), []byte("test data"), utils.PermFileDefault)
@@ -74,10 +73,8 @@ func TestCacheStatusCommand(t *testing.T) {
 	cmd.SetOut(output)
 	cmd.SetErr(output)
 
-	err := runCacheStatus(cmd, []string{})
-	if err != nil {
-		t.Fatalf("cache status failed: %v", err)
-	}
+	err = runCacheStatus(cmd, []string{})
+	require.NoError(t, err, "cache status failed")
 
 	outputStr := output.String()
 
@@ -93,31 +90,19 @@ func TestCacheStatusCommand(t *testing.T) {
 	}
 
 	for _, section := range expectedSections {
-		if !strings.Contains(outputStr, section) {
-			t.Errorf("Output missing section: %s", section)
-		}
+		assert.Contains(t, outputStr, section, "Output missing section %v", section)
 	}
 
 	// Verify version-specific information
-	if !strings.Contains(outputStr, "1.23.2") {
-		t.Error("Output missing version 1.23.2")
-	}
-	if !strings.Contains(outputStr, "1.24.4") {
-		t.Error("Output missing version 1.24.4")
-	}
+	assert.Contains(t, outputStr, "1.23.2", "Output missing version 1.23.2")
+	assert.Contains(t, outputStr, "1.24.4", "Output missing version 1.24.4")
 
 	// Verify architecture awareness
-	if !strings.Contains(outputStr, "host-host") {
-		t.Error("Output missing host-host architecture")
-	}
-	if !strings.Contains(outputStr, "linux-amd64") {
-		t.Error("Output missing linux-amd64 architecture")
-	}
+	assert.Contains(t, outputStr, "host-host", "Output missing host-host architecture")
+	assert.Contains(t, outputStr, "linux-amd64", "Output missing linux-amd64 architecture")
 
 	// Verify old format detection
-	if !strings.Contains(outputStr, "(old format)") {
-		t.Error("Output should detect old format cache")
-	}
+	assert.Contains(t, outputStr, "(old format)", "Output should detect old format cache")
 }
 
 func TestCacheStatusNoVersions(t *testing.T) {
@@ -133,27 +118,19 @@ func TestCacheStatusNoVersions(t *testing.T) {
 	cmd.SetErr(output)
 
 	err := runCacheStatus(cmd, []string{})
-	if err != nil {
-		t.Fatalf("cache status failed: %v", err)
-	}
+	require.NoError(t, err, "cache status failed")
 
 	outputStr := output.String()
 
 	// Should show "No Go versions installed"
-	if !strings.Contains(outputStr, "No Go versions installed") {
-		t.Error("Output should indicate no versions installed")
-	}
+	assert.Contains(t, outputStr, "No Go versions installed", "Output should indicate no versions installed")
 }
 
 func TestCacheCommand(t *testing.T) {
 	// Test that cache command is registered
-	if cacheCmd == nil {
-		t.Fatal("cache command not initialized")
-	}
+	require.NotNil(t, cacheCmd, "cache command not initialized")
 
-	if cacheCmd.Use != "cache" {
-		t.Errorf("Expected 'cache', got %s", cacheCmd.Use)
-	}
+	assert.Equal(t, "cache", cacheCmd.Use, "Expected 'cache'")
 
 	// Test that status subcommand exists
 	foundStatus := false
@@ -167,12 +144,8 @@ func TestCacheCommand(t *testing.T) {
 		}
 	}
 
-	if !foundStatus {
-		t.Error("status subcommand not registered")
-	}
-	if !foundClean {
-		t.Error("clean subcommand not registered")
-	}
+	assert.True(t, foundStatus, "status subcommand not registered")
+	assert.True(t, foundClean, "clean subcommand not registered")
 }
 
 func TestCacheCleanInvalidType(t *testing.T) {
@@ -185,13 +158,9 @@ func TestCacheCleanInvalidType(t *testing.T) {
 	cmd.SetErr(output)
 
 	err := runCacheClean(cmd, []string{"invalid"})
-	if err == nil {
-		t.Fatal("Expected error for invalid type")
-	}
+	assert.Error(t, err, "Expected error for invalid type")
 
-	if !strings.Contains(err.Error(), "invalid type") {
-		t.Errorf("Expected 'invalid type' error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "invalid type", "Expected 'invalid type' error %v", err)
 }
 
 func TestCacheCleanNoVersions(t *testing.T) {
@@ -204,36 +173,22 @@ func TestCacheCleanNoVersions(t *testing.T) {
 	cmd.SetErr(output)
 
 	err := runCacheClean(cmd, []string{"build"})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	outputStr := output.String()
-	if !strings.Contains(outputStr, "No Go versions installed") {
-		t.Error("Should report no versions installed")
-	}
+	assert.Contains(t, outputStr, "No Go versions installed", "Should report no versions installed")
 }
 
 func TestCacheCleanFlags(t *testing.T) {
 	// Test that flags are registered
-	if cacheCleanCmd.Flags().Lookup("version") == nil {
-		t.Error("--version flag not registered")
-	}
-	if cacheCleanCmd.Flags().Lookup("old-format") == nil {
-		t.Error("--old-format flag not registered")
-	}
-	if cacheCleanCmd.Flags().Lookup("force") == nil {
-		t.Error("--force flag not registered")
-	}
-	if cacheCleanCmd.Flags().Lookup("dry-run") == nil {
-		t.Error("--dry-run flag not registered")
-	}
+	assert.NotNil(t, cacheCleanCmd.Flags().Lookup("version"), "--version flag not registered")
+	assert.NotNil(t, cacheCleanCmd.Flags().Lookup("old-format"), "--old-format flag not registered")
+	assert.NotNil(t, cacheCleanCmd.Flags().Lookup("force"), "--force flag not registered")
+	assert.NotNil(t, cacheCleanCmd.Flags().Lookup("dry-run"), "--dry-run flag not registered")
 
 	// Test that -n shorthand exists for dry-run
 	flag := cacheCleanCmd.Flags().ShorthandLookup("n")
-	if flag == nil {
-		t.Error("-n shorthand for --dry-run not registered")
-	}
+	assert.NotNil(t, flag, "-n shorthand for --dry-run not registered")
 }
 
 func TestCacheCleanBuildOnly(t *testing.T) {
@@ -261,6 +216,7 @@ func TestCacheCleanAll(t *testing.T) {
 }
 
 func TestCacheCleanDryRun(t *testing.T) {
+	var err error
 	// Create temporary GOENV_ROOT with mock caches
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
@@ -268,9 +224,8 @@ func TestCacheCleanDryRun(t *testing.T) {
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err)
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
@@ -282,9 +237,8 @@ func TestCacheCleanDryRun(t *testing.T) {
 		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	if err := utils.EnsureDirWithContext(buildCache, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(buildCache, "create test directory")
+	require.NoError(t, err)
 
 	// Create test files in build cache
 	testFile := filepath.Join(buildCache, "test.a")
@@ -307,20 +261,14 @@ func TestCacheCleanDryRun(t *testing.T) {
 	cmd.SetErr(output)
 
 	// Run cache clean in dry-run mode
-	err := runCacheClean(cmd, []string{"build"})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	err = runCacheClean(cmd, []string{"build"})
+	require.NoError(t, err)
 
 	outputStr := output.String()
 
 	// Verify dry-run message appears
-	if !strings.Contains(outputStr, "Dry run") {
-		t.Errorf("Expected 'Dry run' message in output. Got:\n%s", outputStr)
-	}
-	if !strings.Contains(outputStr, "Would remove") {
-		t.Errorf("Expected 'Would remove' message. Got:\n%s", outputStr)
-	}
+	assert.Contains(t, outputStr, "Dry run", "Expected 'Dry run' message in output. Got:\\n %v", outputStr)
+	assert.Contains(t, outputStr, "Would remove", "Expected 'Would remove' message. Got:\\n %v", outputStr)
 
 	// Verify files were NOT deleted
 	if utils.FileNotExists(testFile) {
@@ -334,6 +282,7 @@ func TestCacheCleanDryRun(t *testing.T) {
 }
 
 func TestCacheCleanDryRunWithFilters(t *testing.T) {
+	var err error
 	// Create temporary GOENV_ROOT with mock caches
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
@@ -341,9 +290,8 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err)
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
@@ -355,9 +303,8 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	if err := utils.EnsureDirWithContext(buildCache, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(buildCache, "create test directory")
+	require.NoError(t, err)
 
 	// Create test file
 	testFile := filepath.Join(buildCache, "test.a")
@@ -383,22 +330,16 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 	cmd.SetOut(output)
 	cmd.SetErr(output)
 
-	err := runCacheClean(cmd, []string{"build"})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	err = runCacheClean(cmd, []string{"build"})
+	require.NoError(t, err)
 
 	outputStr := output.String()
 
 	// Should have dry-run message
-	if !strings.Contains(outputStr, "Dry run") {
-		t.Errorf("Expected dry-run message. Got:\n%s", outputStr)
-	}
+	assert.Contains(t, outputStr, "Dry run", "Expected dry-run message. Got:\\n %v", outputStr)
 
 	// Should show what would be removed
-	if !strings.Contains(outputStr, "Would remove") {
-		t.Errorf("Expected 'Would remove' in dry-run output. Got:\n%s", outputStr)
-	}
+	assert.Contains(t, outputStr, "Would remove", "Expected 'Would remove' in dry-run output. Got:\\n %v", outputStr)
 
 	// Note: Version number may not appear in summary - dry-run output is minimal
 
@@ -409,6 +350,7 @@ func TestCacheCleanDryRunWithFilters(t *testing.T) {
 }
 
 func TestCacheCleanDryRunShowsSummary(t *testing.T) {
+	var err error
 	// Create temporary GOENV_ROOT with multiple caches
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
@@ -417,9 +359,8 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err)
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
@@ -432,9 +373,8 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 	}
 
 	for _, cache := range []string{buildCache1, buildCache2} {
-		if err := utils.EnsureDirWithContext(cache, "create test directory"); err != nil {
-			t.Fatal(err)
-		}
+		err = utils.EnsureDirWithContext(cache, "create test directory")
+		require.NoError(t, err)
 		// Add files to make caches non-empty
 		testFile := filepath.Join(cache, "test.a")
 		testutil.WriteTestFile(t, testFile, []byte("test data"), utils.PermFileDefault)
@@ -454,27 +394,19 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 	cmd.SetOut(output)
 	cmd.SetErr(output)
 
-	err := runCacheClean(cmd, []string{"build"})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	err = runCacheClean(cmd, []string{"build"})
+	require.NoError(t, err)
 
 	outputStr := output.String()
 
 	// Should show dry-run header
-	if !strings.Contains(outputStr, "Dry run - showing what would be cleaned") {
-		t.Errorf("Expected dry-run header in output. Got:\n%s", outputStr)
-	}
+	assert.Contains(t, outputStr, "Dry run - showing what would be cleaned", "Expected dry-run header in output. Got:\\n %v", outputStr)
 
 	// Should show summary with number of caches
-	if !strings.Contains(outputStr, "Would remove") {
-		t.Errorf("Expected 'Would remove' summary in output. Got:\n%s", outputStr)
-	}
+	assert.Contains(t, outputStr, "Would remove", "Expected 'Would remove' summary in output. Got:\\n %v", outputStr)
 
 	// Should show caches count
-	if !strings.Contains(outputStr, "2 cache(s)") {
-		t.Errorf("Expected '2 cache(s)' in output. Got:\n%s", outputStr)
-	}
+	assert.Contains(t, outputStr, "2 cache(s)", "Expected '2 cache(s)' in output. Got:\\n %v", outputStr)
 
 	// Verify no actual deletion
 	for _, cache := range []string{buildCache1, buildCache2} {
@@ -485,14 +417,14 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 }
 
 func TestCacheCleanDryRunEmptyCaches(t *testing.T) {
+	var err error
 	// Create temporary GOENV_ROOT with no caches
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
 	binDir := filepath.Join(versionsDir, "bin")
 
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err)
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
@@ -518,23 +450,20 @@ func TestCacheCleanDryRunEmptyCaches(t *testing.T) {
 	cmd.SetOut(output)
 	cmd.SetErr(output)
 
-	err := runCacheClean(cmd, []string{"build"})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	err = runCacheClean(cmd, []string{"build"})
+	require.NoError(t, err)
 
 	outputStr := output.String()
 
 	// Should report no caches found
-	if !strings.Contains(outputStr, "No caches found") {
-		t.Errorf("Expected 'No caches found' message when no caches exist. Got:\n%s", outputStr)
-	}
+	assert.Contains(t, outputStr, "No caches found", "Expected 'No caches found' message when no caches exist. Got:\\n %v", outputStr)
 
 	// Should NOT show dry-run message if there's nothing to clean
 	// (function returns early before dry-run check)
 }
 
 func TestCacheClean_NoForceNonInteractive(t *testing.T) {
+	var err error
 	// Create temporary GOENV_ROOT with mock cache
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
@@ -542,9 +471,8 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err)
 
 	// Create fake go executable (manager checks for this)
 	goExe := filepath.Join(binDir, "go")
@@ -556,9 +484,8 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	if err := utils.EnsureDirWithContext(buildCache, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(buildCache, "create test directory")
+	require.NoError(t, err)
 
 	// Create test files in build cache
 	testFile := filepath.Join(buildCache, "test.a")
@@ -584,9 +511,7 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 
 	// Create a pipe to simulate non-interactive stdin (not a TTY)
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer r.Close()
 	defer w.Close()
 
@@ -605,9 +530,7 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 	err = runCacheClean(cmd, []string{"build"})
 
 	// Should succeed (PromptYesNo returns false, command cancels gracefully)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v\nOutput:\n%s\nError output:\n%s", err, output.String(), errOutput.String())
-	}
+	require.NoError(t, err, "Unexpected error: \\nOutput:\\n\\nError output:\\n")
 
 	// Verify cache was NOT deleted (InteractiveContext automatically returns false in CI mode)
 	if utils.FileNotExists(testFile) {
@@ -615,12 +538,11 @@ func TestCacheClean_NoForceNonInteractive(t *testing.T) {
 	}
 
 	// Verify "Cancelled" message in stdout
-	if !strings.Contains(output.String(), "Cancelled") {
-		t.Errorf("Expected 'Cancelled' message in output, got:\n%s", output.String())
-	}
+	assert.Contains(t, output.String(), "Cancelled", "Expected 'Cancelled' message in output, got:\\n %v", output.String())
 }
 
 func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
+	var err error
 	// Create temporary GOENV_ROOT with mock cache
 	tmpDir := t.TempDir()
 	versionsDir := filepath.Join(tmpDir, "versions", "1.23.2")
@@ -628,9 +550,8 @@ func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
 	binDir := filepath.Join(versionsDir, "bin")
 
 	// Create bin directory to make version appear "installed"
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err)
 
 	// Create fake go executable
 	goExe := filepath.Join(binDir, "go")
@@ -641,9 +562,8 @@ func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
 		testutil.WriteTestFile(t, goExe, []byte("#!/bin/sh\necho fake go\n"), utils.PermFileExecutable)
 	}
 
-	if err := utils.EnsureDirWithContext(buildCache, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(buildCache, "create test directory")
+	require.NoError(t, err)
 
 	// Create test files in build cache
 	testFile := filepath.Join(buildCache, "test.a")
@@ -667,9 +587,7 @@ func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
 
 	// Create a pipe to simulate non-interactive stdin
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer r.Close()
 	defer w.Close()
 
@@ -688,10 +606,7 @@ func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
 	err = runCacheClean(cmd, []string{"build"})
 
 	// Should succeed
-	if err != nil {
-		t.Fatalf("Unexpected error with GOENV_ASSUME_YES=1: %v\nOutput:\n%s\nError output:\n%s",
-			err, output.String(), errOutput.String())
-	}
+	require.NoError(t, err, "Unexpected error with GOENV_ASSUME_YES=1: \\nOutput:\\n\\nError output:\\n")
 
 	// Verify cache WAS deleted (auto-confirmed)
 	if utils.PathExists(testFile) {
@@ -699,9 +614,7 @@ func TestCacheClean_AssumeYesEnvVar(t *testing.T) {
 	}
 
 	// Should show successful removal message
-	if !strings.Contains(output.String(), "Removed") {
-		t.Errorf("Expected 'Removed' message in output with GOENV_ASSUME_YES=1, got:\n%s", output.String())
-	}
+	assert.Contains(t, output.String(), "Removed", "Expected 'Removed' message in output with GOENV_ASSUME_YES=1, got:\\n %v", output.String())
 }
 
 func TestGetDirSizeWithOptions_FastMode(t *testing.T) {
@@ -715,27 +628,15 @@ func TestGetDirSizeWithOptions_FastMode(t *testing.T) {
 
 	// Test normal mode
 	size, files, err := cache.GetDirSizeWithOptions(tmpDir, false, 10*time.Second)
-	if err != nil {
-		t.Fatalf("GetDirSizeWithOptions error: %v", err)
-	}
-	if size == 0 {
-		t.Error("Expected non-zero size")
-	}
-	if files != 100 {
-		t.Errorf("Expected 100 files, got %d", files)
-	}
+	require.NoError(t, err, "GetDirSizeWithOptions error")
+	assert.NotEqual(t, 0, size, "Expected non-zero size")
+	assert.Equal(t, 100, files, "Expected 100 files")
 
 	// Test fast mode (should return -1 for files)
 	sizeFast, filesFast, err := cache.GetDirSizeWithOptions(tmpDir, true, 10*time.Second)
-	if err != nil {
-		t.Fatalf("GetDirSizeWithOptions (fast) error: %v", err)
-	}
-	if sizeFast != size {
-		t.Errorf("Fast mode size mismatch: got %d, want %d", sizeFast, size)
-	}
-	if filesFast != -1 {
-		t.Errorf("Fast mode should return -1 for files, got %d", filesFast)
-	}
+	require.NoError(t, err, "GetDirSizeWithOptions (fast) error")
+	assert.Equal(t, size, sizeFast, "Fast mode size mismatch")
+	assert.Equal(t, -1, filesFast, "Fast mode should return -1 for files")
 }
 
 func TestGetDirSizeWithOptions_Timeout(t *testing.T) {
@@ -752,14 +653,10 @@ func TestGetDirSizeWithOptions_Timeout(t *testing.T) {
 
 	// Use very short timeout to force timeout during scan
 	size, files, err := cache.GetDirSizeWithOptions(tmpDir, false, 1*time.Nanosecond)
-	if err != nil {
-		t.Fatalf("GetDirSizeWithOptions error: %v", err)
-	}
+	require.NoError(t, err, "GetDirSizeWithOptions error")
 
 	// Should have scanned some files before timing out
-	if files == 0 && size == 0 {
-		t.Error("Expected partial scan, got no results")
-	}
+	assert.False(t, files == 0 && size == 0, "Expected partial scan, got no results")
 
 	// Should return -1 for files when timed out (indicates approximate)
 	if files != -1 {
@@ -767,20 +664,17 @@ func TestGetDirSizeWithOptions_Timeout(t *testing.T) {
 	}
 
 	// Should have measured some size even with timeout
-	if size == 0 {
-		t.Error("Expected some size measurement even with timeout")
-	}
+	assert.NotEqual(t, 0, size, "Expected some size measurement even with timeout")
 }
 
 func TestCacheStatusFastFlag(t *testing.T) {
 	// Test that --fast flag is registered
 	flag := cacheStatusCmd.Flags().Lookup("fast")
-	if flag == nil {
-		t.Error("--fast flag not registered")
-	}
+	assert.NotNil(t, flag, "--fast flag not registered")
 }
 
 func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
+	var err error
 	// Test that cache migration uses platform.OS()/GOARCH, not env vars
 	// This ensures we create "go-build-darwin-arm64" not "go-build-host-host"
 
@@ -792,9 +686,8 @@ func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
 	versionsDir := filepath.Join(tmpDir, "versions")
 	versionPath := filepath.Join(versionsDir, "1.23.2")
 	binPath := filepath.Join(versionPath, "bin")
-	if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(binPath, "create test directory")
+	require.NoError(t, err, "Failed to create bin directory")
 
 	// Create fake go executable
 	goExe := filepath.Join(binPath, "go")
@@ -809,9 +702,8 @@ func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
 
 	// Create old format cache (go-build without architecture suffix)
 	oldCachePath := filepath.Join(versionPath, "go-build")
-	if err := utils.EnsureDirWithContext(oldCachePath, "create test directory"); err != nil {
-		t.Fatalf("Failed to create old cache: %v", err)
-	}
+	err = utils.EnsureDirWithContext(oldCachePath, "create test directory")
+	require.NoError(t, err, "Failed to create old cache")
 
 	// Add a test file
 	testFile := filepath.Join(oldCachePath, "test.a")
@@ -830,10 +722,8 @@ func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
 	migrateForce = true
 	defer func() { migrateForce = false }()
 
-	err := cacheMigrateCmd.RunE(cacheMigrateCmd, []string{})
-	if err != nil {
-		t.Fatalf("Cache migrate failed: %v\nOutput: %s", err, buf.String())
-	}
+	err = cacheMigrateCmd.RunE(cacheMigrateCmd, []string{})
+	require.NoError(t, err, "Cache migrate failed: \\nOutput")
 
 	output := buf.String()
 
@@ -854,9 +744,7 @@ func TestCacheMigration_UsesRuntimeArchitecture(t *testing.T) {
 	}
 
 	// Verify output mentions the correct architecture
-	if !strings.Contains(output, expectedArch) {
-		t.Errorf("Expected output to mention %s, got: %s", expectedArch, output)
-	}
+	assert.Contains(t, output, expectedArch, "Expected output to mention %v %v", expectedArch, output)
 
 	t.Logf("✓ Cache migration correctly used runtime architecture: %s", expectedArch)
 	t.Logf("✓ Created: %s", expectedCachePath)

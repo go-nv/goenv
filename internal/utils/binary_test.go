@@ -6,20 +6,18 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWindowsExecutableExtensions(t *testing.T) {
 	exts := WindowsExecutableExtensions()
 	expected := []string{".exe", ".bat", ".cmd", ".com"}
 
-	if len(exts) != len(expected) {
-		t.Errorf("Expected %d extensions, got %d", len(expected), len(exts))
-	}
+	assert.Len(t, exts, len(expected), "Expected extensions")
 
 	for i, ext := range expected {
-		if exts[i] != ext {
-			t.Errorf("Expected extension %s at index %d, got %s", ext, i, exts[i])
-		}
+		assert.Equal(t, ext, exts[i], "Expected extension at index")
 	}
 }
 
@@ -74,28 +72,18 @@ func TestFindExecutable(t *testing.T) {
 			// Make executable on Unix if needed
 			if tt.makeExec && !IsWindows() {
 				err := os.Chmod(filePath, PermFileExecutable)
-				if err != nil {
-					t.Fatalf("Failed to chmod file: %v", err)
-				}
+				require.NoError(t, err, "Failed to chmod file")
 			}
 
 			// Try to find it
 			found, err := FindExecutable(tmpDir, tt.searchName)
 
 			if tt.shouldFind {
-				if err != nil {
-					t.Errorf("Expected to find executable, got error: %v", err)
-				}
-				if found == "" {
-					t.Error("Expected non-empty path")
-				}
-				if tt.expectedExt != "" && filepath.Ext(found) != tt.expectedExt {
-					t.Errorf("Expected extension %s, got %s", tt.expectedExt, filepath.Ext(found))
-				}
+				assert.NoError(t, err, "Expected to find executable")
+				assert.NotEmpty(t, found, "Expected non-empty path")
+				assert.False(t, tt.expectedExt != "" && filepath.Ext(found) != tt.expectedExt, "Expected extension")
 			} else {
-				if err == nil {
-					t.Errorf("Expected not to find executable on this platform, but found: %s", found)
-				}
+				assert.Error(t, err, "Expected not to find executable on this platform, but found %v", found)
 			}
 
 			// Cleanup
@@ -150,15 +138,11 @@ func TestIsExecutable(t *testing.T) {
 
 			if tt.makeExec && !IsWindows() {
 				err := os.Chmod(filePath, PermFileExecutable)
-				if err != nil {
-					t.Fatalf("Failed to chmod file: %v", err)
-				}
+				require.NoError(t, err, "Failed to chmod file")
 			}
 
 			isExec := IsExecutable(filePath)
-			if isExec != tt.shouldBeExec {
-				t.Errorf("Expected IsExecutable=%v, got %v", tt.shouldBeExec, isExec)
-			}
+			assert.Equal(t, tt.shouldBeExec, isExec, "Expected IsExecutable=")
 		})
 	}
 }
@@ -181,10 +165,7 @@ func TestHasExecutableExtension(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.filename, func(t *testing.T) {
 				result := HasExecutableExtension(tt.filename)
-				if result != tt.expected {
-					t.Errorf("HasExecutableExtension(%q) = %v, expected %v",
-						tt.filename, result, tt.expected)
-				}
+				assert.Equal(t, tt.expected, result, "HasExecutableExtension() = , expected %v", tt.filename)
 			})
 		}
 	} else {
@@ -193,9 +174,7 @@ func TestHasExecutableExtension(t *testing.T) {
 		for _, filename := range tests {
 			t.Run(filename, func(t *testing.T) {
 				result := HasExecutableExtension(filename)
-				if !result {
-					t.Errorf("HasExecutableExtension(%q) = false, expected true on Unix", filename)
-				}
+				assert.True(t, result, "HasExecutableExtension() = false, expected true on Unix")
 			})
 		}
 	}

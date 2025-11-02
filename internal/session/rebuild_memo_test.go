@@ -3,15 +3,15 @@ package session
 import (
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRebuildMemo_SingletonBehavior(t *testing.T) {
 	memo1 := GetRebuildMemo()
 	memo2 := GetRebuildMemo()
 
-	if memo1 != memo2 {
-		t.Error("GetRebuildMemo should return the same instance (singleton)")
-	}
+	assert.Equal(t, memo2, memo1, "GetRebuildMemo should return the same instance (singleton)")
 }
 
 func TestRebuildMemo_HasChecked(t *testing.T) {
@@ -26,9 +26,7 @@ func TestRebuildMemo_HasChecked(t *testing.T) {
 
 	memo.MarkChecked(toolPath)
 
-	if !memo.HasChecked(toolPath) {
-		t.Error("Tool should be checked after MarkChecked")
-	}
+	assert.True(t, memo.HasChecked(toolPath), "Tool should be checked after MarkChecked")
 }
 
 func TestRebuildMemo_HasRebuilt(t *testing.T) {
@@ -43,9 +41,7 @@ func TestRebuildMemo_HasRebuilt(t *testing.T) {
 
 	memo.MarkRebuilt(toolPath)
 
-	if !memo.HasRebuilt(toolPath) {
-		t.Error("Tool should be rebuilt after MarkRebuilt")
-	}
+	assert.True(t, memo.HasRebuilt(toolPath), "Tool should be rebuilt after MarkRebuilt")
 }
 
 func TestRebuildMemo_ShouldPromptRebuild(t *testing.T) {
@@ -55,9 +51,7 @@ func TestRebuildMemo_ShouldPromptRebuild(t *testing.T) {
 	toolPath := "/test/tool/prompt"
 
 	// Should prompt initially
-	if !memo.ShouldPromptRebuild(toolPath) {
-		t.Error("Should prompt for rebuild initially")
-	}
+	assert.True(t, memo.ShouldPromptRebuild(toolPath), "Should prompt for rebuild initially")
 
 	// After checking, should not prompt
 	memo.MarkChecked(toolPath)
@@ -69,9 +63,7 @@ func TestRebuildMemo_ShouldPromptRebuild(t *testing.T) {
 	memo.Clear()
 	toolPath2 := "/test/tool/prompt2"
 
-	if !memo.ShouldPromptRebuild(toolPath2) {
-		t.Error("Should prompt for rebuild initially")
-	}
+	assert.True(t, memo.ShouldPromptRebuild(toolPath2), "Should prompt for rebuild initially")
 
 	// After rebuilding, should not prompt
 	memo.MarkRebuilt(toolPath2)
@@ -90,9 +82,7 @@ func TestRebuildMemo_Clear(t *testing.T) {
 	memo.MarkChecked(toolPath1)
 	memo.MarkRebuilt(toolPath2)
 
-	if !memo.HasChecked(toolPath1) || !memo.HasRebuilt(toolPath2) {
-		t.Error("Tools should be marked before clear")
-	}
+	assert.False(t, !memo.HasChecked(toolPath1) || !memo.HasRebuilt(toolPath2), "Tools should be marked before clear")
 
 	memo.Clear()
 
@@ -126,9 +116,7 @@ func TestRebuildMemo_ConcurrentAccess(t *testing.T) {
 	wg.Wait()
 
 	// Tool should be marked as checked
-	if !memo.HasChecked("/test/tool/concurrent") {
-		t.Error("Tool should be checked after concurrent access")
-	}
+	assert.True(t, memo.HasChecked("/test/tool/concurrent"), "Tool should be checked after concurrent access")
 }
 
 func TestRebuildMemo_MultipleTools(t *testing.T) {
@@ -146,23 +134,13 @@ func TestRebuildMemo_MultipleTools(t *testing.T) {
 	memo.MarkRebuilt(tools[1])
 	// tools[2] is untouched
 
-	if !memo.HasChecked(tools[0]) {
-		t.Error("Tool 0 should be checked")
-	}
+	assert.True(t, memo.HasChecked(tools[0]), "Tool 0 should be checked")
 
-	if !memo.HasRebuilt(tools[1]) {
-		t.Error("Tool 1 should be rebuilt")
-	}
+	assert.True(t, memo.HasRebuilt(tools[1]), "Tool 1 should be rebuilt")
 
-	if memo.HasChecked(tools[2]) || memo.HasRebuilt(tools[2]) {
-		t.Error("Tool 2 should not be checked or rebuilt")
-	}
+	assert.False(t, memo.HasChecked(tools[2]) || memo.HasRebuilt(tools[2]), "Tool 2 should not be checked or rebuilt")
 
-	if !memo.ShouldPromptRebuild(tools[2]) {
-		t.Error("Should prompt for tool 2")
-	}
+	assert.True(t, memo.ShouldPromptRebuild(tools[2]), "Should prompt for tool 2")
 
-	if memo.ShouldPromptRebuild(tools[0]) || memo.ShouldPromptRebuild(tools[1]) {
-		t.Error("Should not prompt for tools 0 or 1")
-	}
+	assert.False(t, memo.ShouldPromptRebuild(tools[0]) || memo.ShouldPromptRebuild(tools[1]), "Should not prompt for tools 0 or 1")
 }

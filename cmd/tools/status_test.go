@@ -11,9 +11,12 @@ import (
 	"github.com/go-nv/goenv/internal/manager"
 	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStatusCommand_NoVersions(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -21,22 +24,18 @@ func TestStatusCommand_NoVersions(t *testing.T) {
 
 	// Create empty versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err)
 
 	mgr := manager.NewManager(cfg)
 	versions, err := mgr.ListInstalledVersions()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(versions) != 0 {
-		t.Errorf("Expected no versions, got %d", len(versions))
-	}
+	assert.Len(t, versions, 0, "Expected no versions")
 }
 
 func TestStatusCommand_JSONStructure(t *testing.T) {
+	var err error
 	// Test JSON output structure
 	status := toolStatus{
 		Name:          "gopls",
@@ -64,41 +63,24 @@ func TestStatusCommand_JSONStructure(t *testing.T) {
 
 	// Verify we can marshal to JSON
 	data, err := json.Marshal(output)
-	if err != nil {
-		t.Fatalf("Failed to marshal JSON: %v", err)
-	}
+	require.NoError(t, err, "Failed to marshal JSON")
 
 	// Verify we can unmarshal
 	var parsed jsonOutput
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		t.Fatalf("Failed to unmarshal JSON: %v", err)
-	}
+	err = json.Unmarshal(data, &parsed)
+	require.NoError(t, err, "Failed to unmarshal JSON")
 
-	if parsed.SchemaVersion != "1" {
-		t.Errorf("Expected schema_version '1', got '%s'", parsed.SchemaVersion)
-	}
+	assert.Equal(t, "1", parsed.SchemaVersion, "Expected schema_version '1'")
 
-	if len(parsed.GoVersions) != 3 {
-		t.Errorf("Expected 3 Go versions, got %d", len(parsed.GoVersions))
-	}
+	assert.Len(t, parsed.GoVersions, 3, "Expected 3 Go versions")
 
-	if len(parsed.Tools) != 1 {
-		t.Errorf("Expected 1 tool, got %d", len(parsed.Tools))
-	}
+	assert.Len(t, parsed.Tools, 1, "Expected 1 tool")
 
 	tool := parsed.Tools[0]
-	if tool.Name != "gopls" {
-		t.Errorf("Expected name 'gopls', got '%s'", tool.Name)
-	}
-	if tool.TotalVersions != 3 {
-		t.Errorf("Expected total_versions 3, got %d", tool.TotalVersions)
-	}
-	if tool.InstalledIn != 3 {
-		t.Errorf("Expected installed_in 3, got %d", tool.InstalledIn)
-	}
-	if tool.ConsistencyScore != 100.0 {
-		t.Errorf("Expected consistency_score 100.0, got %f", tool.ConsistencyScore)
-	}
+	assert.Equal(t, "gopls", tool.Name, "Expected name 'gopls'")
+	assert.Equal(t, 3, tool.TotalVersions, "Expected total_versions 3")
+	assert.Equal(t, 3, tool.InstalledIn, "Expected installed_in 3")
+	assert.Equal(t, 100.0, tool.ConsistencyScore, "Expected consistency_score 100.0")
 }
 
 func TestStatusCommand_ConsistencyCalculation(t *testing.T) {
@@ -140,9 +122,7 @@ func TestStatusCommand_ConsistencyCalculation(t *testing.T) {
 
 			// Use a small epsilon for floating point comparison
 			epsilon := 0.0001
-			if score < tt.expectedScore-epsilon || score > tt.expectedScore+epsilon {
-				t.Errorf("Expected score %f, got %f", tt.expectedScore, score)
-			}
+			assert.False(t, score < tt.expectedScore-epsilon || score > tt.expectedScore+epsilon, "Expected score")
 		})
 	}
 }
@@ -174,18 +154,14 @@ func TestStatusCommand_Categorization(t *testing.T) {
 	// Get versions and collect tools
 	mgr := manager.NewManager(cfg)
 	foundVersions, err := mgr.ListInstalledVersions()
-	if err != nil {
-		t.Fatalf("ListInstalledVersions failed: %v", err)
-	}
+	require.NoError(t, err, "ListInstalledVersions failed")
 
 	toolsByVersion := make(map[string][]string)
 	allToolNames := make(map[string]bool)
 
 	for _, version := range foundVersions {
 		toolList, err := toolspkg.ListForVersion(cfg, version)
-		if err != nil {
-			t.Fatalf("ListForVersion failed for %s: %v", version, err)
-		}
+		require.NoError(t, err, "ListForVersion failed for")
 
 		// Extract tool names
 		var toolNames []string
@@ -206,9 +182,7 @@ func TestStatusCommand_Categorization(t *testing.T) {
 			goplsCount++
 		}
 	}
-	if goplsCount != 3 {
-		t.Errorf("Expected gopls in all 3 versions, found in %d", goplsCount)
-	}
+	assert.Equal(t, 3, goplsCount, "Expected gopls in all 3 versions, found in")
 
 	// Verify staticcheck is partial (in 2 versions)
 	staticcheckCount := 0
@@ -217,9 +191,7 @@ func TestStatusCommand_Categorization(t *testing.T) {
 			staticcheckCount++
 		}
 	}
-	if staticcheckCount != 2 {
-		t.Errorf("Expected staticcheck in 2 versions, found in %d", staticcheckCount)
-	}
+	assert.Equal(t, 2, staticcheckCount, "Expected staticcheck in 2 versions, found in")
 
 	// Verify gofmt is version-specific (in 1 version)
 	gofmtCount := 0
@@ -228,9 +200,7 @@ func TestStatusCommand_Categorization(t *testing.T) {
 			gofmtCount++
 		}
 	}
-	if gofmtCount != 1 {
-		t.Errorf("Expected gofmt in 1 version, found in %d", gofmtCount)
-	}
+	assert.Equal(t, 1, gofmtCount, "Expected gofmt in 1 version, found in")
 
 	// Verify golangci-lint is version-specific (in 1 version)
 	golangciCount := 0
@@ -239,9 +209,7 @@ func TestStatusCommand_Categorization(t *testing.T) {
 			golangciCount++
 		}
 	}
-	if golangciCount != 1 {
-		t.Errorf("Expected golangci-lint in 1 version, found in %d", golangciCount)
-	}
+	assert.Equal(t, 1, golangciCount, "Expected golangci-lint in 1 version, found in")
 }
 
 func TestStatusCommand_EmptyTools(t *testing.T) {
@@ -259,57 +227,39 @@ func TestStatusCommand_EmptyTools(t *testing.T) {
 
 	mgr := manager.NewManager(cfg)
 	foundVersions, err := mgr.ListInstalledVersions()
-	if err != nil {
-		t.Fatalf("ListInstalledVersions failed: %v", err)
-	}
+	require.NoError(t, err, "ListInstalledVersions failed")
 
-	if len(foundVersions) != 3 {
-		t.Errorf("Expected 3 versions, got %d", len(foundVersions))
-	}
+	assert.Len(t, foundVersions, 3, "Expected 3 versions")
 
 	// All versions should have no tools
 	allToolNames := make(map[string]bool)
 	for _, version := range foundVersions {
 		toolList, err := toolspkg.ListForVersion(cfg, version)
-		if err != nil {
-			t.Fatalf("ListForVersion failed for %s: %v", version, err)
-		}
+		require.NoError(t, err, "ListForVersion failed for")
 
-		if len(toolList) != 0 {
-			t.Errorf("Version %s: expected no tools, got %d", version, len(toolList))
-		}
+		assert.Len(t, toolList, 0, "Version : expected no tools %v", version)
 
 		for _, tool := range toolList {
 			allToolNames[tool.Name] = true
 		}
 	}
 
-	if len(allToolNames) != 0 {
-		t.Errorf("Expected no tools across all versions, got %d", len(allToolNames))
-	}
+	assert.Len(t, allToolNames, 0, "Expected no tools across all versions")
 }
 
 func TestStatusCommand_Command(t *testing.T) {
 	// Test that the command can be created
 	cmd := newStatusCommand()
 
-	if cmd == nil {
-		t.Fatal("Expected command to be created")
-	}
+	require.NotNil(t, cmd, "Expected command to be created")
 
-	if cmd.Use != "status" {
-		t.Errorf("Expected Use 'status', got '%s'", cmd.Use)
-	}
+	assert.Equal(t, "status", cmd.Use, "Expected Use 'status'")
 
-	if cmd.Short != "Show tool installation consistency across versions" {
-		t.Errorf("Unexpected Short description: %s", cmd.Short)
-	}
+	assert.Equal(t, "Show tool installation consistency across versions", cmd.Short, "Unexpected Short description")
 
 	// Check flags
 	jsonFlag := cmd.Flags().Lookup("json")
-	if jsonFlag == nil {
-		t.Error("Expected --json flag to exist")
-	}
+	assert.NotNil(t, jsonFlag, "Expected --json flag to exist")
 }
 
 func TestConsistencyScoreCalculation(t *testing.T) {
@@ -349,14 +299,13 @@ func TestConsistencyScoreCalculation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			score := float64(tt.installedIn) / float64(tt.totalVersions) * 100
 			epsilon := 0.0001
-			if score < tt.expectedScore-epsilon || score > tt.expectedScore+epsilon {
-				t.Errorf("Expected score %f, got %f", tt.expectedScore, score)
-			}
+			assert.False(t, score < tt.expectedScore-epsilon || score > tt.expectedScore+epsilon, "Expected score")
 		})
 	}
 }
 
 func TestStatusCommand_MultipleTools(t *testing.T) {
+	var err error
 	// Test creating multiple tool statuses
 	statuses := []toolStatus{
 		{
@@ -407,18 +356,13 @@ func TestStatusCommand_MultipleTools(t *testing.T) {
 	}
 
 	data, err := json.Marshal(output)
-	if err != nil {
-		t.Fatalf("Failed to marshal JSON: %v", err)
-	}
+	require.NoError(t, err, "Failed to marshal JSON")
 
 	var parsed jsonOutput
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		t.Fatalf("Failed to unmarshal JSON: %v", err)
-	}
+	err = json.Unmarshal(data, &parsed)
+	require.NoError(t, err, "Failed to unmarshal JSON")
 
-	if len(parsed.Tools) != 3 {
-		t.Errorf("Expected 3 tools, got %d", len(parsed.Tools))
-	}
+	assert.Len(t, parsed.Tools, 3, "Expected 3 tools")
 
 	// Categorize tools
 	var fullyInstalled, partiallyInstalled, singleVersion []toolStatus
@@ -432,15 +376,9 @@ func TestStatusCommand_MultipleTools(t *testing.T) {
 		}
 	}
 
-	if len(fullyInstalled) != 1 {
-		t.Errorf("Expected 1 fully installed tool, got %d", len(fullyInstalled))
-	}
+	assert.Len(t, fullyInstalled, 1, "Expected 1 fully installed tool")
 
-	if len(partiallyInstalled) != 1 {
-		t.Errorf("Expected 1 partially installed tool, got %d", len(partiallyInstalled))
-	}
+	assert.Len(t, partiallyInstalled, 1, "Expected 1 partially installed tool")
 
-	if len(singleVersion) != 1 {
-		t.Errorf("Expected 1 single-version tool, got %d", len(singleVersion))
-	}
+	assert.Len(t, singleVersion, 1, "Expected 1 single-version tool")
 }

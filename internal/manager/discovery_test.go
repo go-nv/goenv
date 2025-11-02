@@ -6,9 +6,12 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDiscoverVersion(t *testing.T) {
+	var err error
 	// Create temp directory
 	tmpDir := t.TempDir()
 
@@ -127,9 +130,8 @@ func TestDiscoverVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test directory
 			testDir := filepath.Join(tmpDir, tt.name)
-			if err := utils.EnsureDirWithContext(testDir, "create test directory"); err != nil {
-				t.Fatal(err)
-			}
+			err = utils.EnsureDirWithContext(testDir, "create test directory")
+			require.NoError(t, err)
 
 			// Setup files
 			if tt.setupFiles != nil {
@@ -141,38 +143,27 @@ func TestDiscoverVersion(t *testing.T) {
 
 			// Check error
 			if tt.expectError {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
+				assert.Error(t, err, "expected error, got nil")
 				return
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			// Check nil result
 			if tt.expectNil {
-				if result != nil {
-					t.Errorf("expected nil result, got %+v", result)
-				}
+				assert.Nil(t, result, "expected nil result")
 				return
 			}
 
 			// Check result
-			if result == nil {
-				t.Fatal("expected result, got nil")
-			}
-			if result.Version != tt.expectedVer {
-				t.Errorf("expected version %q, got %q", tt.expectedVer, result.Version)
-			}
-			if result.Source != tt.expectedSource {
-				t.Errorf("expected source %q, got %q", tt.expectedSource, result.Source)
-			}
+			require.NotNil(t, result, "expected result, got nil")
+			assert.Equal(t, tt.expectedVer, result.Version, "expected version")
+			assert.Equal(t, tt.expectedSource, result.Source, "expected source")
 		})
 	}
 }
 
 func TestDiscoverVersionMismatch(t *testing.T) {
+	var err error
 	// Create temp directory
 	tmpDir := t.TempDir()
 
@@ -246,9 +237,8 @@ func TestDiscoverVersionMismatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test directory
 			testDir := filepath.Join(tmpDir, tt.name)
-			if err := utils.EnsureDirWithContext(testDir, "create test directory"); err != nil {
-				t.Fatal(err)
-			}
+			err = utils.EnsureDirWithContext(testDir, "create test directory")
+			require.NoError(t, err)
 
 			// Setup files
 			if tt.setupFiles != nil {
@@ -257,19 +247,11 @@ func TestDiscoverVersionMismatch(t *testing.T) {
 
 			// Check for mismatch
 			mismatch, goVersionVer, goModVer, err := DiscoverVersionMismatch(testDir)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if mismatch != tt.expectMismatch {
-				t.Errorf("expected mismatch=%v, got %v", tt.expectMismatch, mismatch)
-			}
-			if goVersionVer != tt.goVersionVer {
-				t.Errorf("expected goVersionVer=%q, got %q", tt.goVersionVer, goVersionVer)
-			}
-			if goModVer != tt.goModVer {
-				t.Errorf("expected goModVer=%q, got %q", tt.goModVer, goModVer)
-			}
+			assert.Equal(t, tt.expectMismatch, mismatch, "expected mismatch=")
+			assert.Equal(t, tt.goVersionVer, goVersionVer, "expected goVersionVer=")
+			assert.Equal(t, tt.goModVer, goModVer, "expected goModVer=")
 		})
 	}
 }
@@ -320,9 +302,7 @@ func TestParseVersionContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := parseVersionContent(tt.content)
-			if result != tt.expected {
-				t.Errorf("expected %q, got %q", tt.expected, result)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

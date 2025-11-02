@@ -3,21 +3,19 @@ package hooks
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCheckDiskSpaceAction_Name(t *testing.T) {
 	action := &CheckDiskSpaceAction{}
-	if action.Name() != ActionCheckDiskSpace {
-		t.Errorf("Name() = %v, want %v", action.Name(), ActionCheckDiskSpace)
-	}
+	assert.Equal(t, ActionCheckDiskSpace, action.Name(), "Name() =")
 }
 
 func TestCheckDiskSpaceAction_Description(t *testing.T) {
 	action := &CheckDiskSpaceAction{}
 	desc := action.Description()
-	if desc == "" {
-		t.Error("Description() returned empty string")
-	}
+	assert.NotEmpty(t, desc, "Description() returned empty string")
 }
 
 func TestCheckDiskSpaceAction_Validate(t *testing.T) {
@@ -133,9 +131,7 @@ func TestCheckDiskSpaceAction_Validate(t *testing.T) {
 					t.Errorf("Validate() error = %q, want error containing %q", err.Error(), tt.errMsg)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Validate() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Validate() unexpected error")
 			}
 		})
 	}
@@ -204,19 +200,16 @@ func TestCheckDiskSpaceAction_Execute(t *testing.T) {
 
 			err := action.Execute(ctx, tt.params)
 			if tt.wantErr {
-				if err == nil {
-					t.Error("Execute() expected error, got nil")
-				}
+				assert.Error(t, err, "Execute() expected error, got nil")
 			} else {
-				if err != nil {
-					t.Errorf("Execute() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Execute() unexpected error")
 			}
 		})
 	}
 }
 
 func TestCheckDiskSpaceAction_ExecuteFloatConversion(t *testing.T) {
+	var err error
 	action := &CheckDiskSpaceAction{}
 
 	tempDir := t.TempDir()
@@ -232,7 +225,6 @@ func TestCheckDiskSpaceAction_ExecuteFloatConversion(t *testing.T) {
 		"min_free_mb": 1.5, // Float value
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Errorf("Execute() with float min_free_mb failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	assert.NoError(t, err, "Execute() with float min_free_mb failed")
 }

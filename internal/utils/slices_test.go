@@ -1,6 +1,10 @@
 package utils
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestSlicesEqual(t *testing.T) {
 	tests := []struct {
@@ -50,9 +54,7 @@ func TestSlicesEqual(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := SlicesEqual(tt.a, tt.b)
-			if result != tt.expected {
-				t.Errorf("SlicesEqual(%v, %v) = %v, want %v", tt.a, tt.b, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "SlicesEqual(, ) = %v %v", tt.a, tt.b)
 		})
 	}
 }
@@ -99,9 +101,7 @@ func TestSliceContains(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := SliceContains(tt.slice, tt.item)
-			if result != tt.expected {
-				t.Errorf("SliceContains(%v, %v) = %v, want %v", tt.slice, tt.item, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "SliceContains(, ) = %v %v", tt.slice, tt.item)
 		})
 	}
 }

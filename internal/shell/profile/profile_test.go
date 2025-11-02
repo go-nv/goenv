@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetInitLine(t *testing.T) {
@@ -25,9 +27,7 @@ func TestGetInitLine(t *testing.T) {
 		t.Run(string(tt.shell), func(t *testing.T) {
 			pm := NewProfileManager(tt.shell)
 			got := pm.GetInitLine()
-			if got != tt.expected {
-				t.Errorf("GetInitLine() = %q, want %q", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "GetInitLine() =")
 		})
 	}
 }
@@ -50,14 +50,13 @@ func TestHasGoenvInit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := pm.hasGoenvInit(tt.content)
-			if got != tt.expected {
-				t.Errorf("hasGoenvInit() = %v, want %v", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "hasGoenvInit() =")
 		})
 	}
 }
 
 func TestGetProfile(t *testing.T) {
+	var err error
 	// This test is Unix-specific (tests .bashrc)
 	if utils.IsWindows() {
 		t.Skip("Skipping Unix shell profile test on Windows")
@@ -66,9 +65,8 @@ func TestGetProfile(t *testing.T) {
 	// Create temporary test directory
 	tmpDir := t.TempDir()
 	home := filepath.Join(tmpDir, "home")
-	if err := utils.EnsureDirWithContext(home, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(home, "create test directory")
+	require.NoError(t, err)
 
 	// Override home directory for testing
 	oldHome := os.Getenv(utils.EnvVarHome)
@@ -82,21 +80,13 @@ func TestGetProfile(t *testing.T) {
 
 	pm := NewProfileManager(ShellTypeBash)
 	profile, err := pm.GetProfile()
-	if err != nil {
-		t.Fatalf("GetProfile() error = %v", err)
-	}
+	require.NoError(t, err, "GetProfile() error =")
 
-	if !profile.Exists {
-		t.Error("Expected profile to exist")
-	}
+	assert.True(t, profile.Exists, "Expected profile to exist")
 
-	if !profile.HasGoenv {
-		t.Error("Expected profile to have goenv")
-	}
+	assert.True(t, profile.HasGoenv, "Expected profile to have goenv")
 
-	if profile.Content != testContent {
-		t.Errorf("Content = %q, want %q", profile.Content, testContent)
-	}
+	assert.Equal(t, testContent, profile.Content, "Content =")
 }
 
 func TestDetectPathResets(t *testing.T) {
@@ -140,18 +130,15 @@ func TestDetectPathResets(t *testing.T) {
 
 			issues := pm.detectPathResets([]*Profile{profile})
 
-			if tt.wantIssue && len(issues) == 0 {
-				t.Error("Expected to detect PATH reset issue, but none found")
-			}
+			assert.False(t, tt.wantIssue && len(issues) == 0, "Expected to detect PATH reset issue, but none found")
 
-			if !tt.wantIssue && len(issues) > 0 {
-				t.Errorf("Expected no issues, but found: %v", issues)
-			}
+			assert.False(t, !tt.wantIssue && len(issues) > 0, "Expected no issues, but found")
 		})
 	}
 }
 
 func TestGetAllProfiles(t *testing.T) {
+	var err error
 	// This test is Unix-specific (tests .zshrc, .zprofile)
 	if utils.IsWindows() {
 		t.Skip("Skipping Unix shell profile test on Windows")
@@ -160,9 +147,8 @@ func TestGetAllProfiles(t *testing.T) {
 	// Create temporary test directory
 	tmpDir := t.TempDir()
 	home := filepath.Join(tmpDir, "home")
-	if err := utils.EnsureDirWithContext(home, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(home, "create test directory")
+	require.NoError(t, err)
 
 	// Override home directory for testing
 	oldHome := os.Getenv(utils.EnvVarHome)
@@ -178,14 +164,10 @@ func TestGetAllProfiles(t *testing.T) {
 
 	pm := NewProfileManager(ShellTypeZsh)
 	profiles, err := pm.GetAllProfiles()
-	if err != nil {
-		t.Fatalf("GetAllProfiles() error = %v", err)
-	}
+	require.NoError(t, err, "GetAllProfiles() error =")
 
 	// Should return 3 profiles: .zshrc, .zprofile, .zshenv
-	if len(profiles) != 3 {
-		t.Errorf("Expected 3 profiles, got %d", len(profiles))
-	}
+	assert.Len(t, profiles, 3, "Expected 3 profiles")
 
 	// Check that at least 2 exist (the ones we created)
 	existCount := 0
@@ -195,18 +177,16 @@ func TestGetAllProfiles(t *testing.T) {
 		}
 	}
 
-	if existCount != 2 {
-		t.Errorf("Expected 2 existing profiles, got %d", existCount)
-	}
+	assert.Equal(t, 2, existCount, "Expected 2 existing profiles")
 }
 
 func TestAddInitialization(t *testing.T) {
+	var err error
 	// Create temporary test directory
 	tmpDir := t.TempDir()
 	home := filepath.Join(tmpDir, "home")
-	if err := utils.EnsureDirWithContext(home, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(home, "create test directory")
+	require.NoError(t, err)
 
 	// Override home directory for testing
 	oldHome := os.Getenv(utils.EnvVarHome)
@@ -216,30 +196,20 @@ func TestAddInitialization(t *testing.T) {
 	pm := NewProfileManager(ShellTypeBash)
 
 	// Add initialization to non-existent profile
-	err := pm.AddInitialization(false)
-	if err != nil {
-		t.Fatalf("AddInitialization() error = %v", err)
-	}
+	err = pm.AddInitialization(false)
+	require.NoError(t, err, "AddInitialization() error =")
 
 	// Verify it was added
 	profile, err := pm.GetProfile()
-	if err != nil {
-		t.Fatalf("GetProfile() error = %v", err)
-	}
+	require.NoError(t, err, "GetProfile() error =")
 
-	if !profile.Exists {
-		t.Error("Expected profile to be created")
-	}
+	assert.True(t, profile.Exists, "Expected profile to be created")
 
-	if !profile.HasGoenv {
-		t.Error("Expected profile to have goenv")
-	}
+	assert.True(t, profile.HasGoenv, "Expected profile to have goenv")
 
 	// Try to add again - should fail
 	err = pm.AddInitialization(false)
-	if err == nil {
-		t.Error("Expected error when adding initialization twice, got nil")
-	}
+	assert.Error(t, err, "Expected error when adding initialization twice, got nil")
 }
 
 func TestDetectDuplicates(t *testing.T) {
@@ -260,11 +230,7 @@ eval "$(goenv init -)"
 	pm := NewProfileManager(ShellTypeBash)
 	issues := pm.detectDuplicates([]*Profile{profile})
 
-	if len(issues) == 0 {
-		t.Error("Expected to detect duplicate goenv init, but none found")
-	}
+	assert.NotEqual(t, 0, len(issues), "Expected to detect duplicate goenv init, but none found")
 
-	if issues[0].Type != IssueTypeDuplicate {
-		t.Errorf("Expected IssueTypeDuplicate, got %v", issues[0].Type)
-	}
+	assert.Equal(t, IssueTypeDuplicate, issues[0].Type, "Expected IssueTypeDuplicate")
 }

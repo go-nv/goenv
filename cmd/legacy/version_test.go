@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -114,22 +115,15 @@ func TestVersionCommand(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+			assert.NoError(t, err)
 
 			got := cmdtest.StripDeprecationWarning(output.String())
 
 			if tt.checkOutputMatch {
 				// Check if output starts with expected prefix
-				if !strings.HasPrefix(got, tt.expectedOutput) {
-					t.Errorf("Expected output to start with '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.True(t, strings.HasPrefix(got, tt.expectedOutput))
 			} else {
-				if got != tt.expectedOutput {
-					t.Errorf("Expected '%s', got '%s'", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got)
 			}
 		})
 	}
@@ -160,30 +154,20 @@ func TestVersionWithMultipleVersions(t *testing.T) {
 	cmd.SetArgs([]string{})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
+	assert.NoError(t, err)
 
 	got := cmdtest.StripDeprecationWarning(output.String())
 	gotLines := strings.Split(got, "\n")
 
 	// Should show both versions
-	if len(gotLines) != 2 {
-		t.Errorf("Expected 2 lines, got %d:\n%s", len(gotLines), got)
-		return
-	}
+	assert.Len(t, gotLines, 2, "Expected 2 lines %v", got)
 
 	expectedPrefix1 := "1.11.1 (set by "
 	expectedPrefix2 := "1.10.3 (set by "
 
-	if !strings.HasPrefix(gotLines[0], expectedPrefix1) {
-		t.Errorf("Line 0: expected to start with '%s', got '%s'", expectedPrefix1, gotLines[0])
-	}
+	assert.True(t, strings.HasPrefix(gotLines[0], expectedPrefix1))
 
-	if !strings.HasPrefix(gotLines[1], expectedPrefix2) {
-		t.Errorf("Line 1: expected to start with '%s', got '%s'", expectedPrefix2, gotLines[1])
-	}
+	assert.True(t, strings.HasPrefix(gotLines[1], expectedPrefix2))
 }
 
 func TestVersionWithMissingVersions(t *testing.T) {
@@ -221,22 +205,14 @@ func TestVersionWithMissingVersions(t *testing.T) {
 	err := cmd.Execute()
 
 	// Should fail but show error for missing versions and success for installed one
-	if err == nil {
-		t.Errorf("Expected error for missing versions, got nil")
-	}
+	assert.Error(t, err, "Expected error for missing versions, got nil")
 
 	// Check that error output contains information about missing versions
 	combined := output.String() + errOutput.String() + err.Error()
 
-	if !strings.Contains(combined, "1.1") {
-		t.Errorf("Expected error output to mention missing version '1.1'")
-	}
-	if !strings.Contains(combined, "1.2") {
-		t.Errorf("Expected error output to mention missing version '1.2'")
-	}
-	if !strings.Contains(combined, "1.11.1") {
-		t.Errorf("Expected output to mention installed version '1.11.1'")
-	}
+	assert.Contains(t, combined, "1.1", "Expected error output to mention missing version '1.1'")
+	assert.Contains(t, combined, "1.2", "Expected error output to mention missing version '1.2'")
+	assert.Contains(t, combined, "1.11.1", "Expected output to mention installed version '1.11.1'")
 }
 
 func TestVersionCommandRejectsExtraArguments(t *testing.T) {
@@ -265,12 +241,7 @@ func TestVersionCommandRejectsExtraArguments(t *testing.T) {
 	err := cmd.Execute()
 
 	// Should error with usage message
-	if err == nil {
-		t.Error("Expected error when extra arguments provided, got nil")
-		return
-	}
+	assert.Error(t, err, "Expected error when extra arguments provided, got nil")
 
-	if !strings.Contains(err.Error(), "usage: goenv version") {
-		t.Errorf("Expected usage error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "usage: goenv version", "Expected usage error %v", err)
 }

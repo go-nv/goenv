@@ -14,6 +14,8 @@ import (
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdateCommand_FlagValidation(t *testing.T) {
@@ -55,15 +57,15 @@ func TestUpdateCommand_FlagValidation(t *testing.T) {
 }
 
 func TestUpdateCommand_DetectionGitInstall(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create a fake git repository structure
 	gitDir := filepath.Join(tmpDir, ".git")
-	if err := utils.EnsureDirWithContext(gitDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .git directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(gitDir, "create test directory")
+	require.NoError(t, err, "Failed to create .git directory")
 
 	// Create a fake HEAD file to make it look like a git repo
 	headFile := filepath.Join(gitDir, "HEAD")
@@ -79,9 +81,7 @@ func TestUpdateCommand_DetectionGitInstall(t *testing.T) {
 	output := buf.String()
 
 	// Should mention checking for updates
-	if !strings.Contains(output, "Checking") || !strings.Contains(output, "update") {
-		t.Errorf("Expected update checking message, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "Checking") || !strings.Contains(output, "update"), "Expected update checking message")
 }
 
 func TestUpdateCommand_BinaryDetection(t *testing.T) {
@@ -101,9 +101,7 @@ func TestUpdateCommand_BinaryDetection(t *testing.T) {
 	output := buf.String()
 
 	// Should mention checking for updates
-	if !strings.Contains(output, "Checking") || !strings.Contains(output, "update") {
-		t.Errorf("Expected update checking message, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "Checking") || !strings.Contains(output, "update"), "Expected update checking message")
 }
 
 func TestUpdateCommand_CheckOnly(t *testing.T) {
@@ -126,9 +124,7 @@ func TestUpdateCommand_CheckOnly(t *testing.T) {
 	output := buf.String()
 
 	// Should check but not update
-	if !strings.Contains(output, "Checking") {
-		t.Errorf("Expected checking message in check-only mode, got: %s", output)
-	}
+	assert.Contains(t, output, "Checking", "Expected checking message in check-only mode %v", output)
 }
 
 func TestUpdateCommand_NoArgs(t *testing.T) {
@@ -144,9 +140,7 @@ func TestUpdateCommand_NoArgs(t *testing.T) {
 	// If Args is defined, check it; otherwise skip
 	if updateCmd.Args != nil {
 		err := updateCmd.Args(updateCmd, []string{})
-		if err != nil {
-			t.Errorf("Update command should accept no arguments, got error: %v", err)
-		}
+		assert.NoError(t, err, "Update command should accept no arguments")
 	}
 }
 
@@ -188,12 +182,11 @@ func TestUpdateCommand_OutputFormat(t *testing.T) {
 		strings.Contains(output, "Fetching latest changes") ||
 		strings.Contains(output, "Checking GitHub releases")
 
-	if !hasExpectedOutput {
-		t.Errorf("Expected formatted output with update messages, got: %s", output)
-	}
+	assert.True(t, hasExpectedOutput, "Expected formatted output with update messages")
 }
 
 func TestUpdateCommand_GitInstallWithGit(t *testing.T) {
+	var err error
 	// Skip if git is not available
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available, skipping test")
@@ -205,9 +198,8 @@ func TestUpdateCommand_GitInstallWithGit(t *testing.T) {
 
 	// Initialize a real git repo
 	gitDir := filepath.Join(tmpDir, ".git")
-	if err := utils.EnsureDirWithContext(gitDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .git directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(gitDir, "create test directory")
+	require.NoError(t, err, "Failed to create .git directory")
 
 	// Create minimal git repo structure
 	headFile := filepath.Join(gitDir, "HEAD")
@@ -215,9 +207,8 @@ func TestUpdateCommand_GitInstallWithGit(t *testing.T) {
 
 	// Create refs directory
 	refsDir := filepath.Join(gitDir, "refs", "heads")
-	if err := utils.EnsureDirWithContext(refsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create refs directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(refsDir, "create test directory")
+	require.NoError(t, err, "Failed to create refs directory")
 
 	buf := new(bytes.Buffer)
 	updateCmd.SetOut(buf)
@@ -241,9 +232,7 @@ func TestUpdateHelp(t *testing.T) {
 	updateCmd.SetErr(buf)
 
 	err := updateCmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 	expectedStrings := []string{
@@ -254,23 +243,17 @@ func TestUpdateHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q", expected)
-		}
+		assert.Contains(t, output, expected, "Help output missing %v", expected)
 	}
 }
 
 func TestUpdateCommand_Flags(t *testing.T) {
 	// Test that flags are properly defined
 	checkFlag := updateCmd.Flags().Lookup("check")
-	if checkFlag == nil {
-		t.Error("Expected --check flag to be defined")
-	}
+	assert.NotNil(t, checkFlag, "Expected --check flag to be defined")
 
 	forceFlag := updateCmd.Flags().Lookup("force")
-	if forceFlag == nil {
-		t.Error("Expected --force flag to be defined")
-	}
+	assert.NotNil(t, forceFlag, "Expected --force flag to be defined")
 }
 
 func TestUpdateCommand_WithDebug(t *testing.T) {
@@ -323,6 +306,7 @@ func TestUpdateCommand_GitNotFoundError(t *testing.T) {
 }
 
 func TestUpdateCommand_WritePermissionError(t *testing.T) {
+	var err error
 	// This test documents the improved error message for write permission issues
 	// Actual testing of file permissions is complex, so we verify the error formatting
 
@@ -333,12 +317,11 @@ func TestUpdateCommand_WritePermissionError(t *testing.T) {
 	testutil.WriteTestFile(t, tmpFile, []byte("test"), utils.PermFileDefault)
 
 	// Make it read-only
-	if err := os.Chmod(tmpFile, 0444); err != nil {
-		t.Fatalf("Failed to chmod file: %v", err)
-	}
+	err = os.Chmod(tmpFile, 0444)
+	require.NoError(t, err, "Failed to chmod file")
 
 	// Try to check write permission
-	err := checkWritePermission(tmpFile)
+	err = checkWritePermission(tmpFile)
 	if err == nil {
 		t.Skip("Expected permission error on read-only file")
 	}
@@ -351,6 +334,7 @@ func TestUpdateCommand_WritePermissionError(t *testing.T) {
 }
 
 func TestGetLatestRelease_304NotModified(t *testing.T) {
+	var err error
 	// Test that 304 Not Modified response is handled correctly with ETag
 	// This simulates the case where we have a cached ETag and GitHub returns 304
 
@@ -381,9 +365,8 @@ func TestGetLatestRelease_304NotModified(t *testing.T) {
 
 	// Create cache directory and write ETag
 	cacheDir := filepath.Join(tmpDir, "cache")
-	if err := utils.EnsureDirWithContext(cacheDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create cache directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(cacheDir, "create test directory")
+	require.NoError(t, err, "Failed to create cache directory")
 
 	etagFile := filepath.Join(cacheDir, "update-etag")
 	testutil.WriteTestFile(t, etagFile, []byte(etag), utils.PermFileSecure)

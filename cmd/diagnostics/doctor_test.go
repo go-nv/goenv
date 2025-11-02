@@ -14,9 +14,12 @@ import (
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDoctorCommand_BasicRun(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -34,15 +37,12 @@ func TestDoctorCommand_BasicRun(t *testing.T) {
 	defer func() { doctorExit = oldExit }()
 
 	// Create basic directory structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
@@ -60,13 +60,12 @@ func TestDoctorCommand_BasicRun(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Expected %q in output, got: %s", expected, output)
-		}
+		assert.Contains(t, output, expected, "Expected in output %v %v", expected, output)
 	}
 }
 
 func TestDoctorCommand_ChecksExecuted(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -84,15 +83,12 @@ func TestDoctorCommand_ChecksExecuted(t *testing.T) {
 	defer func() { doctorExit = oldExit }()
 
 	// Create directory structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
@@ -115,13 +111,12 @@ func TestDoctorCommand_ChecksExecuted(t *testing.T) {
 	}
 
 	for _, checkName := range checkNames {
-		if !strings.Contains(output, checkName) {
-			t.Errorf("Expected check %q to be mentioned in output", checkName)
-		}
+		assert.Contains(t, output, checkName, "Expected check to be mentioned in output %v", checkName)
 	}
 }
 
 func TestDoctorCommand_WithInstalledVersion(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -142,22 +137,18 @@ func TestDoctorCommand_WithInstalledVersion(t *testing.T) {
 	rootBinDir := filepath.Join(tmpDir, "bin")
 	shimsDir := filepath.Join(tmpDir, "shims")
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(rootBinDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDirWithContext(shimsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(rootBinDir, "create test directory")
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDirWithContext(shimsDir, "create test directory")
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	// Create a fake installed version
 	versionDir := filepath.Join(versionsDir, "1.21.0")
 	binDir := filepath.Join(versionDir, "bin")
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err, "Failed to create bin directory")
 
 	// Create mock go binary
 	goBinary := filepath.Join(binDir, "go")
@@ -179,9 +170,7 @@ func TestDoctorCommand_WithInstalledVersion(t *testing.T) {
 	output := buf.String()
 
 	// Should mention installed versions
-	if !strings.Contains(output, "Installed") && !strings.Contains(output, "version") {
-		t.Errorf("Expected installed versions check in output, got: %s", output)
-	}
+	assert.True(t, strings.Contains(output, "Installed") || strings.Contains(output, "version"), "Expected installed versions check in output")
 }
 
 func TestDoctorCommand_MissingGOENV_ROOT(t *testing.T) {
@@ -207,9 +196,7 @@ func TestDoctorCommand_MissingGOENV_ROOT(t *testing.T) {
 	t.Logf("Exit code: %d", exitCode)
 
 	// Doctor should call exit(1) when GOENV_ROOT doesn't exist
-	if exitCode != 1 {
-		t.Errorf("Expected exit code 1 when GOENV_ROOT doesn't exist, got: %d", exitCode)
-	}
+	assert.Equal(t, 1, exitCode, "Expected exit code 1 when GOENV_ROOT doesn't exist")
 
 	// Error may or may not be returned (before exit is called) - doctor now calls os.Exit
 	// so we just check that output contains the error
@@ -218,12 +205,11 @@ func TestDoctorCommand_MissingGOENV_ROOT(t *testing.T) {
 	output := buf.String()
 
 	// Should show error for GOENV_ROOT
-	if !strings.Contains(output, "GOENV_ROOT") {
-		t.Errorf("Expected GOENV_ROOT error in output, got: %s", output)
-	}
+	assert.Contains(t, output, "GOENV_ROOT", "Expected GOENV_ROOT error in output %v", output)
 }
 
 func TestDoctorCommand_OutputFormat(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -245,15 +231,12 @@ func TestDoctorCommand_OutputFormat(t *testing.T) {
 	t.Setenv(utils.EnvVarNoColor, "")
 
 	// Create basic structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
@@ -271,21 +254,16 @@ func TestDoctorCommand_OutputFormat(t *testing.T) {
 	}
 
 	for _, element := range formatElements {
-		if !strings.Contains(output, element) {
-			t.Errorf("Expected format element %q in output", element)
-		}
+		assert.Contains(t, output, element, "Expected format element in output %v", element)
 	}
 
 	// Just verify that output is not empty and contains diagnostic info
-	if len(output) == 0 {
-		t.Error("Expected non-empty output")
-	}
-	if !strings.Contains(output, "goenv") {
-		t.Error("Expected output to contain 'goenv'")
-	}
+	assert.NotEqual(t, 0, len(output), "Expected non-empty output")
+	assert.Contains(t, output, "goenv", "Expected output to contain 'goenv'")
 }
 
 func TestDoctorCommand_WithCache(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -303,21 +281,17 @@ func TestDoctorCommand_WithCache(t *testing.T) {
 	defer func() { doctorExit = oldExit }()
 
 	// Create directory structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	// Create cache file
 	cacheFile := filepath.Join(tmpDir, "cache", "releases.json")
-	if err := utils.EnsureDirWithContext(filepath.Dir(cacheFile), "create test directory"); err != nil {
-		t.Fatalf("Failed to create cache directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(filepath.Dir(cacheFile), "create test directory")
+	require.NoError(t, err, "Failed to create cache directory")
 	testutil.WriteTestFile(t, cacheFile, []byte("{}"), utils.PermFileDefault)
 
 	buf := new(bytes.Buffer)
@@ -329,9 +303,7 @@ func TestDoctorCommand_WithCache(t *testing.T) {
 	output := buf.String()
 
 	// Should mention cache check
-	if !strings.Contains(output, "Cache") || !strings.Contains(output, "cache") {
-		t.Errorf("Expected cache check in output, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "Cache") || !strings.Contains(output, "cache"), "Expected cache check in output")
 }
 
 func TestDoctorCommand_ErrorCount(t *testing.T) {
@@ -360,17 +332,14 @@ func TestDoctorCommand_ErrorCount(t *testing.T) {
 	output := buf.String()
 
 	// Should show summary with error count
-	if !strings.Contains(output, "error") {
-		t.Errorf("Expected error count in summary, got: %s", output)
-	}
+	assert.Contains(t, output, "error", "Expected error count in summary %v", output)
 
 	// Doctor should call exit(1) when errors are found
-	if exitCode != 1 {
-		t.Errorf("Expected exit code 1 when errors are found, got: %d", exitCode)
-	}
+	assert.Equal(t, 1, exitCode, "Expected exit code 1 when errors are found")
 }
 
 func TestDoctorCommand_SuccessScenario(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -384,24 +353,20 @@ func TestDoctorCommand_SuccessScenario(t *testing.T) {
 	defer func() { doctorExit = oldExit }()
 
 	// Create complete directory structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
 	shimsDir := filepath.Join(tmpDir, "shims")
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(shimsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(shimsDir, "create test directory")
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	// Create a version
 	versionDir := filepath.Join(versionsDir, "1.21.0")
 	binDir := filepath.Join(versionDir, "bin")
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err, "Failed to create bin directory")
 
 	goBinary := filepath.Join(binDir, "go")
 	var content string
@@ -426,14 +391,10 @@ func TestDoctorCommand_SuccessScenario(t *testing.T) {
 	output := buf.String()
 
 	// In success scenario, we should see OK indicators
-	if !strings.Contains(output, "OK") && !strings.Contains(output, "✅") {
-		t.Errorf("Expected success indicators in output, got: %s", output)
-	}
+	assert.True(t, strings.Contains(output, "OK") || strings.Contains(output, "✅"), "Expected success indicators in output")
 
 	// Should show summary
-	if !strings.Contains(output, "Summary:") {
-		t.Errorf("Expected summary in output, got: %s", output)
-	}
+	assert.Contains(t, output, "Summary:", "Expected summary in output %v", output)
 }
 
 func TestDoctorHelp(t *testing.T) {
@@ -442,9 +403,7 @@ func TestDoctorHelp(t *testing.T) {
 	doctorCmd.SetErr(buf)
 
 	err := doctorCmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 	expectedStrings := []string{
@@ -455,13 +414,12 @@ func TestDoctorHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q", expected)
-		}
+		assert.Contains(t, output, expected, "Help output missing %v", expected)
 	}
 }
 
 func TestDoctorCommand_ShellDetection(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -492,15 +450,12 @@ func TestDoctorCommand_ShellDetection(t *testing.T) {
 	}()
 
 	// Create basic structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
@@ -511,12 +466,11 @@ func TestDoctorCommand_ShellDetection(t *testing.T) {
 	output := buf.String()
 
 	// Should mention shell in output
-	if !strings.Contains(output, "Shell") || !strings.Contains(output, "shell") {
-		t.Errorf("Expected shell check in output, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "Shell") || !strings.Contains(output, "shell"), "Expected shell check in output")
 }
 
 func TestDoctorCommand_NoVersions(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -534,16 +488,13 @@ func TestDoctorCommand_NoVersions(t *testing.T) {
 	defer func() { doctorExit = oldExit }()
 
 	// Create structure but NO versions
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
@@ -554,9 +505,7 @@ func TestDoctorCommand_NoVersions(t *testing.T) {
 	output := buf.String()
 
 	// Should mention installed versions (even if none)
-	if !strings.Contains(output, "version") || !strings.Contains(output, "Version") {
-		t.Errorf("Expected version check in output, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "version") || !strings.Contains(output, "Version"), "Expected version check in output")
 }
 
 // Test the checkGoToolchain function
@@ -610,28 +559,21 @@ func TestCheckGoToolchain(t *testing.T) {
 
 			result := checkGoToolchain()
 
-			if result.status != tt.expectedStatus {
-				t.Errorf("Expected status %q, got %q", tt.expectedStatus, result.status)
-			}
+			assert.Equal(t, tt.expectedStatus, result.status, "Expected status")
 
-			if !strings.Contains(result.message, tt.shouldContain) {
-				t.Errorf("Expected message to contain %q, got %q", tt.shouldContain, result.message)
-			}
+			assert.Contains(t, result.message, tt.shouldContain, "Expected message to contain %v %v", tt.shouldContain, result.message)
 
-			if result.name != "GOTOOLCHAIN setting" {
-				t.Errorf("Expected name %q, got %q", "GOTOOLCHAIN setting", result.name)
-			}
+			assert.Equal(t, "GOTOOLCHAIN setting", result.name, "Expected name")
 
 			// Warnings should have advice
-			if result.status == StatusWarning && result.advice == "" {
-				t.Error("Warning status should have advice")
-			}
+			assert.False(t, result.status == StatusWarning && result.advice == "", "Warning status should have advice")
 		})
 	}
 }
 
 // Test the checkCacheIsolationEffectiveness function
 func TestCheckCacheIsolationEffectiveness(t *testing.T) {
+	var err error
 	tests := []struct {
 		name           string
 		setupVersion   string
@@ -701,9 +643,8 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 			// Change to tmpDir to avoid picking up .go-version files from parent directories
 			oldDir, _ := os.Getwd()
 			defer os.Chdir(oldDir)
-			if err := os.Chdir(tmpDir); err != nil {
-				t.Fatalf("Failed to change directory: %v", err)
-			}
+			err = os.Chdir(tmpDir)
+			require.NoError(t, err, "Failed to change directory")
 
 			// Unset any existing GOENV variables to ensure isolation
 			t.Setenv(utils.GoenvEnvVarVersion.String(), "")
@@ -713,17 +654,15 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 
 			// Create basic structure
 			versionsDir := filepath.Join(tmpDir, "versions")
-			if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-				t.Fatalf("Failed to create versions directory: %v", err)
-			}
+			err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+			require.NoError(t, err, "Failed to create versions directory")
 
 			// Setup version if needed
 			if tt.setupVersion != "" && tt.setupVersion != manager.SystemVersion {
 				versionDir := filepath.Join(versionsDir, tt.setupVersion)
 				binDir := filepath.Join(versionDir, "bin")
-				if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create bin directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(binDir, "create test directory")
+				require.NoError(t, err, "Failed to create bin directory")
 
 				// Create version file to set current version
 				versionFile := filepath.Join(tmpDir, "version")
@@ -742,17 +681,15 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 					}
 					cacheSuffix := "go-build-" + goos + "-" + goarch
 					cacheDir := filepath.Join(versionDir, cacheSuffix)
-					if err := utils.EnsureDirWithContext(cacheDir, "create test directory"); err != nil {
-						t.Fatalf("Failed to create cache directory: %v", err)
-					}
+					err = utils.EnsureDirWithContext(cacheDir, "create test directory")
+					require.NoError(t, err, "Failed to create cache directory")
 				}
 
 				if tt.setupOldCache {
 					// Create old-style cache
 					oldCacheDir := filepath.Join(versionDir, "go-build")
-					if err := utils.EnsureDirWithContext(oldCacheDir, "create test directory"); err != nil {
-						t.Fatalf("Failed to create old cache directory: %v", err)
-					}
+					err = utils.EnsureDirWithContext(oldCacheDir, "create test directory")
+					require.NoError(t, err, "Failed to create old cache directory")
 				}
 			} else if tt.setupVersion == manager.SystemVersion {
 				// Set system version
@@ -773,17 +710,11 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 			mgr := manager.NewManager(cfg)
 			result := checkCacheIsolationEffectiveness(cfg, mgr)
 
-			if result.status != tt.expectedStatus {
-				t.Errorf("Expected status %q, got %q", tt.expectedStatus, result.status)
-			}
+			assert.Equal(t, tt.expectedStatus, result.status, "Expected status")
 
-			if !strings.Contains(result.message, tt.shouldContain) {
-				t.Errorf("Expected message to contain %q, got %q", tt.shouldContain, result.message)
-			}
+			assert.Contains(t, result.message, tt.shouldContain, "Expected message to contain %v %v", tt.shouldContain, result.message)
 
-			if result.name != "Architecture-aware cache isolation" {
-				t.Errorf("Expected name %q, got %q", "Architecture-aware cache isolation", result.name)
-			}
+			assert.Equal(t, "Architecture-aware cache isolation", result.name, "Expected name")
 		})
 	}
 }
@@ -800,27 +731,22 @@ func TestCheckRosetta(t *testing.T) {
 	result := checkRosetta(cfg)
 
 	// Should always return a valid result
-	if result.name != "Rosetta detection" {
-		t.Errorf("Expected name %q, got %q", "Rosetta detection", result.name)
-	}
+	assert.Equal(t, "Rosetta detection", result.name, "Expected name")
 
 	// Status should be one of ok, warning, or error
 	validStatuses := []Status{StatusOK, StatusWarning, StatusError}
-	if !slices.Contains(validStatuses, result.status) {
-		t.Errorf("Invalid status %q, expected one of %v", result.status, validStatuses)
-	}
+	assert.True(t, slices.Contains(validStatuses, result.status), "Invalid status , expected one of")
 
 	// On non-macOS systems, should say "Not applicable"
 	if !platform.IsMacOS() {
-		if !strings.Contains(result.message, "Not applicable") && !strings.Contains(result.message, "not macOS") {
-			t.Errorf("Expected non-macOS message, got %q", result.message)
-		}
+		assert.True(t, strings.Contains(result.message, "Not applicable") || strings.Contains(result.message, "not macOS"), "Expected non-macOS message")
 	}
 	// On macOS, the message depends on the actual system configuration
 	// We can't reliably test specific outcomes without knowing the hardware
 }
 
 func TestDoctorCommand_EnvironmentDetection(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -838,15 +764,12 @@ func TestDoctorCommand_EnvironmentDetection(t *testing.T) {
 	defer func() { doctorExit = oldExit }()
 
 	// Create directory structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	doctorCmd.SetOut(buf)
@@ -863,9 +786,7 @@ func TestDoctorCommand_EnvironmentDetection(t *testing.T) {
 	}
 
 	for _, check := range environmentChecks {
-		if !strings.Contains(output, check) {
-			t.Errorf("Expected environment check %q to be in output", check)
-		}
+		assert.Contains(t, output, check, "Expected environment check to be in output %v", check)
 	}
 
 	// Should see either Native, Container, or WSL
@@ -873,16 +794,12 @@ func TestDoctorCommand_EnvironmentDetection(t *testing.T) {
 		strings.Contains(output, "Container") ||
 		strings.Contains(output, "WSL")
 
-	if !hasEnvironmentType {
-		t.Error("Expected to see environment type (Native, Container, or WSL) in output")
-	}
+	assert.True(t, hasEnvironmentType, "Expected to see environment type (Native, Container, or WSL) in output")
 
 	// Should see filesystem type
 	hasFilesystemType := strings.Contains(output, "Filesystem type:")
 
-	if !hasFilesystemType {
-		t.Error("Expected to see 'Filesystem type:' in output")
-	}
+	assert.True(t, hasFilesystemType, "Expected to see 'Filesystem type:' in output")
 }
 
 func TestCheckEnvironment(t *testing.T) {
@@ -890,26 +807,18 @@ func TestCheckEnvironment(t *testing.T) {
 
 	result := checkEnvironment(cfg)
 
-	if result.name != "Runtime environment" {
-		t.Errorf("Expected check name 'Runtime environment', got %s", result.name)
-	}
+	assert.Equal(t, "Runtime environment", result.name, "Expected check name 'Runtime environment'")
 
-	if result.status != StatusOK && result.status != StatusWarning {
-		t.Errorf("Expected status 'ok' or 'warning', got %s", result.status)
-	}
+	assert.False(t, result.status != StatusOK && result.status != StatusWarning, "Expected status 'ok' or 'warning'")
 
-	if result.message == "" {
-		t.Error("Expected non-empty message")
-	}
+	assert.NotEmpty(t, result.message, "Expected non-empty message")
 
 	// Message should contain environment description
 	hasEnvType := strings.Contains(result.message, "Native") ||
 		strings.Contains(result.message, "Container") ||
 		strings.Contains(result.message, "WSL")
 
-	if !hasEnvType {
-		t.Errorf("Expected message to contain environment type, got: %s", result.message)
-	}
+	assert.True(t, hasEnvType, "Expected message to contain environment type")
 }
 
 func TestCheckGoenvRootFilesystem(t *testing.T) {
@@ -919,21 +828,16 @@ func TestCheckGoenvRootFilesystem(t *testing.T) {
 
 	result := checkGoenvRootFilesystem(cfg)
 
-	if result.name != "GOENV_ROOT filesystem" {
-		t.Errorf("Expected check name 'GOENV_ROOT filesystem', got %s", result.name)
-	}
+	assert.Equal(t, "GOENV_ROOT filesystem", result.name, "Expected check name 'GOENV_ROOT filesystem'")
 
-	if result.message == "" {
-		t.Error("Expected non-empty message")
-	}
+	assert.NotEmpty(t, result.message, "Expected non-empty message")
 
 	// Message should mention filesystem type
-	if !strings.Contains(result.message, "Filesystem type:") {
-		t.Errorf("Expected message to contain 'Filesystem type:', got: %s", result.message)
-	}
+	assert.Contains(t, result.message, "Filesystem type:", "Expected message to contain 'Filesystem type:' %v", result.message)
 }
 
 func TestCheckMacOSDeploymentTarget(t *testing.T) {
+	var err error
 	if !platform.IsMacOS() {
 		t.Skip("macOS deployment target check only works on macOS")
 	}
@@ -946,9 +850,8 @@ func TestCheckMacOSDeploymentTarget(t *testing.T) {
 	versionsDir := filepath.Join(tmpDir, "versions")
 	versionDir := filepath.Join(versionsDir, "1.23.0")
 	binDir := filepath.Join(versionDir, "bin")
-	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(binDir, "create test directory")
+	require.NoError(t, err, "Failed to create bin directory")
 
 	// Set current version
 	versionFile := filepath.Join(tmpDir, "version")
@@ -957,9 +860,7 @@ func TestCheckMacOSDeploymentTarget(t *testing.T) {
 	mgr := manager.NewManager(cfg)
 	result := checkMacOSDeploymentTarget(cfg, mgr)
 
-	if result.name != "macOS deployment target" {
-		t.Errorf("Expected check name 'macOS deployment target', got %s", result.name)
-	}
+	assert.Equal(t, "macOS deployment target", result.name, "Expected check name 'macOS deployment target'")
 
 	// Should be ok or have a message about not finding binary
 	if result.status != StatusOK {
@@ -975,13 +876,9 @@ func TestCheckWindowsCompiler(t *testing.T) {
 	cfg := config.Load()
 	result := checkWindowsCompiler(cfg)
 
-	if result.name != "Windows compiler" {
-		t.Errorf("Expected check name 'Windows compiler', got %s", result.name)
-	}
+	assert.Equal(t, "Windows compiler", result.name, "Expected check name 'Windows compiler'")
 
-	if result.message == "" {
-		t.Error("Expected non-empty message")
-	}
+	assert.NotEmpty(t, result.message, "Expected non-empty message")
 
 	t.Logf("Status: %s, Message: %s", result.status, result.message)
 }
@@ -994,18 +891,12 @@ func TestCheckWindowsARM64(t *testing.T) {
 	cfg := config.Load()
 	result := checkWindowsARM64(cfg)
 
-	if result.name != "Windows ARM64/ARM64EC" {
-		t.Errorf("Expected check name 'Windows ARM64/ARM64EC', got %s", result.name)
-	}
+	assert.Equal(t, "Windows ARM64/ARM64EC", result.name, "Expected check name 'Windows ARM64/ARM64EC'")
 
-	if result.message == "" {
-		t.Error("Expected non-empty message")
-	}
+	assert.NotEmpty(t, result.message, "Expected non-empty message")
 
 	// Should mention process mode
-	if !strings.Contains(result.message, "Process mode:") {
-		t.Errorf("Expected message to contain 'Process mode:', got: %s", result.message)
-	}
+	assert.Contains(t, result.message, "Process mode:", "Expected message to contain 'Process mode:' %v", result.message)
 
 	t.Logf("Status: %s, Message: %s", result.status, result.message)
 }
@@ -1018,23 +909,18 @@ func TestCheckLinuxKernelVersion(t *testing.T) {
 	cfg := config.Load()
 	result := checkLinuxKernelVersion(cfg)
 
-	if result.name != "Linux kernel version" {
-		t.Errorf("Expected check name 'Linux kernel version', got %s", result.name)
-	}
+	assert.Equal(t, "Linux kernel version", result.name, "Expected check name 'Linux kernel version'")
 
-	if result.message == "" {
-		t.Error("Expected non-empty message")
-	}
+	assert.NotEmpty(t, result.message, "Expected non-empty message")
 
 	// Should mention kernel version
-	if !strings.Contains(result.message, "Kernel:") {
-		t.Errorf("Expected message to contain 'Kernel:', got: %s", result.message)
-	}
+	assert.Contains(t, result.message, "Kernel:", "Expected message to contain 'Kernel:' %v", result.message)
 
 	t.Logf("Status: %s, Message: %s", result.status, result.message)
 }
 
 func TestPlatformSpecificChecksInDoctor(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
@@ -1047,15 +933,12 @@ func TestPlatformSpecificChecksInDoctor(t *testing.T) {
 	t.Setenv(utils.EnvVarPath, filepath.Join(tmpDir, "bin")+string(os.PathListSeparator)+oldPath)
 
 	// Create directory structure
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "bin")); err != nil {
-		t.Fatalf("Failed to create bin directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "shims")); err != nil {
-		t.Fatalf("Failed to create shims directory: %v", err)
-	}
-	if err := utils.EnsureDir(filepath.Join(tmpDir, "versions")); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(tmpDir, "bin"))
+	require.NoError(t, err, "Failed to create bin directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "shims"))
+	require.NoError(t, err, "Failed to create shims directory")
+	err = utils.EnsureDir(filepath.Join(tmpDir, "versions"))
+	require.NoError(t, err, "Failed to create versions directory")
 
 	// Override exit to prevent test termination
 	oldExit := doctorExit
@@ -1073,40 +956,20 @@ func TestPlatformSpecificChecksInDoctor(t *testing.T) {
 	// Check for platform-specific checks based on OS
 	switch platform.OS() {
 	case "darwin":
-		if !strings.Contains(output, "macOS deployment target") {
-			t.Error("Expected 'macOS deployment target' check on macOS")
-		}
-		if strings.Contains(output, "Windows compiler") {
-			t.Error("Should not have Windows checks on macOS")
-		}
-		if strings.Contains(output, "Linux kernel") {
-			t.Error("Should not have Linux checks on macOS")
-		}
+		assert.Contains(t, output, "macOS deployment target", "Expected 'macOS deployment target' check on macOS")
+		assert.NotContains(t, output, "Windows compiler", "Should not have Windows checks on macOS")
+		assert.NotContains(t, output, "Linux kernel", "Should not have Linux checks on macOS")
 
 	case "windows":
-		if !strings.Contains(output, "Windows compiler") {
-			t.Error("Expected 'Windows compiler' check on Windows")
-		}
-		if !strings.Contains(output, "Windows ARM64/ARM64EC") {
-			t.Error("Expected 'Windows ARM64/ARM64EC' check on Windows")
-		}
-		if strings.Contains(output, "macOS deployment target") {
-			t.Error("Should not have macOS checks on Windows")
-		}
-		if strings.Contains(output, "Linux kernel") {
-			t.Error("Should not have Linux checks on Windows")
-		}
+		assert.Contains(t, output, "Windows compiler", "Expected 'Windows compiler' check on Windows")
+		assert.Contains(t, output, "Windows ARM64/ARM64EC", "Expected 'Windows ARM64/ARM64EC' check on Windows")
+		assert.NotContains(t, output, "macOS deployment target", "Should not have macOS checks on Windows")
+		assert.NotContains(t, output, "Linux kernel", "Should not have Linux checks on Windows")
 
 	case "linux":
-		if !strings.Contains(output, "Linux kernel version") {
-			t.Error("Expected 'Linux kernel version' check on Linux")
-		}
-		if strings.Contains(output, "macOS deployment target") {
-			t.Error("Should not have macOS checks on Linux")
-		}
-		if strings.Contains(output, "Windows compiler") {
-			t.Error("Should not have Windows checks on Linux")
-		}
+		assert.Contains(t, output, "Linux kernel version", "Expected 'Linux kernel version' check on Linux")
+		assert.NotContains(t, output, "macOS deployment target", "Should not have macOS checks on Linux")
+		assert.NotContains(t, output, "Windows compiler", "Should not have Windows checks on Linux")
 	}
 }
 
@@ -1119,15 +982,9 @@ func TestPlatformChecksCrossOSBehavior(t *testing.T) {
 	if !utils.IsWindows() {
 		t.Run("WindowsChecksOnNonWindows", func(t *testing.T) {
 			result := checkWindowsCompiler(cfg)
-			if result.id != "windows-compiler" {
-				t.Errorf("Expected id 'windows-compiler', got %s", result.id)
-			}
-			if result.status != StatusOK {
-				t.Errorf("Expected status 'ok' (not applicable), got %s", result.status)
-			}
-			if !strings.Contains(result.message, "Not applicable") {
-				t.Errorf("Expected 'Not applicable' message on non-Windows, got: %s", result.message)
-			}
+			assert.Equal(t, "windows-compiler", result.id, "Expected id 'windows-compiler'")
+			assert.Equal(t, StatusOK, result.status, "Expected status 'ok' (not applicable)")
+			assert.Contains(t, result.message, "Not applicable", "Expected 'Not applicable' message on non-Windows %v", result.message)
 		})
 	}
 
@@ -1136,13 +993,9 @@ func TestPlatformChecksCrossOSBehavior(t *testing.T) {
 		t.Run("MacOSChecksOnNonMacOS", func(t *testing.T) {
 			mgr := manager.NewManager(cfg)
 			result := checkMacOSDeploymentTarget(cfg, mgr)
-			if result.id != "macos-deployment-target" {
-				t.Errorf("Expected id 'macos-deployment-target', got %s", result.id)
-			}
+			assert.Equal(t, "macos-deployment-target", result.id, "Expected id 'macos-deployment-target'")
 			// Check should handle non-macOS gracefully
-			if result.status == StatusError {
-				t.Errorf("Check should not error on non-macOS, got status: %s", result.status)
-			}
+			assert.NotEqual(t, StatusError, result.status, "Check should not error on non-macOS")
 		})
 	}
 
@@ -1150,20 +1003,15 @@ func TestPlatformChecksCrossOSBehavior(t *testing.T) {
 	if !platform.IsLinux() {
 		t.Run("LinuxChecksOnNonLinux", func(t *testing.T) {
 			result := checkLinuxKernelVersion(cfg)
-			if result.id != "linux-kernel-version" {
-				t.Errorf("Expected id 'linux-kernel-version', got %s", result.id)
-			}
-			if result.status != StatusOK {
-				t.Errorf("Expected status 'ok' (not applicable), got %s", result.status)
-			}
-			if !strings.Contains(result.message, "Not applicable") {
-				t.Errorf("Expected 'Not applicable' message on non-Linux, got: %s", result.message)
-			}
+			assert.Equal(t, "linux-kernel-version", result.id, "Expected id 'linux-kernel-version'")
+			assert.Equal(t, StatusOK, result.status, "Expected status 'ok' (not applicable)")
+			assert.Contains(t, result.message, "Not applicable", "Expected 'Not applicable' message on non-Linux %v", result.message)
 		})
 	}
 }
 
 func TestCheckShellEnvironment(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -1252,15 +1100,13 @@ func TestCheckShellEnvironment(t *testing.T) {
 			if tt.goenvShell != "" {
 				// Create shims directory using cfg.ShimsDir() to ensure path consistency
 				shimsDir := cfg.ShimsDir()
-				if err := utils.EnsureDirWithContext(shimsDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create shims directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(shimsDir, "create test directory")
+				require.NoError(t, err, "Failed to create shims directory")
 
 				// Create a fake goenv executable for command validation checks
 				binDir := filepath.Join(tmpDir, "bin")
-				if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create bin directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(binDir, "create test directory")
+				require.NoError(t, err, "Failed to create bin directory")
 				goenvBin := filepath.Join(binDir, "goenv")
 				// Create a simple script that exits successfully
 				testutil.WriteTestFile(t, goenvBin, []byte("#!/bin/sh\nexit 0\n"), utils.PermFileExecutable)
@@ -1297,20 +1143,12 @@ func TestCheckShellEnvironment(t *testing.T) {
 
 			result := checkShellEnvironment(cfg)
 
-			if result.id != "shell-environment" {
-				t.Errorf("Expected id 'shell-environment', got %s", result.id)
-			}
-			if result.status != tt.expectedStatus {
-				t.Errorf("Expected status '%s', got '%s'", tt.expectedStatus, result.status)
-			}
-			if !strings.Contains(result.message, tt.expectedMsg) {
-				t.Errorf("Expected message to contain '%s', got: %s", tt.expectedMsg, result.message)
-			}
+			assert.Equal(t, "shell-environment", result.id, "Expected id 'shell-environment'")
+			assert.Equal(t, tt.expectedStatus, result.status)
+			assert.Contains(t, result.message, tt.expectedMsg)
 
 			// Verify advice is present for non-ok statuses
-			if result.status != StatusOK && result.advice == "" {
-				t.Errorf("Expected advice for status '%s', but got empty advice", result.status)
-			}
+			assert.False(t, result.status != StatusOK && result.advice == "")
 		})
 	}
 }
@@ -1390,23 +1228,15 @@ func TestOfferShellEnvironmentFix(t *testing.T) {
 			output := buf.String()
 
 			if tt.expectPrompt {
-				if !strings.Contains(output, "Shell Environment Issue Detected") {
-					t.Errorf("Expected prompt header in output, got: %s", output)
-				}
-				if !strings.Contains(output, "Would you like to see the command") {
-					t.Errorf("Expected prompt question in output, got: %s", output)
-				}
+				assert.Contains(t, output, "Shell Environment Issue Detected", "Expected prompt header in output %v", output)
+				assert.Contains(t, output, "Would you like to see the command", "Expected prompt question in output %v", output)
 
 				if strings.Contains(tt.userInput, "y") {
 					// Should show the fix command
-					if !strings.Contains(output, "Run this command") {
-						t.Errorf("Expected fix command in output when user accepts, got: %s", output)
-					}
+					assert.Contains(t, output, "Run this command", "Expected fix command in output when user accepts %v", output)
 				}
 			} else {
-				if strings.Contains(output, "Shell Environment Issue Detected") {
-					t.Errorf("Did not expect prompt for status %s, got: %s", tt.shellEnvStatus, output)
-				}
+				assert.NotContains(t, output, "Shell Environment Issue Detected", "Did not expect prompt for status %v %v", tt.shellEnvStatus, output)
 			}
 		})
 	}
@@ -1436,9 +1266,7 @@ func TestDetermineProfilePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(string(tt.shell), func(t *testing.T) {
 			result := shellutil.GetProfilePathDisplay(tt.shell)
-			if result != tt.expected {
-				t.Errorf("Expected %q, got %q", tt.expected, result)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

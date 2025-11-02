@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultRoot(t *testing.T) {
@@ -17,30 +18,22 @@ func TestDefaultRoot(t *testing.T) {
 	utils.GoenvEnvVarRoot.Set("/custom/root")
 	root := DefaultRoot()
 	// Normalize paths for cross-platform comparison
-	if filepath.ToSlash(root) != "/custom/root" {
-		t.Errorf("Expected /custom/root, got %s", root)
-	}
+	assert.Equal(t, "/custom/root", filepath.ToSlash(root), "Expected /custom/root %v", root)
 
 	// Test without GOENV_ROOT set
 	t.Setenv(utils.GoenvEnvVarRoot.String(), "")
 	root = DefaultRoot()
 	homeDir, _ := os.UserHomeDir()
 	expected := filepath.Join(homeDir, ".goenv")
-	if root != expected {
-		t.Errorf("Expected %s, got %s", expected, root)
-	}
+	assert.Equal(t, expected, root)
 }
 
 func TestConfigLoad(t *testing.T) {
 	cfg := Load()
 
-	if cfg.Root == "" {
-		t.Error("Expected Root to be set")
-	}
+	assert.NotEmpty(t, cfg.Root, "Expected Root to be set")
 
-	if cfg.CurrentDir == "" {
-		t.Error("Expected CurrentDir to be set")
-	}
+	assert.NotEmpty(t, cfg.CurrentDir, "Expected CurrentDir to be set")
 }
 
 func TestConfigDirectories(t *testing.T) {
@@ -49,27 +42,19 @@ func TestConfigDirectories(t *testing.T) {
 	versionsDir := cfg.VersionsDir()
 	expected := "/test/goenv/versions"
 	// Normalize paths for cross-platform comparison
-	if filepath.ToSlash(versionsDir) != expected {
-		t.Errorf("Expected %s, got %s", expected, versionsDir)
-	}
+	assert.Equal(t, expected, filepath.ToSlash(versionsDir))
 
 	shimsDir := cfg.ShimsDir()
 	expected = "/test/goenv/shims"
 	// Normalize paths for cross-platform comparison
-	if filepath.ToSlash(shimsDir) != expected {
-		t.Errorf("Expected %s, got %s", expected, shimsDir)
-	}
+	assert.Equal(t, expected, filepath.ToSlash(shimsDir))
 
 	globalFile := cfg.GlobalVersionFile()
 	expected = "/test/goenv/version"
 	// Normalize paths for cross-platform comparison
-	if filepath.ToSlash(globalFile) != expected {
-		t.Errorf("Expected %s, got %s", expected, globalFile)
-	}
+	assert.Equal(t, expected, filepath.ToSlash(globalFile))
 
 	localFile := cfg.LocalVersionFile()
 	expected = ".go-version"
-	if localFile != expected {
-		t.Errorf("Expected %s, got %s", expected, localFile)
-	}
+	assert.Equal(t, expected, localFile)
 }

@@ -8,11 +8,14 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spf13/cobra"
 )
 
 func TestShRehashCommand(t *testing.T) {
+	var err error
 	if utils.IsWindows() {
 		t.Skip("Skipping Unix shell test on Windows")
 	}
@@ -53,9 +56,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "hash -r 2>/dev/null || true",
 		},
@@ -70,9 +72,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "",
 		},
@@ -87,9 +88,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "hash -r 2>/dev/null || true",
 		},
@@ -104,9 +104,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "hash -r 2>/dev/null || true",
 		},
@@ -121,9 +120,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "export GOPATH=",
 		},
@@ -138,9 +136,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "set -gx GOPATH",
 		},
@@ -155,9 +152,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "export GOROOT=",
 		},
@@ -174,9 +170,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: ":/fake-gopath",
 		},
@@ -193,9 +188,8 @@ func TestShRehashCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "/fake-gopath:",
 		},
@@ -226,30 +220,22 @@ func TestShRehashCommand(t *testing.T) {
 			cmd.SetOut(outputBuf)
 			cmd.SetErr(errorBuf)
 
-			err := runShRehash(cmd, tt.args)
+			err = runShRehash(cmd, tt.args)
 
 			// Check error expectation
 			if tt.shouldFail {
-				if err == nil {
-					t.Fatalf("Expected command to fail, but it succeeded")
-				}
+				assert.Error(t, err, "Expected command to fail, but it succeeded")
 			} else {
-				if err != nil {
-					t.Fatalf("Unexpected error: %v", err)
-				}
+				require.NoError(t, err)
 			}
 
 			// Check output
 			output := strings.TrimSpace(outputBuf.String())
 			if tt.expectedOutput != "" {
-				if !strings.Contains(output, tt.expectedOutput) {
-					t.Errorf("Expected output to contain %q, got %q", tt.expectedOutput, output)
-				}
+				assert.Contains(t, output, tt.expectedOutput, "Expected output to contain %v %v", tt.expectedOutput, output)
 			} else {
 				// Expect empty output
-				if output != "" {
-					t.Errorf("Expected empty output, got %q", output)
-				}
+				assert.Empty(t, output, "Expected empty output")
 			}
 		})
 	}

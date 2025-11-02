@@ -13,10 +13,13 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // setupSyncTestEnv creates a test environment with Go versions and tools
 func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string) string {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 
@@ -25,18 +28,16 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 
 		// Create go binary directory (tools manager expects versionPath/go/bin/go)
 		goBinDir := filepath.Join(versionPath, "go", "bin")
-		if err := utils.EnsureDirWithContext(goBinDir, "create test directory"); err != nil {
-			t.Fatalf("Failed to create go bin directory: %v", err)
-		}
+		err = utils.EnsureDirWithContext(goBinDir, "create test directory")
+		require.NoError(t, err, "Failed to create go bin directory")
 
 		// Create mock go binary using helper (handles .bat on Windows)
 		cmdtest.CreateToolExecutable(t, goBinDir, "go")
 
 		// Create GOPATH/bin directory
 		gopathBin := filepath.Join(versionPath, "gopath", "bin")
-		if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
-			t.Fatalf("Failed to create GOPATH/bin: %v", err)
-		}
+		err = utils.EnsureDirWithContext(gopathBin, "create test directory")
+		require.NoError(t, err, "Failed to create GOPATH/bin")
 
 		// Create tools for this version using helper (handles .bat on Windows)
 		if versionTools, ok := tools[version]; ok {
@@ -210,13 +211,9 @@ func TestSyncTools_BasicOperation(t *testing.T) {
 			output, _ := io.ReadAll(r)
 			buf.Write(output)
 
-			if err != nil && tt.expectedOutput != "No Go tools found" {
-				t.Errorf("Unexpected error: %v", err)
-			}
+			assert.False(t, err != nil && tt.expectedOutput != "No Go tools found")
 
-			if !strings.Contains(buf.String(), tt.expectedOutput) {
-				t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, buf.String())
-			}
+			assert.Contains(t, buf.String(), tt.expectedOutput, "Expected output to contain , got:\\n %v %v", tt.expectedOutput, buf.String())
 
 			syncToolsFlags.dryRun = false
 		})
@@ -297,9 +294,7 @@ func TestSyncTools_Filtering(t *testing.T) {
 			output, _ := io.ReadAll(r)
 			buf.Write(output)
 
-			if !strings.Contains(buf.String(), tt.expectedOutput) {
-				t.Errorf("Expected output to contain %q, got:\n%s", tt.expectedOutput, buf.String())
-			}
+			assert.Contains(t, buf.String(), tt.expectedOutput, "Expected output to contain , got:\\n %v %v", tt.expectedOutput, buf.String())
 
 			syncToolsFlags.select_ = ""
 			syncToolsFlags.exclude = ""
@@ -314,9 +309,7 @@ func TestSyncToolsHelp(t *testing.T) {
 	cmd.SetErr(buf)
 
 	err := cmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 
@@ -331,9 +324,7 @@ func TestSyncToolsHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q, got:\n%s", expected, output)
-		}
+		assert.Contains(t, output, expected, "Help output missing , got:\\n %v %v", expected, output)
 	}
 }
 
@@ -405,7 +396,5 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 
 	err := runSyncTools(cmd, args)
 
-	if err != nil {
-		t.Errorf("Expected sync to succeed on Windows with .bat binaries, got error: %v", err)
-	}
+	assert.NoError(t, err, "Expected sync to succeed on Windows with .bat binaries")
 }

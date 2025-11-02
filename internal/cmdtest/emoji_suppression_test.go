@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestEmojiSuppression_CommandOutput is a golden test that verifies
@@ -75,27 +76,17 @@ func TestEmojiSuppression_CommandOutput(t *testing.T) {
 			// Check emoji suppression
 			result := utils.ShouldUseEmojis()
 
-			if result != sc.expectEmoji {
-				t.Errorf("ShouldUseEmojis() = %v, expected %v", result, sc.expectEmoji)
-			}
+			assert.Equal(t, sc.expectEmoji, result, "ShouldUseEmojis() = , expected")
 
 			// Verify Emoji() function
 			emojiResult := utils.Emoji("✓ ")
-			if sc.expectEmoji && emojiResult == "" {
-				t.Error("Expected emoji to be returned, but got empty string")
-			}
-			if !sc.expectEmoji && emojiResult != "" {
-				t.Errorf("Expected no emoji, but got %q", emojiResult)
-			}
+			assert.False(t, sc.expectEmoji && emojiResult == "", "Expected emoji to be returned, but got empty string")
+			assert.False(t, !sc.expectEmoji && emojiResult != "", "Expected no emoji")
 
 			// Verify EmojiOr() function
 			fallbackResult := utils.EmojiOr("✓ ", "[OK] ")
-			if sc.expectEmoji && fallbackResult == "[OK] " {
-				t.Error("Expected emoji, but got fallback")
-			}
-			if !sc.expectEmoji && fallbackResult != "[OK] " {
-				t.Errorf("Expected fallback %q, but got %q", "[OK] ", fallbackResult)
-			}
+			assert.False(t, sc.expectEmoji && fallbackResult == "[OK] ", "Expected emoji, but got fallback")
+			assert.False(t, !sc.expectEmoji && fallbackResult != "[OK] ", "Expected fallback")
 
 			// Clean up
 			os.Unsetenv("NO_COLOR")
@@ -187,14 +178,10 @@ func TestEmojiFunction_DirectUsage(t *testing.T) {
 			if strings.Contains(tt.name, "NO_COLOR") || strings.Contains(tt.name, "plain") {
 				if strings.Contains(tt.name, "EmojiOr") {
 					// Should return fallback
-					if result != tt.fallback {
-						t.Errorf("Expected %q, got %q", tt.fallback, result)
-					}
+					assert.Equal(t, tt.fallback, result)
 				} else {
 					// Should return empty
-					if result != "" {
-						t.Errorf("Expected empty string, got %q", result)
-					}
+					assert.Empty(t, result, "Expected empty string")
 				}
 			}
 
@@ -213,25 +200,17 @@ func TestOutputFunctions_NilCheck(t *testing.T) {
 
 	// Test with empty strings
 	result := utils.Emoji("")
-	if result != "" {
-		t.Errorf("Emoji(%q) should return empty string, got %q", "", result)
-	}
+	assert.Empty(t, result, "Emoji() should return empty string")
 
 	// Test EmojiOr with empty strings
 	result = utils.EmojiOr("", "")
-	if result != "" {
-		t.Errorf("EmojiOr(%q, %q) should return empty string, got %q", "", "", result)
-	}
+	assert.Empty(t, result, "EmojiOr(, ) should return empty string")
 
 	// Test with NO_COLOR
 	os.Setenv(utils.EnvVarNoColor, "1")
 	result = utils.Emoji("✓")
-	if result != "" {
-		t.Errorf("With NO_COLOR, Emoji should return empty, got %q", result)
-	}
+	assert.Empty(t, result, "With NO_COLOR, Emoji should return empty")
 
 	result = utils.EmojiOr("✓", "OK")
-	if result != "OK" {
-		t.Errorf("With NO_COLOR, EmojiOr should return fallback, got %q", result)
-	}
+	assert.Equal(t, "OK", result, "With NO_COLOR, EmojiOr should return fallback")
 }

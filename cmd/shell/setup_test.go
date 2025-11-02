@@ -11,6 +11,8 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetupCommand_DryRun(t *testing.T) {
@@ -35,14 +37,10 @@ func TestSetupCommand_DryRun(t *testing.T) {
 	setupCmd.SetErr(buf)
 
 	err := runSetup(setupCmd, []string{})
-	if err != nil {
-		t.Fatalf("runSetup() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runSetup() unexpected error")
 
 	output := buf.String()
-	if !strings.Contains(output, "DRY RUN") {
-		t.Errorf("Expected '[DRY RUN]' in output, got: %s", output)
-	}
+	assert.Contains(t, output, "DRY RUN", "Expected '[DRY RUN]' in output %v", output)
 
 	// Verify no actual files were created in dry-run
 	bashrc := filepath.Join(tmpDir, ".bashrc")
@@ -70,15 +68,11 @@ func TestSetupCommand_AutoYes(t *testing.T) {
 	setupCmd.SetErr(buf)
 
 	err := runSetup(setupCmd, []string{})
-	if err != nil {
-		t.Fatalf("runSetup() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runSetup() unexpected error")
 
 	output := buf.String()
 	// Should complete without prompts
-	if strings.Contains(output, "[y/N]") {
-		t.Error("Auto-yes mode should not show prompts")
-	}
+	assert.NotContains(t, output, "[y/N]", "Auto-yes mode should not show prompts")
 }
 
 func TestSetupCommand_AlreadyConfigured(t *testing.T) {
@@ -108,17 +102,14 @@ eval "$(goenv init -)"
 	setupCmd.SetErr(buf)
 
 	err := runSetup(setupCmd, []string{})
-	if err != nil {
-		t.Fatalf("runSetup() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runSetup() unexpected error")
 
 	output := buf.String()
-	if !strings.Contains(output, "already") || !strings.Contains(output, "configured") {
-		t.Errorf("Expected 'already configured' message, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "already") || !strings.Contains(output, "configured"), "Expected 'already configured' message")
 }
 
 func TestWriteVSCodeSettings_NewFile(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	settingsFile := filepath.Join(tmpDir, "settings.json")
 
@@ -127,10 +118,8 @@ func TestWriteVSCodeSettings_NewFile(t *testing.T) {
 		"go.gopath": "${env:GOPATH}",
 	}
 
-	err := writeVSCodeSettings(settingsFile, settings)
-	if err != nil {
-		t.Fatalf("writeVSCodeSettings() unexpected error: %v", err)
-	}
+	err = writeVSCodeSettings(settingsFile, settings)
+	require.NoError(t, err, "writeVSCodeSettings() unexpected error")
 
 	// Verify file was created
 	if utils.FileNotExists(settingsFile) {
@@ -139,21 +128,17 @@ func TestWriteVSCodeSettings_NewFile(t *testing.T) {
 
 	// Verify content
 	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("Failed to read settings file: %v", err)
-	}
+	require.NoError(t, err, "Failed to read settings file")
 
 	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		t.Fatalf("Invalid JSON in settings file: %v", err)
-	}
+	err = json.Unmarshal(data, &result)
+	require.NoError(t, err, "Invalid JSON in settings file")
 
-	if result["go.goroot"] != "${env:GOROOT}" {
-		t.Errorf("Expected go.goroot to be ${env:GOROOT}, got %v", result["go.goroot"])
-	}
+	assert.Equal(t, "${env:GOROOT}", result["go.goroot"], "Expected go.goroot to be ${env:GOROOT}")
 }
 
 func TestWriteVSCodeSettings_MergeExisting(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	settingsFile := filepath.Join(tmpDir, "settings.json")
 
@@ -171,35 +156,25 @@ func TestWriteVSCodeSettings_MergeExisting(t *testing.T) {
 		"go.gopath": "${env:GOPATH}",
 	}
 
-	err := writeVSCodeSettings(settingsFile, newSettings)
-	if err != nil {
-		t.Fatalf("writeVSCodeSettings() unexpected error: %v", err)
-	}
+	err = writeVSCodeSettings(settingsFile, newSettings)
+	require.NoError(t, err, "writeVSCodeSettings() unexpected error")
 
 	// Verify merged content
 	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("Failed to read settings file: %v", err)
-	}
+	require.NoError(t, err, "Failed to read settings file")
 
 	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		t.Fatalf("Invalid JSON in settings file: %v", err)
-	}
+	err = json.Unmarshal(data, &result)
+	require.NoError(t, err, "Invalid JSON in settings file")
 
 	// Should have both old and new settings
-	if result["editor.fontSize"] != float64(14) {
-		t.Errorf("Expected editor.fontSize to be preserved, got %v", result["editor.fontSize"])
-	}
-	if result["go.goroot"] != "${env:GOROOT}" {
-		t.Errorf("Expected go.goroot to be updated, got %v", result["go.goroot"])
-	}
-	if result["go.gopath"] != "${env:GOPATH}" {
-		t.Errorf("Expected go.gopath to be added, got %v", result["go.gopath"])
-	}
+	assert.Equal(t, float64(14), result["editor.fontSize"], "Expected editor.fontSize to be preserved")
+	assert.Equal(t, "${env:GOROOT}", result["go.goroot"], "Expected go.goroot to be updated")
+	assert.Equal(t, "${env:GOPATH}", result["go.gopath"], "Expected go.gopath to be added")
 }
 
 func TestWriteVSCodeSettings_InvalidJSON(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	settingsFile := filepath.Join(tmpDir, "settings.json")
 
@@ -215,36 +190,27 @@ func TestWriteVSCodeSettings_InvalidJSON(t *testing.T) {
 		"go.goroot": "${env:GOROOT}",
 	}
 
-	err := writeVSCodeSettings(settingsFile, newSettings)
+	err = writeVSCodeSettings(settingsFile, newSettings)
 
 	w.Close()
 	os.Stderr = oldStderr
 
-	if err != nil {
-		t.Fatalf("writeVSCodeSettings() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "writeVSCodeSettings() unexpected error")
 
 	// Should still create valid JSON even with invalid input
 	data, err := os.ReadFile(settingsFile)
-	if err != nil {
-		t.Fatalf("Failed to read settings file: %v", err)
-	}
+	require.NoError(t, err, "Failed to read settings file")
 
 	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		t.Fatalf("Result should be valid JSON: %v", err)
-	}
+	err = json.Unmarshal(data, &result)
+	require.NoError(t, err, "Result should be valid JSON")
 
-	if result["go.goroot"] != "${env:GOROOT}" {
-		t.Errorf("Expected go.goroot to be set, got %v", result["go.goroot"])
-	}
+	assert.Equal(t, "${env:GOROOT}", result["go.goroot"], "Expected go.goroot to be set")
 
 	// Check warning was printed
 	output := make([]byte, 1024)
 	n, _ := r.Read(output)
-	if n > 0 && !strings.Contains(string(output[:n]), "Warning") {
-		t.Error("Expected warning about invalid JSON")
-	}
+	assert.False(t, n > 0 && !strings.Contains(string(output[:n]), "Warning"), "Expected warning about invalid JSON")
 }
 
 func TestSetupShellProfile_FilePermissions(t *testing.T) {
@@ -276,20 +242,14 @@ func TestSetupShellProfile_FilePermissions(t *testing.T) {
 
 	// Call setupShellProfile directly
 	_, err := setupShellProfile(setupCmd, cfg)
-	if err != nil {
-		t.Fatalf("setupShellProfile() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "setupShellProfile() unexpected error")
 
 	// Check file has been modified (new content added)
 	content, err := os.ReadFile(bashrc)
-	if err != nil {
-		t.Fatalf("Failed to read %s: %v", bashrc, err)
-	}
+	require.NoError(t, err, "Failed to read")
 
 	// Should contain goenv init
-	if !strings.Contains(string(content), "goenv init") {
-		t.Errorf("Expected .bashrc to contain 'goenv init', got: %s", string(content))
-	}
+	assert.Contains(t, string(content), "goenv init", "Expected .bashrc to contain 'goenv init' %v", string(content))
 
 	// Note: File permissions will be preserved from original utils.PermFileDefault by append mode
 	// The security fix applies to NEW files created via os.OpenFile with O_CREATE
@@ -324,25 +284,17 @@ func TestSetupShellProfile_BackupCreation(t *testing.T) {
 	}
 
 	_, err := setupShellProfile(setupCmd, cfg)
-	if err != nil {
-		t.Fatalf("setupShellProfile() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "setupShellProfile() unexpected error")
 
 	// Check backup was created (with goenv-backup prefix)
 	backups, _ := filepath.Glob(filepath.Join(tmpDir, ".bashrc.goenv-backup.*"))
-	if len(backups) == 0 {
-		t.Error("Expected backup file to be created")
-	}
+	assert.NotEqual(t, 0, len(backups), "Expected backup file to be created")
 
 	// Verify backup has original content
 	if len(backups) > 0 {
 		backupContent, err := os.ReadFile(backups[0])
-		if err != nil {
-			t.Fatalf("Failed to read backup: %v", err)
-		}
-		if string(backupContent) != originalContent {
-			t.Errorf("Backup content = %q, want %q", string(backupContent), originalContent)
-		}
+		require.NoError(t, err, "Failed to read backup")
+		assert.Equal(t, originalContent, string(backupContent), "Backup content =")
 	}
 }
 
@@ -365,15 +317,11 @@ func TestSetupCommand_NonInteractive(t *testing.T) {
 	setupCmd.SetErr(buf)
 
 	err := runSetup(setupCmd, []string{})
-	if err != nil {
-		t.Fatalf("runSetup() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runSetup() unexpected error")
 
 	output := buf.String()
 	// Should not prompt in non-interactive mode
-	if strings.Contains(output, "[y/N]") {
-		t.Error("Non-interactive mode should not show prompts")
-	}
+	assert.NotContains(t, output, "[y/N]", "Non-interactive mode should not show prompts")
 }
 
 func TestSetupHelp(t *testing.T) {
@@ -382,9 +330,7 @@ func TestSetupHelp(t *testing.T) {
 	setupCmd.SetErr(buf)
 
 	err := setupCmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 	expectedStrings := []string{
@@ -396,9 +342,7 @@ func TestSetupHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q", expected)
-		}
+		assert.Contains(t, output, expected, "Help output missing %v", expected)
 	}
 }
 

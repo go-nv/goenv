@@ -8,6 +8,8 @@ import (
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spf13/cobra"
 )
@@ -125,32 +127,24 @@ func TestCommandsCommand(t *testing.T) {
 			commandsNoSh = false
 
 			err := cmd.Execute()
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			got := output.String()
 
 			// Check exact output if specified
 			if tt.expectedOutput != "" {
-				if got != tt.expectedOutput {
-					t.Errorf("Expected output %q, got %q", tt.expectedOutput, got)
-				}
+				assert.Equal(t, tt.expectedOutput, got, "Expected output")
 				return
 			}
 
 			// Check contains
 			for _, expected := range tt.expectedContains {
-				if !strings.Contains(got, expected) {
-					t.Errorf("Expected output to contain %q, but it didn't. Output:\n%s", expected, got)
-				}
+				assert.Contains(t, got, expected, "Expected output to contain , but it didn't. Output:\\n %v %v", expected, got)
 			}
 
 			// Check excludes
 			for _, excluded := range tt.expectedExcludes {
-				if strings.Contains(got, excluded) {
-					t.Errorf("Expected output to NOT contain %q, but it did. Output:\n%s", excluded, got)
-				}
+				assert.NotContains(t, got, excluded, "Expected output to NOT contain , but it did. Output:\\n %v %v", excluded, got)
 			}
 		})
 	}

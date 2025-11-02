@@ -1,8 +1,9 @@
 package tools
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExtractToolName(t *testing.T) {
@@ -39,9 +40,7 @@ func TestExtractToolName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			result := ExtractToolName(tt.input)
-			if result != tt.expected {
-				t.Errorf("ExtractToolName(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "ExtractToolName() = %v", tt.input)
 		})
 	}
 }
@@ -76,9 +75,7 @@ func TestExtractToolNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ExtractToolNames(tt.input)
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("ExtractToolNames(%v) = %v, want %v", tt.input, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "ExtractToolNames() = %v %v %v", tt.input, result, tt.expected)
 		})
 	}
 }
@@ -113,9 +110,7 @@ func TestNormalizePackagePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			result := NormalizePackagePath(tt.input)
-			if result != tt.expected {
-				t.Errorf("NormalizePackagePath(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "NormalizePackagePath() = %v", tt.input)
 		})
 	}
 }
@@ -160,9 +155,7 @@ func TestNormalizePackagePaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := NormalizePackagePaths(tt.input)
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("NormalizePackagePaths(%v) = %v, want %v", tt.input, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "NormalizePackagePaths() = %v %v %v", tt.input, result, tt.expected)
 		})
 	}
 }

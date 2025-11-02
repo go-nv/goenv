@@ -3,10 +3,11 @@ package tools
 import (
 	"bytes"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
@@ -48,13 +49,9 @@ func TestInstallCommand_AllFlag(t *testing.T) {
 	// Test that the function validates versions correctly
 	mgr := manager.NewManager(cfg)
 	foundVersions, err := mgr.ListInstalledVersions()
-	if err != nil {
-		t.Fatalf("ListInstalledVersions failed: %v", err)
-	}
+	require.NoError(t, err, "ListInstalledVersions failed")
 
-	if len(foundVersions) != 3 {
-		t.Errorf("Expected 3 versions, got %d", len(foundVersions))
-	}
+	assert.Len(t, foundVersions, 3, "Expected 3 versions")
 
 	for _, expected := range versions {
 		found := false
@@ -64,13 +61,12 @@ func TestInstallCommand_AllFlag(t *testing.T) {
 				break
 			}
 		}
-		if !found {
-			t.Errorf("Expected version %s not found", expected)
-		}
+		assert.True(t, found, "Expected version not found")
 	}
 }
 
 func TestInstallCommand_DryRun(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	_ = &config.Config{
 		Root: tmpDir,
@@ -81,12 +77,10 @@ func TestInstallCommand_DryRun(t *testing.T) {
 	versionPath := filepath.Join(tmpDir, "versions", version)
 	goRoot := filepath.Join(versionPath, "go", "bin")
 	gopath := filepath.Join(versionPath, "gopath", "bin")
-	if err := utils.EnsureDirWithContext(goRoot, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
-	if err := utils.EnsureDirWithContext(gopath, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(goRoot, "create test directory")
+	require.NoError(t, err)
+	err = utils.EnsureDirWithContext(gopath, "create test directory")
+	require.NoError(t, err)
 
 	// Create fake go binary
 	goBin := filepath.Join(goRoot, "go")
@@ -100,18 +94,15 @@ func TestInstallCommand_DryRun(t *testing.T) {
 	packages := toolspkg.NormalizePackagePaths([]string{"gopls", "golang.org/x/tools/cmd/goimports@v0.1.0"})
 	expected := []string{"gopls@latest", "golang.org/x/tools/cmd/goimports@v0.1.0"}
 
-	if len(packages) != len(expected) {
-		t.Errorf("Expected %d packages, got %d", len(expected), len(packages))
-	}
+	assert.Len(t, packages, len(expected), "Expected packages")
 
 	for i, exp := range expected {
-		if packages[i] != exp {
-			t.Errorf("Package %d: expected %s, got %s", i, exp, packages[i])
-		}
+		assert.Equal(t, exp, packages[i], "Package : expected")
 	}
 }
 
 func TestInstallCommand_NoVersionsInstalled(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -119,20 +110,15 @@ func TestInstallCommand_NoVersionsInstalled(t *testing.T) {
 
 	// Create empty versions directory
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err)
 
 	// Try to get installed versions
 	mgr := manager.NewManager(cfg)
 	versions, err := mgr.ListInstalledVersions()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(versions) != 0 {
-		t.Errorf("Expected no versions, got %d", len(versions))
-	}
+	assert.Len(t, versions, 0, "Expected no versions")
 }
 
 func TestInstallCommand_VerboseOutput(t *testing.T) {
@@ -141,14 +127,10 @@ func TestInstallCommand_VerboseOutput(t *testing.T) {
 	defer func() { installVerbose = originalVerbose }()
 
 	installVerbose = true
-	if !installVerbose {
-		t.Error("installVerbose flag should be true")
-	}
+	assert.True(t, installVerbose, "installVerbose flag should be true")
 
 	installVerbose = false
-	if installVerbose {
-		t.Error("installVerbose flag should be false")
-	}
+	assert.False(t, installVerbose, "installVerbose flag should be false")
 }
 
 func TestExtractToolNames(t *testing.T) {
@@ -177,20 +159,16 @@ func TestExtractToolNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := toolspkg.ExtractToolNames(tt.packages)
-			if len(result) != len(tt.expected) {
-				t.Errorf("Expected %d names, got %d", len(tt.expected), len(result))
-				return
-			}
+			assert.Len(t, result, len(tt.expected), "Expected names")
 			for i, exp := range tt.expected {
-				if result[i] != exp {
-					t.Errorf("Name %d: expected %s, got %s", i, exp, result[i])
-				}
+				assert.Equal(t, exp, result[i], "Name : expected")
 			}
 		})
 	}
 }
 
 func TestInstallToolForVersion_MissingGo(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -198,21 +176,16 @@ func TestInstallToolForVersion_MissingGo(t *testing.T) {
 
 	version := "1.23.0"
 	versionPath := filepath.Join(tmpDir, "versions", version)
-	if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(versionPath, "create test directory")
+	require.NoError(t, err)
 
 	// Don't create Go binary - should fail
 	mgr := manager.NewManager(cfg)
 	toolMgr := toolspkg.NewManager(cfg, mgr)
-	err := toolMgr.InstallSingleTool(version, "gopls@latest", false)
-	if err == nil {
-		t.Error("Expected error when Go binary is missing")
-	}
+	err = toolMgr.InstallSingleTool(version, "gopls@latest", false)
+	assert.Error(t, err, "Expected error when Go binary is missing")
 
-	if !strings.Contains(err.Error(), "go binary not found") {
-		t.Errorf("Expected 'Go binary not found' error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "go binary not found", "Expected 'Go binary not found' error %v", err)
 }
 
 func TestExtractToolName_EdgeCases(t *testing.T) {
@@ -245,9 +218,7 @@ func TestExtractToolName_EdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			result := extractToolName(tt.input)
-			if result != tt.expected {
-				t.Errorf("expected %v, got %v", tt.expected, result)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -282,9 +253,7 @@ func TestExtractToolName_ComplexPaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.packagePath, func(t *testing.T) {
 			result := extractToolName(tt.packagePath)
-			if result != tt.expected {
-				t.Errorf("expected %v, got %v", tt.expected, result)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

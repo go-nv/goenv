@@ -5,21 +5,19 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunCommandAction_Name(t *testing.T) {
 	action := &RunCommandAction{}
-	if action.Name() != ActionRunCommand {
-		t.Errorf("Name() = %v, want %v", action.Name(), ActionRunCommand)
-	}
+	assert.Equal(t, ActionRunCommand, action.Name(), "Name() =")
 }
 
 func TestRunCommandAction_Description(t *testing.T) {
 	action := &RunCommandAction{}
 	desc := action.Description()
-	if desc == "" {
-		t.Error("Description() returned empty string")
-	}
+	assert.NotEmpty(t, desc, "Description() returned empty string")
 }
 
 func TestRunCommandAction_Validate(t *testing.T) {
@@ -206,15 +204,14 @@ func TestRunCommandAction_Validate(t *testing.T) {
 					t.Errorf("Validate() error = %q, want error containing %q", err.Error(), tt.errMsg)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Validate() unexpected error: %v", err)
-				}
+				assert.NoError(t, err, "Validate() unexpected error")
 			}
 		})
 	}
 }
 
 func TestRunCommandAction_Execute_Simple(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping command execution test in short mode")
 	}
@@ -240,12 +237,12 @@ func TestRunCommandAction_Execute_Simple(t *testing.T) {
 		}
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 }
 
 func TestRunCommandAction_Execute_WithArgs(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping command execution test in short mode")
 	}
@@ -275,12 +272,12 @@ func TestRunCommandAction_Execute_WithArgs(t *testing.T) {
 		params["args"] = []interface{}{"/C", "echo", "hello", "world"}
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 }
 
 func TestRunCommandAction_Execute_CaptureOutput(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping command execution test in short mode")
 	}
@@ -307,9 +304,8 @@ func TestRunCommandAction_Execute_CaptureOutput(t *testing.T) {
 		}
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 
 	// Check that output was captured
 	if _, exists := ctx.Variables["command_stdout"]; !exists {
@@ -318,9 +314,7 @@ func TestRunCommandAction_Execute_CaptureOutput(t *testing.T) {
 
 	// Verify the output contains our test string
 	stdout := ctx.Variables["command_stdout"]
-	if !strings.Contains(stdout, "test output") {
-		t.Errorf("command_stdout = %q, want to contain 'test output'", stdout)
-	}
+	assert.Contains(t, stdout, "test output", "command_stdout = %v", stdout)
 }
 
 func TestRunCommandAction_Execute_FailOnError(t *testing.T) {
@@ -352,9 +346,7 @@ func TestRunCommandAction_Execute_FailOnError(t *testing.T) {
 	}
 
 	err := action.Execute(ctx, params)
-	if err == nil {
-		t.Error("Execute() expected error for failing command, got nil")
-	}
+	assert.Error(t, err, "Execute() expected error for failing command, got nil")
 }
 
 func TestRunCommandAction_Execute_NoFailOnError(t *testing.T) {
@@ -386,12 +378,11 @@ func TestRunCommandAction_Execute_NoFailOnError(t *testing.T) {
 	}
 
 	err := action.Execute(ctx, params)
-	if err != nil {
-		t.Errorf("Execute() with fail_on_error=false should not error, got: %v", err)
-	}
+	assert.NoError(t, err, "Execute() with fail_on_error=false should not error")
 }
 
 func TestRunCommandAction_Execute_Interpolation(t *testing.T) {
+	var err error
 	if testing.Short() {
 		t.Skip("Skipping command execution test in short mode")
 	}
@@ -421,17 +412,12 @@ func TestRunCommandAction_Execute_Interpolation(t *testing.T) {
 		}
 	}
 
-	if err := action.Execute(ctx, params); err != nil {
-		t.Fatalf("Execute() failed: %v", err)
-	}
+	err = action.Execute(ctx, params)
+	require.NoError(t, err, "Execute() failed")
 
 	stdout := ctx.Variables["command_stdout"]
-	if !strings.Contains(stdout, "hello") {
-		t.Errorf("command_stdout should contain interpolated 'hello', got: %q", stdout)
-	}
-	if !strings.Contains(stdout, "1.21.0") {
-		t.Errorf("command_stdout should contain interpolated '1.21.0', got: %q", stdout)
-	}
+	assert.Contains(t, stdout, "hello", "command_stdout should contain interpolated 'hello' %v", stdout)
+	assert.Contains(t, stdout, "1.21.0", "command_stdout should contain interpolated '1.21.0' %v", stdout)
 }
 
 func TestRunCommandAction_Execute_Timeout(t *testing.T) {
@@ -465,12 +451,8 @@ func TestRunCommandAction_Execute_Timeout(t *testing.T) {
 	}
 
 	err := action.Execute(ctx, params)
-	if err == nil {
-		t.Error("Execute() expected timeout error, got nil")
-	}
-	if !strings.Contains(err.Error(), "timeout") && !strings.Contains(err.Error(), "timed out") {
-		t.Errorf("Execute() error should mention timeout, got: %v", err)
-	}
+	assert.Error(t, err, "Execute() expected timeout error, got nil")
+	assert.True(t, strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "timed out"), "Execute() error should mention timeout")
 }
 
 func TestPrepareCommand(t *testing.T) {
@@ -528,19 +510,12 @@ func TestPrepareCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gotCmd, gotArgs := prepareCommand(tt.command, tt.args, tt.shellType)
 
-			if gotCmd != tt.wantCmd {
-				t.Errorf("prepareCommand() cmd = %q, want %q", gotCmd, tt.wantCmd)
-			}
+			assert.Equal(t, tt.wantCmd, gotCmd, "prepareCommand() cmd =")
 
-			if len(gotArgs) != len(tt.wantArgs) {
-				t.Errorf("prepareCommand() args length = %d, want %d", len(gotArgs), len(tt.wantArgs))
-				return
-			}
+			assert.Len(t, gotArgs, len(tt.wantArgs), "prepareCommand() args length =")
 
 			for i := range gotArgs {
-				if gotArgs[i] != tt.wantArgs[i] {
-					t.Errorf("prepareCommand() args[%d] = %q, want %q", i, gotArgs[i], tt.wantArgs[i])
-				}
+				assert.Equal(t, tt.wantArgs[i], gotArgs[i], "prepareCommand() args[] =")
 			}
 		})
 	}
@@ -551,18 +526,10 @@ func TestPrepareCommand_Auto(t *testing.T) {
 	cmd, args := prepareCommand("echo test", []string{}, "auto")
 
 	if utils.IsWindows() {
-		if cmd != "cmd" {
-			t.Errorf("Auto-detect on Windows: cmd = %q, want 'cmd'", cmd)
-		}
-		if len(args) != 2 || args[0] != "/C" {
-			t.Errorf("Auto-detect on Windows: args = %v, want [/C ...]", args)
-		}
+		assert.Equal(t, "cmd", cmd, "Auto-detect on Windows: cmd =")
+		assert.False(t, len(args) != 2 || args[0] != "/C", "Auto-detect on Windows: args =")
 	} else {
-		if cmd != "sh" {
-			t.Errorf("Auto-detect on Unix: cmd = %q, want 'sh'", cmd)
-		}
-		if len(args) != 2 || args[0] != "-c" {
-			t.Errorf("Auto-detect on Unix: args = %v, want [-c ...]", args)
-		}
+		assert.Equal(t, "sh", cmd, "Auto-detect on Unix: cmd =")
+		assert.False(t, len(args) != 2 || args[0] != "-c", "Auto-detect on Unix: args =")
 	}
 }

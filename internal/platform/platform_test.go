@@ -1,108 +1,80 @@
 package platform
 
 import (
-	"github.com/go-nv/goenv/internal/osinfo"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/osinfo"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDetect(t *testing.T) {
 	info := Detect()
 
-	if info.OS == "" {
-		t.Error("OS should not be empty")
-	}
+	assert.NotEmpty(t, info.OS, "OS should not be empty")
 
-	if info.Arch == "" {
-		t.Error("Arch should not be empty")
-	}
+	assert.NotEmpty(t, info.Arch, "Arch should not be empty")
 
 	// OS should match osinfo.OS()
-	if info.OS != osinfo.OS() {
-		t.Errorf("OS mismatch: got %s, want %s", info.OS, osinfo.OS())
-	}
+	assert.Equal(t, osinfo.OS(), info.OS, "OS mismatch")
 
 	// Arch should match osinfo.Arch()
-	if info.Arch != osinfo.Arch() {
-		t.Errorf("Arch mismatch: got %s, want %s", info.Arch, osinfo.Arch())
-	}
+	assert.Equal(t, osinfo.Arch(), info.Arch, "Arch mismatch")
 }
 
 func TestIsWindows(t *testing.T) {
 	result := IsWindows()
 	expected := osinfo.IsWindows()
 
-	if result != expected {
-		t.Errorf("IsWindows() = %v, want %v", result, expected)
-	}
+	assert.Equal(t, expected, result, "IsWindows() =")
 }
 
 func TestIsMacOS(t *testing.T) {
 	result := IsMacOS()
 	expected := osinfo.IsMacOS()
 
-	if result != expected {
-		t.Errorf("IsMacOS() = %v, want %v", result, expected)
-	}
+	assert.Equal(t, expected, result, "IsMacOS() =")
 }
 
 func TestIsLinux(t *testing.T) {
 	result := IsLinux()
 	expected := osinfo.IsLinux()
 
-	if result != expected {
-		t.Errorf("IsLinux() = %v, want %v", result, expected)
-	}
+	assert.Equal(t, expected, result, "IsLinux() =")
 }
 
 func TestIsUnix(t *testing.T) {
 	result := IsUnix()
 	expected := !osinfo.IsWindows()
 
-	if result != expected {
-		t.Errorf("IsUnix() = %v, want %v", result, expected)
-	}
+	assert.Equal(t, expected, result, "IsUnix() =")
 }
 
 func TestOSName(t *testing.T) {
 	name := OSName()
 
-	if name == "" {
-		t.Error("OSName() should not return empty string")
-	}
+	assert.NotEmpty(t, name, "OSName() should not return empty string")
 
 	// Verify it returns reasonable values
 	switch osinfo.OS() {
 	case "darwin":
-		if name != "macOS" {
-			t.Errorf("OSName() = %s, want macOS", name)
-		}
+		assert.Equal(t, "macOS", name, "OSName() =")
 	case "windows":
-		if name != "Windows" {
-			t.Errorf("OSName() = %s, want Windows", name)
-		}
+		assert.Equal(t, "Windows", name, "OSName() =")
 	case "linux":
-		if name != "Linux" {
-			t.Errorf("OSName() = %s, want Linux", name)
-		}
+		assert.Equal(t, "Linux", name, "OSName() =")
 	}
 }
 
 func TestArchName(t *testing.T) {
 	name := ArchName()
 
-	if name == "" {
-		t.Error("ArchName() should not return empty string")
-	}
+	assert.NotEmpty(t, name, "ArchName() should not return empty string")
 
 	// Verify it returns reasonable values
 	switch osinfo.Arch() {
 	case "amd64":
-		if name != "x86_64" {
-			t.Errorf("ArchName() = %s, want x86_64", name)
-		}
+		assert.Equal(t, "x86_64", name, "ArchName() =")
 	case "arm64":
-		if name != "ARM64" {
-			t.Errorf("ArchName() = %s, want ARM64", name)
-		}
+		assert.Equal(t, "ARM64", name, "ArchName() =")
 	}
 }

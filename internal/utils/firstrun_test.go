@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsFirstRun(t *testing.T) {
@@ -76,9 +77,7 @@ func TestIsFirstRun(t *testing.T) {
 
 			// Test
 			result := IsFirstRun(tmpDir)
-			if result != tt.expectedResult {
-				t.Errorf("IsFirstRun() = %v, expected %v", result, tt.expectedResult)
-			}
+			assert.Equal(t, tt.expectedResult, result, "IsFirstRun() = , expected")
 		})
 	}
 }
@@ -116,9 +115,7 @@ func TestIsShellInitialized(t *testing.T) {
 			}
 
 			result := IsShellInitialized()
-			if result != tt.expected {
-				t.Errorf("IsShellInitialized() = %v, expected %v", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "IsShellInitialized() = , expected")
 		})
 	}
 }
@@ -178,9 +175,7 @@ func TestHasAnyVersionsInstalled(t *testing.T) {
 			tt.setupFunc(tmpDir)
 
 			result := HasAnyVersionsInstalled(tmpDir)
-			if result != tt.expected {
-				t.Errorf("HasAnyVersionsInstalled() = %v, expected %v", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "HasAnyVersionsInstalled() = , expected")
 		})
 	}
 }

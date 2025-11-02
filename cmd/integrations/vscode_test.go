@@ -1,10 +1,13 @@
 package integrations
 
 import (
-	"github.com/go-nv/goenv/internal/utils"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/go-nv/goenv/testing/testutil"
@@ -17,25 +20,17 @@ func TestVSCodeTemplatesUsePlatformEnvVars(t *testing.T) {
 	for _, template := range templates {
 		t.Run(template, func(t *testing.T) {
 			settings, err := generateSettings(template)
-			if err != nil {
-				t.Fatalf("Failed to generate %s template: %v", template, err)
-			}
+			require.NoError(t, err, "Failed to generate template")
 
 			// Verify toolsGopath uses environment variable (cross-platform)
 			toolsGopath, ok := settings["go.toolsGopath"].(string)
-			if !ok {
-				t.Fatal("go.toolsGopath not found in template")
-			}
+			require.True(t, ok, "go.toolsGopath not found in template")
 
 			// Should use either ${env:HOME} (Unix) or ${env:USERPROFILE} (Windows)
-			if !strings.Contains(toolsGopath, "${env:HOME}") && !strings.Contains(toolsGopath, "${env:USERPROFILE}") {
-				t.Errorf("Template '%s': Expected platform-specific env var, got '%s'", template, toolsGopath)
-			}
+			assert.True(t, strings.Contains(toolsGopath, "${env:HOME}") || strings.Contains(toolsGopath, "${env:USERPROFILE}"))
 
 			// Should end with /go/tools
-			if !strings.HasSuffix(toolsGopath, "/go/tools") {
-				t.Errorf("Template '%s': Expected path ending with '/go/tools', got '%s'", template, toolsGopath)
-			}
+			assert.True(t, strings.HasSuffix(toolsGopath, "/go/tools"))
 
 			t.Logf("✓ Template '%s' uses platform-specific home directory: %s", template, toolsGopath)
 		})
@@ -45,9 +40,7 @@ func TestVSCodeTemplatesUsePlatformEnvVars(t *testing.T) {
 // TestVSCodeGenerateSettingsBasic verifies the basic template structure
 func TestVSCodeGenerateSettingsBasic(t *testing.T) {
 	settings, err := generateSettings("basic")
-	if err != nil {
-		t.Fatalf("Failed to generate basic template: %v", err)
-	}
+	require.NoError(t, err, "Failed to generate basic template")
 
 	// Verify required keys exist
 	// Note: go.useLanguageServer removed - modern Go extension (v0.30.0+) defaults to gopls
@@ -71,21 +64,15 @@ func TestVSCodeGenerateSettingsBasic(t *testing.T) {
 	}
 
 	// Verify environment variable syntax for GOROOT and GOPATH
-	if settings["go.goroot"] != "${env:GOROOT}" {
-		t.Errorf("Expected go.goroot to be '${env:GOROOT}', got '%v'", settings["go.goroot"])
-	}
+	assert.Equal(t, "${env:GOROOT}", settings["go.goroot"], "Expected go.goroot to be '${env:GOROOT}'")
 
-	if settings["go.gopath"] != "${env:GOPATH}" {
-		t.Errorf("Expected go.gopath to be '${env:GOPATH}', got '%v'", settings["go.gopath"])
-	}
+	assert.Equal(t, "${env:GOPATH}", settings["go.gopath"], "Expected go.gopath to be '${env:GOPATH}'")
 }
 
 // TestVSCodeGenerateSettingsAdvanced verifies the advanced template
 func TestVSCodeGenerateSettingsAdvanced(t *testing.T) {
 	settings, err := generateSettings("advanced")
-	if err != nil {
-		t.Fatalf("Failed to generate advanced template: %v", err)
-	}
+	require.NoError(t, err, "Failed to generate advanced template")
 
 	// Verify gopls settings exist (modern language server configuration)
 	if _, ok := settings["gopls"]; !ok {
@@ -93,9 +80,7 @@ func TestVSCodeGenerateSettingsAdvanced(t *testing.T) {
 	}
 
 	// Verify modern tool management settings
-	if settings["go.toolsManagement.autoUpdate"] != true {
-		t.Error("Advanced template should have autoUpdate enabled")
-	}
+	assert.Equal(t, true, settings["go.toolsManagement.autoUpdate"], "Advanced template should have autoUpdate enabled")
 
 	// Verify gopls settings are properly structured
 	gopls, ok := settings["gopls"].(map[string]interface{})
@@ -113,20 +98,14 @@ func TestVSCodeGenerateSettingsAdvanced(t *testing.T) {
 // TestVSCodeGenerateSettingsMonorepo verifies the monorepo template
 func TestVSCodeGenerateSettingsMonorepo(t *testing.T) {
 	settings, err := generateSettings("monorepo")
-	if err != nil {
-		t.Fatalf("Failed to generate monorepo template: %v", err)
-	}
+	require.NoError(t, err, "Failed to generate monorepo template")
 
 	// Verify inferGopath is disabled for monorepos
-	if settings["go.inferGopath"] != false {
-		t.Error("Monorepo template should have inferGopath disabled")
-	}
+	assert.Equal(t, false, settings["go.inferGopath"], "Monorepo template should have inferGopath disabled")
 
 	// Verify gopls directory filters exist
 	gopls, ok := settings["gopls"].(map[string]interface{})
-	if !ok {
-		t.Fatal("gopls settings not found in monorepo template")
-	}
+	require.True(t, ok, "gopls settings not found in monorepo template")
 
 	if _, ok := gopls["build.directoryFilters"]; !ok {
 		t.Error("Monorepo template missing build.directoryFilters")
@@ -136,13 +115,9 @@ func TestVSCodeGenerateSettingsMonorepo(t *testing.T) {
 // TestVSCodeGenerateSettingsInvalidTemplate verifies error handling
 func TestVSCodeGenerateSettingsInvalidTemplate(t *testing.T) {
 	_, err := generateSettings("invalid")
-	if err == nil {
-		t.Error("Expected error for invalid template, got nil")
-	}
+	assert.Error(t, err, "Expected error for invalid template, got nil")
 
-	if !strings.Contains(err.Error(), "unknown template") {
-		t.Errorf("Expected 'unknown template' error, got: %v", err)
-	}
+	assert.Contains(t, err.Error(), "unknown template", "Expected 'unknown template' error %v", err)
 }
 
 // TestVSCodeMergeSettings verifies settings merging logic
@@ -160,19 +135,13 @@ func TestVSCodeMergeSettings(t *testing.T) {
 	merged := mergeSettings(existing, new)
 
 	// Should preserve existing go.goroot
-	if merged["go.goroot"] != "/old/path" {
-		t.Errorf("Expected existing go.goroot to be preserved, got '%v'", merged["go.goroot"])
-	}
+	assert.Equal(t, "/old/path", merged["go.goroot"], "Expected existing go.goroot to be preserved")
 
 	// Should add new go.gopath
-	if merged["go.gopath"] != "${env:GOPATH}" {
-		t.Errorf("Expected new go.gopath to be added, got '%v'", merged["go.gopath"])
-	}
+	assert.Equal(t, "${env:GOPATH}", merged["go.gopath"], "Expected new go.gopath to be added")
 
 	// Should preserve custom setting
-	if merged["custom.setting"] != "value" {
-		t.Error("Custom setting was not preserved")
-	}
+	assert.Equal(t, "value", merged["custom.setting"], "Custom setting was not preserved")
 }
 
 // TestVSCodeMergeSettingsWithOverride verifies override logic
@@ -192,19 +161,13 @@ func TestVSCodeMergeSettingsWithOverride(t *testing.T) {
 	merged := mergeSettingsWithOverride(existing, new, overrideKeys)
 
 	// Should override go.goroot
-	if merged["go.goroot"] != "/new/path" {
-		t.Errorf("Expected go.goroot to be overridden, got '%v'", merged["go.goroot"])
-	}
+	assert.Equal(t, "/new/path", merged["go.goroot"], "Expected go.goroot to be overridden")
 
 	// Should override go.gopath
-	if merged["go.gopath"] != "/new/gopath" {
-		t.Errorf("Expected go.gopath to be overridden, got '%v'", merged["go.gopath"])
-	}
+	assert.Equal(t, "/new/gopath", merged["go.gopath"], "Expected go.gopath to be overridden")
 
 	// Should preserve custom setting
-	if merged["custom.setting"] != "value" {
-		t.Error("Custom setting was not preserved")
-	}
+	assert.Equal(t, "value", merged["custom.setting"], "Custom setting was not preserved")
 }
 
 // TestReadExistingExtensions verifies extensions.json reading
@@ -223,28 +186,20 @@ func TestReadExistingExtensions(t *testing.T) {
 	testutil.WriteTestFile(t, extensionsFile, []byte(content), utils.PermFileDefault)
 
 	extensions, err := vscode.ReadExistingExtensions(extensionsFile)
-	if err != nil {
-		t.Fatalf("Failed to read extensions: %v", err)
-	}
+	require.NoError(t, err, "Failed to read extensions")
 
-	if len(extensions.Recommendations) != 2 {
-		t.Errorf("Expected 2 recommendations, got %d", len(extensions.Recommendations))
-	}
+	assert.Len(t, extensions.Recommendations, 2, "Expected 2 recommendations")
 
 	expected := []string{"ms-vscode.vscode-typescript-next", "dbaeumer.vscode-eslint"}
 	for i, rec := range extensions.Recommendations {
-		if rec != expected[i] {
-			t.Errorf("Expected recommendation[%d] to be '%s', got '%s'", i, expected[i], rec)
-		}
+		assert.Equal(t, expected[i], rec)
 	}
 }
 
 // TestReadExistingExtensionsNonExistent verifies error handling for non-existent file
 func TestReadExistingExtensionsNonExistent(t *testing.T) {
 	_, err := vscode.ReadExistingExtensions("/nonexistent/extensions.json")
-	if err == nil {
-		t.Error("Expected error for non-existent file, got nil")
-	}
+	assert.Error(t, err, "Expected error for non-existent file, got nil")
 }
 
 // TestReadExistingExtensionsWithComments verifies JSONC support
@@ -264,13 +219,9 @@ func TestReadExistingExtensionsWithComments(t *testing.T) {
 	testutil.WriteTestFile(t, extensionsFile, []byte(content), utils.PermFileDefault)
 
 	extensions, err := vscode.ReadExistingExtensions(extensionsFile)
-	if err != nil {
-		t.Fatalf("Failed to read extensions with comments: %v", err)
-	}
+	require.NoError(t, err, "Failed to read extensions with comments")
 
-	if len(extensions.Recommendations) != 2 {
-		t.Errorf("Expected 2 recommendations, got %d", len(extensions.Recommendations))
-	}
+	assert.Len(t, extensions.Recommendations, 2, "Expected 2 recommendations")
 }
 
 // TestExtensionsMerging verifies that golang.go is added to existing recommendations
@@ -290,9 +241,7 @@ func TestExtensionsMerging(t *testing.T) {
 		recommendations = append(recommendations, goExtension)
 	}
 
-	if len(recommendations) != 1 || recommendations[0] != "golang.go" {
-		t.Errorf("Expected golang.go to be added, got %v", recommendations)
-	}
+	assert.False(t, len(recommendations) != 1 || recommendations[0] != "golang.go", "Expected golang.go to be added")
 
 	// Test case 2: Existing extensions without golang.go
 	recommendations = []string{"ms-vscode.vscode-typescript-next", "dbaeumer.vscode-eslint"}
@@ -308,12 +257,8 @@ func TestExtensionsMerging(t *testing.T) {
 		recommendations = append(recommendations, goExtension)
 	}
 
-	if len(recommendations) != 3 {
-		t.Errorf("Expected 3 recommendations, got %d", len(recommendations))
-	}
-	if recommendations[2] != "golang.go" {
-		t.Errorf("Expected golang.go to be appended, got %v", recommendations)
-	}
+	assert.Len(t, recommendations, 3, "Expected 3 recommendations")
+	assert.Equal(t, "golang.go", recommendations[2], "Expected golang.go to be appended")
 
 	// Test case 3: golang.go already present
 	recommendations = []string{"golang.go", "ms-vscode.vscode-typescript-next"}
@@ -329,21 +274,19 @@ func TestExtensionsMerging(t *testing.T) {
 		recommendations = append(recommendations, goExtension)
 	}
 
-	if len(recommendations) != 2 {
-		t.Errorf("Expected 2 recommendations (no duplicate), got %d", len(recommendations))
-	}
+	assert.Len(t, recommendations, 2, "Expected 2 recommendations (no duplicate)")
 }
 
 // TestVSCodeInitPreservesExtensions verifies that running vscode init multiple times preserves existing extensions
 func TestVSCodeInitPreservesExtensions(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
 	extensionsFile := vscodeDir + "/extensions.json"
 
 	// Create .vscode directory
-	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .vscode directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(vscodeDir, "create test directory")
+	require.NoError(t, err, "Failed to create .vscode directory")
 
 	// Create initial extensions.json with custom extensions
 	initialContent := `{
@@ -356,13 +299,9 @@ func TestVSCodeInitPreservesExtensions(t *testing.T) {
 
 	// Read the file and verify initial state
 	initialExtensions, err := vscode.ReadExistingExtensions(extensionsFile)
-	if err != nil {
-		t.Fatalf("Failed to read initial extensions: %v", err)
-	}
+	require.NoError(t, err, "Failed to read initial extensions")
 
-	if len(initialExtensions.Recommendations) != 2 {
-		t.Errorf("Expected 2 initial recommendations, got %d", len(initialExtensions.Recommendations))
-	}
+	assert.Len(t, initialExtensions.Recommendations, 2, "Expected 2 initial recommendations")
 
 	// Simulate what vscode init does - merge with existing
 	var recommendations []string
@@ -385,9 +324,7 @@ func TestVSCodeInitPreservesExtensions(t *testing.T) {
 	}
 
 	// Verify merged recommendations
-	if len(recommendations) != 3 {
-		t.Errorf("Expected 3 recommendations after merge, got %d", len(recommendations))
-	}
+	assert.Len(t, recommendations, 3, "Expected 3 recommendations after merge")
 
 	// Verify existing extensions are preserved
 	expectedExtensions := []string{
@@ -397,9 +334,7 @@ func TestVSCodeInitPreservesExtensions(t *testing.T) {
 	}
 
 	for i, expected := range expectedExtensions {
-		if i >= len(recommendations) || recommendations[i] != expected {
-			t.Errorf("Expected recommendation[%d] to be '%s', got '%s'", i, expected, recommendations[i])
-		}
+		assert.False(t, i >= len(recommendations) || recommendations[i] != expected)
 	}
 
 	t.Log("✓ Existing extensions preserved and golang.go added")
@@ -413,18 +348,14 @@ func TestVSCodePathGeneration_PlatformSpecific(t *testing.T) {
 	// Test the generateSettings function produces correct env vars
 	t.Run("Templates use correct platform env vars", func(t *testing.T) {
 		settings, err := generateSettings("basic")
-		if err != nil {
-			t.Fatalf("Failed to generate settings: %v", err)
-		}
+		require.NoError(t, err, "Failed to generate settings")
 
 		toolsGopath := settings["go.toolsGopath"].(string)
 
 		// On Unix/macOS, should use ${env:HOME}
 		// On Windows, should use ${env:USERPROFILE}
 		// Both are valid and cross-platform
-		if !strings.Contains(toolsGopath, "${env:HOME}") && !strings.Contains(toolsGopath, "${env:USERPROFILE}") {
-			t.Errorf("Expected platform-specific env var in toolsGopath, got: %s", toolsGopath)
-		}
+		assert.True(t, strings.Contains(toolsGopath, "${env:HOME}") || strings.Contains(toolsGopath, "${env:USERPROFILE}"), "Expected platform-specific env var in toolsGopath")
 
 		t.Logf("✓ toolsGopath uses platform-appropriate env var: %s", toolsGopath)
 	})
@@ -450,12 +381,12 @@ func TestVSCodePathGeneration_PlatformSpecific(t *testing.T) {
 
 // TestVSCodeInit_NoBackupWhenNoChanges verifies that no backup is created when settings are already correct
 func TestVSCodeInit_NoBackupWhenNoChanges(t *testing.T) {
+	var err error
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
-	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .vscode directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(vscodeDir, "create test directory")
+	require.NoError(t, err, "Failed to create .vscode directory")
 
 	settingsFile := vscodeDir + "/settings.json"
 	backupFile := settingsFile + ".bak"
@@ -467,26 +398,20 @@ func TestVSCodeInit_NoBackupWhenNoChanges(t *testing.T) {
 		"go.toolsGopath": "${env:HOME}/go/tools",
 	}
 
-	if err := vscode.WriteJSONFile(settingsFile, initialSettings); err != nil {
-		t.Fatalf("Failed to write initial settings: %v", err)
-	}
+	err = vscode.WriteJSONFile(settingsFile, initialSettings)
+	require.NoError(t, err, "Failed to write initial settings")
 
 	// Change to temp directory
 	oldWd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
+	require.NoError(t, err, "Failed to get working directory")
 	defer os.Chdir(oldWd)
 
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("Failed to change directory: %v", err)
-	}
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err, "Failed to change directory")
 
 	// Simulate the check that happens in runVSCodeInit
 	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
-	if err != nil {
-		t.Fatalf("Failed to read existing settings: %v", err)
-	}
+	require.NoError(t, err, "Failed to read existing settings")
 
 	keysToUpdate := map[string]interface{}{
 		"go.goroot": "${env:HOME}/.goenv/versions/1.23.2",
@@ -504,9 +429,7 @@ func TestVSCodeInit_NoBackupWhenNoChanges(t *testing.T) {
 	}
 
 	// Verify that no changes are detected
-	if hasChanges {
-		t.Error("Expected no changes to be detected when settings are already correct")
-	}
+	assert.False(t, hasChanges, "Expected no changes to be detected when settings are already correct")
 
 	// Verify no backup file exists
 	if utils.PathExists(backupFile) {
@@ -518,12 +441,12 @@ func TestVSCodeInit_NoBackupWhenNoChanges(t *testing.T) {
 
 // TestVSCodeInit_BackupCreatedWhenChangesNeeded verifies that backup is created only when changes are made
 func TestVSCodeInit_BackupCreatedWhenChangesNeeded(t *testing.T) {
+	var err error
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
-	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .vscode directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(vscodeDir, "create test directory")
+	require.NoError(t, err, "Failed to create .vscode directory")
 
 	settingsFile := vscodeDir + "/settings.json"
 	backupFile := settingsFile + ".bak"
@@ -535,15 +458,12 @@ func TestVSCodeInit_BackupCreatedWhenChangesNeeded(t *testing.T) {
 		"go.toolsGopath": "${env:HOME}/go/tools",
 	}
 
-	if err := vscode.WriteJSONFile(settingsFile, initialSettings); err != nil {
-		t.Fatalf("Failed to write initial settings: %v", err)
-	}
+	err = vscode.WriteJSONFile(settingsFile, initialSettings)
+	require.NoError(t, err, "Failed to write initial settings")
 
 	// Simulate the check that happens in runVSCodeInit
 	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
-	if err != nil {
-		t.Fatalf("Failed to read existing settings: %v", err)
-	}
+	require.NoError(t, err, "Failed to read existing settings")
 
 	keysToUpdate := map[string]interface{}{
 		"go.goroot": "${env:HOME}/.goenv/versions/1.23.2", // New version
@@ -561,15 +481,12 @@ func TestVSCodeInit_BackupCreatedWhenChangesNeeded(t *testing.T) {
 	}
 
 	// Verify that changes ARE detected
-	if !hasChanges {
-		t.Error("Expected changes to be detected when settings differ")
-	}
+	assert.True(t, hasChanges, "Expected changes to be detected when settings differ")
 
 	// If changes are detected, backup should be created
 	if hasChanges {
-		if err := vscode.BackupFile(settingsFile); err != nil {
-			t.Fatalf("Failed to create backup: %v", err)
-		}
+		err = vscode.BackupFile(settingsFile)
+		require.NoError(t, err, "Failed to create backup")
 
 		// Verify backup file exists
 		if utils.FileNotExists(backupFile) {
@@ -578,17 +495,11 @@ func TestVSCodeInit_BackupCreatedWhenChangesNeeded(t *testing.T) {
 
 		// Verify backup contains the old values
 		backupSettings, err := vscode.ReadExistingSettings(backupFile)
-		if err != nil {
-			t.Fatalf("Failed to read backup settings: %v", err)
-		}
+		require.NoError(t, err, "Failed to read backup settings")
 
-		if backupSettings["go.goroot"] != "${env:HOME}/.goenv/versions/1.22.0" {
-			t.Errorf("Backup should contain old go.goroot value, got: %v", backupSettings["go.goroot"])
-		}
+		assert.Equal(t, "${env:HOME}/.goenv/versions/1.22.0", backupSettings["go.goroot"], "Backup should contain old go.goroot value")
 
-		if backupSettings["go.gopath"] != "${env:HOME}/go/1.22.0" {
-			t.Errorf("Backup should contain old go.gopath value, got: %v", backupSettings["go.gopath"])
-		}
+		assert.Equal(t, "${env:HOME}/go/1.22.0", backupSettings["go.gopath"], "Backup should contain old go.gopath value")
 
 		t.Log("✓ Backup created and contains correct old values when changes are needed")
 	}
@@ -596,12 +507,12 @@ func TestVSCodeInit_BackupCreatedWhenChangesNeeded(t *testing.T) {
 
 // TestVSCodeSync_NoBackupWhenAlreadySynced verifies that sync doesn't create backup when already in sync
 func TestVSCodeSync_NoBackupWhenAlreadySynced(t *testing.T) {
+	var err error
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
-	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .vscode directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(vscodeDir, "create test directory")
+	require.NoError(t, err, "Failed to create .vscode directory")
 
 	settingsFile := vscodeDir + "/settings.json"
 	backupFile := settingsFile + ".bak"
@@ -614,15 +525,12 @@ func TestVSCodeSync_NoBackupWhenAlreadySynced(t *testing.T) {
 		"go.toolsGopath": "${env:HOME}/go/tools",
 	}
 
-	if err := vscode.WriteJSONFile(settingsFile, syncedSettings); err != nil {
-		t.Fatalf("Failed to write synced settings: %v", err)
-	}
+	err = vscode.WriteJSONFile(settingsFile, syncedSettings)
+	require.NoError(t, err, "Failed to write synced settings")
 
 	// Simulate the sync check
 	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
-	if err != nil {
-		t.Fatalf("Failed to read existing settings: %v", err)
-	}
+	require.NoError(t, err, "Failed to read existing settings")
 
 	// Keys that sync would update (using same version, so should be identical)
 	keysToUpdate := map[string]interface{}{
@@ -641,9 +549,7 @@ func TestVSCodeSync_NoBackupWhenAlreadySynced(t *testing.T) {
 	}
 
 	// Verify no changes detected
-	if hasChanges {
-		t.Error("Expected no changes when settings are already synced")
-	}
+	assert.False(t, hasChanges, "Expected no changes when settings are already synced")
 
 	// Verify no backup file exists
 	if utils.PathExists(backupFile) {
@@ -655,12 +561,12 @@ func TestVSCodeSync_NoBackupWhenAlreadySynced(t *testing.T) {
 
 // TestVSCodeSync_BackupCreatedWhenOutOfSync verifies that sync creates backup when out of sync
 func TestVSCodeSync_BackupCreatedWhenOutOfSync(t *testing.T) {
+	var err error
 	// Create a temporary directory
 	tmpDir := t.TempDir()
 	vscodeDir := tmpDir + "/.vscode"
-	if err := utils.EnsureDirWithContext(vscodeDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create .vscode directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(vscodeDir, "create test directory")
+	require.NoError(t, err, "Failed to create .vscode directory")
 
 	settingsFile := vscodeDir + "/settings.json"
 	backupFile := settingsFile + ".bak"
@@ -674,15 +580,12 @@ func TestVSCodeSync_BackupCreatedWhenOutOfSync(t *testing.T) {
 		"go.toolsGopath": "${env:HOME}/go/tools",
 	}
 
-	if err := vscode.WriteJSONFile(settingsFile, oldSettings); err != nil {
-		t.Fatalf("Failed to write old settings: %v", err)
-	}
+	err = vscode.WriteJSONFile(settingsFile, oldSettings)
+	require.NoError(t, err, "Failed to write old settings")
 
 	// Simulate the sync check with a new version
 	existingSettings, err := vscode.ReadExistingSettings(settingsFile)
-	if err != nil {
-		t.Fatalf("Failed to read existing settings: %v", err)
-	}
+	require.NoError(t, err, "Failed to read existing settings")
 
 	// Keys that sync would update (using new version)
 	keysToUpdate := map[string]interface{}{
@@ -701,15 +604,12 @@ func TestVSCodeSync_BackupCreatedWhenOutOfSync(t *testing.T) {
 	}
 
 	// Verify changes ARE detected
-	if !hasChanges {
-		t.Error("Expected changes to be detected when versions differ")
-	}
+	assert.True(t, hasChanges, "Expected changes to be detected when versions differ")
 
 	// Create backup when changes are detected
 	if hasChanges {
-		if err := vscode.BackupFile(settingsFile); err != nil {
-			t.Fatalf("Failed to create backup: %v", err)
-		}
+		err = vscode.BackupFile(settingsFile)
+		require.NoError(t, err, "Failed to create backup")
 
 		// Verify backup file exists
 		if utils.FileNotExists(backupFile) {
@@ -718,14 +618,10 @@ func TestVSCodeSync_BackupCreatedWhenOutOfSync(t *testing.T) {
 
 		// Verify backup contains the old version
 		backupSettings, err := vscode.ReadExistingSettings(backupFile)
-		if err != nil {
-			t.Fatalf("Failed to read backup settings: %v", err)
-		}
+		require.NoError(t, err, "Failed to read backup settings")
 
 		expectedOldGoroot := "${env:HOME}/.goenv/versions/" + oldVersion
-		if backupSettings["go.goroot"] != expectedOldGoroot {
-			t.Errorf("Backup should contain old version %s, got: %v", expectedOldGoroot, backupSettings["go.goroot"])
-		}
+		assert.Equal(t, expectedOldGoroot, backupSettings["go.goroot"], "Backup should contain old version")
 
 		t.Log("✓ Backup created when sync detects version mismatch")
 	}

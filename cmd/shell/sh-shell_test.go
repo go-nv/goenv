@@ -7,11 +7,14 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/spf13/cobra"
 )
 
 func TestShShellCommand(t *testing.T) {
+	var err error
 	if utils.IsWindows() {
 		t.Skip("Skipping Unix shell test on Windows")
 	}
@@ -82,9 +85,8 @@ func TestShShellCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.2.3")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: `export GOENV_VERSION="1.2.3"`,
 		},
@@ -96,9 +98,8 @@ func TestShShellCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.2.3")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: `export GOENV_VERSION="1.2.3"`,
 		},
@@ -110,9 +111,8 @@ func TestShShellCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.2.3")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: `export GOENV_VERSION="1.2.3"`,
 		},
@@ -124,9 +124,8 @@ func TestShShellCommand(t *testing.T) {
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
 				versionDir := filepath.Join(tmpDir, "versions", "1.2.3")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: `set -gx GOENV_VERSION "1.2.3"`,
 		},
@@ -149,9 +148,8 @@ func TestShShellCommand(t *testing.T) {
 			setupFunc: func(t *testing.T, tmpDir string) {
 				// Create a test version
 				versionDir := filepath.Join(tmpDir, "versions", "1.10.0")
-				if err := utils.EnsureDirWithContext(versionDir, "create test directory"); err != nil {
-					t.Fatalf("Failed to create version directory: %v", err)
-				}
+				err = utils.EnsureDirWithContext(versionDir, "create test directory")
+				require.NoError(t, err, "Failed to create version directory")
 			},
 			expectedOutput: "--unset\nsystem",
 		},
@@ -183,31 +181,23 @@ func TestShShellCommand(t *testing.T) {
 			cmd.SetOut(outputBuf)
 			cmd.SetErr(errorBuf)
 
-			err := runShShell(cmd, tt.args)
+			err = runShShell(cmd, tt.args)
 
 			// Check error expectation
 			if tt.shouldFail {
-				if err == nil {
-					t.Fatalf("Expected command to fail, but it succeeded")
-				}
+				assert.Error(t, err, "Expected command to fail, but it succeeded")
 				if tt.expectedError != "" {
 					errOutput := err.Error() + errorBuf.String()
-					if !strings.Contains(errOutput, tt.expectedError) {
-						t.Errorf("Expected error containing %q, got %q", tt.expectedError, errOutput)
-					}
+					assert.Contains(t, errOutput, tt.expectedError, "Expected error containing %v %v", tt.expectedError, errOutput)
 				}
 			} else {
-				if err != nil {
-					t.Fatalf("Unexpected error: %v", err)
-				}
+				require.NoError(t, err)
 			}
 
 			// Check output
 			if tt.expectedOutput != "" {
 				output := strings.TrimSpace(outputBuf.String())
-				if !strings.Contains(output, tt.expectedOutput) {
-					t.Errorf("Expected output to contain %q, got %q", tt.expectedOutput, output)
-				}
+				assert.Contains(t, output, tt.expectedOutput, "Expected output to contain %v %v", tt.expectedOutput, output)
 			}
 		})
 	}

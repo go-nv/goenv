@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetStartedCommand_NotInitialized(t *testing.T) {
@@ -22,47 +24,40 @@ func TestGetStartedCommand_NotInitialized(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
 	// Should show initialization instructions
-	if !strings.Contains(output, "init") || !strings.Contains(output, "eval") {
-		t.Errorf("Expected initialization instructions, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "init") || !strings.Contains(output, "eval"), "Expected initialization instructions")
 }
 
 func TestGetStartedCommand_Initialized(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
 	// Create versions directory (empty)
 	versionsDir := filepath.Join(tmpDir, "versions")
-	if err := utils.EnsureDirWithContext(versionsDir, "create test directory"); err != nil {
-		t.Fatalf("Failed to create versions directory: %v", err)
-	}
+	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
+	require.NoError(t, err, "Failed to create versions directory")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
 	getStartedCmd.SetErr(buf)
 
-	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	err = runGetStarted(getStartedCmd, []string{})
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
 	// Should show next steps (like installing Go)
-	if !strings.Contains(output, "install") {
-		t.Errorf("Expected installation instructions, got: %s", output)
-	}
+	assert.Contains(t, output, "install", "Expected installation instructions %v", output)
 }
 
 func TestGetStartedCommand_WithInstalledVersions(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
@@ -70,18 +65,15 @@ func TestGetStartedCommand_WithInstalledVersions(t *testing.T) {
 	// Create versions directory with an installed version
 	versionsDir := filepath.Join(tmpDir, "versions")
 	versionDir := filepath.Join(versionsDir, "1.21.5")
-	if err := utils.EnsureDir(filepath.Join(versionDir, "bin")); err != nil {
-		t.Fatalf("Failed to create version directory: %v", err)
-	}
+	err = utils.EnsureDir(filepath.Join(versionDir, "bin"))
+	require.NoError(t, err, "Failed to create version directory")
 
 	buf := new(bytes.Buffer)
 	getStartedCmd.SetOut(buf)
 	getStartedCmd.SetErr(buf)
 
-	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	err = runGetStarted(getStartedCmd, []string{})
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
@@ -102,16 +94,12 @@ func TestGetStartedCommand_BashShell(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
 	// Should show bash-specific instructions
-	if !strings.Contains(output, "bashrc") && !strings.Contains(output, "bash_profile") {
-		t.Errorf("Expected bash-specific instructions, got: %s", output)
-	}
+	assert.True(t, strings.Contains(output, "bashrc") || strings.Contains(output, "bash_profile"), "Expected bash-specific instructions")
 }
 
 func TestGetStartedCommand_ZshShell(t *testing.T) {
@@ -125,16 +113,12 @@ func TestGetStartedCommand_ZshShell(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
 	// Should show zsh-specific instructions
-	if !strings.Contains(output, "zshrc") {
-		t.Errorf("Expected zsh-specific instructions, got: %s", output)
-	}
+	assert.Contains(t, output, "zshrc", "Expected zsh-specific instructions %v", output)
 }
 
 func TestGetStartedCommand_FishShell(t *testing.T) {
@@ -148,16 +132,12 @@ func TestGetStartedCommand_FishShell(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
 	// Should show fish-specific instructions
-	if !strings.Contains(output, "fish") && !strings.Contains(output, "config.fish") {
-		t.Errorf("Expected fish-specific instructions, got: %s", output)
-	}
+	assert.True(t, strings.Contains(output, "fish") || strings.Contains(output, "config.fish"), "Expected fish-specific instructions")
 }
 
 func TestGetStartedCommand_UnknownShell(t *testing.T) {
@@ -177,16 +157,12 @@ func TestGetStartedCommand_UnknownShell(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
 	// Should still provide generic instructions
-	if !strings.Contains(output, "eval") || !strings.Contains(output, "init") {
-		t.Errorf("Expected generic init instructions, got: %s", output)
-	}
+	assert.False(t, !strings.Contains(output, "eval") || !strings.Contains(output, "init"), "Expected generic init instructions")
 }
 
 func TestGetStartedHelp(t *testing.T) {
@@ -195,9 +171,7 @@ func TestGetStartedHelp(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := getStartedCmd.Help()
-	if err != nil {
-		t.Fatalf("Help command failed: %v", err)
-	}
+	require.NoError(t, err, "Help command failed")
 
 	output := buf.String()
 	expectedStrings := []string{
@@ -206,9 +180,7 @@ func TestGetStartedHelp(t *testing.T) {
 	}
 
 	for _, expected := range expectedStrings {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Help output missing %q", expected)
-		}
+		assert.Contains(t, output, expected, "Help output missing %v", expected)
 	}
 }
 
@@ -222,9 +194,7 @@ func TestGetStartedCommand_ShowsHelpfulLinks(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
@@ -237,9 +207,7 @@ func TestGetStartedCommand_ShowsHelpfulLinks(t *testing.T) {
 		}
 	}
 
-	if foundCommands == 0 {
-		t.Error("Expected at least one helpful command mentioned")
-	}
+	assert.NotEqual(t, 0, foundCommands, "Expected at least one helpful command mentioned")
 }
 
 func TestGetStartedCommand_FormattingAndStructure(t *testing.T) {
@@ -252,16 +220,12 @@ func TestGetStartedCommand_FormattingAndStructure(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
 	// Should have clear structure (sections with headings)
-	if !strings.Contains(output, "\n\n") {
-		t.Error("Output should have paragraph breaks for readability")
-	}
+	assert.Contains(t, output, "\n\n", "Output should have paragraph breaks for readability")
 
 	// Should have some numbered or bulleted steps
 	hasSteps := strings.Contains(output, "1.") ||
@@ -269,9 +233,7 @@ func TestGetStartedCommand_FormattingAndStructure(t *testing.T) {
 		strings.Contains(output, "-") ||
 		strings.Contains(output, "*")
 
-	if !hasSteps {
-		t.Error("Expected step-by-step instructions")
-	}
+	assert.True(t, hasSteps, "Expected step-by-step instructions")
 }
 
 func TestGetStartedCommand_EmptyOutput(t *testing.T) {
@@ -283,16 +245,12 @@ func TestGetStartedCommand_EmptyOutput(t *testing.T) {
 	getStartedCmd.SetErr(buf)
 
 	err := runGetStarted(getStartedCmd, []string{})
-	if err != nil {
-		t.Fatalf("runGetStarted() unexpected error: %v", err)
-	}
+	require.NoError(t, err, "runGetStarted() unexpected error")
 
 	output := buf.String()
 
 	// Should never have empty output
-	if output == "" {
-		t.Error("Output should not be empty")
-	}
+	assert.NotEmpty(t, output, "Output should not be empty")
 
 	// Should be reasonably long (helpful guide)
 	if len(output) < 100 {
@@ -339,15 +297,11 @@ func TestGetStartedCommand_AdaptiveContent(t *testing.T) {
 			getStartedCmd.SetErr(buf)
 
 			err := runGetStarted(getStartedCmd, []string{})
-			if err != nil {
-				t.Fatalf("runGetStarted() unexpected error: %v", err)
-			}
+			require.NoError(t, err, "runGetStarted() unexpected error")
 
 			output := buf.String()
 
-			if tt.expectText != "" && !strings.Contains(output, tt.expectText) {
-				t.Errorf("Expected %q in output, got: %s", tt.expectText, output)
-			}
+			assert.False(t, tt.expectText != "" && !strings.Contains(output, tt.expectText), "Expected in output")
 		})
 	}
 }

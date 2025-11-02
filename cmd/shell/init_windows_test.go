@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/shellutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInitWindowsShells(t *testing.T) {
@@ -45,9 +46,7 @@ func TestInitWindowsShells(t *testing.T) {
 			script := renderInitScript(tt.shell, cfg, false)
 
 			for _, expected := range tt.expectContains {
-				if !strings.Contains(script, expected) {
-					t.Errorf("init script for %s should contain: %s", tt.shell, expected)
-				}
+				assert.Contains(t, script, expected, "init script for should contain %v %v", tt.shell, expected)
 			}
 		})
 	}
@@ -71,9 +70,7 @@ func TestDetermineProfilePathWindows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(string(tt.shell), func(t *testing.T) {
 			result := shellutil.GetProfilePathDisplay(tt.shell)
-			if result != tt.expected {
-				t.Errorf("expected %s, got %s", tt.expected, result)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -96,9 +93,7 @@ func TestRenderUsageSnippetWindows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(string(tt.shell), func(t *testing.T) {
 			snippet := renderUsageSnippet(tt.shell)
-			if !strings.Contains(snippet, tt.expectedSnippet) {
-				t.Errorf("expected snippet to contain %s", tt.expectedSnippet)
-			}
+			assert.Contains(t, snippet, tt.expectedSnippet, "expected snippet to contain %v", tt.expectedSnippet)
 		})
 	}
 }
@@ -118,9 +113,7 @@ func TestRenderShellFunctionPowerShell(t *testing.T) {
 	}
 
 	for _, check := range checks {
-		if !strings.Contains(script, check) {
-			t.Errorf("PowerShell function should contain: %s", check)
-		}
+		assert.Contains(t, script, check, "PowerShell function should contain %v", check)
 	}
 }
 
@@ -128,12 +121,8 @@ func TestRenderShellFunctionCmd(t *testing.T) {
 	script := renderShellFunction(shellutil.ShellTypeCmd)
 
 	// cmd.exe doesn't support functions, so should have REM comment
-	if !strings.Contains(script, "REM cmd.exe does not support functions") {
-		t.Error("cmd script should contain comment about no function support")
-	}
-	if !strings.Contains(script, "REM Use goenv commands directly") {
-		t.Error("cmd script should contain comment about using commands directly")
-	}
+	assert.Contains(t, script, "REM cmd.exe does not support functions", "cmd script should contain comment about no function support")
+	assert.Contains(t, script, "REM Use goenv commands directly", "cmd script should contain comment about using commands directly")
 }
 
 func TestDetectEnvShellWindows(t *testing.T) {
@@ -143,9 +132,7 @@ func TestDetectEnvShellWindows(t *testing.T) {
 	shell := detectEnvShell()
 
 	// On Windows, should return either powershell or cmd
-	if shell != shellutil.ShellTypePowerShell && shell != shellutil.ShellTypeCmd {
-		t.Errorf("expected powershell or cmd, got %s", shell)
-	}
+	assert.False(t, shell != shellutil.ShellTypePowerShell && shell != shellutil.ShellTypeCmd, "expected powershell or cmd")
 }
 
 func TestRenderInitScriptPathSeparators(t *testing.T) {
@@ -171,9 +158,7 @@ func TestRenderInitScriptPathSeparators(t *testing.T) {
 
 			// Windows uses semicolon for PATH separator
 			shimsPath := strings.Replace(cfg.ShimsDir(), "/", "\\", -1)
-			if !strings.Contains(script, shimsPath) {
-				t.Errorf("script should contain shims path with backslashes: %s", shimsPath)
-			}
+			assert.Contains(t, script, shimsPath, "script should contain shims path with backslashes %v", shimsPath)
 		})
 	}
 }

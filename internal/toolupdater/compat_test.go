@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseGoVersion(t *testing.T) {
@@ -67,23 +69,15 @@ func TestParseGoVersion(t *testing.T) {
 			major, minor, err := parseGoVersion(tt.version)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, err, "Expected error but got none")
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
-			if major != tt.wantMajor {
-				t.Errorf("Expected major %d, got %d", tt.wantMajor, major)
-			}
+			assert.Equal(t, tt.wantMajor, major, "Expected major")
 
-			if minor != tt.wantMinor {
-				t.Errorf("Expected minor %d, got %d", tt.wantMinor, minor)
-			}
+			assert.Equal(t, tt.wantMinor, minor, "Expected minor")
 		})
 	}
 }
@@ -143,9 +137,7 @@ func TestCompareGoVersions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := utils.CompareGoVersions(tt.v1, tt.v2)
 
-			if got != tt.want {
-				t.Errorf("utils.CompareGoVersions(%s, %s) = %d, want %d", tt.v1, tt.v2, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "utils.CompareGoVersions(, ) = %v %v", tt.v1, tt.v2)
 		})
 	}
 }
@@ -187,9 +179,7 @@ func TestIsGoVersionCompatible(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := IsGoVersionCompatible(tt.v1, tt.v2)
 
-			if got != tt.want {
-				t.Errorf("IsGoVersionCompatible(%s, %s) = %v, want %v", tt.v1, tt.v2, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "IsGoVersionCompatible(, ) = %v %v", tt.v1, tt.v2)
 		})
 	}
 }
@@ -241,18 +231,11 @@ func TestCheckGoVersionRequirement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gotCompat, gotReason := checkGoVersionRequirement(tt.required, tt.current)
 
-			if gotCompat != tt.wantCompat {
-				t.Errorf("checkGoVersionRequirement(%s, %s) compatibility = %v, want %v",
-					tt.required, tt.current, gotCompat, tt.wantCompat)
-			}
+			assert.Equal(t, tt.wantCompat, gotCompat, "checkGoVersionRequirement(, ) compatibility = %v %v", tt.required, tt.current)
 
-			if !tt.wantCompat && gotReason == "" {
-				t.Error("Expected reason for incompatibility but got empty string")
-			}
+			assert.False(t, !tt.wantCompat && gotReason == "", "Expected reason for incompatibility but got empty string")
 
-			if tt.wantCompat && gotReason != "" {
-				t.Errorf("Expected no reason for compatible versions but got: %s", gotReason)
-			}
+			assert.False(t, tt.wantCompat && gotReason != "", "Expected no reason for compatible versions but")
 		})
 	}
 }
@@ -304,9 +287,7 @@ func TestValidateToolVersion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ValidateToolVersion(tt.version)
 
-			if got != tt.want {
-				t.Errorf("ValidateToolVersion(%s) = %v, want %v", tt.version, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "ValidateToolVersion() = %v", tt.version)
 		})
 	}
 }
@@ -344,10 +325,7 @@ func TestCheckCompatibility(t *testing.T) {
 
 			gotCompat, gotReason := CheckCompatibility(tt.packagePath, tt.toolVersion, tt.goVersion)
 
-			if gotCompat != tt.wantCompat {
-				t.Errorf("CheckCompatibility() compatibility = %v, want %v (reason: %s)",
-					gotCompat, tt.wantCompat, gotReason)
-			}
+			assert.Equal(t, tt.wantCompat, gotCompat, "CheckCompatibility() compatibility = %v", gotReason)
 		})
 	}
 }
@@ -377,14 +355,9 @@ func TestCheckCompatibilityDetailed(t *testing.T) {
 			}
 
 			result, err := CheckCompatibilityDetailed(tt.packagePath, tt.toolVersion, tt.goVersion)
-			if err != nil {
-				t.Fatalf("CheckCompatibilityDetailed failed: %v", err)
-			}
+			require.NoError(t, err, "CheckCompatibilityDetailed failed")
 
-			if result.Compatible != tt.wantCompat {
-				t.Errorf("CheckCompatibilityDetailed() compatibility = %v, want %v (reason: %s)",
-					result.Compatible, tt.wantCompat, result.Reason)
-			}
+			assert.Equal(t, tt.wantCompat, result.Compatible, "CheckCompatibilityDetailed() compatibility = %v", result.Reason)
 		})
 	}
 }
@@ -414,9 +387,7 @@ func TestGetCompatibleGoVersions(t *testing.T) {
 			}
 
 			compatible, err := GetCompatibleGoVersions(tt.packagePath, tt.toolVersion, installedVersions)
-			if err != nil {
-				t.Fatalf("GetCompatibleGoVersions failed: %v", err)
-			}
+			require.NoError(t, err, "GetCompatibleGoVersions failed")
 
 			if len(compatible) < tt.wantMinVersions {
 				t.Errorf("Expected at least %d compatible versions, got %d",
@@ -451,13 +422,9 @@ func TestSuggestGoVersionForTool(t *testing.T) {
 			}
 
 			suggested, err := SuggestGoVersionForTool(tt.packagePath, tt.toolVersion, installedVersions)
-			if err != nil {
-				t.Fatalf("SuggestGoVersionForTool failed: %v", err)
-			}
+			require.NoError(t, err, "SuggestGoVersionForTool failed")
 
-			if tt.wantVersion != "" && suggested != tt.wantVersion {
-				t.Errorf("Expected suggested version %s, got %s", tt.wantVersion, suggested)
-			}
+			assert.False(t, tt.wantVersion != "" && suggested != tt.wantVersion, "Expected suggested version")
 
 			// Verify suggested version is in installed list
 			found := false
@@ -467,9 +434,7 @@ func TestSuggestGoVersionForTool(t *testing.T) {
 					break
 				}
 			}
-			if !found {
-				t.Errorf("Suggested version %s not in installed versions", suggested)
-			}
+			assert.True(t, found, "Suggested version not in installed versions")
 		})
 	}
 }
@@ -477,9 +442,7 @@ func TestSuggestGoVersionForTool(t *testing.T) {
 func TestSuggestGoVersionForToolNoCompatible(t *testing.T) {
 	// Empty installed versions should return error
 	_, err := SuggestGoVersionForTool("some/package", "v1.0.0", []string{})
-	if err == nil {
-		t.Error("Expected error for no installed versions")
-	}
+	assert.Error(t, err, "Expected error for no installed versions")
 }
 
 // Helper function to detect CI environment

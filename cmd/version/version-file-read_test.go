@@ -8,6 +8,8 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVersionFileReadCommand(t *testing.T) {
@@ -157,15 +159,11 @@ require (
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			require.NoError(t, err)
 
 			// Check output
 			got := strings.TrimSpace(output.String())
-			if got != tt.expectedOutput {
-				t.Errorf("Expected output %q, got %q", tt.expectedOutput, got)
-			}
+			assert.Equal(t, tt.expectedOutput, got, "Expected output")
 		})
 	}
 }

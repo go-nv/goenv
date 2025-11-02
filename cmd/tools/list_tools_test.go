@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
@@ -49,20 +51,14 @@ func TestListCommand_AllFlag(t *testing.T) {
 	// Get all versions
 	mgr := manager.NewManager(cfg)
 	foundVersions, err := mgr.ListInstalledVersions()
-	if err != nil {
-		t.Fatalf("ListInstalledVersions failed: %v", err)
-	}
+	require.NoError(t, err, "ListInstalledVersions failed")
 
-	if len(foundVersions) != 3 {
-		t.Errorf("Expected 3 versions, got %d", len(foundVersions))
-	}
+	assert.Len(t, foundVersions, 3, "Expected 3 versions")
 
 	// Get tools for each version
 	for version, expectedTools := range versionsTools {
 		toolList, err := toolspkg.ListForVersion(cfg, version)
-		if err != nil {
-			t.Fatalf("ListForVersion failed for %s: %v", version, err)
-		}
+		require.NoError(t, err, "ListForVersion failed for")
 
 		// Extract tool names from Tool structs
 		var toolNames []string
@@ -70,9 +66,7 @@ func TestListCommand_AllFlag(t *testing.T) {
 			toolNames = append(toolNames, tool.Name)
 		}
 
-		if len(toolNames) != len(expectedTools) {
-			t.Errorf("Version %s: expected %d tools, got %d", version, len(expectedTools), len(toolNames))
-		}
+		assert.Len(t, toolNames, len(expectedTools), "Version : expected tools %v", version)
 
 		for _, expected := range expectedTools {
 			found := false
@@ -82,14 +76,13 @@ func TestListCommand_AllFlag(t *testing.T) {
 					break
 				}
 			}
-			if !found {
-				t.Errorf("Version %s: expected tool %s not found", version, expected)
-			}
+			assert.True(t, found, "Version : expected tool not found")
 		}
 	}
 }
 
 func TestListCommand_JSONOutput(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -98,9 +91,8 @@ func TestListCommand_JSONOutput(t *testing.T) {
 	// Create a version with tools
 	version := "1.23.0"
 	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-	if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binPath, "create test directory")
+	require.NoError(t, err)
 
 	tools := []string{"gopls", "staticcheck"}
 	for _, tool := range tools {
@@ -113,9 +105,7 @@ func TestListCommand_JSONOutput(t *testing.T) {
 
 	// Get tools
 	toolList, err := toolspkg.ListForVersion(cfg, version)
-	if err != nil {
-		t.Fatalf("ListForVersion failed: %v", err)
-	}
+	require.NoError(t, err, "ListForVersion failed")
 
 	// Extract tool names from Tool structs
 	var foundTools []string
@@ -145,30 +135,22 @@ func TestListCommand_JSONOutput(t *testing.T) {
 	}
 
 	data, err := json.Marshal(output)
-	if err != nil {
-		t.Fatalf("Failed to marshal JSON: %v", err)
-	}
+	require.NoError(t, err, "Failed to marshal JSON")
 
 	// Verify JSON is valid
 	var parsed jsonOutput
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		t.Fatalf("Failed to unmarshal JSON: %v", err)
-	}
+	err = json.Unmarshal(data, &parsed)
+	require.NoError(t, err, "Failed to unmarshal JSON")
 
-	if parsed.SchemaVersion != "1" {
-		t.Errorf("Expected schema_version '1', got '%s'", parsed.SchemaVersion)
-	}
+	assert.Equal(t, "1", parsed.SchemaVersion, "Expected schema_version '1'")
 
-	if len(parsed.Versions) != 1 {
-		t.Errorf("Expected 1 version, got %d", len(parsed.Versions))
-	}
+	assert.Len(t, parsed.Versions, 1, "Expected 1 version")
 
-	if parsed.Versions[0].Version != version {
-		t.Errorf("Expected version %s, got %s", version, parsed.Versions[0].Version)
-	}
+	assert.Equal(t, version, parsed.Versions[0].Version, "Expected version")
 }
 
 func TestListCommand_EmptyVersion(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -177,22 +159,18 @@ func TestListCommand_EmptyVersion(t *testing.T) {
 	// Create version with no tools
 	version := "1.23.0"
 	versionPath := filepath.Join(tmpDir, "versions", version)
-	if err := utils.EnsureDirWithContext(versionPath, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(versionPath, "create test directory")
+	require.NoError(t, err)
 
 	// No bin directory created - should return empty
 	toolList, err := toolspkg.ListForVersion(cfg, version)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if len(toolList) != 0 {
-		t.Errorf("Expected no tools, got %d", len(toolList))
-	}
+	assert.Len(t, toolList, 0, "Expected no tools")
 }
 
 func TestListCommand_HiddenFiles(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -200,18 +178,15 @@ func TestListCommand_HiddenFiles(t *testing.T) {
 
 	version := "1.23.0"
 	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-	if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binPath, "create test directory")
+	require.NoError(t, err)
 
 	// Create regular and hidden files (use helper for gopls to handle .bat on Windows)
 	cmdtest.CreateToolExecutable(t, binPath, "gopls")
 	testutil.WriteTestFile(t, filepath.Join(binPath, ".hidden"), []byte("fake"), utils.PermFileExecutable)
 
 	toolList, err := toolspkg.ListForVersion(cfg, version)
-	if err != nil {
-		t.Fatalf("ListForVersion failed: %v", err)
-	}
+	require.NoError(t, err, "ListForVersion failed")
 
 	// Extract tool names from Tool structs
 	var toolNames []string
@@ -220,16 +195,13 @@ func TestListCommand_HiddenFiles(t *testing.T) {
 	}
 
 	// Should only get non-hidden files
-	if len(toolNames) != 1 {
-		t.Errorf("Expected 1 tool, got %d", len(toolNames))
-	}
+	assert.Len(t, toolNames, 1, "Expected 1 tool")
 
-	if len(toolNames) > 0 && toolNames[0] != "gopls" {
-		t.Errorf("Expected 'gopls', got '%s'", toolNames[0])
-	}
+	assert.False(t, len(toolNames) > 0 && toolNames[0] != "gopls", "Expected 'gopls'")
 }
 
 func TestListCommand_PlatformVariants(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -237,18 +209,15 @@ func TestListCommand_PlatformVariants(t *testing.T) {
 
 	version := "1.23.0"
 	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-	if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binPath, "create test directory")
+	require.NoError(t, err)
 
 	// Create tool with platform variants
 	testutil.WriteTestFile(t, filepath.Join(binPath, "gopls"), []byte("fake"), utils.PermFileExecutable)
 	testutil.WriteTestFile(t, filepath.Join(binPath, "gopls.exe"), []byte("fake"), utils.PermFileExecutable)
 
 	toolList, err := toolspkg.ListForVersion(cfg, version)
-	if err != nil {
-		t.Fatalf("ListForVersion failed: %v", err)
-	}
+	require.NoError(t, err, "ListForVersion failed")
 
 	// Extract tool names from Tool structs
 	var toolNames []string
@@ -257,16 +226,13 @@ func TestListCommand_PlatformVariants(t *testing.T) {
 	}
 
 	// Should deduplicate - only get base name
-	if len(toolNames) != 1 {
-		t.Errorf("Expected 1 tool (deduplicated), got %d", len(toolNames))
-	}
+	assert.Len(t, toolNames, 1, "Expected 1 tool (deduplicated)")
 
-	if len(toolNames) > 0 && toolNames[0] != "gopls" {
-		t.Errorf("Expected 'gopls', got '%s'", toolNames[0])
-	}
+	assert.False(t, len(toolNames) > 0 && toolNames[0] != "gopls", "Expected 'gopls'")
 }
 
 func TestListCommand_RunE(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -275,9 +241,8 @@ func TestListCommand_RunE(t *testing.T) {
 	// Create a version with tools
 	version := "1.23.0"
 	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
-	if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-		t.Fatal(err)
-	}
+	err = utils.EnsureDirWithContext(binPath, "create test directory")
+	require.NoError(t, err)
 
 	tools := []string{"gopls", "staticcheck"}
 	for _, tool := range tools {
@@ -296,9 +261,7 @@ func TestListCommand_RunE(t *testing.T) {
 
 	// Verify tools are found
 	toolList, err := toolspkg.ListForVersion(cfg, version)
-	if err != nil {
-		t.Fatalf("ListForVersion failed: %v", err)
-	}
+	require.NoError(t, err, "ListForVersion failed")
 
 	// Extract tool names from Tool structs
 	var foundTools []string
@@ -306,12 +269,11 @@ func TestListCommand_RunE(t *testing.T) {
 		foundTools = append(foundTools, tool.Name)
 	}
 
-	if len(foundTools) != 2 {
-		t.Errorf("Expected 2 tools, got %d", len(foundTools))
-	}
+	assert.Len(t, foundTools, 2, "Expected 2 tools")
 }
 
 func TestListCommand_MultipleVersions(t *testing.T) {
+	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -325,29 +287,22 @@ func TestListCommand_MultipleVersions(t *testing.T) {
 
 		// Create tools using helper (handles .bat on Windows)
 		binPath := filepath.Join(tmpDir, "versions", v, "gopath", "bin")
-		if err := utils.EnsureDirWithContext(binPath, "create test directory"); err != nil {
-			t.Fatal(err)
-		}
+		err = utils.EnsureDirWithContext(binPath, "create test directory")
+		require.NoError(t, err)
 		cmdtest.CreateToolExecutable(t, binPath, "gopls")
 	}
 
 	// Get all versions
 	mgr := manager.NewManager(cfg)
 	foundVersions, err := mgr.ListInstalledVersions()
-	if err != nil {
-		t.Fatalf("ListInstalledVersions failed: %v", err)
-	}
+	require.NoError(t, err, "ListInstalledVersions failed")
 
-	if len(foundVersions) != 3 {
-		t.Errorf("Expected 3 versions, got %d", len(foundVersions))
-	}
+	assert.Len(t, foundVersions, 3, "Expected 3 versions")
 
 	// Verify each version has gopls
 	for _, version := range foundVersions {
 		toolList, err := toolspkg.ListForVersion(cfg, version)
-		if err != nil {
-			t.Fatalf("ListForVersion failed for %s: %v", version, err)
-		}
+		require.NoError(t, err, "ListForVersion failed for")
 
 		// Extract tool names from Tool structs
 		var toolNames []string
@@ -355,12 +310,8 @@ func TestListCommand_MultipleVersions(t *testing.T) {
 			toolNames = append(toolNames, tool.Name)
 		}
 
-		if len(toolNames) != 1 {
-			t.Errorf("Version %s: expected 1 tool, got %d", version, len(toolNames))
-		}
+		assert.Len(t, toolNames, 1, "Version : expected 1 tool %v", version)
 
-		if len(toolNames) > 0 && toolNames[0] != "gopls" {
-			t.Errorf("Version %s: expected 'gopls', got '%s'", version, toolNames[0])
-		}
+		assert.False(t, len(toolNames) > 0 && toolNames[0] != "gopls", "Version : expected 'gopls'")
 	}
 }

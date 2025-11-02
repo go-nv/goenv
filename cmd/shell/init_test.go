@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitCommand(t *testing.T) {
@@ -218,28 +220,20 @@ func TestInitCommand(t *testing.T) {
 
 			// Check error expectation
 			if tt.shouldFail {
-				if err == nil {
-					t.Fatalf("Expected command to fail, but it succeeded")
-				}
+				assert.Error(t, err, "Expected command to fail, but it succeeded")
 			} else {
-				if err != nil {
-					t.Fatalf("Unexpected error: %v", err)
-				}
+				require.NoError(t, err)
 			}
 
 			// Check output
 			output := outputBuf.String()
 			for _, expected := range tt.expectedOutput {
-				if !strings.Contains(output, expected) {
-					t.Errorf("Expected output to contain %q, but it was missing.\nFull output:\n%s", expected, output)
-				}
+				assert.Contains(t, output, expected, "Expected output to contain , but it was missing.\\nFull output:\\n %v %v", expected, output)
 			}
 
 			// Check unexpected output
 			for _, unexpected := range tt.unexpectedOutput {
-				if strings.Contains(output, unexpected) {
-					t.Errorf("Expected output to NOT contain %q, but it was present.\nFull output:\n%s", unexpected, output)
-				}
+				assert.NotContains(t, output, unexpected, "Expected output to NOT contain , but it was present.\\nFull output:\\n %v %v", unexpected, output)
 			}
 
 			// Check directories were created

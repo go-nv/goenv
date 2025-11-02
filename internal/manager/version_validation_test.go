@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateVersionString(t *testing.T) {
@@ -188,9 +189,7 @@ func TestValidateVersionString(t *testing.T) {
 					t.Errorf("Expected error to contain %q, got: %v", tt.errorText, err)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Expected no error for version %q, but got: %v", tt.version, err)
-				}
+				assert.NoError(t, err, "Expected no error for version , but %v", tt.version)
 			}
 		})
 	}
@@ -210,9 +209,7 @@ func TestValidateVersionStringCVE202235861(t *testing.T) {
 	for _, version := range maliciousVersions {
 		t.Run("CVE-2022-35861: "+version, func(t *testing.T) {
 			err := validateVersionString(version)
-			if err == nil {
-				t.Errorf("CVE-2022-35861: Expected error for malicious version %q, but validation passed", version)
-			}
+			assert.Error(t, err, "CVE-2022-35861: Expected error for malicious version , but validation passed %v", version)
 		})
 	}
 }
@@ -351,12 +348,8 @@ func TestParseGoModVersion(t *testing.T) {
 					t.Errorf("Expected error containing %q, got: %v", tt.errorContains, err)
 				}
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if result != tt.expected {
-					t.Errorf("Expected version %q, got %q", tt.expected, result)
-				}
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result, "Expected version")
 			}
 		})
 	}
@@ -406,10 +399,7 @@ func TestVersionSatisfies(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := VersionSatisfies(tt.current, tt.required)
-			if result != tt.expected {
-				t.Errorf("VersionSatisfies(%q, %q) = %v, expected %v",
-					tt.current, tt.required, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "VersionSatisfies(, ) = , expected %v %v", tt.current, tt.required)
 		})
 	}
 }

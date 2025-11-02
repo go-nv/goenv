@@ -11,12 +11,15 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Comprehensive test suite for goenv rehash command
 // Based on bash implementation tests from test/goenv-rehash.bats
 
 func TestRehashCommand(t *testing.T) {
+	var err error
 	tests := []struct {
 		name            string
 		setupVersions   []string
@@ -255,9 +258,8 @@ func TestRehashCommand(t *testing.T) {
 					t.Skip("skipping permission test on Windows")
 				}
 				_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
-				if err := os.Chmod(shimsDir, os.FileMode(tt.shimsDirPerms)); err != nil {
-					t.Fatalf("Failed to change shims directory permissions: %v", err)
-				}
+				err = os.Chmod(shimsDir, os.FileMode(tt.shimsDirPerms))
+				require.NoError(t, err, "Failed to change shims directory permissions")
 				// Ensure cleanup restores permissions
 				defer os.Chmod(shimsDir, utils.PermFileExecutable)
 			}
@@ -277,31 +279,21 @@ func TestRehashCommand(t *testing.T) {
 			cmd.SetErr(errOutput)
 			cmd.SetArgs([]string{})
 
-			err := cmd.Execute()
+			err = cmd.Execute()
 
 			// Check error expectations
 			if tt.expectedError != "" {
-				if err == nil {
-					t.Errorf("Expected error containing %q but got none", tt.expectedError)
-					return
-				}
-				if !strings.Contains(err.Error(), tt.expectedError) && !strings.Contains(errOutput.String(), tt.expectedError) {
-					t.Errorf("Expected error to contain %q, got %q", tt.expectedError, err.Error())
-				}
+				assert.Error(t, err, "Expected error containing")
+				assert.True(t, strings.Contains(err.Error(), tt.expectedError) || strings.Contains(errOutput.String(), tt.expectedError), "Expected error to contain")
 				return // Don't check other expectations on error
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-					return
-				}
+				assert.NoError(t, err)
 			}
 
 			// Check output
 			got := output.String()
 			if tt.expectedOutput != "" {
-				if !strings.Contains(got, tt.expectedOutput) {
-					t.Errorf("Expected output to contain %q, got %q", tt.expectedOutput, got)
-				}
+				assert.Contains(t, got, tt.expectedOutput, "Expected output to contain %v %v", tt.expectedOutput, got)
 			}
 
 			// Verify expected shims exist
@@ -351,12 +343,8 @@ func TestRehashCommand(t *testing.T) {
 
 				// Verify shim structure (bash shim)
 				if !utils.IsWindows() {
-					if !strings.Contains(contentStr, "#!/usr/bin/env bash") {
-						t.Errorf("Expected bash shebang in shim %q", expectedShim)
-					}
-					if !strings.Contains(contentStr, "goenv exec") {
-						t.Errorf("Expected 'goenv exec' in shim %q", expectedShim)
-					}
+					assert.Contains(t, contentStr, "#!/usr/bin/env bash", "Expected bash shebang in shim %v", expectedShim)
+					assert.Contains(t, contentStr, "goenv exec", "Expected 'goenv exec' in shim %v", expectedShim)
 					// Bash implementation has special handling for "go*" commands
 					if strings.HasPrefix(expectedShim, "go") && !strings.Contains(contentStr, "GOENV_FILE_ARG") {
 						t.Logf("Note: Shim for %q doesn't have GOENV_FILE_ARG handling (may differ from bash)", expectedShim)
@@ -379,9 +367,7 @@ func TestRehashCommand(t *testing.T) {
 						break
 					}
 				}
-				if !found {
-					t.Errorf("Unexpected shim %q exists", actualShim)
-				}
+				assert.True(t, found, "Unexpected shim exists")
 			}
 
 			// Verify old shims are removed
@@ -427,9 +413,7 @@ func TestRehashShimContent(t *testing.T) {
 	cmd.SetArgs([]string{})
 
 	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("Rehash failed: %v", err)
-	}
+	require.NoError(t, err, "Rehash failed")
 
 	// Read and verify shim content
 	shimPath := filepath.Join(testRoot, "shims", "go")
@@ -437,9 +421,7 @@ func TestRehashShimContent(t *testing.T) {
 		shimPath += ".bat"
 	}
 	content, err := os.ReadFile(shimPath)
-	if err != nil {
-		t.Fatalf("Failed to read shim: %v", err)
-	}
+	require.NoError(t, err, "Failed to read shim")
 
 	contentStr := string(content)
 
@@ -455,9 +437,7 @@ func TestRehashShimContent(t *testing.T) {
 		}
 
 		for _, element := range requiredElements {
-			if !strings.Contains(contentStr, element) {
-				t.Errorf("Expected shim to contain %q but it doesn't.\nShim content:\n%s", element, contentStr)
-			}
+			assert.Contains(t, contentStr, element, "Expected shim to contain but it doesn't.\\nShim content:\\n %v %v", element, contentStr)
 		}
 
 		// Check for GOENV_FILE_ARG special handling for go commands
@@ -476,9 +456,7 @@ func TestRehashShimContent(t *testing.T) {
 		}
 
 		for _, element := range requiredElements {
-			if !strings.Contains(contentStr, element) {
-				t.Errorf("Expected shim to contain %q but it doesn't.\nShim content:\n%s", element, contentStr)
-			}
+			assert.Contains(t, contentStr, element, "Expected shim to contain but it doesn't.\\nShim content:\\n %v %v", element, contentStr)
 		}
 	}
 }
@@ -529,30 +507,20 @@ func TestRehashIdempotency(t *testing.T) {
 
 	// Run rehash first time
 	shims1, err := runRehashCmd()
-	if err != nil {
-		t.Fatalf("First rehash failed: %v", err)
-	}
+	require.NoError(t, err, "First rehash failed")
 
 	// Run rehash second time
 	shims2, err := runRehashCmd()
-	if err != nil {
-		t.Fatalf("Second rehash failed: %v", err)
-	}
+	require.NoError(t, err, "Second rehash failed")
 
 	// Run rehash third time
 	shims3, err := runRehashCmd()
-	if err != nil {
-		t.Fatalf("Third rehash failed: %v", err)
-	}
+	require.NoError(t, err, "Third rehash failed")
 
 	// All should be identical
-	if fmt.Sprintf("%v", shims1) != fmt.Sprintf("%v", shims2) {
-		t.Errorf("First and second rehash produced different results:\n  First:  %v\n  Second: %v", shims1, shims2)
-	}
+	assert.Equal(t, fmt.Sprintf("%v", shims2), fmt.Sprintf("%v", shims1), "First and second rehash produced different results:\\n First: \\n Second %v %v", shims1, shims2)
 
-	if fmt.Sprintf("%v", shims2) != fmt.Sprintf("%v", shims3) {
-		t.Errorf("Second and third rehash produced different results:\n  Second: %v\n  Third:  %v", shims2, shims3)
-	}
+	assert.Equal(t, fmt.Sprintf("%v", shims3), fmt.Sprintf("%v", shims2), "Second and third rehash produced different results:\\n Second: \\n Third %v %v", shims2, shims3)
 }
 
 // Helper to create a test binary in a version's bin directory

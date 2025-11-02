@@ -12,6 +12,8 @@ import (
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInfoCommand(t *testing.T) {
@@ -35,26 +37,18 @@ func TestInfoCommand(t *testing.T) {
 			name:    "installed version",
 			version: "1.23.2",
 			checkOutput: func(t *testing.T, output string) {
-				if output == "" {
-					t.Error("Expected output, got empty string")
-				}
+				assert.NotEmpty(t, output, "Expected output, got empty string")
 				// Check for key information
-				if !bytes.Contains([]byte(output), []byte("1.23.2")) {
-					t.Error("Output should contain version number")
-				}
+				assert.True(t, bytes.Contains([]byte(output), []byte("1.23.2")), "Output should contain version number")
 			},
 		},
 		{
 			name:    "not installed version",
 			version: "1.20.5",
 			checkOutput: func(t *testing.T, output string) {
-				if output == "" {
-					t.Error("Expected output, got empty string")
-				}
+				assert.NotEmpty(t, output, "Expected output, got empty string")
 				// Should still show info even if not installed
-				if !bytes.Contains([]byte(output), []byte("1.20.5")) {
-					t.Error("Output should contain version number")
-				}
+				assert.True(t, bytes.Contains([]byte(output), []byte("1.20.5")), "Output should contain version number")
 			},
 		},
 	}
@@ -75,12 +69,8 @@ func TestInfoCommand(t *testing.T) {
 
 			// Run command
 			err := cmd.Execute()
-			if tt.expectError && err == nil {
-				t.Error("Expected error but got none")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
+			assert.False(t, tt.expectError && err == nil, "Expected error but got none")
+			assert.False(t, !tt.expectError && err != nil)
 
 			// Check output
 			if tt.checkOutput != nil {
@@ -91,6 +81,7 @@ func TestInfoCommand(t *testing.T) {
 }
 
 func TestInfoJSONOutput(t *testing.T) {
+	var err error
 	// Create temporary test directory
 	tmpDir := t.TempDir()
 
@@ -114,15 +105,13 @@ func TestInfoJSONOutput(t *testing.T) {
 	defer func() { infoFlags.json = false }()
 
 	// Run command directly
-	err := runInfo(&cobra.Command{}, []string{"1.23.2"})
+	err = runInfo(&cobra.Command{}, []string{"1.23.2"})
 
 	// Close writer and restore stdout
 	w.Close()
 	os.Stdout = originalStdout
 
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
-	}
+	require.NoError(t, err, "Command failed")
 
 	// Read captured output
 	var buf bytes.Buffer
@@ -132,14 +121,11 @@ func TestInfoJSONOutput(t *testing.T) {
 	// Parse JSON output
 	var result map[string]interface{}
 	decoder := json.NewDecoder(bytes.NewReader(output))
-	if err := decoder.Decode(&result); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, buf.String())
-	}
+	err = decoder.Decode(&result)
+	require.NoError(t, err, "Failed to parse JSON: \\nOutput")
 
 	// Verify JSON structure
-	if result["version"] != "1.23.2" {
-		t.Errorf("Expected version 1.23.2, got %v", result["version"])
-	}
+	assert.Equal(t, "1.23.2", result["version"], "Expected version 1.23.2")
 	if _, ok := result["installed"]; !ok {
 		t.Error("JSON should contain 'installed' field")
 	}
@@ -152,6 +138,7 @@ func TestInfoJSONOutput(t *testing.T) {
 }
 
 func TestCalculateDirSize(t *testing.T) {
+	var err error
 	// Create temporary test directory
 	tmpDir := t.TempDir()
 
@@ -168,9 +155,8 @@ func TestCalculateDirSize(t *testing.T) {
 	expectedSize := int64(0)
 	for _, tf := range testFiles {
 		path := filepath.Join(tmpDir, tf.name)
-		if err := utils.EnsureDirWithContext(filepath.Dir(path), "create test directory"); err != nil {
-			t.Fatalf("Failed to create dir: %v", err)
-		}
+		err = utils.EnsureDirWithContext(filepath.Dir(path), "create test directory")
+		require.NoError(t, err, "Failed to create dir")
 		data := make([]byte, tf.size)
 		testutil.WriteTestFile(t, path, data, utils.PermFileDefault)
 		expectedSize += tf.size
@@ -178,13 +164,9 @@ func TestCalculateDirSize(t *testing.T) {
 
 	// Calculate size
 	size, err := calculateDirSize(tmpDir)
-	if err != nil {
-		t.Fatalf("calculateDirSize failed: %v", err)
-	}
+	require.NoError(t, err, "calculateDirSize failed")
 
-	if size != expectedSize {
-		t.Errorf("Expected size %d, got %d", expectedSize, size)
-	}
+	assert.Equal(t, expectedSize, size, "Expected size")
 }
 
 func TestFormatSize(t *testing.T) {
@@ -207,9 +189,7 @@ func TestFormatSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			result := formatSize(tt.bytes)
-			if result != tt.expected {
-				t.Errorf("formatSize(%d) = %s, want %s", tt.bytes, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "formatSize() = %v", tt.bytes)
 		})
 	}
 }
@@ -231,9 +211,7 @@ func TestExtractMajorMinor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.version, func(t *testing.T) {
 			result := utils.ExtractMajorMinor(tt.version)
-			if result != tt.expected {
-				t.Errorf("utils.ExtractMajorMinor(%q) = %q, want %q", tt.version, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "utils.ExtractMajorMinor() = %v", tt.version)
 		})
 	}
 }
@@ -245,15 +223,11 @@ func TestInfoCommandWithConfig(t *testing.T) {
 
 	// Load config
 	cfg := config.Load()
-	if cfg == nil {
-		t.Fatal("Failed to load config")
-	}
+	require.NotNil(t, cfg, "Failed to load config")
 
 	// Verify versions dir is set correctly
 	versionsDir := cfg.VersionsDir()
-	if versionsDir == "" {
-		t.Error("Versions directory should not be empty")
-	}
+	assert.NotEmpty(t, versionsDir, "Versions directory should not be empty")
 }
 
 func BenchmarkCalculateDirSize(b *testing.B) {
