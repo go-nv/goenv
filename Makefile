@@ -12,6 +12,7 @@ export PREFIX ?= /usr/local
 
 # Build targets
 .PHONY: build clean test install uninstall dev-deps all cross-build generate-embedded test-windows release snapshot
+.DEFAULT=build
 
 # Default target
 all: build
@@ -22,6 +23,8 @@ generate-embedded:
 
 build:
 	go run scripts/build-tool/main.go -task=build
+
+build-swap:: build swap
 
 test:
 	go run scripts/build-tool/main.go -task=test
@@ -70,3 +73,6 @@ release:
 
 snapshot:
 	go run scripts/build-tool/main.go -task=snapshot
+
+swap:
+	go run ./scripts/swap/main.go go
