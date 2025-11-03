@@ -1,5 +1,8 @@
 name-template: "$RESOLVED_VERSION"
 tag-template: "$RESOLVED_VERSION"
+version-template: '2.$MINOR.$PATCH'
+filter-by-commitish: true
+commitish: master
 categories:
   - title: "🚀 Features"
     labels:
@@ -44,13 +47,13 @@ autolabeler:
 version-resolver:
   major:
     labels:
-      - "major"
+      - "major-release"
   minor:
     labels:
-      - "minor"
+      - "minor-release"
   patch:
     labels:
-      - "patch"
+      - "patch-release"
   default: patch
 template: |
   ## Changes since $PREVIOUS_TAG
