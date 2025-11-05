@@ -190,8 +190,10 @@ Examples:
   -f/--force         Install even if the version appears to be installed already
   -s/--skip-existing Skip if the version appears to be installed already
 
-  If no version is specified, ` + "`goenv local`" + ` will be used to determine the
-  desired version.
+  If no version is specified, goenv will auto-detect the version to install:
+    1. Check for .go-version in current directory or parent directories
+    2. Check for go.mod and use the go directive version
+    3. Fall back to installing the latest stable version
 
   go-build options:
 

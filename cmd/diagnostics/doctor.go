@@ -193,6 +193,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 0: Environment detection (containers, WSL, filesystems)
 	results = append(results, checkEnvironment(cfg))
 
+	// Check 0a: Obsolete environment variables
+	results = append(results, checkObsoleteEnvVars())
+
 	// Check 1: goenv binary location
 	results = append(results, checkGoenvBinary(cfg))
 
@@ -267,6 +270,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 20: PATH order (goenv shims before system Go)
 	results = append(results, checkPathOrder(cfg))
+
+	// Check 20b: Unnecessary GOENV_ROOT/bin in PATH for Homebrew installations
+	results = append(results, checkUnnecessaryPathEntries(cfg))
 
 	// Check 21: System libc compatibility (Linux only)
 	if platform.IsLinux() {
@@ -447,6 +453,48 @@ func checkEnvironment(cfg *config.Config) checkResult {
 		id:      "runtime-environment",
 		name:    "Runtime environment",
 		status:  status,
+		message: message,
+		advice:  advice,
+	}
+}
+
+func checkObsoleteEnvVars() checkResult {
+	// List of environment variables that were removed in v3
+	obsoleteVars := []struct {
+		name        string
+		description string
+	}{
+		{"GOENV_PREPEND_GOPATH", "removed in v3 - GOPATH ordering is automatic"},
+		{"GOENV_APPEND_GOPATH", "removed in v3 - GOPATH ordering is automatic"},
+		{"GOENV_GOMODCACHE_DIR", "removed in v3 - module cache (GOMODCACHE) is shared by default"},
+		{"GOENV_DISABLE_GOMODCACHE", "removed in v3 - build cache (GOCACHE) is now isolated per version, see GOENV_DISABLE_GOCACHE"},
+	}
+
+	var foundVars []string
+	for _, envVar := range obsoleteVars {
+		if value := os.Getenv(envVar.name); value != "" {
+			foundVars = append(foundVars, fmt.Sprintf("%s=%q (%s)", envVar.name, value, envVar.description))
+		}
+	}
+
+	if len(foundVars) == 0 {
+		return checkResult{
+			id:      "obsolete-env-vars",
+			name:    "Obsolete environment variables",
+			status:  StatusOK,
+			message: "No obsolete environment variables detected",
+		}
+	}
+
+	// Found obsolete variables - warn the user
+	message := fmt.Sprintf("Found %d obsolete environment variable(s)", len(foundVars))
+	advice := fmt.Sprintf("These environment variables are no longer used in goenv v3:\n   %s\n   Please remove them from your shell configuration.\n   See docs/user-guide/MIGRATION_GUIDE.md for details.",
+		strings.Join(foundVars, "\n   "))
+
+	return checkResult{
+		id:      "obsolete-env-vars",
+		name:    "Obsolete environment variables",
+		status:  StatusWarning,
 		message: message,
 		advice:  advice,
 	}
@@ -1684,26 +1732,26 @@ func fixCacheClean(cmd *cobra.Command, cfg *config.Config) error {
 	// Clean build caches using the cache manager
 	// This handles both old-format and new architecture-specific caches
 	cacheMgr := cache.NewManager(cfg)
-	
+
 	result, err := cacheMgr.Clean(cache.CleanOptions{
 		Kind:    cache.CacheKindBuild,
 		DryRun:  false,
 		Verbose: false,
 	})
-	
+
 	if err != nil {
 		return errors.FailedTo("clean build caches", err)
 	}
-	
+
 	if result.CachesRemoved > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "  Cleaned %d cache(s), freed %s\n", 
+		fmt.Fprintf(cmd.OutOrStdout(), "  Cleaned %d cache(s), freed %s\n",
 			result.CachesRemoved, cache.FormatBytes(result.BytesReclaimed))
 	}
-	
+
 	if len(result.Errors) > 0 {
 		return fmt.Errorf("cleaned caches but encountered %d error(s)", len(result.Errors))
 	}
-	
+
 	return nil
 }
 
@@ -2108,6 +2156,95 @@ func checkPath(cfg *config.Config) checkResult {
 		name:    "PATH configuration",
 		status:  StatusOK,
 		message: "goenv bin and shims directories are in PATH",
+	}
+}
+
+func checkUnnecessaryPathEntries(cfg *config.Config) checkResult {
+	pathEnv := os.Getenv(utils.EnvVarPath)
+	pathDirs := filepath.SplitList(pathEnv)
+
+	goenvBin := filepath.Join(cfg.Root, "bin")
+	goenvBinInPath := false
+
+	for _, dir := range pathDirs {
+		if dir == goenvBin {
+			goenvBinInPath = true
+			break
+		}
+	}
+
+	// Only check if GOENV_ROOT/bin is in PATH
+	if !goenvBinInPath {
+		return checkResult{
+			id:      "path-homebrew-config",
+			name:    "PATH configuration (installation method)",
+			status:  StatusOK,
+			message: "PATH configuration is appropriate",
+		}
+	}
+
+	// Detect if goenv is installed via Homebrew
+	goenvPath, err := exec.LookPath("goenv")
+	if err != nil {
+		// Can't determine installation method
+		return checkResult{
+			id:      "path-homebrew-config",
+			name:    "PATH configuration (installation method)",
+			status:  StatusOK,
+			message: "PATH configuration is appropriate",
+		}
+	}
+
+	// Resolve symlinks to get actual installation path
+	resolvedPath := goenvPath
+	if resolved, err := filepath.EvalSymlinks(goenvPath); err == nil {
+		resolvedPath = resolved
+	}
+
+	isHomebrew := strings.Contains(resolvedPath, "homebrew") ||
+		strings.Contains(resolvedPath, "Cellar") ||
+		strings.Contains(resolvedPath, "Homebrew")
+
+	if !isHomebrew {
+		// Manual installation - GOENV_ROOT/bin in PATH is correct
+		return checkResult{
+			id:      "path-homebrew-config",
+			name:    "PATH configuration (installation method)",
+			status:  StatusOK,
+			message: "PATH configuration is appropriate for manual installation",
+		}
+	}
+
+	// Homebrew installation with GOENV_ROOT/bin in PATH - this is unnecessary
+	// Check if the bin directory is empty or contains stale files
+	binEntries, err := os.ReadDir(goenvBin)
+	hasFiles := err == nil && len(binEntries) > 0
+
+	advice := fmt.Sprintf(
+		"Remove 'export PATH=\"$GOENV_ROOT/bin:$PATH\"' from your shell profile.\n"+
+			"For Homebrew installations, only 'eval \"$(goenv init -)\"' is needed.\n"+
+			"The manual PATH entry can cause issues if stale binaries exist in %s.",
+		goenvBin,
+	)
+
+	if hasFiles {
+		// Directory has files - higher risk
+		return checkResult{
+			id:      "path-homebrew-config",
+			name:    "PATH configuration (installation method)",
+			status:  StatusWarning,
+			message: fmt.Sprintf("Unnecessary PATH entry for Homebrew installation (%s has %d file(s))", goenvBin, len(binEntries)),
+			advice:  advice + fmt.Sprintf("\n\nNote: %s contains files that may interfere with Homebrew's goenv.", goenvBin),
+		}
+	}
+
+	// Directory is empty - lower risk but still unnecessary
+	return checkResult{
+		id:      "path-homebrew-config",
+		name:    "PATH configuration (installation method)",
+		status:  StatusWarning,
+		message: fmt.Sprintf("Unnecessary PATH entry for Homebrew installation (but %s is empty)", goenvBin),
+		advice:  advice,
 	}
 }
 
@@ -2926,7 +3063,7 @@ func checkOldModCaches(cfg *config.Config, mgr *manager.Manager) checkResult {
 	// Check for old per-version module caches from v2
 	// v3 uses a shared module cache at $GOENV_ROOT/shared/go-mod
 	// Old per-version caches at $VERSION/pkg/mod are no longer used
-	
+
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil || len(versions) == 0 {
 		return checkResult{
@@ -2939,7 +3076,7 @@ func checkOldModCaches(cfg *config.Config, mgr *manager.Manager) checkResult {
 
 	oldCaches := make([]string, 0)
 	totalSize := int64(0)
-	
+
 	for _, version := range versions {
 		oldModPath := filepath.Join(cfg.VersionsDir(), version, "pkg", "mod")
 		if utils.DirExists(oldModPath) {

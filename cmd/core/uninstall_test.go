@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
@@ -91,16 +92,10 @@ func TestUninstallCommand(t *testing.T) {
 				t.Setenv(utils.GoenvEnvVarVersion.String(), tt.currentVersion)
 			}
 
-			// Setup versions
+			// Setup versions using proper mock creation
 			for _, version := range tt.setupVersions {
-				versionPath := filepath.Join(tmpDir, "versions", version)
-
-				err = utils.EnsureDirWithContext(versionPath, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
-
-				// Create a marker file to verify existence
-				markerFile := filepath.Join(versionPath, ".installed")
-				testutil.WriteTestFile(t, markerFile, []byte("installed"), utils.PermFileDefault)
+				// Use testutil helper which creates proper bin/go executable
+				cmdtest.CreateMockGoVersion(t, tmpDir, version)
 			}
 
 			// Create command
@@ -251,4 +246,207 @@ func TestUninstallCompletion(t *testing.T) {
 
 	// Reset flags
 	uninstallFlags.complete = false
+}
+
+// TestFindAllMatchingVersions tests the version matching logic for multiple versions
+func TestFindAllMatchingVersions(t *testing.T) {
+	tests := []struct {
+		name              string
+		requestedVersion  string
+		installedVersions []string
+		expectedVersions  []string
+		expectError       bool
+	}{
+		{
+			name:              "exact match",
+			requestedVersion:  "1.21.13",
+			installedVersions: []string{"1.21.13", "1.21.5", "1.20.0"},
+			expectedVersions:  []string{"1.21.13"},
+			expectError:       false,
+		},
+		{
+			name:              "partial match single",
+			requestedVersion:  "1.20",
+			installedVersions: []string{"1.21.13", "1.20.0", "1.19.5"},
+			expectedVersions:  []string{"1.20.0"},
+			expectError:       false,
+		},
+		{
+			name:              "partial match multiple sorted descending",
+			requestedVersion:  "1.21",
+			installedVersions: []string{"1.21.13", "1.21.5", "1.21.0", "1.20.0"},
+			expectedVersions:  []string{"1.21.13", "1.21.5", "1.21.0"},
+			expectError:       false,
+		},
+		{
+			name:              "no match",
+			requestedVersion:  "1.19",
+			installedVersions: []string{"1.21.13", "1.20.0"},
+			expectedVersions:  nil,
+			expectError:       true,
+		},
+		{
+			name:              "empty installed versions",
+			requestedVersion:  "1.21",
+			installedVersions: []string{},
+			expectedVersions:  nil,
+			expectError:       true,
+		},
+		{
+			name:              "version with go prefix",
+			requestedVersion:  "go1.21",
+			installedVersions: []string{"1.21.13", "1.21.5"},
+			expectedVersions:  []string{"1.21.13", "1.21.5"},
+			expectError:       false,
+		},
+		{
+			name:              "prefix matching major.minor",
+			requestedVersion:  "1.22",
+			installedVersions: []string{"1.23.0", "1.22.8", "1.22.0", "1.21.13", "1.20.0"},
+			expectedVersions:  []string{"1.22.8", "1.22.0"},
+			expectError:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			versions, err := findAllMatchingVersions(tt.requestedVersion, tt.installedVersions)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, versions)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedVersions, versions)
+			}
+		})
+	}
+}
+
+// TestResolveInstalledVersion_MultipleVersions tests single version resolution with multiple matches
+func TestResolveInstalledVersion_MultipleVersions(t *testing.T) {
+	tests := []struct {
+		name              string
+		requestedVersion  string
+		installedVersions []string
+		expectedVersion   string
+		expectError       bool
+	}{
+		{
+			name:              "exact match",
+			requestedVersion:  "1.21.13",
+			installedVersions: []string{"1.21.13", "1.21.5"},
+			expectedVersion:   "1.21.13",
+			expectError:       false,
+		},
+		{
+			name:              "partial match returns highest",
+			requestedVersion:  "1.21",
+			installedVersions: []string{"1.21.13", "1.21.5", "1.21.0"},
+			expectedVersion:   "1.21.13",
+			expectError:       false,
+		},
+		{
+			name:              "no match error",
+			requestedVersion:  "1.19",
+			installedVersions: []string{"1.21.13", "1.20.0"},
+			expectedVersion:   "",
+			expectError:       true,
+		},
+		{
+			name:              "highest version among unsorted list",
+			requestedVersion:  "1.22",
+			installedVersions: []string{"1.22.0", "1.22.8", "1.22.2"},
+			expectedVersion:   "1.22.8",
+			expectError:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			version, err := resolveInstalledVersion(tt.requestedVersion, tt.installedVersions)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedVersion, version)
+			}
+		})
+	}
+}
+
+// TestUninstallCommand_AllFlag tests the --all flag is properly registered
+func TestUninstallCommand_AllFlag(t *testing.T) {
+	// Reset and reinitialize flags
+	uninstallCmd.ResetFlags()
+	uninstallCmd.Flags().BoolVar(&uninstallFlags.complete, "complete", false, "Internal flag for shell completions")
+	uninstallCmd.Flags().BoolVar(&uninstallFlags.all, "all", false, "Uninstall all versions matching the given prefix")
+
+	// Verify --all flag is registered
+	allFlag := uninstallCmd.Flags().Lookup("all")
+	require.NotNil(t, allFlag, "--all flag should be registered")
+	assert.Equal(t, "bool", allFlag.Value.Type())
+	assert.Equal(t, "false", allFlag.DefValue)
+	assert.False(t, allFlag.Hidden, "--all flag should be visible in help")
+
+	// Verify flag description
+	assert.Contains(t, allFlag.Usage, "all versions", "Flag usage should describe multi-version behavior")
+}
+
+// TestUninstallCommand_VersionSorting tests that versions are properly sorted
+func TestUninstallCommand_VersionSorting(t *testing.T) {
+	installedVersions := []string{
+		"1.21.0", "1.21.13", "1.21.5", "1.21.12", "1.21.1",
+	}
+
+	versions, err := findAllMatchingVersions("1.21", installedVersions)
+	require.NoError(t, err)
+
+	// Should be in descending order (highest first)
+	expected := []string{"1.21.13", "1.21.12", "1.21.5", "1.21.1", "1.21.0"}
+	assert.Equal(t, expected, versions)
+}
+
+// TestUninstallCommand_PrefixMatching tests prefix matching edge cases
+func TestUninstallCommand_PrefixMatching(t *testing.T) {
+	installedVersions := []string{
+		"1.2.0",   // Should NOT match "1.21"
+		"1.21.0",  // Should match "1.21"
+		"1.21.5",  // Should match "1.21"
+		"1.210.0", // Should NOT match "1.21" (must have dot after prefix)
+	}
+
+	versions, err := findAllMatchingVersions("1.21", installedVersions)
+	require.NoError(t, err)
+	assert.Len(t, versions, 2, "Should find exactly 2 matching versions")
+	assert.Contains(t, versions, "1.21.5")
+	assert.Contains(t, versions, "1.21.0")
+	assert.NotContains(t, versions, "1.2.0", "1.2.0 should not match 1.21")
+	assert.NotContains(t, versions, "1.210.0", "1.210.0 should not match 1.21")
+}
+
+// TestUninstallCommand_HelpTextIncludesAllFlag tests that help text documents --all flag
+func TestUninstallCommand_HelpTextIncludesAllFlag(t *testing.T) {
+	// Reset command flags
+	uninstallCmd.ResetFlags()
+	uninstallCmd.Flags().BoolVar(&uninstallFlags.complete, "complete", false, "Internal flag for shell completions")
+	uninstallCmd.Flags().BoolVar(&uninstallFlags.all, "all", false, "Uninstall all versions matching the given prefix")
+	_ = uninstallCmd.Flags().MarkHidden("complete")
+
+	var output bytes.Buffer
+	uninstallCmd.SetOut(&output)
+	uninstallCmd.SetErr(&output)
+
+	// Get the help text directly using UsageString()
+	helpText := uninstallCmd.UsageString()
+
+	// Verify --all flag is documented
+	assert.Contains(t, helpText, "--all", "Help text should include --all flag")
+	assert.Contains(t, helpText, "Uninstall all versions",
+		"Help text should explain --all flag behavior")
+
+	// Verify --complete flag is NOT shown (it's hidden)
+	assert.NotContains(t, helpText, "--complete",
+		"Help text should not show hidden --complete flag")
 }

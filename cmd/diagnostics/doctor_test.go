@@ -1270,3 +1270,115 @@ func TestDetermineProfilePath(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckObsoleteEnvVars(t *testing.T) {
+	tests := []struct {
+		name           string
+		envVars        map[string]string
+		expectStatus   Status
+		expectMessage  string
+		expectInAdvice []string
+	}{
+		{
+			name:          "no obsolete env vars",
+			envVars:       map[string]string{},
+			expectStatus:  StatusOK,
+			expectMessage: "No obsolete environment variables detected",
+		},
+		{
+			name: "GOENV_PREPEND_GOPATH set",
+			envVars: map[string]string{
+				"GOENV_PREPEND_GOPATH": "1",
+			},
+			expectStatus:  StatusWarning,
+			expectMessage: "Found 1 obsolete environment variable(s)",
+			expectInAdvice: []string{
+				"GOENV_PREPEND_GOPATH",
+				"removed in v3",
+				"MIGRATION_GUIDE.md",
+			},
+		},
+		{
+			name: "GOENV_APPEND_GOPATH set",
+			envVars: map[string]string{
+				"GOENV_APPEND_GOPATH": "1",
+			},
+			expectStatus:  StatusWarning,
+			expectMessage: "Found 1 obsolete environment variable(s)",
+			expectInAdvice: []string{
+				"GOENV_APPEND_GOPATH",
+				"removed in v3",
+				"MIGRATION_GUIDE.md",
+			},
+		},
+		{
+			name: "GOENV_GOMODCACHE_DIR set",
+			envVars: map[string]string{
+				"GOENV_GOMODCACHE_DIR": "/custom/cache",
+			},
+			expectStatus:  StatusWarning,
+			expectMessage: "Found 1 obsolete environment variable(s)",
+			expectInAdvice: []string{
+				"GOENV_GOMODCACHE_DIR",
+				"removed in v3",
+				"MIGRATION_GUIDE.md",
+			},
+		},
+		{
+			name: "GOENV_DISABLE_GOMODCACHE set",
+			envVars: map[string]string{
+				"GOENV_DISABLE_GOMODCACHE": "1",
+			},
+			expectStatus:  StatusWarning,
+			expectMessage: "Found 1 obsolete environment variable(s)",
+			expectInAdvice: []string{
+				"GOENV_DISABLE_GOMODCACHE",
+				"removed in v3",
+				"MIGRATION_GUIDE.md",
+			},
+		},
+		{
+			name: "multiple obsolete env vars",
+			envVars: map[string]string{
+				"GOENV_PREPEND_GOPATH":     "1",
+				"GOENV_APPEND_GOPATH":      "1",
+				"GOENV_GOMODCACHE_DIR":     "/custom/cache",
+				"GOENV_DISABLE_GOMODCACHE": "1",
+			},
+			expectStatus:  StatusWarning,
+			expectMessage: "Found 4 obsolete environment variable(s)",
+			expectInAdvice: []string{
+				"GOENV_PREPEND_GOPATH",
+				"GOENV_APPEND_GOPATH",
+				"GOENV_GOMODCACHE_DIR",
+				"GOENV_DISABLE_GOMODCACHE",
+				"removed in v3",
+				"MIGRATION_GUIDE.md",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set env vars
+			for key, value := range tt.envVars {
+				t.Setenv(key, value)
+			}
+
+			// Run check
+			result := checkObsoleteEnvVars()
+
+			// Verify result
+			assert.Equal(t, "obsolete-env-vars", result.id)
+			assert.Equal(t, "Obsolete environment variables", result.name)
+			assert.Equal(t, tt.expectStatus, result.status)
+			assert.Contains(t, result.message, tt.expectMessage)
+
+			// Check advice content
+			for _, expected := range tt.expectInAdvice {
+				assert.Contains(t, result.advice, expected,
+					"Expected %q in advice: %s", expected, result.advice)
+			}
+		})
+	}
+}

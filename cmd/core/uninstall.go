@@ -30,11 +30,13 @@ var uninstallCmd = &cobra.Command{
 
 var uninstallFlags struct {
 	complete bool
+	all      bool
 }
 
 func init() {
 	cmdpkg.RootCmd.AddCommand(uninstallCmd)
 	uninstallCmd.Flags().BoolVar(&uninstallFlags.complete, "complete", false, "Internal flag for shell completions")
+	uninstallCmd.Flags().BoolVar(&uninstallFlags.all, "all", false, "Uninstall all versions matching the given prefix")
 	_ = uninstallCmd.Flags().MarkHidden("complete")
 }
 
@@ -58,41 +60,101 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	}
 
 	installer := install.NewInstaller(cfg)
+	requestedVersion := args[0]
 
-	goVersion := args[0]
-
-	if cfg.Debug {
-		fmt.Printf("Debug: Uninstalling Go version %s\n", goVersion)
-	}
-
-	// Interactive: Check if version is active and offer to switch
-	shouldProceed := checkActiveVersionAndOffer(cmd, cfg, mgr, goVersion)
-	if !shouldProceed {
-		return fmt.Errorf("uninstall cancelled")
-	}
-
-	// Interactive: Final safety confirmation
-	if !confirmUninstall(cmd, goVersion) {
-		fmt.Fprintf(cmd.OutOrStdout(), "Uninstall cancelled\n")
-		return nil
-	}
-
-	// Execute pre-uninstall hooks
-	cmdhooks.ExecuteHooks(hooks.PreUninstall, map[string]string{
-		"version": goVersion,
-	})
-
-	// Perform the actual uninstallation
-	err := installer.Uninstall(goVersion)
-
-	// Execute post-uninstall hooks (even if uninstall failed, for logging)
-	cmdhooks.ExecuteHooks(hooks.PostUninstall, map[string]string{
-		"version": goVersion,
-	})
-
+	// Get all installed versions
+	installedVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
-		return errors.FailedTo("uninstall Go", err)
+		return errors.FailedTo("list installed versions", err)
 	}
+
+	// Find all matching versions
+	matchingVersions, err := findAllMatchingVersions(requestedVersion, installedVersions)
+	if err != nil {
+		return err
+	}
+
+	// Determine which versions to uninstall
+	var versionsToUninstall []string
+
+	if uninstallFlags.all {
+		// --all flag: uninstall all matching versions
+		versionsToUninstall = matchingVersions
+	} else if len(matchingVersions) == 1 {
+		// Only one match: uninstall it
+		versionsToUninstall = matchingVersions
+		// Show resolution feedback if version was resolved
+		if matchingVersions[0] != requestedVersion {
+			fmt.Fprintf(cmd.OutOrStdout(), "%sResolved %s to %s\n",
+				utils.Emoji("🔍 "),
+				utils.Cyan(requestedVersion),
+				utils.Cyan(matchingVersions[0]))
+		}
+	} else {
+		// Multiple matches: prompt user (unless --yes is set)
+		ctx := cmdutil.NewInteractiveContext(cmd)
+		if ctx.AssumeYes || !ctx.IsInteractive() {
+			// Non-interactive or --yes: pick the latest (first in sorted list)
+			versionsToUninstall = []string{matchingVersions[0]}
+			fmt.Fprintf(cmd.OutOrStdout(), "%sResolved %s to %s (latest installed)\n",
+				utils.Emoji("🔍 "),
+				utils.Cyan(requestedVersion),
+				utils.Cyan(matchingVersions[0]))
+		} else {
+			// Interactive mode: show selection prompt
+			selected, err := promptVersionSelection(cmd, requestedVersion, matchingVersions)
+			if err != nil {
+				return err
+			}
+			versionsToUninstall = selected
+		}
+	}
+
+	// Uninstall each version
+	for _, goVersion := range versionsToUninstall {
+		if cfg.Debug {
+			fmt.Printf("Debug: Uninstalling Go version %s\n", goVersion)
+		}
+
+		// Interactive: Check if version is active and offer to switch
+		shouldProceed := checkActiveVersionAndOffer(cmd, cfg, mgr, goVersion)
+		if !shouldProceed {
+			fmt.Fprintf(cmd.OutOrStdout(), "Skipping uninstall of %s\n", goVersion)
+			continue
+		}
+
+		// Interactive: Final safety confirmation
+		if !confirmUninstall(cmd, goVersion) {
+			fmt.Fprintf(cmd.OutOrStdout(), "Skipped uninstall of %s\n", goVersion)
+			continue
+		}
+
+		// Execute pre-uninstall hooks
+		cmdhooks.ExecuteHooks(hooks.PreUninstall, map[string]string{
+			"version": goVersion,
+		})
+
+		// Perform the actual uninstallation
+		err = installer.Uninstall(goVersion)
+
+		// Execute post-uninstall hooks (even if uninstall failed, for logging)
+		cmdhooks.ExecuteHooks(hooks.PostUninstall, map[string]string{
+			"version": goVersion,
+		})
+
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStderr(), "Error uninstalling %s: %v\n", goVersion, err)
+			// Continue with other versions if multiple
+			if len(versionsToUninstall) == 1 {
+				return errors.FailedTo("uninstall Go", err)
+			}
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "%sUninstalled Go %s\n",
+				utils.Emoji("✓ "),
+				utils.Cyan(goVersion))
+		}
+	}
+
 	return nil
 }
 
@@ -189,6 +251,43 @@ func confirmUninstall(cmd *cobra.Command, version string) bool {
 	return ctx.Confirm(question, false)
 }
 
+// promptVersionSelection prompts the user to select which versions to uninstall
+// when multiple versions match the requested prefix
+func promptVersionSelection(cmd *cobra.Command, requestedVersion string, matchingVersions []string) ([]string, error) {
+	ctx := cmdutil.NewInteractiveContext(cmd)
+
+	// Build options list with descriptive labels
+	options := make([]string, len(matchingVersions)+1)
+	for i, version := range matchingVersions {
+		if i == 0 {
+			options[i] = fmt.Sprintf("%s (latest)", version)
+		} else {
+			options[i] = version
+		}
+	}
+	options[len(matchingVersions)] = "All of the above"
+
+	// Prompt for selection (ctx.Select displays the list automatically)
+	question := fmt.Sprintf("Found %d installed versions matching %s. Which would you like to uninstall?",
+		len(matchingVersions),
+		utils.Cyan(requestedVersion))
+
+	selection := ctx.Select(question, options)
+
+	if selection == 0 {
+		// User cancelled
+		return nil, fmt.Errorf("uninstall cancelled")
+	}
+
+	if selection == len(options) {
+		// User selected "All of the above"
+		return matchingVersions, nil
+	}
+
+	// User selected a specific version
+	return []string{matchingVersions[selection-1]}, nil
+}
+
 // isVersionActive checks if a version is currently active
 func isVersionActive(cfg *config.Config, version string) (bool, string) {
 	// Check GOENV_VERSION environment variable
@@ -231,4 +330,57 @@ func readLocalVersion(dir string) string {
 		return filepath.Base(string(data))
 	}
 	return ""
+}
+
+// resolveInstalledVersion resolves a partial version (e.g., "1.21") to a full installed version (e.g., "1.21.13")
+// Similar to resolvePartialVersion in install.go but works with installed versions instead of available versions
+// findAllMatchingVersions finds all installed versions matching the requested version prefix
+// Returns them sorted in descending order (highest first)
+func findAllMatchingVersions(requestedVersion string, installedVersions []string) ([]string, error) {
+	normalized := utils.NormalizeGoVersion(requestedVersion)
+
+	// First try exact match
+	for _, installed := range installedVersions {
+		if utils.MatchesVersion(installed, normalized) {
+			return []string{utils.NormalizeGoVersion(installed)}, nil
+		}
+	}
+
+	// If no exact match, try prefix match to find all matches
+	var candidates []string
+	for _, installed := range installedVersions {
+		installedNormalized := utils.NormalizeGoVersion(installed)
+		if installedNormalized == normalized ||
+			(len(installedNormalized) > len(normalized) &&
+				installedNormalized[:len(normalized)] == normalized &&
+				installedNormalized[len(normalized)] == '.') {
+			candidates = append(candidates, installedNormalized)
+		}
+	}
+
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("version %s is not installed", requestedVersion)
+	}
+
+	// Sort candidates in descending order (highest first)
+	for i := 0; i < len(candidates)-1; i++ {
+		for j := i + 1; j < len(candidates); j++ {
+			if utils.CompareGoVersions(candidates[j], candidates[i]) > 0 {
+				candidates[i], candidates[j] = candidates[j], candidates[i]
+			}
+		}
+	}
+
+	return candidates, nil
+}
+
+func resolveInstalledVersion(requestedVersion string, installedVersions []string) (string, error) {
+	// Find all matching versions
+	candidates, err := findAllMatchingVersions(requestedVersion, installedVersions)
+	if err != nil {
+		return "", err
+	}
+
+	// Return the highest version (first in the sorted list)
+	return candidates[0], nil
 }

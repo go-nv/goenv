@@ -60,13 +60,6 @@ func TestCompareCommand_InstalledVersions(t *testing.T) {
 	assert.Contains(t, output, "Installed", "Expected 'Installed' in output %v", output)
 }
 
-func TestCompareCommand_InvalidArgs(t *testing.T) {
-	// Skip: When no versions are installed, root command shows beginner-friendly help
-	// instead of argument validation errors. This is intentional UX behavior.
-	// Argument validation is still enforced when versions exist.
-	t.Skip("Argument validation testing requires installed versions - tested in integration tests")
-}
-
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
 		name        string

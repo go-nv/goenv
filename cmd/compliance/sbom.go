@@ -22,8 +22,15 @@ var sbomCmd = &cobra.Command{
 	GroupID: string(cmdpkg.GroupTools),
 	Long: `Generate SBOMs using industry-standard tools (cyclonedx-gomod, syft) with goenv-managed toolchains.
 
-This command is a thin wrapper that ensures SBOM generation uses the correct Go version
-and is reproducible in CI environments.
+CURRENT STATE (v3.0): This is a convenience wrapper that runs SBOM tools with the 
+correct Go version and environment. It does NOT generate SBOMs itself or add features
+beyond what the underlying tools provide.
+
+ROADMAP: Future versions will add validation, policy enforcement, signing, vulnerability
+scanning, and compliance reporting. See docs/roadmap/SBOM_ROADMAP.md for details.
+
+ALTERNATIVE: Advanced users can run SBOM tools directly:
+  goenv exec cyclonedx-gomod -json -output sbom.json
 
 Examples:
   # Generate CycloneDX SBOM for current project
@@ -45,10 +52,18 @@ var sbomProjectCmd = &cobra.Command{
 	Short: "Generate SBOM for a Go project",
 	Long: `Generate a Software Bill of Materials for a Go project using cyclonedx-gomod or syft.
 
-This wrapper ensures:
-- Reproducible builds with pinned Go and tool versions
-- Correct cache isolation per Go version
-- CI-friendly exit codes and output
+WHAT THIS DOES:
+- Runs SBOM tools with the correct Go version and environment
+- Provides unified CLI across different SBOM tools
+- Ensures reproducibility in CI/CD pipelines
+
+WHAT THIS DOES NOT DO (yet):
+- Validate SBOM format or completeness (planned: v3.1)
+- Sign or attest SBOMs (planned: v3.2)
+- Scan for vulnerabilities (planned: v3.5)
+- Enforce policies (planned: v3.1)
+
+See docs/roadmap/SBOM_ROADMAP.md for planned features.
 
 Supported tools:
 - cyclonedx-gomod: Native Go module SBOM generator (CycloneDX format)

@@ -21,10 +21,9 @@ import (
 
 func TestCacheStatusCommand(t *testing.T) {
 	var err error
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
+	if os.Getenv("INTEGRATION") == "" {
+		t.Skip("Integration test - requires complex mocking")
 	}
-	t.Skip("Integration test - requires complex mocking")
 	// Create temporary GOENV_ROOT
 	tmpDir := t.TempDir()
 
@@ -189,30 +188,6 @@ func TestCacheCleanFlags(t *testing.T) {
 	// Test that -n shorthand exists for dry-run
 	flag := cacheCleanCmd.Flags().ShorthandLookup("n")
 	assert.NotNil(t, flag, "-n shorthand for --dry-run not registered")
-}
-
-func TestCacheCleanBuildOnly(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-	t.Skip("Integration test - requires mock version setup")
-	// Would test cleaning only build caches
-}
-
-func TestCacheCleanModOnly(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-	t.Skip("Integration test - requires mock version setup")
-	// Would test cleaning only module caches
-}
-
-func TestCacheCleanAll(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-	t.Skip("Integration test - requires mock version setup")
-	// Would test cleaning both build and module caches
 }
 
 func TestCacheCleanDryRun(t *testing.T) {

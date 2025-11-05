@@ -79,10 +79,16 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv completions`](#goenv-completions)
   - [`goenv tools`](#goenv-tools)
   - [`goenv tools default`](#goenv-tools-default)
+  - [`goenv tools install`](#goenv-tools-install)
+  - [`goenv tools uninstall`](#goenv-tools-uninstall)
+  - [`goenv tools list`](#goenv-tools-list)
+  - [`goenv tools outdated`](#goenv-tools-outdated)
+  - [`goenv tools status`](#goenv-tools-status)
   - [`goenv doctor`](#goenv-doctor)
     - [Quick Usage](#quick-usage)
     - [Exit Codes (for CI/automation)](#exit-codes-for-ciautomation)
     - [Flags](#flags)
+    - [Interactive Fix Mode](#interactive-fix-mode)
     - [Example Output](#example-output)
     - [Comprehensive Checks](#comprehensive-checks)
     - [Comprehensive Checks](#comprehensive-checks-1)
@@ -103,6 +109,7 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv install`](#goenv-install)
     - [Options](#options)
     - [Using a Custom Mirror](#using-a-custom-mirror)
+    - [Security: Checksum Verification](#security-checksum-verification)
     - [Auto-Rehash](#auto-rehash)
   - [`goenv installed`](#goenv-installed)
   - [`goenv inventory`](#goenv-inventory)
@@ -115,9 +122,15 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv rehash`](#goenv-rehash)
   - [`goenv root`](#goenv-root)
   - [`goenv sbom`](#goenv-sbom)
+    - [⚠️ Current State (v3.0)](#️-current-state-v30)
     - [Prerequisites](#prerequisites)
     - [Usage: `goenv sbom project`](#usage-goenv-sbom-project)
-    - [Secured CI/CD Usage](#secured-cicd-usage)
+    - [🔒 Secured CI/CD Example (Recommended)](#-secured-cicd-example-recommended)
+    - [Alternative: Direct Tool Execution](#alternative-direct-tool-execution)
+    - [CycloneDX vs SPDX Format](#cyclonedx-vs-spdx-format)
+    - [Advanced: Container Image Scanning (Syft)](#advanced-container-image-scanning-syft)
+    - [Troubleshooting](#troubleshooting)
+    - [🔐 Security Best Practices](#-security-best-practices)
   - [`goenv shell`](#goenv-shell)
   - [`goenv shims`](#goenv-shims)
   - [`goenv unalias`](#goenv-unalias)
@@ -138,10 +151,10 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
       - [Permission denied (binary installations)](#permission-denied-binary-installations)
       - [Uncommitted changes (git-based installations)](#uncommitted-changes-git-based-installations)
     - [Examples](#examples)
-    - [Troubleshooting](#troubleshooting)
+    - [Troubleshooting](#troubleshooting-1)
   - [`goenv tools update`](#goenv-tools-update)
-    - [Options](#options-3)
   - [`goenv vscode`](#goenv-vscode)
+    - [`goenv vscode setup`](#goenv-vscode-setup)
     - [`goenv vscode init`](#goenv-vscode-init)
   - [`goenv version`](#goenv-version)
   - [`goenv --version`](#goenv---version)
@@ -151,7 +164,7 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv version-name`](#goenv-version-name)
   - [`goenv version-origin`](#goenv-version-origin)
   - [`goenv versions`](#goenv-versions)
-    - [Options](#options-4)
+    - [Options](#options-3)
   - [`goenv whence`](#goenv-whence)
   - [`goenv which`](#goenv-which)
   - [Version Discovery \& Precedence](#version-discovery--precedence)
@@ -163,8 +176,15 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
       - [For Go Module Projects](#for-go-module-projects)
       - [For Scripts/Non-Module Projects](#for-scriptsnon-module-projects)
       - [For CI/CD](#for-cicd)
-    - [Troubleshooting](#troubleshooting-1)
+    - [Troubleshooting](#troubleshooting-2)
   - [🔄 Legacy Commands (Backward Compatibility)](#-legacy-commands-backward-compatibility)
+    - [Command Migration Guide](#command-migration-guide)
+    - [Why Use Modern Commands?](#why-use-modern-commands)
+    - [Examples](#examples-2)
+    - [Backward Compatibility Promise](#backward-compatibility-promise)
+    - [Deprecation Timeline](#deprecation-timeline)
+    - [Recommendation for New Projects](#recommendation-for-new-projects)
+    - [Legacy Command Documentation](#legacy-command-documentation)
 
 ## `goenv get-started`
 
@@ -225,16 +245,19 @@ The command detects your shell and provides tailored setup instructions:
 **What It Covers:**
 
 1. **Shell Initialization**
+
    - How to add goenv to your shell
    - Shell-specific configuration files
    - Temporary vs permanent setup
 
 2. **Installing Go Versions**
+
    - How to install latest version
    - How to install specific versions
    - How to list available versions
 
 3. **Setting Default Version**
+
    - Using `goenv global` to set default
    - Understanding version selection
 
@@ -299,6 +322,7 @@ Helpful Commands:
 **Aliases:**
 
 The command has several aliases for convenience:
+
 - `goenv getting-started`
 - `goenv quickstart`
 - `goenv first-run`
@@ -514,6 +538,7 @@ RUN goenv cache clean all --force
 ```
 
 **Why `GOENV_ASSUME_YES` is better for CI/CD:**
+
 - More explicit about intent (auto-confirming vs forcing)
 - Works globally for all goenv prompts
 - Self-documenting in CI/CD config files
@@ -886,11 +911,13 @@ Tip: Use 'goenv <command> --help' for detailed information
 **Available Categories:**
 
 1. **getting-started** - Setup and first-time use
+
    - `get-started` - Interactive beginner's guide
    - `setup` - Automatic configuration wizard
    - `doctor` - Installation diagnostics
 
 2. **versions** - Install, switch, and manage Go versions
+
    - `install` - Download and install versions
    - `uninstall` - Remove installed versions
    - `list` - Show installed versions
@@ -902,19 +929,23 @@ Tip: Use 'goenv <command> --help' for detailed information
    - `compare` - Compare two versions
 
 3. **tools** - Manage Go tools and binaries
+
    - `tools install` - Install tools
    - `tools list` - List installed tools
    - `tools update` - Update tools
 
 4. **shell** - Configure your shell environment
+
    - `init` - Initialize shell integration
    - `rehash` - Rebuild shims
 
 5. **diagnostics** - Troubleshoot and verify installation
+
    - `doctor` - Comprehensive diagnostics
    - `status` - Quick health check
 
 6. **integrations** - IDE and CI/CD setup
+
    - `vscode init` - Configure VS Code
    - `ci-setup` - Set up for CI/CD
 
@@ -1522,6 +1553,7 @@ goenv doctor --fix
 ```
 
 **Supported fixes:**
+
 - Add missing shell initialization
 - Fix PATH configuration
 - Remove duplicate goenv installations
@@ -1728,21 +1760,25 @@ Run 'goenv doctor' for detailed diagnostics
 **What it Shows:**
 
 1. **Initialization Status**
+
    - Whether goenv is properly initialized in your shell
    - Current shell type (bash, zsh, fish, etc.)
    - goenv root directory
 
 2. **Current Version**
+
    - Active Go version
    - Whether it's installed (✓) or missing (✗)
    - Source file that set the version
 
 3. **Installed Versions**
+
    - Count of installed Go versions
    - List of up to 5 most recent versions
    - Arrow (→) indicates current version
 
 4. **Shims Status**
+
    - Number of available shims
    - Reminder to run `goenv rehash` if needed
 
@@ -2384,17 +2420,20 @@ Automatic first-time configuration wizard that detects your shell, adds goenv in
 **What It Does:**
 
 1. **Shell Detection**
+
    - Automatically detects your shell (bash, zsh, fish, PowerShell, cmd)
    - Finds the appropriate profile file (`.bashrc`, `.zshrc`, `config.fish`, etc.)
    - Shows you what will be added before making changes
 
 2. **Shell Profile Setup**
+
    - Creates backup of your profile file
    - Adds goenv initialization code
    - Checks if already configured to avoid duplicates
    - Safe to run multiple times
 
 3. **VS Code Integration** (optional)
+
    - Detects if VS Code is being used (looks for `.vscode/` directory)
    - Configures VS Code settings to use goenv
    - Sets up `go.goroot`, `go.gopath`, and `go.toolsGopath`
@@ -2435,16 +2474,19 @@ Automatic first-time configuration wizard that detects your shell, adds goenv in
 The command automatically handles shell-specific syntax:
 
 - **bash/zsh**: Adds to `~/.bashrc` or `~/.zshrc`
+
   ```bash
   eval "$(goenv init -)"
   ```
 
 - **fish**: Adds to `~/.config/fish/config.fish`
+
   ```fish
   status --is-interactive; and goenv init - | source
   ```
 
 - **PowerShell**: Adds to `$PROFILE`
+
   ```powershell
   & goenv init - | Invoke-Expression
   ```
@@ -2504,9 +2546,67 @@ If setup doesn't work as expected:
 
 Install a Go version (using `go-build`). It's required that the version is a known installable definition by `go-build`. Alternatively, supply `latest` as an argument to install the latest version available to goenv.
 
+**Smart Version Detection:** When no version is specified, `goenv install` automatically detects the desired version:
+
+1. Checks for `.go-version` in current directory or parent directories
+2. Checks for `go.mod` and uses the `go` directive version
+3. Falls back to installing the latest stable version
+
 ```shell
+# Auto-detect from .go-version or go.mod (recommended)
+> cd my-project
+> cat .go-version
+1.23.0
+> goenv install
+📍 Detected version 1.23.0 from .go-version
+Installing Go 1.23.0...
+
+# Explicit version (overrides project files)
 > goenv install 1.11.1
+
+# Install latest stable (in directory without version files)
+> cd /tmp/empty-dir
+> goenv install
+ℹ️  No version file found, installing latest stable: 1.25.3
+Installing Go 1.25.3...
 ```
+
+**Benefits:**
+
+- 🎯 No need to specify version twice (once in `.go-version`, again in command)
+- ✅ Matches industry standards (nvm, rbenv, pyenv)
+- 🚀 Works seamlessly in CI/CD and development
+- 🔄 Explicit versions always override auto-detection
+
+**Partial Version Resolution:** When you specify a partial version (e.g., `1.21`), goenv automatically resolves it to the latest matching patch version:
+
+```shell
+# Install latest 1.21.x patch
+> goenv install 1.21
+🔍 Resolved 1.21 to 1.21.13 (latest patch)
+Installing Go 1.21.13...
+✓ Installed Go 1.21.13
+
+# Works with auto-detection too
+> echo "go 1.22" > go.mod
+> goenv install
+📍 Detected version 1.22 from go.mod
+🔍 Resolved 1.22 to 1.22.9 (latest patch)
+Installing Go 1.22.9...
+✓ Installed Go 1.22.9
+
+# Exact versions work as always
+> goenv install 1.21.5
+Installing Go 1.21.5...
+✓ Installed Go 1.21.5
+```
+
+**How resolution works:**
+
+- `1.21` → resolves to latest `1.21.x` (e.g., `1.21.13`)
+- `1.22` → resolves to latest `1.22.x` (e.g., `1.22.9`)
+- `1.21.5` → exact match, installs `1.21.5`
+- Version not found → shows helpful error with available versions
 
 ### Options
 
@@ -3027,7 +3127,25 @@ Display the root directory where versions and shims are kept
 
 Generate Software Bill of Materials (SBOM) for Go projects using industry-standard tools.
 
-**Note:** This is a thin wrapper that runs mature SBOM tools (cyclonedx-gomod, syft) with goenv-managed toolchains for reproducible CI builds.
+### ⚠️ Current State (v3.0)
+
+**What this is:** A convenience wrapper that runs SBOM tools (cyclonedx-gomod, syft) with the correct Go version and environment.
+
+**What this is NOT:** A full SBOM management solution. It does not validate, sign, or analyze SBOMs—it only generates them using the underlying tools.
+
+**Roadmap:** Future versions will add validation, policy enforcement, signing, vulnerability scanning, and compliance reporting. See [SBOM Roadmap](../roadmap/SBOM_ROADMAP.md) for details.
+
+**Alternative approach:** Advanced users can run SBOM tools directly:
+
+```shell
+# Instead of the wrapper:
+goenv sbom project --tool=cyclonedx-gomod --format=cyclonedx-json
+
+# You can run directly:
+goenv exec cyclonedx-gomod -json -output sbom.json
+```
+
+Both approaches produce identical results. The wrapper provides convenience and cross-tool consistency.
 
 ### Prerequisites
 
@@ -3082,12 +3200,22 @@ Generate an SBOM for a Go project:
 | `cyclonedx-gomod` | Go modules (fast, lightweight)     | ❌ No         | ✅ Yes       | `cyclonedx-json`, `cyclonedx-xml`      |
 | `syft`            | Multi-language, containers, images | ✅ Yes        | ⚠️ Partial   | `spdx-json`, `cyclonedx-json`, `table` |
 
-**Benefits:**
+**Current Benefits (v3.0):**
 
 - ✅ **Reproducible SBOMs** - Pinned Go and tool versions ensure consistent output
-- ✅ **Correct cache isolation** - Each Go version has isolated module/build caches
-- ✅ **CI-friendly output** - Provenance to stderr, SBOM to stdout/file
-- ✅ **Exit code preservation** - Pipeline integration with proper error handling
+- ✅ **Fast generation** - Shared module cache across Go versions
+- ✅ **Cross-platform** - Same command works on Linux, macOS, Windows
+- ✅ **CI-friendly** - Provenance to stderr, SBOM to stdout/file
+
+**Future Benefits (Roadmap):**
+
+- 🔜 **Validation** - Enforce SBOM completeness and policy compliance (v3.1)
+- 🔜 **Signing** - Cryptographic attestation for supply chain security (v3.2)
+- 🔜 **Automation** - Hooks integration for zero-touch SBOM generation (v3.3)
+- 🔜 **Analysis** - Diff SBOMs to detect dependency drift (v3.4)
+- 🔜 **Security** - Integrated vulnerability scanning workflows (v3.5)
+
+See [SBOM Roadmap](../roadmap/SBOM_ROADMAP.md) for timeline and details.
 
 ### 🔒 Secured CI/CD Example (Recommended)
 
@@ -3217,6 +3345,41 @@ generate-sbom:
 3. **Auditability** - Fixed versions allow audit trail verification
 4. **Supply chain security** - Pinned tools reduce attack surface
 5. **Compliance-ready** - Meets SLSA, SSDF, and SBOM requirements
+
+### Alternative: Direct Tool Execution
+
+For advanced users or when you need full access to tool-specific features, you can run SBOM tools directly with `goenv exec`:
+
+```bash
+# CycloneDX with all native flags
+goenv exec cyclonedx-gomod \
+  -json \
+  -output sbom.cdx.json \
+  -licenses \
+  -std \
+  -verbose
+
+# Syft with advanced filtering
+goenv exec syft . \
+  -o cyclonedx-json=sbom.json \
+  --exclude '/test/**' \
+  --catalogers go-module-file-cataloger \
+  --platform linux/amd64
+```
+
+**When to use direct execution:**
+
+- ✅ You need tool-specific flags not exposed by the wrapper
+- ✅ You're comfortable with the underlying tool's CLI
+- ✅ You want to chain tools with pipes or custom scripts
+- ✅ You're debugging SBOM generation issues
+
+**When to use the wrapper:**
+
+- ✅ You want a standardized, cross-tool interface
+- ✅ You're onboarding new team members
+- ✅ You need CI templates that "just work"
+- ✅ You want future features (validation, signing, etc.) when available
 
 ### CycloneDX vs SPDX Format
 
@@ -3459,49 +3622,125 @@ This command removes the specified alias from the `~/.goenv/aliases` file. The t
 
 ## `goenv uninstall`
 
-Uninstalls the specified version if it exists, otherwise - error.
+Uninstalls the specified Go version(s). Supports partial version matching and multi-version operations.
 
 **Usage:**
 
 ```shell
-# Interactive mode (prompts for confirmation)
-> goenv uninstall 1.6.3
-Remove Go 1.6.3? [y/N]: y
-Uninstalling Go 1.6.3...
-✓ Go 1.6.3 uninstalled
+# Interactive mode - uninstall specific version
+> goenv uninstall 1.21.13
+Really uninstall Go 1.21.13? This cannot be undone [y/N]: y
+Uninstalling Go 1.21.13...
+✓ Uninstalled Go 1.21.13
 
-# Non-interactive mode (requires --force)
-> goenv uninstall 1.6.3 --force
-Uninstalling Go 1.6.3...
-✓ Go 1.6.3 uninstalled
+# Partial version - automatically resolves to latest installed
+> goenv uninstall 1.21
+🔍 Resolved 1.21 to 1.21.13
+Really uninstall Go 1.21.13? This cannot be undone [y/N]: y
+✓ Uninstalled Go 1.21.13
+
+# Multiple matches - shows interactive menu
+> goenv uninstall 1.22
+Found 3 installed versions matching 1.22. Which would you like to uninstall?
+  1) 1.22.8 (latest)
+  2) 1.22.2
+  3) 1.22.0
+  4) All of the above
+
+Enter selection: 1
+Really uninstall Go 1.22.8? This cannot be undone [y/N]: y
+✓ Uninstalled Go 1.22.8
+
+# Uninstall all matching versions
+> goenv uninstall 1.21 --all
+✓ Uninstalled Go 1.21.13
+✓ Uninstalled Go 1.21.5
+✓ Uninstalled Go 1.21.0
+
+# Non-interactive mode (picks latest automatically)
+> goenv uninstall 1.21 --yes
+🔍 Resolved 1.21 to 1.21.13 (latest installed)
+✓ Uninstalled Go 1.21.13
 ```
 
 **Options:**
 
-- `--force, -f` - Skip confirmation prompt (required for non-interactive environments)
+- `--all` - Uninstall all versions matching the given prefix (e.g., all 1.21.x versions)
+- `--yes, -y` - Auto-confirm all prompts (non-interactive mode, picks latest if multiple matches)
+- `--debug, -d` - Enable debug output
+- `--quiet, -q` - Suppress progress output (only show errors)
 
-**Non-Interactive Environments:**
+**Smart Version Resolution:**
 
-When running in CI/CD, scripts, or automated workflows, use `--force` to bypass the confirmation prompt:
+When you specify a partial version (e.g., `1.21`), goenv intelligently resolves it:
+
+- **Single match**: Uninstalls that version directly
+- **Multiple matches (interactive mode)**: Shows a menu to choose which version(s) to uninstall
+- **Multiple matches (non-interactive mode)**: Uninstalls the latest matching version
+- **Multiple matches with `--all`**: Uninstalls all matching versions
+
+**Interactive Selection:**
+
+When multiple versions match your request in interactive mode, you get a numbered menu:
+
+```shell
+> goenv uninstall 1.22
+Found 3 installed versions matching 1.22. Which would you like to uninstall?
+  1) 1.22.8 (latest)
+  2) 1.22.2
+  3) 1.22.0
+  4) All of the above
+
+Enter selection [1-4, default=1]: _
+```
+
+Choose a number to uninstall that specific version, or select "All of the above" to uninstall all matching versions.
+
+**Non-Interactive Environments (CI/CD):**
+
+For scripts and automation, use `--yes` to bypass prompts:
 
 ```bash
-# CI/CD pipeline
-goenv uninstall 1.23.0 --force
+# CI/CD pipeline - uninstall specific version
+goenv uninstall 1.23.0 --yes
 
-# Automated cleanup script
+# Uninstall latest matching version
+goenv uninstall 1.21 --yes
+# Resolves to latest 1.21.x and uninstalls without prompting
+
+# Uninstall all matching versions
+goenv uninstall 1.20 --all --yes
+# Uninstalls all 1.20.x versions without prompting
+
+# Automated cleanup script - remove all old versions
 for version in $(goenv list --bare | grep -v "$(goenv current --bare)"); do
-  goenv uninstall "$version" --force
+  goenv uninstall "$version" --yes
 done
 
 # Docker multi-stage build cleanup
-RUN goenv uninstall 1.22.0 --force
+RUN goenv uninstall 1.22.0 --yes
 ```
 
-Without `--force`, the command will fail in non-interactive mode:
+**Examples:**
 
-```
-Error: cannot prompt for confirmation in non-interactive mode
-Use --force to bypass confirmation: goenv uninstall <version> --force
+```bash
+# Clean up all 1.21.x versions at once
+goenv uninstall 1.21 --all
+
+# Remove a specific version
+goenv uninstall 1.22.5
+
+# Interactive selection from multiple versions
+goenv uninstall 1.22
+# Shows menu if you have 1.22.0, 1.22.2, 1.22.8 installed
+
+# Non-interactive: remove latest 1.21.x
+goenv uninstall 1.21 --yes
+# Automatically picks 1.21.13 if that's the latest installed
+
+# Batch removal in scripts
+goenv uninstall 1.20 --all --yes
+# Removes all 1.20.x versions without any prompts
 ```
 
 ## `goenv update`
@@ -4180,6 +4419,7 @@ GOENV_NONINTERACTIVE=1 goenv vscode setup --force
 ```
 
 **See also:**
+
 - [VS Code Integration Guide](../user-guide/VSCODE_INTEGRATION.md) - Complete setup walkthrough
 - [`goenv vscode init`](#goenv-vscode-init) - Initialize only (without sync/doctor)
 - [`goenv vscode sync`](#goenv-vscode-sync) - Sync only (after version changes)
