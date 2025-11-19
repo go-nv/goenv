@@ -98,7 +98,7 @@ function Install-Binary {
             Copy-Item -Path "$completionsPath\*" -Destination $targetCompletions -Recurse -Force -ErrorAction SilentlyContinue
         }
         
-        Write-ColorOutput Green "✓ goenv installed successfully!"
+        Write-ColorOutput Green "goenv installed successfully!"
     }
     catch {
         Write-ColorOutput Red "Installation failed: $_"
@@ -117,25 +117,22 @@ function Show-Instructions {
     $profilePath = $PROFILE
     
     Write-Output ""
-    Write-ColorOutput Green "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    Write-ColorOutput Green "=============================================="
     Write-ColorOutput Green "Installation complete!"
-    Write-ColorOutput Green "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    Write-ColorOutput Green "=============================================="
     Write-Output ""
     Write-ColorOutput Yellow "Add the following to your PowerShell profile:"
     Write-Output "  $profilePath"
     Write-Output ""
-    Write-Output '  $env:GOENV_ROOT = "$HOME\.goenv"'
-    Write-Output '  $env:PATH = "$env:GOENV_ROOT\bin;$env:PATH"'
-    Write-Output '  & goenv init - | Invoke-Expression'
+    Write-Output "  `$env:GOENV_ROOT = \"`$HOME\.goenv\""
+    Write-Output "  `$env:PATH = \"`$env:GOENV_ROOT\bin;`$env:PATH\""
+    Write-Output "  & goenv init - | Invoke-Expression"
     Write-Output ""
-    Write-ColorOutput Yellow "Quick setup command:"
-    Write-Output @'
-  @"
-`$env:GOENV_ROOT = "`$HOME\.goenv"
-`$env:PATH = "`$env:GOENV_ROOT\bin;`$env:PATH"
-& goenv init - | Invoke-Expression
-"@ | Add-Content $PROFILE
-'@
+    Write-ColorOutput Yellow "Quick setup command (copy and paste):"
+    Write-Output ""
+    Write-Output "  `$env:GOENV_ROOT = \"`$HOME\.goenv\""
+    Write-Output "  `$env:PATH = \"`$env:GOENV_ROOT\bin;`$env:PATH\""
+    Write-Output "  & goenv init - | Invoke-Expression"
     Write-Output ""
     Write-ColorOutput Yellow "Then reload your profile:"
     Write-Output "  . `$PROFILE"
@@ -148,7 +145,7 @@ function Show-Instructions {
     Write-ColorOutput Yellow "Enable tab completion (optional):"
     Write-Output "  goenv completion --install"
     Write-Output ""
-    Write-ColorOutput Green "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    Write-ColorOutput Green "=============================================="
 }
 
 # Main installation flow

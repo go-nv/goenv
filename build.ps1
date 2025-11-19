@@ -30,13 +30,13 @@ param(
 )
 
 # Build arguments for the Go build tool
-$args = @()
-$args += "-task=$Task"
+$go_args = @()
+$go_args += "-task=$Task"
 
 if ($Prefix -ne "") {
-    $args += "-prefix=$Prefix"
+    $go_args += "-prefix=$Prefix"
 }
 
 # Delegate to the unified Go-based build tool
-& go run scripts/build-tool/main.go @args
+& go run scripts/build-tool/main.go @go_args
 exit $LASTEXITCODE
