@@ -49,7 +49,7 @@ OUT
   run goenv-rehash
   assert_success ""
 
-  run /bin/ls "${GOENV_ROOT}/shims"
+  run ls "${GOENV_ROOT}/shims"
   assert_success_out <<OUT
 go
 godoc
@@ -161,7 +161,7 @@ OUT
   run goenv-rehash
   assert_success ""
 
-  run /bin/ls "${GOENV_ROOT}/shims"
+  run ls "${GOENV_ROOT}/shims"
   assert_success "go"
 
   run type go
