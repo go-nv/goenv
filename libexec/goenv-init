@@ -189,3 +189,47 @@ if [ -z "$no_rehash" ]; then
   goenv rehash --only-manage-paths
 EOS
 fi
+
+# Add automatic version detection on directory change (opt-in via GOENV_AUTOMATICALLY_DETECT_VERSION)
+if [ -n "${GOENV_AUTOMATICALLY_DETECT_VERSION}" ] && [ "${GOENV_AUTOMATICALLY_DETECT_VERSION}" != "0" ]; then
+  case "$shell" in
+  fish)
+    cat <<'EOS'
+function __goenv_auto_detect_version --on-variable PWD
+  if test -n "$GOENV_AUTOMATICALLY_DETECT_VERSION"; and test "$GOENV_AUTOMATICALLY_DETECT_VERSION" != "0"
+    goenv rehash --only-manage-paths > /dev/null 2>&1
+  end
+end
+EOS
+    ;;
+  zsh)
+    cat <<'EOS'
+__goenv_auto_detect_version() {
+  if [ -n "${GOENV_AUTOMATICALLY_DETECT_VERSION}" ] && [ "${GOENV_AUTOMATICALLY_DETECT_VERSION}" != "0" ]; then
+    eval "$(goenv rehash --only-manage-paths)"
+  fi
+}
+if [[ ! "${chpwd_functions[*]}" =~ "__goenv_auto_detect_version" ]]; then
+  chpwd_functions+=(__goenv_auto_detect_version)
+fi
+EOS
+    ;;
+  *)
+    # bash, ksh, and other POSIX shells use PROMPT_COMMAND
+    cat <<'EOS'
+__goenv_auto_detect_version() {
+  if [ -n "${GOENV_AUTOMATICALLY_DETECT_VERSION}" ] && [ "${GOENV_AUTOMATICALLY_DETECT_VERSION}" != "0" ]; then
+    eval "$(goenv rehash --only-manage-paths)"
+  fi
+}
+if [[ ! "${PROMPT_COMMAND}" =~ "__goenv_auto_detect_version" ]]; then
+  if [ -n "${PROMPT_COMMAND}" ]; then
+    PROMPT_COMMAND="${PROMPT_COMMAND};__goenv_auto_detect_version"
+  else
+    PROMPT_COMMAND="__goenv_auto_detect_version"
+  fi
+fi
+EOS
+    ;;
+  esac
+fi
