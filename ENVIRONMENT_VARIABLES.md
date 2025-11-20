@@ -19,3 +19,4 @@ name | default | description
 `GOENV_AUTO_INSTALL_FLAGS` | | (Note: only works if `GOENV_AUTO_INSTALL` is set to 1) Appends flags to the auto install command (see `goenv install --help` for all available flags)
 `GOENV_RC_FILE` | `$HOME/.goenvrc` | If `GOENV_RC_FILE` is set, it will be modified accordingly.
 `GOENV_PATH_ORDER` | | If `GOENV_PATH_ORDER` is set to `front`, `$GOENV_ROOT/shims` will be prepended to the existing `PATH`.Set `GOENV_PATH_ORDER` to a configuration file named by `GOENV_RC_FILE`(e.g. `~/.goenvrc`), for example `GOENV_PATH_ORDER=front` in `~/.goenvrc`.
+`GOENV_AUTOMATICALLY_DETECT_VERSION` | `0` | If set to `1`, goenv will automatically update `GOROOT` and `GOPATH` when you change directories. This enables automatic version switching based on local `.go-version` files without needing to reload your shell configuration. **Note:** This feature adds a hook that runs on every directory change, which may have a slight performance impact.
