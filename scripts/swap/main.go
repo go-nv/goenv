@@ -410,8 +410,12 @@ Options:
 	fmt.Println()
 	success("Switch successful!")
 	warn("IMPORTANT: Reload your shell before testing:")
-	fmt.Println("  hash -r")
-	fmt.Println("  # OR restart your terminal")
+	if runtime.GOOS != "windows" {
+		fmt.Println("  hash -r")
+		fmt.Println("  # OR restart your terminal")
+	} else {
+		fmt.Println("  Restart your terminal or PowerShell session")
+	}
 	fmt.Println()
 	warn("To test: goenv --version")
 	warn("If it hangs, swap back with: ./swap bash")
@@ -547,7 +551,11 @@ func cmdBash() {
 	}
 
 	success("Switch successful!")
-	warn("Reload your shell: hash -r (or restart terminal)")
+	if runtime.GOOS != "windows" {
+		warn("Reload your shell: hash -r (or restart terminal)")
+	} else {
+		warn("Reload your shell: restart terminal or PowerShell session")
+	}
 }
 
 func printUsage() {

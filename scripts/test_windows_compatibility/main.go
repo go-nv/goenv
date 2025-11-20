@@ -460,8 +460,8 @@ func testUnixCommands() {
 			}
 
 			// Track if file has shell-specific branching (fish/powershell/cmd/else)
-			if strings.Contains(line, "shell ==") &&
-				(strings.Contains(line, "powershell") || strings.Contains(line, "cmd") || strings.Contains(line, "fish")) {
+			if (strings.Contains(line, "shell ==") || strings.Contains(line, "shellType ==")) &&
+				(strings.Contains(line, "powershell") || strings.Contains(line, "PowerShell") || strings.Contains(line, "cmd") || strings.Contains(line, "Cmd") || strings.Contains(line, "fish") || strings.Contains(line, "Fish")) {
 				hasShellBranching = true
 			}
 
@@ -533,6 +533,7 @@ func testShellRedirection() {
 		scanner := bufio.NewScanner(file)
 		lineNum := 0
 		hasShellCheck := false
+		inUnixShellLoop := false
 		for scanner.Scan() {
 			lineNum++
 			line := scanner.Text()
@@ -542,9 +543,16 @@ func testShellRedirection() {
 				hasShellCheck = true
 			}
 
+			// Track if in a loop over Unix shells (bash/zsh)
+			if strings.Contains(line, `[]string{"bash"`) || strings.Contains(line, `[]string{"zsh"`) ||
+				(strings.Contains(line, "bash") && strings.Contains(line, "zsh") && strings.Contains(line, "[]string")) {
+				inUnixShellLoop = true
+			}
+
 			if regexp.MustCompile(`2>/dev/null|>/dev/null`).MatchString(line) &&
 				!strings.Contains(line, "//") &&
-				!hasShellCheck {
+				!hasShellCheck &&
+				!inUnixShellLoop {
 				issues = append(issues, fmt.Sprintf("%s:%d", path, lineNum))
 			}
 		}
