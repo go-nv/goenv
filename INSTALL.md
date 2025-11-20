@@ -62,6 +62,22 @@ export GOENV_ROOT="$HOME/.goenv"
 export PATH="$GOENV_ROOT/bin:$PATH"
 eval "$(goenv init -)"
 ```
+
+7. **(Optional) Enable automatic version detection on directory change.**
+   By default, when you `cd` into a directory with a `.go-version` file, the shims will use the correct Go version,
+   but environment variables like `GOROOT` and `GOPATH` won't update until you reload your shell.
+   
+   To enable automatic updating of `GOROOT` and `GOPATH` when changing directories, set the following environment variable:
+   
+   ```shell
+   export GOENV_AUTOMATICALLY_DETECT_VERSION=1
+   ```
+   
+   Add this line **before** the `eval "$(goenv init -)"` line in your shell configuration file.
+   
+   **Note:** This feature adds a hook that runs on every directory change (or before each prompt in bash/ksh),
+   which may have a slight performance impact. If you don't need `GOROOT` and `GOPATH` to update automatically,
+   you can leave this disabled and rely on the shims, which always work correctly.
    
 ## via ZPlug plugin manager for Zsh
 
