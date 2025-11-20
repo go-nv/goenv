@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -e
 export -n CDPATH
-export LC_ALL=C # boost grep performance by disabling unicode
+
+# Save original LC_ALL to restore later
+GOENV_ORIGINAL_LC_ALL="${LC_ALL:-}"
+
+# Temporarily set LC_ALL=C to boost grep performance by disabling unicode
+export LC_ALL=C
 
 if [ "$1" = "--debug" ]; then
   export GOENV_DEBUG=1
@@ -22,6 +27,15 @@ abort() {
     fi
   } >&2
   exit 1
+}
+
+# Restore original LC_ALL before executing commands
+restore_lc_all() {
+  if [ -n "$GOENV_ORIGINAL_LC_ALL" ]; then
+    export LC_ALL="$GOENV_ORIGINAL_LC_ALL"
+  else
+    unset LC_ALL
+  fi
 }
 
 if enable -f "${BASH_SOURCE%/*}"/../libexec/goenv-realpath.dylib realpath 2>/dev/null; then
@@ -121,13 +135,16 @@ case "$command" in
   } | abort
   ;;
 -v | --version)
+  restore_lc_all
   exec goenv---version
   ;;
 -h | --help)
+  restore_lc_all
   exec goenv-help
   ;;
 # NOTE: Provide goenv completions
 --complete)
+  restore_lc_all
   exec goenv-commands
   ;;
 *)
@@ -149,8 +166,10 @@ case "$command" in
   fi
 
   if [ "$1" = --help ]; then
+    restore_lc_all
     exec goenv-help "$command"
   else
+    restore_lc_all
     exec "$command_path" "$@"
   fi
   ;;

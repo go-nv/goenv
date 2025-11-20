@@ -350,3 +350,36 @@ $GOENV_ROOT/versions/1.12.0
 /tmp/goenv/example/1.12.0
 OUT
 }
+
+@test "preserves LC_ALL environment variable when executing commands" {
+  create_version "1.12.0"
+  create_executable "1.12.0" "go-lc" <<SH
+#!$BASH
+echo "LC_ALL=\$LC_ALL"
+SH
+
+  LC_ALL=en_US.UTF-8 GOENV_VERSION=1.12.0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-lc
+
+  assert_success_out <<OUT
+LC_ALL=en_US.UTF-8
+OUT
+}
+
+@test "LC_ALL remains unset if it was not set before" {
+  create_version "1.12.0"
+  create_executable "1.12.0" "go-lc" <<SH
+#!$BASH
+if [ -z "\$LC_ALL" ]; then
+  echo "LC_ALL is unset"
+else
+  echo "LC_ALL=\$LC_ALL"
+fi
+SH
+
+  unset LC_ALL
+  GOENV_VERSION=1.12.0 PATH=${GOENV_TEST_DIR}:${PATH} run goenv-exec go-lc
+
+  assert_success_out <<OUT
+LC_ALL is unset
+OUT
+}
