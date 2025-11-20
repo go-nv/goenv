@@ -36,7 +36,7 @@ version_exists() {
       version_regex="${version_regex}(\\.[0-9]+)?"
     fi
 
-    local versions=($(/bin/ls ${GOENV_ROOT}/versions | grep -E "^$version_regex$" | sort -V))
+    local versions=($(ls ${GOENV_ROOT}/versions | grep -E "^$version_regex$" | sort -V))
     IFS="$OLDIFS"
     if [[ ${#versions[@]} -eq 0 ]]; then
       return 1

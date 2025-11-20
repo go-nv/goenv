@@ -22,7 +22,7 @@ load test_helper
   PREFIX="${PWD}/usr" run "${BATS_TEST_DIRNAME}/../install.sh"
   assert_success ""
 
-  run $BASH -c '/bin/ls -l usr/share/go-build | tail -2 | cut -c1-10'
+  run $BASH -c 'ls -l usr/share/go-build | tail -2 | cut -c1-10'
   assert_success_out <<OUT
 -rw-r--r--
 -rw-r--r--
@@ -56,6 +56,6 @@ OUT
   assert [ -e bin/bananas ]
   assert [ -e share/bananas/docs ]
 
-  run /bin/ls -ld bin
+  run ls -ld bin
   assert_equal "r-x" "${output:4:3}"
 }
