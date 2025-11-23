@@ -1,0 +1,116 @@
+# GoReleaser configuration for goenv
+# Documentation: https://goreleaser.com
+
+version: 2
+
+# Build configuration
+builds:
+  - id: goenv
+    main: .
+    binary: goenv
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.buildTime={{.Date}}
+    goos:
+      - linux
+      - darwin
+      - windows
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "6"
+      - "7"
+    ignore:
+      # Windows on ARM is not commonly used for development
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+      # FreeBSD ARM support is limited
+      - goos: freebsd
+        goarch: arm
+      - goos: freebsd
+        goarch: arm64
+
+# Archive configuration
+archives:
+  - id: goenv
+    name_template: "goenv_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+      - completions/*
+      - docs/**/*
+
+# Checksum configuration
+checksum:
+  name_template: "goenv_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# Snapshot configuration (for non-tagged builds)
+snapshot:
+  name_template: "{{ incpatch .Version }}-dev"
+
+# Changelog configuration
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - typo
+  groups:
+    - title: "Features"
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: "Bug Fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: "Enhancements"
+      regexp: "^.*enhance[(\\w)]*:+.*$"
+      order: 2
+    - title: "Others"
+      order: 999
+
+# Release configuration
+release:
+  github:
+    owner: go-nv
+    name: goenv
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## goenv {{ .Tag }}
+
+    **Installation:**
+    
+    ### Quick Binary Install (No Go Required!)
+    
+    ```bash
+    # Linux/macOS
+    curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
+    
+    # Or download directly:
+    # Linux (x64):   goenv_{{ .Version }}_linux_amd64.tar.gz
+    # Linux (ARM64): goenv_{{ .Version }}_linux_arm64.tar.gz
+    # macOS (Intel): goenv_{{ .Version }}_darwin_amd64.tar.gz
+    # macOS (M1/M2): goenv_{{ .Version }}_darwin_arm64.tar.gz
+    # Windows (x64): goenv_{{ .Version }}_windows_amd64.zip
+    ```
+    
+    ### What's Changed
+  footer: |
+    **Full Changelog**: https://github.com/go-nv/goenv/compare/{{ .PreviousTag }}...{{ .Tag }}

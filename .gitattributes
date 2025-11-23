@@ -2,10 +2,43 @@
 # https://github.com/github-linguist/linguist/blob/master/docs/overrides.md
 # Reclassify files as Shell for proper statistics (instead of "Roff")
 libexec/* linguist-language=Shell
-plugins/go-build/bin/* linguist-language=Shell
-plugins/go-build/share/go-build/* linguist-language=Shell
-plugins/go-build/test/fixtures/definitions/* linguist-language=Shell
-plugins/go-build/test/stubs/* linguist-language=Shell
 src/shobj-conf/* linguist-language=Shell
 test/libexec/* linguist-language=Shell
+
+# Line ending normalization for cross-platform compatibility
+# Ensure consistent line endings across Windows, macOS, and Linux
+
+# Shell scripts always use LF (required for Unix shells)
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.fish text eol=lf
+
+# Windows batch and PowerShell files use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Go source files use LF
+*.go text eol=lf
+*.mod text eol=lf
+*.sum text eol=lf
+
+# Documentation and config files use LF
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+Makefile text eol=lf
+
+# Binary files
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.tar.gz binary
+*.zip binary
 

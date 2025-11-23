@@ -1,0 +1,7 @@
+{
+  "go.useLanguageServer": true,
+  "makefile.configureOnOpen": false,
+  "go.toolsGopath": "${env:HOME}/go/tools",
+  "go.goroot": "${env:HOME}/.goenv/versions/1.23.2",
+  "go.gopath": "${env:HOME}/go/1.23.2"
+}
