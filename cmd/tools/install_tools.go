@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/go-nv/goenv/cmd/shims"
 	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
@@ -47,6 +48,7 @@ Common tools:
   - github.com/golangci/golangci-lint/cmd/golangci-lint  (linting)
   - honnef.co/go/tools/cmd/staticcheck    (static analysis)
   - github.com/go-delve/delve/cmd/dlv     (debugger)
+  - gotest.tools/gotestsum                (test runner with nice output)
   - mvdan.cc/gofumpt                       (stricter gofmt)`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runInstall,
@@ -147,8 +149,15 @@ func runInstall(cmd *cobra.Command, args []string) error {
 				// Find the error
 				for i, failed := range result.Failed {
 					if failed == failedKey && i < len(result.Errors) {
+						errMsg := result.Errors[i].Error()
 						fmt.Fprintf(cmd.ErrOrStderr(), "  %s Failed to install %s: %v\n",
 							utils.Red("✗"), toolName, result.Errors[i])
+						
+						// Provide helpful hint for common errors
+						if strings.Contains(errMsg, "missing dot in first path element") {
+							fmt.Fprintf(cmd.ErrOrStderr(), "    %s Hint: Use the full package path, e.g., gotest.tools/gotestsum@latest\n",
+								utils.EmojiOr("💡 ", ""))
+						}
 						break
 					}
 				}
@@ -172,6 +181,17 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			utils.EmojiOr("⚠️  ", ""),
 			successCount, failureCount)
 		return fmt.Errorf("%d installation(s) failed", failureCount)
+	}
+
+	// Trigger rehash if tools were installed for current version
+	if successCount > 0 {
+		currentVersion, _, err := mgr.GetCurrentVersion()
+		if err == nil && slices.Contains(targetVersions, currentVersion) {
+			fmt.Fprintf(cmd.OutOrStdout(), "\n%sRehashing shims...\n", utils.Emoji("🔄 "))
+			if err := shims.RunRehash(cmd, []string{}); err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "Warning: Failed to rehash: %v\n", err)
+			}
+		}
 	}
 
 	if !installAllVersions && len(packages) == 1 {

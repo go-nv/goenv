@@ -90,7 +90,7 @@ func (m *Manager) Install(opts InstallOptions) (*InstallResult, error) {
 
 			if err := m.InstallSingleTool(version, pkg, opts.Verbose); err != nil {
 				result.Failed = append(result.Failed, fmt.Sprintf("%s@%s", toolName, version))
-				result.Errors = append(result.Errors, fmt.Errorf("%s@%s: %w", toolName, version, err))
+				result.Errors = append(result.Errors, fmt.Errorf("%s (using Go %s): %w", pkg, version, err))
 			} else {
 				result.Installed = append(result.Installed, fmt.Sprintf("%s@%s", toolName, version))
 			}
@@ -136,10 +136,18 @@ func (m *Manager) InstallSingleTool(version, packagePath string, verbose bool) e
 	if verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-	}
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("go install failed: %w", err)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("go install failed: %w", err)
+		}
+	} else {
+		// Capture stderr to provide helpful error messages
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			if len(output) > 0 {
+				return fmt.Errorf("%s", string(output))
+			}
+			return fmt.Errorf("go install failed: %w", err)
+		}
 	}
 
 	return nil
