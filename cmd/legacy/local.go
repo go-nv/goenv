@@ -239,9 +239,62 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Automatically initialize VS Code if --vscode flag is set
-	if localFlags.vscode {
-		fmt.Fprintln(cmd.OutOrStdout())
+	// Automatically initialize VS Code if --vscode flag is set OR auto-detect workspace
+	shouldConfigureVSCode := localFlags.vscode
+	
+	// Auto-detect VS Code workspace if flag not explicitly set
+	if !localFlags.vscode {
+		cwd, _ := os.Getwd()
+		vscodeSettingsPath := filepath.Join(cwd, ".vscode", "settings.json")
+		
+		// Check if VS Code workspace exists
+		if _, err := os.Stat(vscodeSettingsPath); err == nil {
+			// Check VS Code setting first, then env var
+			autoSync := false
+			
+			// Read the settings file to check for goenv.autoSync
+			if data, err := os.ReadFile(vscodeSettingsPath); err == nil {
+				// Simple JSON check - look for "goenv.autoSync": true
+				settingsStr := string(data)
+				if strings.Contains(settingsStr, `"goenv.autoSync"`) && 
+				   (strings.Contains(settingsStr, `"goenv.autoSync": true`) || 
+				    strings.Contains(settingsStr, `"goenv.autoSync":true`)) {
+					autoSync = true
+				}
+			}
+			
+			// Fall back to environment variable
+			if !autoSync {
+				envAutoSync := os.Getenv("GOENV_VSCODE_AUTO_SYNC")
+				if envAutoSync == "1" || envAutoSync == "true" {
+					autoSync = true
+				}
+			}
+			
+			if autoSync {
+				// Auto-sync enabled
+				shouldConfigureVSCode = true
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintf(cmd.OutOrStdout(), "%sAuto-updating VS Code workspace (goenv.autoSync: true)...\n", utils.Emoji("🔧 "))
+			} else {
+				// Prompt user
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintf(cmd.OutOrStdout(), "%sDetected VS Code workspace. Update settings for Go %s? [Y/n]: ", utils.Emoji("💡 "), resolvedVersion)
+				var response string
+				fmt.Fscanln(cmd.InOrStdin(), &response)
+				
+				// Default to Yes if user just presses Enter
+				if response == "" || response == "y" || response == "Y" || response == "yes" {
+					shouldConfigureVSCode = true
+				}
+			}
+		}
+	}
+	
+	if shouldConfigureVSCode {
+		if !localFlags.vscode {
+			fmt.Fprintln(cmd.OutOrStdout())
+		}
 		fmt.Fprintln(cmd.OutOrStdout(), "Initializing VS Code workspace...")
 
 		// Use absolute paths by default (better UX), unless user wants env vars

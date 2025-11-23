@@ -142,17 +142,20 @@ Provides actionable advice for fixing any issues found.`,
 	RunE: runVSCodeDoctor,
 }
 
+
+
 var vscodeSetupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "One-command VS Code setup (init + sync + doctor)",
-	Long: `Unified command for new users to set up VS Code integration.
+	Short: "Complete VS Code setup for goenv",
+	Long: `Comprehensive one-command setup for VS Code integration with goenv.
 
-This command combines three operations:
-  1. Initialize .vscode/settings.json (vscode init)
-  2. Sync with current Go version (vscode sync)
-  3. Validate configuration (vscode doctor)
+This command performs all necessary configuration:
+  1. Fixes user settings (prevents Go extension PATH injection)
+  2. Initializes workspace .vscode/settings.json
+  3. Syncs with current Go version
+  4. Validates configuration (doctor checks)
 
-Perfect for getting started quickly without running multiple commands.`,
+Perfect for both first-time setup and fixing integration issues.`,
 	Example: `  # Complete VS Code setup in one command
   goenv vscode setup
 
@@ -558,6 +561,7 @@ func generateSettings(template string) (VSCodeSettings, error) {
 			"go.goroot":      "${env:GOROOT}",
 			"go.gopath":      "${env:GOPATH}",
 			"go.toolsGopath": homeEnvVar + "/go/tools",
+			"goenv.autoSync": false, // Set to true to auto-update on version change
 		}, nil
 
 	case "advanced":
@@ -565,6 +569,7 @@ func generateSettings(template string) (VSCodeSettings, error) {
 			"go.goroot":                         "${env:GOROOT}",
 			"go.gopath":                         "${env:GOPATH}",
 			"go.toolsGopath":                    homeEnvVar + "/go/tools",
+			"goenv.autoSync":                    false, // Set to true to auto-update on version change
 			"go.toolsManagement.autoUpdate":     true,
 			"go.formatTool":                     "gofumpt",
 			"go.lintTool":                       "golangci-lint",
@@ -592,6 +597,7 @@ func generateSettings(template string) (VSCodeSettings, error) {
 			"go.goroot":                          "${env:GOROOT}",
 			"go.gopath":                          "${env:GOPATH}",
 			"go.toolsGopath":                     homeEnvVar + "/go/tools",
+			"goenv.autoSync":                     false, // Set to true to auto-update on version change
 			"go.inferGopath":                     false,
 			"go.formatTool":                      "gofumpt",
 			"go.testExplorer.enable":             true,
@@ -1181,13 +1187,87 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// fixVSCodeExtensionInteractive is used by doctor --fix to interactively fix Go extension settings
+func fixVSCodeExtensionInteractive(cmd *cobra.Command, args []string) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "%sChecking VS Code Go extension configuration...\n\n", utils.Emoji("🔍 "))
+
+	// Check current state
+	issue, err := vscode.CheckGoExtensionSettings()
+	if err != nil {
+		return errors.FailedTo("check Go extension settings", err)
+	}
+
+	if !issue.Found {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sNo Go extension settings found in user config.\n", utils.Emoji("ℹ️  "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Location: %s\n\n", issue.SettingsPath)
+		fmt.Fprintf(cmd.OutOrStdout(), "Creating goenv-compatible settings...\n")
+	} else if issue.HasPathInjection {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sDetected Go extension PATH injection:\n", utils.Emoji("⚠️  "))
+		fmt.Fprintf(cmd.OutOrStdout(), "  - go.goroot or go.gopath are set to specific paths\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "  - This may inject stale Go versions into terminal PATH\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "  - Bypasses goenv version management\n\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "Fixing configuration...\n")
+	} else if issue.HasAlternateTools && strings.Contains(issue.AlternateToolValue, "goenv") {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sGo extension is already configured to use goenv!\n", utils.Emoji("✅ "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Current setting: go.alternateTools.go = %q\n", issue.AlternateToolValue)
+		return nil
+	} else {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sUpdating Go extension settings for goenv compatibility...\n", utils.Emoji("🔧 "))
+	}
+
+	// Apply fix
+	if err := vscode.FixGoExtensionSettings(); err != nil {
+		return errors.FailedTo("fix Go extension settings", err)
+	}
+
+	settingsPath, _ := vscode.GetUserSettingsPath()
+	fmt.Fprintf(cmd.OutOrStdout(), "\n%sSuccess! Updated VS Code user settings:\n", utils.Emoji("✅ "))
+	fmt.Fprintf(cmd.OutOrStdout(), "  File: %s\n\n", settingsPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "Changes made:\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - go.goroot: \"\" (cleared to prevent PATH injection)\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - go.gopath: \"\" (cleared to prevent PATH injection)\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - go.toolsManagement.autoUpdate: false\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  - go.alternateTools.go: \"goenv exec go\"\n\n")
+
+	fmt.Fprintf(cmd.OutOrStdout(), "%sNext steps:\n", utils.Emoji("📋 "))
+	fmt.Fprintf(cmd.OutOrStdout(), "  1. Reload VS Code window: ⌘+Shift+P → 'Developer: Reload Window'\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  2. Open a NEW terminal (existing terminals won't be affected)\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  3. Verify: which go && go version\n\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "Expected result:\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  which go    → ~/.goenv/shims/go\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  go version  → Matches 'goenv current'\n")
+
+	return nil
+}
+
 // runVSCodeSetup runs unified setup (init + sync + doctor)
 func runVSCodeSetup(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "%sRunning unified VS Code setup...\n\n",
 		utils.Emoji("🚀 "))
 
-	// Step 1: Initialize
-	fmt.Fprintf(cmd.OutOrStdout(), "%sStep 1/3: Initializing VS Code workspace\n",
+	// Step 0: Check user settings (Go extension PATH injection)
+	// NOTE: We don't automatically fix this because UpdateJSONKeys strips comments
+	// Users should run 'goenv doctor --fix' to explicitly fix this issue
+	if !vscodeSetupFlags.dryRun {
+		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 1/4: Checking Go extension user settings\n",
+			utils.Emoji("🔍 "))
+		
+		issue, err := vscode.CheckGoExtensionSettings()
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  ℹ️  Could not check user settings (not critical)\n")
+		} else if issue.HasPathInjection {
+			fmt.Fprintf(cmd.OutOrStdout(), "  ⚠️  Go extension may inject stale paths into terminal PATH\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  💡 Run 'goenv doctor --fix' to fix this issue\n")
+		} else if !issue.Found {
+			fmt.Fprintf(cmd.OutOrStdout(), "  ℹ️  No Go extension user settings found (this is fine)\n")
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "  ✓ User settings look good\n")
+		}
+		fmt.Fprintln(cmd.OutOrStdout())
+	}
+
+	// Step 1: Initialize workspace
+	fmt.Fprintf(cmd.OutOrStdout(), "%sStep 2/4: Initializing VS Code workspace\n",
 		utils.Emoji("📝 "))
 
 	// Set init flags for this invocation
@@ -1195,7 +1275,9 @@ func runVSCodeSetup(cmd *cobra.Command, args []string) error {
 	originalTemplate := VSCodeInitFlags.Template
 	originalDryRun := VSCodeInitFlags.DryRun
 
-	VSCodeInitFlags.Force = true // Always overwrite in setup
+	// NEVER set Force = true - it destroys existing workspace settings!
+	// Init should merge settings, not replace them
+	VSCodeInitFlags.Force = false
 	VSCodeInitFlags.Template = vscodeSetupFlags.template
 	VSCodeInitFlags.DryRun = vscodeSetupFlags.dryRun
 
@@ -1211,9 +1293,9 @@ func runVSCodeSetup(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
 
-	// Step 2: Sync (only if not dry-run)
+	// Step 3: Sync (only if not dry-run)
 	if !vscodeSetupFlags.dryRun {
-		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 2/3: Syncing with current Go version\n",
+		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 3/4: Syncing with current Go version\n",
 			utils.Emoji("🔄 "))
 
 		// Set sync flags
@@ -1233,12 +1315,12 @@ func runVSCodeSetup(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintln(cmd.OutOrStdout())
 	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 2/3: Skipping sync (dry-run mode)\n\n",
+		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 3/4: Skipping sync (dry-run mode)\n\n",
 			utils.Emoji("⏭️  "))
 	}
 
-	// Step 3: Doctor
-	fmt.Fprintf(cmd.OutOrStdout(), "%sStep 3/3: Validating configuration\n",
+	// Step 4: Doctor
+	fmt.Fprintf(cmd.OutOrStdout(), "%sStep 4/4: Validating configuration\n",
 		utils.Emoji("🔍 "))
 
 	// Set doctor flags

@@ -143,10 +143,59 @@ func runUse(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Configure VS Code if requested
-	if useFlags.vscode {
-		if !useFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "\n%sConfiguring VS Code...\n", utils.Emoji("🔧 "))
+	// Configure VS Code if requested OR auto-detect workspace
+	shouldConfigureVSCode := useFlags.vscode
+	
+	// Auto-detect VS Code workspace if flag not explicitly set
+	if !useFlags.vscode && !useFlags.quiet {
+		cwd, _ := os.Getwd()
+		vscodeSettingsPath := filepath.Join(cwd, ".vscode", "settings.json")
+		
+		// Check if VS Code workspace exists
+		if _, err := os.Stat(vscodeSettingsPath); err == nil {
+			// Check VS Code setting first, then env var
+			autoSync := false
+			
+			// Read the settings file to check for goenv.autoSync
+			if data, err := os.ReadFile(vscodeSettingsPath); err == nil {
+				// Simple JSON check - look for "goenv.autoSync": true
+				settingsStr := string(data)
+				if strings.Contains(settingsStr, `"goenv.autoSync"`) && 
+				   (strings.Contains(settingsStr, `"goenv.autoSync": true`) || 
+				    strings.Contains(settingsStr, `"goenv.autoSync":true`)) {
+					autoSync = true
+				}
+			}
+			
+			// Fall back to environment variable
+			if !autoSync {
+				envAutoSync := os.Getenv("GOENV_VSCODE_AUTO_SYNC")
+				if envAutoSync == "1" || envAutoSync == "true" {
+					autoSync = true
+				}
+			}
+			
+			if autoSync {
+				// Auto-sync enabled
+				shouldConfigureVSCode = true
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%sAuto-updating VS Code workspace (goenv.autoSync: true)...\n", utils.Emoji("🔧 "))
+			} else {
+				// Prompt user
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%sDetected VS Code workspace. Update settings for Go %s? [Y/n]: ", utils.Emoji("💡 "), version)
+				var response string
+				fmt.Fscanln(cmd.InOrStdin(), &response)
+				
+				// Default to Yes if user just presses Enter
+				if response == "" || response == "y" || response == "Y" || response == "yes" {
+					shouldConfigureVSCode = true
+				}
+			}
+		}
+	}
+	
+	if shouldConfigureVSCode {
+		if !useFlags.quiet && !useFlags.vscode {
+			fmt.Fprintf(cmd.OutOrStdout(), "%sConfiguring VS Code...\n", utils.Emoji("🔧 "))
 		}
 
 		integrations.VSCodeInitFlags.EnvVars = useFlags.vscodeEnv

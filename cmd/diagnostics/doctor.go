@@ -116,6 +116,7 @@ const (
 	IssueTypeGoModMismatch       IssueType = "gomod-mismatch"
 	IssueTypeVSCodeMissing       IssueType = "vscode-missing"
 	IssueTypeVSCodeMismatch      IssueType = "vscode-mismatch"
+	IssueTypeVSCodeGoExtension   IssueType = "vscode-go-extension"
 	IssueTypeToolsMissing        IssueType = "tools-missing"
 	IssueTypeMultipleInstalls    IssueType = "multiple-installs"
 	IssueTypeShellNotConfigured  IssueType = "shell-not-configured"
@@ -237,6 +238,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 11: VS Code integration
 	results = append(results, checkVSCodeIntegration(cfg))
+
+	// Check 11b: VS Code Go extension PATH injection
+	results = append(results, checkVSCodeGoExtension())
 
 	// Check 12: go.mod version compatibility
 	results = append(results, checkGoModVersion(cfg))
@@ -1669,6 +1673,15 @@ func detectFixableIssues(results []checkResult, cfg *config.Config) []fixableIss
 				fixFunc:     fixVSCodeSync,
 			})
 
+		case IssueTypeVSCodeGoExtension:
+			issues = append(issues, fixableIssue{
+				id:          "vscode-go-extension",
+				name:        "Fix VS Code Go Extension",
+				description: "Go extension PATH injection may bypass goenv",
+				tier:        FixTierPrompt,
+				fixFunc:     fixVSCodeGoExtension,
+			})
+
 		case IssueTypeToolsMissing:
 			issues = append(issues, fixableIssue{
 				id:          "tool-sync",
@@ -1825,6 +1838,47 @@ func fixVSCodeInit(cmd *cobra.Command, cfg *config.Config) error {
 func fixVSCodeSync(cmd *cobra.Command, cfg *config.Config) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv vscode sync\n")
 	return errors.PleaseRunManually()
+}
+
+func fixVSCodeGoExtension(cmd *cobra.Command, cfg *config.Config) error {
+	settingsPath, _ := vscode.GetUserSettingsPath()
+	
+	// Show warning about what will happen
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintf(cmd.OutOrStdout(), "  ⚠️  WARNING: This will modify your VS Code user settings file.\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "     Location: %s\n", settingsPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "     \n")
+	fmt.Fprintf(cmd.OutOrStdout(), "     Changes:\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "     • Comments will be removed (backup: settings.json.backup)\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "     • Only Go-related keys will be modified\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "     • All other settings will be preserved\n")
+	fmt.Fprintln(cmd.OutOrStdout())
+	
+	// Check if in non-interactive mode
+	if doctorNonInteractive {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Running in non-interactive mode - proceeding with fix\n")
+	} else {
+		// Prompt for confirmation
+		fmt.Fprintf(cmd.OutOrStdout(), "  Continue? [y/N]: ")
+		var response string
+		fmt.Fscanln(cmd.InOrStdin(), &response)
+		
+		if response != "y" && response != "Y" && response != "yes" {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Cancelled by user\n")
+			return nil // Not an error, user chose not to proceed
+		}
+	}
+	
+	fmt.Fprintf(cmd.OutOrStdout(), "\n  Fixing VS Code Go extension settings...\n")
+	
+	if err := vscode.FixGoExtensionSettings(); err != nil {
+		return errors.FailedTo("fix Go extension settings", err)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "  ✅ Updated VS Code user settings: %s\n", settingsPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "  💾 Backup created: %s.backup\n", settingsPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "  ⚠️  Reload VS Code: ⌘+Shift+P → 'Developer: Reload Window'\n")
+	return nil
 }
 
 func fixToolSync(cmd *cobra.Command, cfg *config.Config) error {
@@ -2709,6 +2763,67 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 		status:  StatusWarning,
 		message: "VS Code has Go configuration but cannot determine version",
 		advice:  "Run 'goenv vscode init --force' to update settings, or 'goenv vscode doctor' for detailed diagnostics",
+	}
+}
+
+func checkVSCodeGoExtension() checkResult {
+	issue, err := vscode.CheckGoExtensionSettings()
+	if err != nil {
+		// Can't check - not critical
+		return checkResult{
+			id:      "vs-code-go-extension",
+			name:    "VS Code Go extension",
+			status:  StatusOK,
+			message: "Unable to check user settings",
+		}
+	}
+
+	if !issue.Found {
+		// No Go extension settings - this is fine
+		return checkResult{
+			id:      "vs-code-go-extension",
+			name:    "VS Code Go extension",
+			status:  StatusOK,
+			message: "No Go extension settings detected",
+		}
+	}
+
+	// Check for PATH injection issue
+	if issue.HasPathInjection {
+		return checkResult{
+			id:        "vs-code-go-extension",
+			name:      "VS Code Go extension",
+			status:    StatusWarning,
+			message:   "Go extension is configured with specific paths (go.goroot/go.gopath)",
+			advice:    "This may inject stale paths into terminal PATH, bypassing goenv. Run 'goenv vscode fix-extension' to configure the extension to use goenv",
+			issueType: IssueTypeVSCodeGoExtension,
+		}
+	}
+
+	// Check if alternate tools is configured correctly
+	if issue.HasAlternateTools {
+		if strings.Contains(issue.AlternateToolValue, "goenv") {
+			return checkResult{
+				id:      "vs-code-go-extension",
+				name:    "VS Code Go extension",
+				status:  StatusOK,
+				message: fmt.Sprintf("Go extension configured to use goenv (%s)", issue.AlternateToolValue),
+			}
+		}
+		return checkResult{
+			id:      "vs-code-go-extension",
+			name:    "VS Code Go extension",
+			status:  StatusWarning,
+			message: fmt.Sprintf("Go extension alternate tool is set but not using goenv (%s)", issue.AlternateToolValue),
+			advice:  "Run 'goenv vscode fix-extension' to configure the extension to use goenv",
+		}
+	}
+
+	return checkResult{
+		id:      "vs-code-go-extension",
+		name:    "VS Code Go extension",
+		status:  StatusOK,
+		message: "Go extension settings found (no obvious issues)",
 	}
 }
 

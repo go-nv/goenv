@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/errors"
@@ -537,6 +538,186 @@ func UpdateSettingsForVersion(workingDir string, goenvRoot string, version strin
 	// Update settings
 	if err := UpdateJSONKeys(settingsFile, keysToUpdate); err != nil {
 		return errors.FailedTo("update settings", err)
+	}
+
+	return nil
+}
+
+// GetUserSettingsPath returns the path to VS Code user settings.json
+// This varies by platform and is where global VS Code settings are stored
+func GetUserSettingsPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", errors.FailedTo("get home directory", err)
+	}
+
+	var settingsPath string
+	if utils.IsWindows() {
+		// Windows: %APPDATA%\Code\User\settings.json
+		appData := os.Getenv("APPDATA")
+		if appData == "" {
+			appData = filepath.Join(homeDir, "AppData", "Roaming")
+		}
+		settingsPath = filepath.Join(appData, "Code", "User", "settings.json")
+	} else if runtime.GOOS == "darwin" {
+		// macOS: ~/Library/Application Support/Code/User/settings.json
+		settingsPath = filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json")
+	} else {
+		// Linux: ~/.config/Code/User/settings.json
+		configDir := os.Getenv("XDG_CONFIG_HOME")
+		if configDir == "" {
+			configDir = filepath.Join(homeDir, ".config")
+		}
+		settingsPath = filepath.Join(configDir, "Code", "User", "settings.json")
+	}
+
+	return settingsPath, nil
+}
+
+// GoExtensionIssue represents a problem with Go extension configuration
+type GoExtensionIssue struct {
+	// Found indicates if the Go extension settings were detected
+	Found bool
+
+	// HasPathInjection indicates if go.goroot or go.gopath are set to specific paths
+	// This causes PATH injection that bypasses goenv
+	HasPathInjection bool
+
+	// HasAlternateTools indicates if go.alternateTools.go is configured
+	HasAlternateTools bool
+
+	// AlternateToolValue is the value of go.alternateTools.go (e.g., "goenv exec go")
+	AlternateToolValue string
+
+	// SettingsPath is the path to the user settings file
+	SettingsPath string
+}
+
+// CheckGoExtensionSettings checks if VS Code Go extension is properly configured
+// Returns information about potential PATH injection issues
+func CheckGoExtensionSettings() (GoExtensionIssue, error) {
+	issue := GoExtensionIssue{}
+
+	settingsPath, err := GetUserSettingsPath()
+	if err != nil {
+		return issue, err
+	}
+
+	issue.SettingsPath = settingsPath
+
+	// Check if settings file exists
+	if utils.FileNotExists(settingsPath) {
+		// No user settings - this is fine
+		return issue, nil
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		return issue, errors.FailedTo("read user settings", err)
+	}
+
+	// Strip comments and trailing commas (VS Code uses JSONC format)
+	data = jsonc.ToJSON(data)
+
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		// Invalid JSON - treat as if no settings exist
+		return issue, nil
+	}
+
+	// Check for Go extension settings
+	goroot, hasGoRoot := settings["go.goroot"]
+	gopath, hasGoPath := settings["go.gopath"]
+	alternateTools, hasAlternateTools := settings["go.alternateTools"]
+
+	if !hasGoRoot && !hasGoPath && !hasAlternateTools {
+		// No Go extension settings
+		return issue, nil
+	}
+
+	issue.Found = true
+
+	// Check if goroot/gopath are set to non-empty values (PATH injection)
+	if hasGoRoot {
+		if gorootStr, ok := goroot.(string); ok && gorootStr != "" {
+			issue.HasPathInjection = true
+		}
+	}
+	if hasGoPath {
+		if gopathStr, ok := gopath.(string); ok && gopathStr != "" {
+			issue.HasPathInjection = true
+		}
+	}
+
+	// Check alternate tools
+	if hasAlternateTools {
+		if toolsMap, ok := alternateTools.(map[string]any); ok {
+			if goTool, exists := toolsMap["go"]; exists {
+				issue.HasAlternateTools = true
+				if goToolStr, ok := goTool.(string); ok {
+					issue.AlternateToolValue = goToolStr
+				}
+			}
+		}
+	}
+
+	return issue, nil
+}
+
+// FixGoExtensionSettings configures VS Code Go extension to work with goenv
+// This prevents the extension from injecting stale Go paths into terminal PATH
+func FixGoExtensionSettings() error {
+	settingsPath, err := GetUserSettingsPath()
+	if err != nil {
+		return err
+	}
+
+	// Create user settings directory if it doesn't exist
+	settingsDir := filepath.Dir(settingsPath)
+	if err := utils.EnsureDirWithContext(settingsDir, "create VS Code user settings directory"); err != nil {
+		return err
+	}
+
+	// If settings file doesn't exist, create it with just Go settings
+	if utils.FileNotExists(settingsPath) {
+		settings := map[string]any{
+			"go.goroot":                   "",
+			"go.gopath":                   "",
+			"go.toolsManagement.autoUpdate": false,
+			"go.alternateTools": map[string]string{
+				"go": "goenv exec go",
+			},
+		}
+
+		data, err := json.MarshalIndent(settings, "", "  ")
+		if err != nil {
+			return errors.FailedTo("marshal settings", err)
+		}
+
+		if err := utils.WriteFileWithContext(settingsPath, data, utils.PermFileDefault, "create user settings"); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// Backup existing settings
+	if err := BackupFile(settingsPath); err != nil {
+		return errors.FailedTo("create backup", err)
+	}
+
+	// Update settings
+	keysToUpdate := map[string]any{
+		"go.goroot":                   "",
+		"go.gopath":                   "",
+		"go.toolsManagement.autoUpdate": false,
+		"go.alternateTools": map[string]string{
+			"go": "goenv exec go",
+		},
+	}
+
+	if err := UpdateJSONKeys(settingsPath, keysToUpdate); err != nil {
+		return errors.FailedTo("update user settings", err)
 	}
 
 	return nil

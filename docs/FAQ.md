@@ -592,6 +592,47 @@ cat .vscode/settings.json
 
 Yes! That's exactly what `goenv vscode` commands configure. The official Go extension works perfectly with goenv.
 
+### VS Code terminal shows wrong Go version. Why?
+
+The Go extension may be injecting stale paths into your terminal. This bypasses goenv.
+
+**Diagnosis:**
+```bash
+goenv doctor  # Look for "VS Code Go extension" warnings
+```
+
+**Fix:**
+```bash
+goenv doctor --fix  # Updates user settings (creates backup)
+```
+
+**What changed:**
+- Your user settings (`~/Library/Application Support/Code/User/settings.json`)
+- Sets `go.goroot: ""` to prevent PATH injection
+- **Warning:** Comments in settings file will be removed (backup created)
+
+**Then:**
+1. Reload VS Code: `⌘+Shift+P` → "Developer: Reload Window"
+2. Open new terminal and verify: `which go && go version`
+
+See: [VS Code Troubleshooting](./reference/VSCODE_TROUBLESHOOTING.md)
+
+### Why does `goenv doctor --fix` remove comments from my settings?
+
+This is a limitation of Go's JSON libraries - they cannot preserve comments when modifying JSONC (JSON with Comments) files. A backup is always created at `settings.json.backup`.
+
+**Alternative:** Manually add these settings to avoid the issue:
+```json
+{
+  "go.goroot": "",
+  "go.gopath": "",
+  "go.toolsManagement.autoUpdate": false,
+  "go.alternateTools": {"go": "goenv exec go"}
+}
+```
+
+See: [Go Extension Internals](./advanced/VSCODE_GO_EXTENSION_INTERNALS.md#why-comments-are-lost)
+
 ## Cache
 
 ### What does goenv cache?

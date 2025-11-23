@@ -3,15 +3,43 @@
 ## 🚀 Quick Start
 
 ```bash
-# Initialize VS Code workspace (auto-detects go.work)
-goenv vscode init
+# One command does everything (first time setup)
+goenv vscode setup
 
-# Set version and configure VS Code in one command
-goenv local 1.24.4 --vscode
+# Change version - you'll be prompted to update VS Code
+goenv use 1.26.0
+goenv local 1.26.0
 
-# After changing versions, re-sync settings
+# Or use --vscode flag to skip prompt
+goenv use 1.26.0 --vscode
+goenv local 1.26.0 --vscode
+
+# Enable auto-sync in workspace (recommended)
+# Add to .vscode/settings.json:
+"goenv.autoSync": true
+
+# Or use environment variable
+export GOENV_VSCODE_AUTO_SYNC=1
+
+# Manual sync if needed
 goenv vscode sync
+
+# If terminals show wrong Go version
+goenv doctor --fix
 ```
+
+## ⚠️ Common Issues
+
+**Terminal shows wrong Go version?**
+- The Go extension may be injecting stale paths
+- Run: `goenv doctor` to diagnose
+- Fix: `goenv doctor --fix` (creates backup, removes comments)
+- See: [VSCODE_TROUBLESHOOTING.md](VSCODE_TROUBLESHOOTING.md)
+
+**Changed version but VS Code still uses old one?**
+- Workspace settings need updating
+- Run: `goenv vscode sync`
+- Then reload VS Code window
 
 ## 📋 Commands
 
@@ -34,6 +62,30 @@ goenv vscode init                           # Auto-detect, use absolute paths
 goenv vscode init --template advanced       # Use advanced template
 goenv vscode init --dry-run                 # Preview changes
 goenv vscode init --env-vars                # Use ${env:GOROOT} mode
+```
+
+### `goenv vscode setup`
+
+Complete VS Code setup (recommended for first-time setup).
+
+Performs all configuration steps:
+1. Checks user settings for Go extension PATH injection issues
+2. Initializes workspace `.vscode/settings.json`
+3. Syncs with current Go version
+4. Runs health checks
+
+**Flags:**
+
+- `--template <name>` - Choose template: `basic`, `advanced`, `monorepo`
+- `--dry-run` - Preview what would be done
+- `--strict` - Exit with error if validation fails
+
+**Examples:**
+
+```bash
+goenv vscode setup                          # Complete setup
+goenv vscode setup --template advanced      # With advanced template
+goenv vscode setup --strict                 # Fail on any issues
 ```
 
 ### `goenv vscode sync`
