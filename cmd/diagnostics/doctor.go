@@ -2464,7 +2464,19 @@ func checkCurrentVersion(cfg *config.Config, mgr *manager.Manager) checkResult {
 	}
 
 	// Check if the installation is corrupted (missing go binary)
-	versionPath := filepath.Join(cfg.VersionsDir(), version)
+	// Use GetVersionPath to resolve partial versions (e.g., "1.25" -> "1.25.4")
+	versionPath, err := mgr.GetVersionPath(version)
+	if err != nil {
+		return checkResult{
+			id:        "current-go-version",
+			name:      "Current Go version",
+			status:    StatusError,
+			message:   fmt.Sprintf("Version '%s' is set but not installed (set by %s)", version, source),
+			advice:    fmt.Sprintf("Install the version with 'goenv install %s'", version),
+			issueType: IssueTypeVersionNotInstalled,
+			fixData:   version,
+		}
+	}
 	goBinaryBase := filepath.Join(versionPath, "bin", "go")
 
 	// Check if go binary exists (handles .exe and .bat on Windows)

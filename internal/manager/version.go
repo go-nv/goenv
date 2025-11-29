@@ -621,49 +621,69 @@ func (m *Manager) ResolveVersionSpec(spec string) (string, error) {
 }
 
 // ValidateVersion checks if a version is installed or is "system"
-// This also resolves aliases before checking
+// This also resolves aliases and partial versions before checking
 func (m *Manager) ValidateVersion(version string) error {
 	// First validate the version string for path traversal attacks (defense-in-depth)
 	if err := validateVersionString(version); err != nil {
 		return err
 	}
 
-	// Resolve aliases
-	resolved, err := m.ResolveAlias(version)
+	// Resolve version spec (handles aliases, partial versions, "latest", etc.)
+	resolved, err := m.ResolveVersionSpec(version)
 	if err != nil {
 		return err
 	}
-	version = resolved
 
-	if version == SystemVersion {
+	if resolved == SystemVersion {
 		return nil // "system" is always valid
 	}
 
-	versionDir := filepath.Join(m.config.VersionsDir(), version)
-	if utils.FileNotExists(versionDir) {
-		return fmt.Errorf("goenv: version '%s' not installed", version)
-	}
-
+	// At this point, ResolveVersionSpec has already verified the version exists
 	return nil
 }
 
 // IsVersionInstalled checks if a version is installed
+// This also resolves partial versions (e.g., "1.25" matches "1.25.4")
 func (m *Manager) IsVersionInstalled(version string) bool {
 	if version == SystemVersion {
 		return true
 	}
 
+	// Try exact match first
 	versionDir := filepath.Join(m.config.VersionsDir(), version)
-	return !utils.FileNotExists(versionDir)
+	if !utils.FileNotExists(versionDir) {
+		return true
+	}
+
+	// Try resolving as partial version
+	resolved, err := m.ResolveVersionSpec(version)
+	if err != nil {
+		return false
+	}
+
+	return resolved != ""
 }
 
 // GetVersionPath returns the path to a specific Go version
+// This also resolves partial versions (e.g., "1.25" resolves to "1.25.4")
 func (m *Manager) GetVersionPath(version string) (string, error) {
 	if version == SystemVersion {
 		return "", nil // System version uses default PATH
 	}
 
+	// Try exact match first
 	versionDir := filepath.Join(m.config.VersionsDir(), version)
+	if !utils.FileNotExists(versionDir) {
+		return versionDir, nil
+	}
+
+	// Try resolving as partial version
+	resolved, err := m.ResolveVersionSpec(version)
+	if err != nil {
+		return "", fmt.Errorf("goenv: version '%s' not installed", version)
+	}
+
+	versionDir = filepath.Join(m.config.VersionsDir(), resolved)
 	if utils.FileNotExists(versionDir) {
 		return "", fmt.Errorf("goenv: version '%s' not installed", version)
 	}
