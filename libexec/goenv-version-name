@@ -31,7 +31,7 @@ version_exists() {
     IFS=$'\n'
     local version_regex=$(echo ${input_version} | sed s/\\./\\\\./)
 
-    # check if input_version is major/minor/patch instead of just major/minor
+    # check if input_version is major.minor only (not major.minor.patch) to add optional patch pattern
     if ! echo "${input_version}" | grep -q -E "^[0-9]+\.[0-9]+\.[0-9]+(\s*)$"; then
       version_regex="${version_regex}(\\.[0-9]+)?"
     fi
