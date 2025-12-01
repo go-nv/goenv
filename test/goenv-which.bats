@@ -162,3 +162,12 @@ EOF
   assert_success "${GOENV_ROOT}/versions/1.25.4/bin/go"
 }
 
+@test "does not re-resolve full major.minor.patch version when GOENV_GOMOD_VERSION_ENABLE=1" {
+  create_executable "1.25.3" "go"
+  create_executable "1.25.4" "go"
+
+  export GOENV_GOMOD_VERSION_ENABLE=1
+  GOENV_VERSION=1.25.3 run goenv-which go
+  assert_success "${GOENV_ROOT}/versions/1.25.3/bin/go"
+}
+
