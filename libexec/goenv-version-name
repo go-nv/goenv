@@ -24,9 +24,8 @@ fi
 
 version_exists() {
   local input_version="$1"
-  local use_go_mod="$2"
 
-  if [[ -n $use_go_mod ]] && [[ -d ${GOENV_ROOT}/versions ]] && grep -q -E "^[0-9]+\.[0-9]+\.?[0-9]*(\s*)$" <<<${input_version}; then
+  if [[ -d ${GOENV_ROOT}/versions ]] && grep -q -E "^[0-9]+\.[0-9]+\.?[0-9]*(\s*)$" <<<${input_version}; then
     OLDIFS="$IFS"
     IFS=$'\n'
     local version_regex=$(echo ${input_version} | sed s/\\./\\\\./)
@@ -58,7 +57,7 @@ OLDIFS="$IFS"
     elif version_exists "${version#go-}"; then
       versions=("${versions[@]}" "${version#go-}")
     else
-      if [[ -z $GOENV_GOMOD_VERSION_ENABLE ]] || ! version_exists "$version" "$GOENV_GOMOD_VERSION_ENABLE"; then
+      if [[ -z $GOENV_GOMOD_VERSION_ENABLE ]] || ! version_exists "$version"; then
         echo "goenv: version '$version' is not installed (set by $(goenv-version-origin))" >&2
         any_not_installed=1
       fi
