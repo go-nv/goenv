@@ -87,12 +87,6 @@ if [ "$version" = "latest" ]; then
   fi
 fi
 
-# Check if exact version folder exists first (e.g., user has an alias folder like "1.21")
-if [ -d "${GOENV_ROOT}/versions/${version}" ]; then
-  echo "$version"
-  exit 0
-fi
-
 # Check version=1 (major without minor and patch) => 1.23.4 (latest major version)
 # Or version=23 (minor without major and patch) => 1.23.4 (latest patch version)
 # Or version=23rc1 (minor with release candidate) => 1.23rc2 (latest release candidate version)
