@@ -101,3 +101,26 @@ OUT
   run goenv-installed 1.2.4
   assert_failure "goenv: version '1.2.4' not installed"
 }
+
+@test "respects exact version folder when alias folder exists" {
+  # User has an alias folder like "1.21" that contains go 1.21.13
+  mkdir -p "${GOENV_ROOT}/versions/1.21"
+  run goenv-installed 1.21
+  assert_success "1.21"
+}
+
+@test "uses exact alias folder even when full version folder exists" {
+  # User has both an alias folder and the full version folder
+  mkdir -p "${GOENV_ROOT}/versions/1.21"
+  mkdir -p "${GOENV_ROOT}/versions/1.21.13"
+  run goenv-installed 1.21
+  assert_success "1.21"
+}
+
+@test "resolves to latest patch when no exact alias folder exists" {
+  # Only full version folders exist, no alias
+  mkdir -p "${GOENV_ROOT}/versions/1.20.5"
+  mkdir -p "${GOENV_ROOT}/versions/1.20.8"
+  run goenv-installed 1.20
+  assert_success "1.20.8"
+}
