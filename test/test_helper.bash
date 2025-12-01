@@ -3,6 +3,9 @@ load ./test_assert_helpers
 unset GOENV_VERSION
 unset GOENV_DIR
 
+# Disable PATH warning in tests to avoid changing expected output
+export GOENV_DISABLE_PATH_WARNING=1
+
 # guard against executing this block twice due to bats internals
 if [ -z "$GOENV_TEST_DIR" ]; then
   GOENV_TEST_DIR="${BATS_TMPDIR}/goenv"
