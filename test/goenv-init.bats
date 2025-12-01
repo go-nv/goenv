@@ -377,3 +377,52 @@ OUT
   assert [ -n "$(echo "$output" | grep "__goenv_auto_detect_version")" ]
   assert [ -n "$(echo "$output" | grep "on-variable PWD")" ]
 }
+
+@test "includes PATH collision warning when system go exists and GOENV_PATH_ORDER is not front for bash" {
+  # Create a fake go binary in PATH
+  create_executable "${GOENV_TEST_DIR}/bin" "go"
+  
+  unset GOENV_DISABLE_PATH_WARNING
+  run goenv-init - bash
+  
+  assert_success
+  assert_line 'if [ "${GOENV_PATH_ORDER:-}" != "front" ]; then'
+  assert [ -n "$(echo "$output" | grep 'WARNING: System.*go.*found')" ]
+}
+
+@test "does not include PATH collision warning when GOENV_DISABLE_PATH_WARNING is set to 1" {
+  create_executable "${GOENV_TEST_DIR}/bin" "go"
+  
+  GOENV_DISABLE_PATH_WARNING=1 run goenv-init - bash
+  
+  assert_success
+  refute_line '  system_go_path="$(command -v go 2>/dev/null || true)"'
+}
+
+@test "warning executes and shows message when system go exists and GOENV_PATH_ORDER not set" {
+  # Create a fake go binary
+  create_executable "${GOENV_TEST_DIR}/bin" "go"
+  
+  # Don't disable the warning for this test
+  unset GOENV_DISABLE_PATH_WARNING
+  unset GOENV_PATH_ORDER
+  
+  # Eval the init output and capture stderr
+  run bash -c 'eval "$(GOENV_DISABLE_PATH_WARNING=0 goenv-init - bash 2>&1)" 2>&1'
+  
+  assert_success
+  assert [ -n "$(echo "$output" | grep 'WARNING: System.*go.*found')" ]
+  assert [ -n "$(echo "$output" | grep 'GOENV_PATH_ORDER=front')" ]
+}
+
+@test "warning does not execute when GOENV_PATH_ORDER is set to front" {
+  create_executable "${GOENV_TEST_DIR}/bin" "go"
+  
+  unset GOENV_DISABLE_PATH_WARNING
+  export GOENV_PATH_ORDER=front
+  
+  run bash -c 'eval "$(GOENV_DISABLE_PATH_WARNING=0 goenv-init - bash 2>&1)" 2>&1'
+  
+  assert_success
+  assert [ -z "$(echo "$output" | grep 'WARNING')" ]
+}

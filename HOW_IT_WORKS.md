@@ -22,21 +22,28 @@ then `/bin`.
 
 ## Understanding Shims
 
-goenv works by inserting a directory of _shims_ at the end of your
-`PATH`, so if you have `go` in `/usr/bin` it will be found first:
+By default, goenv works by inserting a directory of _shims_ at the end of your
+`PATH`. This means if you have `go` in `/usr/bin`, it will be found first:
 
     /usr/local/bin:/usr/bin:/bin:~/.goenv/shims
+
+**Important:** If you have a system Go installation, you need to configure goenv
+to put shims at the front of your PATH. Add `export GOENV_PATH_ORDER=front` to
+your `~/.goenvrc` file (or your shell profile). This ensures goenv's shims take
+precedence:
+
+    ~/.goenv/shims:/usr/local/bin:/usr/bin:/bin
 
 Through a process called _rehashing_, goenv maintains shims in that
 directory to match every `go` command across every installed version
 of Go.
 
 Shims are lightweight executables that simply pass your command along
-to goenv. So with goenv installed, when you run `go` your
+to goenv. So with goenv properly configured, when you run `go` your
 operating system will do the following:
 
 * Search your `PATH` for an executable file named `go`
-* Find the goenv shim named `go` at the beginning of your `PATH`
+* Find the goenv shim named `go` at the beginning of your `PATH` (if `GOENV_PATH_ORDER=front`)
 * Run the shim named `go`, which in turn passes the command along to
   goenv
 
