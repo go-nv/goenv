@@ -90,8 +90,6 @@ if [ -x "$GOENV_COMMAND_PATH" ]; then
   exit 0
 fi
 
-echo "goenv: You asshole"
-
 any_not_installed=0
 for version in "${versions[@]}"; do
   if [ "$version" = "system" ]; then
