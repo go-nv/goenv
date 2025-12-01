@@ -3,6 +3,7 @@ package manager
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -28,8 +29,12 @@ func setupTestVersions(t *testing.T, versions []string) (string, *Manager) {
 			t.Fatalf("Failed to create version dir %s: %v", version, err)
 		}
 
-		// Create a dummy go binary
-		goFile := filepath.Join(versionDir, "go")
+		// Create a dummy go binary (platform-appropriate)
+		goBinaryName := "go"
+		if runtime.GOOS == "windows" {
+			goBinaryName = "go.exe"
+		}
+		goFile := filepath.Join(versionDir, goBinaryName)
 		if err := os.WriteFile(goFile, []byte("#!/bin/sh\necho go"+version), 0755); err != nil {
 			t.Fatalf("Failed to create go binary for %s: %v", version, err)
 		}
