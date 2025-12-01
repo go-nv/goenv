@@ -26,6 +26,42 @@ OLDIFS="$IFS"
 IFS=: versions=(${GOENV_VERSION:-$(goenv-version-name)})
 IFS="$OLDIFS"
 
+version_exists() {
+  local input_version="$1"
+  local use_go_mod="$2"
+
+  if [[ -n $use_go_mod ]] && [[ -d ${GOENV_ROOT}/versions ]] && grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${input_version}; then
+    OLDIFS="$IFS"
+    IFS=$'\n'
+    local version_regex=$(echo ${input_version} | sed s/\\./\\\\./)
+    local versions=($(ls ${GOENV_ROOT}/versions | grep -E "^$version_regex(\\.[0-9]+)?$" | sort -V))
+    IFS="$OLDIFS"
+    if [[ ${#versions[@]} -eq 0 ]]; then
+      return 1
+    fi
+    version=${versions[${#versions[@]} - 1]}
+  fi
+
+  [ -d "${GOENV_ROOT}/versions/${version}" ]
+}
+
+# Resolve major.minor versions to full versions when GOENV_GO_MOD_ENABLE is set
+if [[ -n "$GOENV_GO_MOD_ENABLE" ]]; then
+  resolved_versions=()
+  for version in "${versions[@]}"; do
+    if [ "$version" != "system" ]; then
+      if version_exists "$version" "$GOENV_GO_MOD_ENABLE"; then
+        resolved_versions=("${resolved_versions[@]}" "${version}")
+      else
+        resolved_versions=("${resolved_versions[@]}" "$version")
+      fi
+    else
+      resolved_versions=("${resolved_versions[@]}" "$version")
+    fi
+  done
+  versions=("${resolved_versions[@]}")
+fi
+
 remove_from_path() {
   local path_to_remove="$1"
   local path_before
@@ -58,25 +94,6 @@ for version in "${versions[@]}"; do
     fi
   fi
 done
-
-version_exists() {
-  local input_version="$1"
-  local use_go_mod="$2"
-
-  if [[ -n $use_go_mod ]] && [[ -d ${GOENV_ROOT}/versions ]] && grep -q -E "^[0-9]+\.[0-9]+(\s*)$" <<<${input_version}; then
-    OLDIFS="$IFS"
-    IFS=$'\n'
-    local version_regex=$(echo ${input_version} | sed s/\\./\\\\./)
-    local versions=($(ls ${GOENV_ROOT}/versions | grep -E "^$version_regex(\\.[0-9]+)?$" | sort -V))
-    IFS="$OLDIFS"
-    if [[ ${#versions[@]} -eq 0 ]]; then
-      return 1
-    fi
-    version=${versions[${#versions[@]} - 1]}
-  fi
-
-  [ -d "${GOENV_ROOT}/versions/${version}" ]
-}
 
 OLDIFS="$IFS"
 IFS=$'\n'

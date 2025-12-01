@@ -61,6 +61,9 @@ OLDIFS="$IFS"
       if [[ -z $GOENV_GOMOD_VERSION_ENABLE ]] || ! version_exists "$version" "$GOENV_GOMOD_VERSION_ENABLE"; then
         echo "goenv: version '$version' is not installed (set by $(goenv-version-origin))" >&2
         any_not_installed=1
+      else
+        # version_exists with GOENV_GOMOD_VERSION_ENABLE succeeded and resolved the version
+        versions=("${versions[@]}" "${version}")
       fi
     fi
   done

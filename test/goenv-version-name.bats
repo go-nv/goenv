@@ -121,3 +121,31 @@ OUT
 
   assert_success "1.10.3"
 }
+
+@test "resolves major.minor version from go.mod to latest patch version when GOENV_GOMOD_VERSION_ENABLE=1" {
+  create_version "1.20.14"
+  create_version "1.25.3"
+  create_version "1.25.4"
+  
+  cat > go.mod <<EOF
+module testmodule
+
+go 1.25
+EOF
+
+  export GOENV_GOMOD_VERSION_ENABLE=1
+  run goenv-version-name
+  
+  assert_success "1.25.4"
+}
+
+@test "resolves major.minor version to latest patch version when GOENV_GOMOD_VERSION_ENABLE=1 and version specified by GOENV_VERSION" {
+  create_version "1.20.14"
+  create_version "1.25.3"
+  create_version "1.25.4"
+  
+  export GOENV_GOMOD_VERSION_ENABLE=1
+  GOENV_VERSION=1.25 run goenv-version-name
+  
+  assert_success "1.25.4"
+}
