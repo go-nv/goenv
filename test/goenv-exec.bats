@@ -383,3 +383,36 @@ SH
 LC_ALL is unset
 OUT
 }
+
+@test "resolves major.minor version from go.mod and executes command when GOENV_GOMOD_VERSION_ENABLE=1" {
+  create_executable "1.20.14" "go" <<SH
+#!/bin/sh
+echo "go version 1.20.14"
+SH
+
+  create_executable "1.25.3" "go" <<SH
+#!/bin/sh
+echo "go version 1.25.3"
+SH
+
+  create_executable "1.25.4" "go" <<SH
+#!/bin/sh
+echo "go version 1.25.4"
+SH
+
+  mkdir -p "$GOENV_TEST_DIR"
+  cd "$GOENV_TEST_DIR"
+  
+  cat > go.mod <<EOF
+module testmodule
+
+go 1.25
+EOF
+
+  export GOENV_GOMOD_VERSION_ENABLE=1
+  run goenv-exec go
+
+  assert_success_out <<OUT
+go version 1.25.4
+OUT
+}

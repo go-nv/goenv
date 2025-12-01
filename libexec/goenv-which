@@ -45,18 +45,19 @@ version_exists() {
   [ -d "${GOENV_ROOT}/versions/${version}" ]
 }
 
-# Resolve major.minor versions to full versions when GOENV_GO_MOD_ENABLE is set
-if [[ -n "$GOENV_GO_MOD_ENABLE" ]]; then
+# Resolve major.minor versions to full versions when GOENV_GOMOD_VERSION_ENABLE is set
+if [[ -n "$GOENV_GOMOD_VERSION_ENABLE" ]]; then
   resolved_versions=()
-  for version in "${versions[@]}"; do
-    if [ "$version" != "system" ]; then
-      if version_exists "$version" "$GOENV_GO_MOD_ENABLE"; then
+  for ver in "${versions[@]}"; do
+    if [ "$ver" != "system" ]; then
+      version="$ver"
+      if version_exists "$version" "$GOENV_GOMOD_VERSION_ENABLE"; then
         resolved_versions=("${resolved_versions[@]}" "${version}")
       else
-        resolved_versions=("${resolved_versions[@]}" "$version")
+        resolved_versions=("${resolved_versions[@]}" "$ver")
       fi
     else
-      resolved_versions=("${resolved_versions[@]}" "$version")
+      resolved_versions=("${resolved_versions[@]}" "$ver")
     fi
   done
   versions=("${resolved_versions[@]}")
@@ -113,7 +114,7 @@ for version in "${versions[@]}"; do
   if [ "$version" = "system" ]; then
     continue
   fi
-  if ! version_exists "$version" "$GOENV_GO_MOD_ENABLE"; then
+  if ! version_exists "$version" "$GOENV_GOMOD_VERSION_ENABLE"; then
     echo "goenv: version '$version' is not installed (set by $(goenv-version-origin))" >&2
     any_not_installed=1
   fi

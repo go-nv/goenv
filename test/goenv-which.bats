@@ -135,17 +135,17 @@ SH
   assert_failure "goenv: 'kill-all-humans' command not found"
 }
 
-@test "resolves major.minor version to latest patch and finds executable when GOENV_GO_MOD_ENABLE=1" {
+@test "resolves major.minor version to latest patch and finds executable when GOENV_GOMOD_VERSION_ENABLE=1" {
   create_executable "1.20.14" "go"
   create_executable "1.25.3" "go"
   create_executable "1.25.4" "go"
 
-  export GOENV_GO_MOD_ENABLE=1
+  export GOENV_GOMOD_VERSION_ENABLE=1
   GOENV_VERSION=1.25 run goenv-which go
   assert_success "${GOENV_ROOT}/versions/1.25.4/bin/go"
 }
 
-@test "resolves major.minor version from go.mod and finds executable when GOENV_GOMOD_VERSION_ENABLE=1 and GOENV_GO_MOD_ENABLE=1" {
+@test "resolves major.minor version from go.mod and finds executable when GOENV_GOMOD_VERSION_ENABLE=1" {
   create_executable "1.20.14" "go"
   create_executable "1.25.3" "go"
   create_executable "1.25.4" "go"
@@ -157,7 +157,6 @@ go 1.25
 EOF
 
   export GOENV_GOMOD_VERSION_ENABLE=1
-  export GOENV_GO_MOD_ENABLE=1
   cd "${GOENV_TEST_DIR}"
   run goenv-which go
   assert_success "${GOENV_ROOT}/versions/1.25.4/bin/go"
