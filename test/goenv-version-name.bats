@@ -121,3 +121,22 @@ OUT
 
   assert_success "1.10.3"
 }
+
+@test "respects version set by alias folder name" {
+  # Simulate installing go 1.21.13 aliased as 1.21
+  create_version "1.21"
+  echo "1.21" > '.go-version'
+  run goenv-version-name
+
+  assert_success "1.21"
+}
+
+@test "respects version set by alias folder name even when full version folder exists" {
+  # User has both an alias folder and the full version folder
+  create_version "1.21"
+  create_version "1.21.13"
+  echo "1.21" > '.go-version'
+  run goenv-version-name
+
+  assert_success "1.21"
+}
