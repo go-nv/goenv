@@ -86,23 +86,42 @@ mkdir -p "${GOENV_ROOT}/"{shims,versions}
 
 case "$shell" in
 fish)
-  cat <<EOL
-set -gx GOENV_SHELL ${shell}
-set -gx GOENV_ROOT ${GOENV_ROOT}
-if test -z \$GOENV_RC_FILE
-  set GOENV_RC_FILE \$HOME/.goenvrc
+  cat <<'EOL'
+set -gx GOENV_SHELL fish
+EOL
+  echo "set -gx GOENV_ROOT ${GOENV_ROOT}"
+  cat <<'EOL'
+if test -z $GOENV_RC_FILE
+  set GOENV_RC_FILE $HOME/.goenvrc
 end
-if test -e \$GOENV_RC_FILE
-  source \$GOENV_RC_FILE
+if test -e $GOENV_RC_FILE
+  source $GOENV_RC_FILE
 end
-if not contains \$GOENV_ROOT/shims \$PATH
-  if test "\$GOENV_PATH_ORDER" = "front"
-    set -gx PATH \$GOENV_ROOT/shims \$PATH
+if not contains $GOENV_ROOT/shims $PATH
+  if test "$GOENV_PATH_ORDER" = "front"
+    set -gx PATH $GOENV_ROOT/shims $PATH
   else
-    set -gx PATH \$PATH \$GOENV_ROOT/shims
+    set -gx PATH $PATH $GOENV_ROOT/shims
   end
 end
 EOL
+
+  # Add PATH collision warning unless explicitly disabled
+  if [ "${GOENV_DISABLE_PATH_WARNING:-0}" != "1" ]; then
+    cat <<'EOL'
+if test "$GOENV_PATH_ORDER" != "front"
+  set -l system_go_path (command -v go 2>/dev/null)
+  if test -n "$system_go_path"; and not string match -q "$GOENV_ROOT*" $system_go_path
+    echo "goenv: WARNING: System 'go' found at $system_go_path" >&2
+    echo "goenv: Since your shims are at the end of PATH, system 'go' will be used instead of goenv-managed versions." >&2
+    echo "goenv: To fix this, add the following to your $GOENV_RC_FILE:" >&2
+    echo "goenv:     set -gx GOENV_PATH_ORDER front" >&2
+    echo "goenv: Or run: echo 'set -gx GOENV_PATH_ORDER front' >> $GOENV_RC_FILE" >&2
+    echo "" >&2
+  end
+end
+EOL
+  fi
   ;;
 *)
   cat <<EOL
@@ -122,6 +141,29 @@ if [ "\${PATH#*\$GOENV_ROOT/shims}" = "\${PATH}" ]; then
   fi
 fi
 EOL
+
+  # Add PATH collision warning unless explicitly disabled
+  if [ "${GOENV_DISABLE_PATH_WARNING:-0}" != "1" ]; then
+    cat <<'EOL'
+if [ "${GOENV_PATH_ORDER:-}" != "front" ]; then
+  system_go_path="$(command -v go 2>/dev/null || true)"
+  if [ -n "$system_go_path" ]; then
+    case "$system_go_path" in
+      ${GOENV_ROOT}/*)
+        ;;
+      *)
+        echo "goenv: WARNING: System 'go' found at $system_go_path" >&2
+        echo "goenv: Since your shims are at the end of PATH, system 'go' will be used instead of goenv-managed versions." >&2
+        echo "goenv: To fix this, add the following to your ${GOENV_RC_FILE}:" >&2
+        echo "goenv:     export GOENV_PATH_ORDER=front" >&2
+        echo "goenv: Or run: echo 'export GOENV_PATH_ORDER=front' >> ${GOENV_RC_FILE}" >&2
+        echo "" >&2
+        ;;
+    esac
+  fi
+fi
+EOL
+  fi
   ;;
 esac
 
