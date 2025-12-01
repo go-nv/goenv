@@ -99,7 +99,7 @@ func TestNormalizePackagePath(t *testing.T) {
 		},
 		{
 			input:    "goimports",
-			expected: "goimports@latest",
+			expected: "golang.org/x/tools/cmd/goimports@latest",
 		},
 		{
 			input:    "",
@@ -146,8 +146,8 @@ func TestNormalizePackagePaths(t *testing.T) {
 				"gopls@v0.12.0",
 			},
 			expected: []string{
-				"goimports@latest",
-				"gopls@v0.12.0",
+				"golang.org/x/tools/cmd/goimports@latest",
+				"golang.org/x/tools/gopls@v0.12.0",
 			},
 		},
 	}

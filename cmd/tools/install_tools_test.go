@@ -92,7 +92,7 @@ func TestInstallCommand_DryRun(t *testing.T) {
 
 	// Test package normalization
 	packages := toolspkg.NormalizePackagePaths([]string{"gopls", "golang.org/x/tools/cmd/goimports@v0.1.0"})
-	expected := []string{"gopls@latest", "golang.org/x/tools/cmd/goimports@v0.1.0"}
+	expected := []string{"golang.org/x/tools/gopls@latest", "golang.org/x/tools/cmd/goimports@v0.1.0"}
 
 	assert.Len(t, packages, len(expected), "Expected packages")
 
