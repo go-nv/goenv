@@ -8,6 +8,76 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// setupTestLifecycleData initializes lifecycle data with test-specific values
+func setupTestLifecycleData() {
+	lifecycleMutex.Lock()
+	defer lifecycleMutex.Unlock()
+
+	// Set up test data with dates relative to current time
+	now := time.Now()
+
+	versionLifecycle = map[string]VersionInfo{
+		"1.25": {
+			Version:      "1.25",
+			ReleaseDate:  now.AddDate(0, -3, 0), // 3 months ago
+			EOLDate:      now.AddDate(1, 0, 0),  // 1 year from now
+			Status:       StatusCurrent,
+			Recommended:  "",
+			SecurityOnly: false,
+		},
+		"1.24": {
+			Version:      "1.24",
+			ReleaseDate:  now.AddDate(0, -9, 0),  // 9 months ago
+			EOLDate:      now.AddDate(0, 6, 0),   // 6 months from now
+			Status:       StatusCurrent,
+			Recommended:  "",
+			SecurityOnly: false,
+		},
+		"1.23": {
+			Version:      "1.23",
+			ReleaseDate:  now.AddDate(-1, -3, 0), // 15 months ago
+			EOLDate:      now.AddDate(0, 2, 0),   // 2 months from now (near EOL)
+			Status:       StatusNearEOL,
+			Recommended:  "1.25",
+			SecurityOnly: true,
+		},
+		"1.22": {
+			Version:      "1.22",
+			ReleaseDate:  now.AddDate(-2, 0, 0),  // 2 years ago
+			EOLDate:      now.AddDate(0, -6, 0),  // 6 months ago (EOL)
+			Status:       StatusEOL,
+			Recommended:  "1.25",
+			SecurityOnly: false,
+		},
+		"1.21": {
+			Version:      "1.21",
+			ReleaseDate:  now.AddDate(-2, -6, 0), // 2.5 years ago
+			EOLDate:      now.AddDate(-1, 0, 0),  // 1 year ago (EOL)
+			Status:       StatusEOL,
+			Recommended:  "1.25",
+			SecurityOnly: false,
+		},
+		"1.20": {
+			Version:      "1.20",
+			ReleaseDate:  now.AddDate(-3, 0, 0),  // 3 years ago
+			EOLDate:      now.AddDate(-1, -6, 0), // 1.5 years ago (EOL)
+			Status:       StatusEOL,
+			Recommended:  "1.25",
+			SecurityOnly: false,
+		},
+		"1.19": {
+			Version:      "1.19",
+			ReleaseDate:  now.AddDate(-3, -6, 0), // 3.5 years ago
+			EOLDate:      now.AddDate(-2, 0, 0),  // 2 years ago (EOL)
+			Status:       StatusEOL,
+			Recommended:  "1.25",
+			SecurityOnly: false,
+		},
+	}
+
+	lifecycleInitialized = true
+}
+
 func TestExtractMajorMinor(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -34,6 +104,8 @@ func TestExtractMajorMinor(t *testing.T) {
 }
 
 func TestGetVersionInfo(t *testing.T) {
+	setupTestLifecycleData()
+
 	tests := []struct {
 		name        string
 		version     string
@@ -62,6 +134,8 @@ func TestGetVersionInfo(t *testing.T) {
 }
 
 func TestIsSupported(t *testing.T) {
+	setupTestLifecycleData()
+
 	tests := []struct {
 		name      string
 		version   string
@@ -84,6 +158,8 @@ func TestIsSupported(t *testing.T) {
 }
 
 func TestIsEOL(t *testing.T) {
+	setupTestLifecycleData()
+
 	tests := []struct {
 		name    string
 		version string
@@ -106,6 +182,8 @@ func TestIsEOL(t *testing.T) {
 }
 
 func TestIsNearEOL(t *testing.T) {
+	setupTestLifecycleData()
+
 	tests := []struct {
 		name      string
 		version   string
@@ -126,6 +204,8 @@ func TestIsNearEOL(t *testing.T) {
 }
 
 func TestGetRecommendedVersion(t *testing.T) {
+	setupTestLifecycleData()
+
 	tests := []struct {
 		name    string
 		version string
@@ -147,6 +227,8 @@ func TestGetRecommendedVersion(t *testing.T) {
 }
 
 func TestFormatWarning(t *testing.T) {
+	setupTestLifecycleData()
+
 	tests := []struct {
 		name           string
 		version        string
@@ -238,6 +320,8 @@ func TestCalculateStatus(t *testing.T) {
 }
 
 func TestVersionLifecycleData(t *testing.T) {
+	setupTestLifecycleData()
+
 	// Verify that lifecycle data is well-formed
 	for version, info := range versionLifecycle {
 		t.Run("version_"+version, func(t *testing.T) {

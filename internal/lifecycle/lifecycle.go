@@ -3,6 +3,9 @@ package lifecycle
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/go-nv/goenv/internal/utils"
@@ -32,95 +35,63 @@ type VersionInfo struct {
 	SecurityOnly bool          // Whether only security updates are provided
 }
 
-// Go version lifecycle data based on Go's support policy:
-// Each major Go release is supported until there are two newer major releases.
-// For example, Go 1.21 is supported until Go 1.23 is released.
-//
-// Data sources:
-// - https://go.dev/doc/devel/release
-// - https://endoflife.date/go
-var versionLifecycle = map[string]VersionInfo{
-	// Current and recent versions (as of Oct 2025)
-	"1.25": {
-		Version:      "1.25",
-		ReleaseDate:  parseDate("2025-08-01"),
-		EOLDate:      parseDate("2026-08-01"), // Estimated: when 1.27 releases
-		Status:       StatusCurrent,
-		Recommended:  "",
-		SecurityOnly: false,
-	},
-	"1.24": {
-		Version:      "1.24",
-		ReleaseDate:  parseDate("2025-02-01"),
-		EOLDate:      parseDate("2026-02-01"), // Estimated: when 1.26 releases
-		Status:       StatusCurrent,
-		Recommended:  "",
-		SecurityOnly: false,
-	},
-	"1.23": {
-		Version:      "1.23",
-		ReleaseDate:  parseDate("2024-08-13"),
-		EOLDate:      parseDate("2025-11-30"), // Approaching EOL (within 3 months from now)
-		Status:       StatusNearEOL,
-		Recommended:  "1.25",
-		SecurityOnly: true,
-	},
-	"1.22": {
-		Version:      "1.22",
-		ReleaseDate:  parseDate("2024-02-06"),
-		EOLDate:      parseDate("2025-02-01"), // When 1.24 was released
-		Status:       StatusEOL,
-		Recommended:  "1.25",
-		SecurityOnly: false,
-	},
-	"1.21": {
-		Version:      "1.21",
-		ReleaseDate:  parseDate("2023-08-08"),
-		EOLDate:      parseDate("2024-08-13"), // When 1.23 was released
-		Status:       StatusEOL,
-		Recommended:  "1.25",
-		SecurityOnly: false,
-	},
-	"1.20": {
-		Version:      "1.20",
-		ReleaseDate:  parseDate("2023-02-01"),
-		EOLDate:      parseDate("2024-02-06"), // When 1.22 was released
-		Status:       StatusEOL,
-		Recommended:  "1.25",
-		SecurityOnly: false,
-	},
-	"1.19": {
-		Version:      "1.19",
-		ReleaseDate:  parseDate("2022-08-02"),
-		EOLDate:      parseDate("2023-08-08"), // When 1.21 was released
-		Status:       StatusEOL,
-		Recommended:  "1.25",
-		SecurityOnly: false,
-	},
-	"1.18": {
-		Version:      "1.18",
-		ReleaseDate:  parseDate("2022-03-15"),
-		EOLDate:      parseDate("2023-02-01"), // When 1.20 was released
-		Status:       StatusEOL,
-		Recommended:  "1.25",
-		SecurityOnly: false,
-	},
-	"1.17": {
-		Version:      "1.17",
-		ReleaseDate:  parseDate("2021-08-16"),
-		EOLDate:      parseDate("2022-08-02"), // When 1.19 was released
-		Status:       StatusEOL,
-		Recommended:  "1.25",
-		SecurityOnly: false,
-	},
-	"1.16": {
-		Version:      "1.16",
-		ReleaseDate:  parseDate("2021-02-16"),
-		EOLDate:      parseDate("2022-03-15"), // When 1.18 was released
-		Status:       StatusEOL,
-		Recommended:  "1.25",
-		SecurityOnly: false,
-	},
+var (
+	// versionLifecycle stores the dynamically loaded lifecycle data
+	versionLifecycle map[string]VersionInfo
+	// lifecycleMutex protects versionLifecycle from concurrent access
+	lifecycleMutex sync.RWMutex
+	// lifecycleInitialized tracks if we've loaded lifecycle data
+	lifecycleInitialized bool
+)
+
+// InitializeLifecycleData loads lifecycle data from API/cache/embedded fallback
+func InitializeLifecycleData() error {
+	lifecycleMutex.Lock()
+	defer lifecycleMutex.Unlock()
+
+	if lifecycleInitialized {
+		return nil // Already initialized
+	}
+
+	// Determine cache directory (use GOENV_ROOT or HOME/.goenv)
+	goenvRoot := os.Getenv("GOENV_ROOT")
+	if goenvRoot == "" {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			goenvRoot = filepath.Join(home, ".goenv")
+		}
+	}
+
+	// Create fetcher with cache
+	fetcher := NewFetcherWithCache(goenvRoot)
+
+	// Fetch with fallback to cache and embedded data
+	data, err := fetcher.FetchWithFallback(goenvRoot)
+	if err != nil {
+		// If fetching fails, use embedded data as ultimate fallback
+		versionLifecycle = EmbeddedLifecycleData
+	} else {
+		versionLifecycle = data
+	}
+
+	lifecycleInitialized = true
+	return nil
+}
+
+// getLifecycleData returns the lifecycle data, initializing if needed
+func getLifecycleData() map[string]VersionInfo {
+	lifecycleMutex.RLock()
+	initialized := lifecycleInitialized
+	lifecycleMutex.RUnlock()
+
+	if !initialized {
+		// Initialize on first access
+		_ = InitializeLifecycleData()
+	}
+
+	lifecycleMutex.RLock()
+	defer lifecycleMutex.RUnlock()
+	return versionLifecycle
 }
 
 // parseDate is a helper to parse dates in lifecycle data
@@ -138,7 +109,10 @@ func GetVersionInfo(version string) (VersionInfo, bool) {
 		return VersionInfo{}, false
 	}
 
-	info, found := versionLifecycle[majorMinor]
+	// Get lifecycle data (initializes on first call)
+	lifecycleData := getLifecycleData()
+
+	info, found := lifecycleData[majorMinor]
 	if !found {
 		return VersionInfo{
 			Version: majorMinor,
@@ -148,6 +122,10 @@ func GetVersionInfo(version string) (VersionInfo, bool) {
 
 	// Update status dynamically based on current date
 	info.Status = calculateStatus(info)
+
+	// Calculate recommended version and security-only status
+	info = calculateDynamicFields(info, lifecycleData)
+
 	return info, true
 }
 
@@ -167,6 +145,36 @@ func calculateStatus(info VersionInfo) SupportStatus {
 	}
 
 	return StatusCurrent
+}
+
+// calculateDynamicFields determines recommended version and security-only status
+func calculateDynamicFields(info VersionInfo, allVersions map[string]VersionInfo) VersionInfo {
+	// Find the latest stable version to recommend
+	var latestVersion string
+	var latestReleaseDate time.Time
+
+	for ver, verInfo := range allVersions {
+		status := calculateStatus(verInfo)
+		// Only recommend current (non-EOL, non-near-EOL) versions
+		if status == StatusCurrent {
+			if verInfo.ReleaseDate.After(latestReleaseDate) {
+				latestVersion = ver
+				latestReleaseDate = verInfo.ReleaseDate
+			}
+		}
+	}
+
+	// Set recommended version for EOL and near-EOL versions
+	if info.Status == StatusEOL || info.Status == StatusNearEOL {
+		info.Recommended = latestVersion
+	}
+
+	// Set security-only flag for near-EOL versions
+	if info.Status == StatusNearEOL {
+		info.SecurityOnly = true
+	}
+
+	return info
 }
 
 // IsSupported returns true if the version is currently supported

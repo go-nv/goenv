@@ -254,36 +254,52 @@ func WriteTestFile(tb testing.TB, path string, content []byte, perm os.FileMode,
 //
 // This function removes the warning block and returns only the actual output.
 func StripDeprecationWarning(output string) string {
-	// Check if output contains a deprecation warning
-	if !strings.Contains(output, "Deprecation warning:") {
+	// Check if output contains warnings (deprecation or lifecycle)
+	hasDeprecation := strings.Contains(output, "Deprecation warning:")
+	hasLifecycleWarning := strings.Contains(output, "Warning: Go")
+
+	if !hasDeprecation && !hasLifecycleWarning {
 		return strings.TrimSpace(output)
 	}
 
 	lines := strings.Split(output, "\n")
+	result := []string{}
+	skipUntilBlank := false
 
-	// Find the blank line that separates warning from actual output
-	// The warning block is: "Deprecation warning:" + 2 indent lines + blank line
-	blankLineIdx := -1
 	for i, line := range lines {
-		if i > 0 && strings.HasPrefix(lines[0], "Deprecation warning:") && strings.TrimSpace(line) == "" {
-			blankLineIdx = i
-			break
+		// Check if this line starts a warning block
+		if strings.HasPrefix(line, "Deprecation warning:") || strings.HasPrefix(line, "Warning: Go") {
+			skipUntilBlank = true
+			continue
+		}
+
+		// If we're skipping, wait for blank line or end of warning
+		if skipUntilBlank {
+			// Lifecycle warnings are 2-3 lines, look for blank line or next non-warning content
+			if strings.TrimSpace(line) == "" {
+				skipUntilBlank = false
+				continue
+			}
+			// Skip lines that are part of the warning (indented or continuation)
+			if strings.HasPrefix(line, " ") || strings.Contains(line, "Consider upgrading") || strings.Contains(line, "support ends soon") {
+				continue
+			}
+			// If we hit a non-warning line, stop skipping
+			skipUntilBlank = false
+		}
+
+		// Add non-warning lines
+		if !skipUntilBlank && i > 0 && strings.TrimSpace(line) == "" && len(result) == 0 {
+			// Skip leading blank lines after warnings
+			continue
+		}
+		if !skipUntilBlank {
+			result = append(result, line)
 		}
 	}
 
-	if blankLineIdx == -1 {
-		// No blank line found, warning only
-		return ""
-	}
-
-	// Return everything after the blank line
-	if blankLineIdx+1 >= len(lines) {
-		return ""
-	}
-
-	result := strings.Join(lines[blankLineIdx+1:], "\n")
-	// Only trim trailing whitespace to preserve formatting of the output
-	return strings.TrimRight(result, " \t\n\r")
+	output = strings.Join(result, "\n")
+	return strings.TrimRight(output, " \t\n\r")
 }
 
 // CreateMockGoVersion creates a complete mock Go version installation.
