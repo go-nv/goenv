@@ -107,7 +107,15 @@ func (m *Manager) InstallSingleTool(version, packagePath string, verbose bool) e
 	versionPath := filepath.Join(m.cfg.Root, "versions", version)
 	goRoot := versionPath
 	goBinDir := filepath.Join(goRoot, "bin")
-	gopath := filepath.Join(versionPath, "gopath")
+	
+	// Use $HOME/go/{version} as GOPATH to match the runtime environment set by sh-rehash
+	// This ensures tools installed with "goenv tools install" go to the same location
+	// as tools installed with "go install" during normal usage
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+	gopath := filepath.Join(home, "go", version)
 
 	// Check if Go binary exists (handles .bat/.exe on Windows)
 	goBin, err := utils.FindExecutable(goBinDir, "go")

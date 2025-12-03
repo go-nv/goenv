@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 	"github.com/go-nv/goenv/cmd/shell"
@@ -81,7 +82,19 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	// See: https://github.com/go-nv/goenv/issues/147
 	existingGopath := os.Getenv(utils.EnvVarGopath)
 	if existingGopath != "" {
-		gopathValue = gopathValue + string(os.PathListSeparator) + existingGopath
+		// Filter out any goenv-managed paths to prevent duplication on re-initialization
+		goPathPattern := filepath.Join(home, "go")
+		var filteredPaths []string
+		for _, path := range filepath.SplitList(existingGopath) {
+			// Skip paths that look like $HOME/go/{version}
+			// Keep paths that are exactly $HOME/go or any other custom paths
+			if !strings.HasPrefix(path, goPathPattern+string(filepath.Separator)) || path == goPathPattern {
+				filteredPaths = append(filteredPaths, path)
+			}
+		}
+		if len(filteredPaths) > 0 {
+			gopathValue = gopathValue + string(os.PathListSeparator) + strings.Join(filteredPaths, string(os.PathListSeparator))
+		}
 	}
 
 	// Build GOROOT value (version install path)
