@@ -57,3 +57,30 @@ func FindExecutable(basePath string) (string, error) {
 	// None found, return error for .exe (expected in production)
 	return "", os.ErrNotExist
 }
+
+// ResolveBinary searches for a binary in the standard goenv search order:
+// 1. Version's bin directory (Go binaries like go, gofmt)
+// 2. Host bin directory (tools installed with "goenv tools install")
+// 3. Version-specific GOPATH bin (if GOPATH not disabled)
+//
+// Returns the full path to the binary if found, or an error if not found.
+func ResolveBinary(command, versionBinDir, hostBinDir, versionGopathBin string, gopathDisabled bool) (string, error) {
+	// Try version's bin directory first
+	if path, err := utils.FindExecutable(versionBinDir, command); err == nil {
+		return path, nil
+	}
+
+	// Try host bin directory (shared across versions)
+	if path, err := utils.FindExecutable(hostBinDir, command); err == nil {
+		return path, nil
+	}
+
+	// Try version-specific GOPATH bin if not disabled
+	if !gopathDisabled {
+		if path, err := utils.FindExecutable(versionGopathBin, command); err == nil {
+			return path, nil
+		}
+	}
+
+	return "", os.ErrNotExist
+}

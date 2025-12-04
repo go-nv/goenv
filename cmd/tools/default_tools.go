@@ -250,7 +250,7 @@ func runInstallTools(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Installing default tools for Go %s...\n", goVersion)
 	fmt.Fprintln(cmd.OutOrStdout())
 
-	if err := tools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.HostGopath(), true); err != nil {
+	if err := tools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.SafeResolvePath(goVersion), true); err != nil {
 		return errors.FailedTo("install default tools", err)
 	}
 

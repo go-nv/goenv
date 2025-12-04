@@ -146,6 +146,19 @@ func (c *Config) EnsureDirectories() error {
 	return nil
 }
 
+func (c *Config) SafeResolvePath(version string) string {
+	// check if version directory exists
+	versionDir := c.VersionDir(version)
+
+	_, err := os.Stat(versionDir)
+	if err == nil {
+		return versionDir
+	}
+
+	// fallback to host gopath
+	return c.HostGopath()
+}
+
 // VersionDir returns the installation directory for a specific Go version
 // Example: /Users/user/.goenv/versions/1.21.0
 func (c *Config) VersionDir(version string) string {

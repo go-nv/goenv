@@ -290,7 +290,7 @@ func installDefaultTools(cmd *cobra.Command, goVersion string) {
 	}
 
 	// Install tools (non-verbose to avoid clutter)
-	if err := tools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.HostGopath(), !installFlags.quiet); err != nil {
+	if err := tools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.SafeResolvePath(goVersion), !installFlags.quiet); err != nil {
 		// Don't fail the whole install if default tools fail
 		if !installFlags.quiet {
 			fmt.Fprintf(cmd.OutOrStderr(), "%sSome default tools failed to install: %v\n", utils.Emoji("⚠️  "), err)
