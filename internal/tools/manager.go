@@ -138,7 +138,7 @@ func (m *Manager) Install(opts InstallOptions) (*InstallResult, error) {
 // InstallSingleTool installs a single tool package for a specific Go version.
 // This is useful for commands that need per-tool progress feedback.
 // For batch installation, use Install() instead.
-func (m *Manager) InstallSingleTool(version, packagePath string, verbose bool) (Tool, error) {
+func (m *Manager) InstallSingleTool(goVersion, packagePath string, verbose bool) (Tool, error) {
 	// Normalize package path to ensure it has a version
 	packagePath = NormalizePackagePath(packagePath)
 
@@ -169,7 +169,7 @@ func (m *Manager) InstallSingleTool(version, packagePath string, verbose bool) (
 	cfg.Tools = []Tool{newTool}
 
 	// Use the gold standard InstallTools function with host-specific GOPATH
-	return newTool, InstallTools(cfg, version, m.cfg.Root, m.cfg.HostGopath(), verbose)
+	return newTool, InstallTools(cfg, goVersion, m.cfg.Root, m.cfg.VersionBinDir(goVersion), verbose)
 }
 
 // UninstallOptions configures tool uninstallation behavior.
