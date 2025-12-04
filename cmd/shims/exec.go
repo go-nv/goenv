@@ -23,6 +23,7 @@ import (
 	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/resolver"
 	"github.com/go-nv/goenv/internal/session"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
@@ -220,42 +221,12 @@ func runExec(cmd *cobra.Command, args []string) error {
 	var commandPath string
 
 	if currentVersion != manager.SystemVersion {
-		// First try to find command in the version's bin directory
-		versionPath, err := mgr.GetVersionPath(currentVersion)
+		// Use centralized resolver to find the binary
+		// Pass version source to control whether host bin is checked
+		r := resolver.New(cfg)
+		var err error
+		commandPath, err = r.ResolveBinary(command, currentVersion, source)
 		if err != nil {
-			return err
-		}
-
-		versionBinDir := filepath.Join(versionPath, "bin")
-		commandPath = findBinaryInDir(versionBinDir, command)
-
-		// If not found in version bin, check host-specific bin directory first
-		if commandPath == "" {
-			hostBinDir := cfg.HostBinDir()
-			commandPath = findBinaryInDir(hostBinDir, command)
-		}
-
-		// If still not found, check GOPATH bin (if GOPATH is enabled)
-		if commandPath == "" && utils.GoenvEnvVarDisableGopath.UnsafeValue() != "1" {
-			// Get the GOPATH from environment (already set above)
-			for _, envVar := range env {
-				if strings.HasPrefix(envVar, "GOPATH=") {
-					gopathValue := strings.TrimPrefix(envVar, "GOPATH=")
-					// Handle multiple GOPATH entries (colon-separated on Unix, semicolon on Windows)
-					gopaths := filepath.SplitList(gopathValue)
-					for _, gp := range gopaths {
-						gopathBinDir := filepath.Join(gp, "bin")
-						commandPath = findBinaryInDir(gopathBinDir, command)
-						if commandPath != "" {
-							break
-						}
-					}
-					break
-				}
-			}
-		}
-
-		if commandPath == "" {
 			return fmt.Errorf("goenv: %s: command not found", command)
 		}
 	} else {
@@ -414,12 +385,4 @@ func prependToPath(env []string, dir string) []string {
 	return append(env, pathPrefix+dir)
 }
 
-// findBinaryInDir searches for a binary in a directory, handling .exe on Windows
-func findBinaryInDir(binDir, command string) string {
-	// Use cross-platform binary finder
-	if binaryPath, err := utils.FindExecutable(binDir, command); err == nil {
-		return binaryPath
-	}
 
-	return ""
-}

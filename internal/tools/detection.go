@@ -34,63 +34,69 @@ func ListForVersionBasic(cfg *config.Config, version string) ([]ToolMetadata, er
 
 // listForVersionWithOptions is the internal implementation with metadata extraction control.
 func listForVersionWithOptions(cfg *config.Config, version string, extractMetadata bool) ([]ToolMetadata, error) {
-	binPath := filepath.Join(cfg.Root, "versions", version, "gopath", "bin")
-
-	entries, err := os.ReadDir(binPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, errors.FailedTo("read tools directory", err)
-	}
-
 	var tools []ToolMetadata
 	seen := make(map[string]bool) // Deduplicate across platform variants
 
-	for _, entry := range entries {
-		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
+	// Collect tools from both host bin (shared) and version-specific gopath
+	dirsToScan := []string{
+		cfg.HostBinDir(),                        // Tools from "goenv tools install"
+		cfg.VersionGopathBin(version),          // Version-specific tools
+	}
 
-		name := entry.Name()
-
-		// Remove platform-specific extensions for deduplication
-		baseName := name
-		for _, ext := range utils.WindowsExecutableExtensions() {
-			baseName = strings.TrimSuffix(baseName, ext)
-		}
-		baseName = strings.TrimSuffix(baseName, ".darwin")
-
-		// Skip if we've already seen this tool (e.g., both "tool" and "tool.exe")
-		if seen[baseName] {
-			continue
-		}
-		seen[baseName] = true
-
-		// Get file info for metadata
-		fullPath := filepath.Join(binPath, name)
-		modTime := utils.GetFileModTime(fullPath)
-		if modTime.IsZero() {
-			continue // Skip files we can't stat
-		}
-
-		tool := ToolMetadata{
-			Name:       baseName,
-			BinaryPath: fullPath,
-			GoVersion:  version,
-			ModTime:    modTime,
-		}
-
-		// Optionally extract package path and version
-		if extractMetadata {
-			packagePath, toolVersion, err := ExtractToolInfo(fullPath)
-			if err == nil {
-				tool.PackagePath = packagePath
-				tool.Version = toolVersion
+	for _, binPath := range dirsToScan {
+		entries, err := os.ReadDir(binPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue // Directory doesn't exist, skip it
 			}
+			return nil, errors.FailedTo("read tools directory", err)
 		}
 
-		tools = append(tools, tool)
+		for _, entry := range entries {
+			if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+
+			name := entry.Name()
+
+			// Remove platform-specific extensions for deduplication
+			baseName := name
+			for _, ext := range utils.WindowsExecutableExtensions() {
+				baseName = strings.TrimSuffix(baseName, ext)
+			}
+			baseName = strings.TrimSuffix(baseName, ".darwin")
+
+			// Skip if we've already seen this tool (e.g., both "tool" and "tool.exe")
+			if seen[baseName] {
+				continue
+			}
+			seen[baseName] = true
+
+			// Get file info for metadata
+			fullPath := filepath.Join(binPath, name)
+			modTime := utils.GetFileModTime(fullPath)
+			if modTime.IsZero() {
+				continue // Skip files we can't stat
+			}
+
+			tool := ToolMetadata{
+				Name:       baseName,
+				BinaryPath: fullPath,
+				GoVersion:  version,
+				ModTime:    modTime,
+			}
+
+			// Optionally extract package path and version
+			if extractMetadata {
+				packagePath, toolVersion, err := ExtractToolInfo(fullPath)
+				if err == nil {
+					tool.PackagePath = packagePath
+					tool.Version = toolVersion
+				}
+			}
+
+			tools = append(tools, tool)
+		}
 	}
 
 	return tools, nil

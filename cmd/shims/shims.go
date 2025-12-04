@@ -16,6 +16,7 @@ import (
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -229,7 +230,7 @@ func runWhence(cmd *cobra.Command, args []string) error {
 				versionPath := filepath.Join(cfg.VersionBinDir(version), commandName)
 				// On Windows, try to find the actual file with extension
 				if utils.IsWindows() {
-					if foundPath, err := findExecutable(versionPath); err == nil {
+					if foundPath, err := pathutil.FindExecutable(versionPath); err == nil {
 						// Strip the extension for display (show logical command name)
 						displayPath := foundPath
 						for _, ext := range utils.WindowsExecutableExtensions() {
@@ -252,42 +253,6 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	// Fallback: manual search
 	return runWhenceManual(cmd, commandName, cfg, mgr)
 }
-
-// findExecutable looks for an executable file, handling Windows extensions
-func findExecutable(basePath string) (string, error) {
-	// On Windows, try common executable extensions
-	if utils.IsWindows() {
-		for _, ext := range utils.WindowsExecutableExtensions() {
-			path := basePath + ext
-			if utils.FileExists(path) {
-				return path, nil
-			}
-		}
-		// Also try without extension
-		if utils.FileExists(basePath) {
-			return basePath, nil
-		}
-		return "", fmt.Errorf("executable not found")
-	}
-
-	// On Unix, check if file exists and is executable
-	info, exists, err := utils.StatWithExistence(basePath)
-	if !exists {
-		if err != nil {
-			return "", err
-		}
-		return "", os.ErrNotExist
-	}
-	if info.IsDir() {
-		return "", fmt.Errorf("is a directory")
-	}
-	// Check executable bit
-	if !utils.HasExecutableBit(info) {
-		return "", fmt.Errorf("not executable")
-	}
-	return basePath, nil
-}
-
 // runWhichManual implements which command logic manually for testing/fallback
 func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config, mgr *manager.Manager) error {
 	// Get current version(s)
@@ -333,7 +298,7 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config, 
 		}
 
 		commandPath := filepath.Join(versionPath, "bin", commandName)
-		if foundPath, err := findExecutable(commandPath); err == nil {
+		if foundPath, err := pathutil.FindExecutable(commandPath); err == nil {
 			fmt.Fprintln(cmd.OutOrStdout(), foundPath)
 			return nil
 		}
@@ -357,7 +322,7 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config, 
 		}
 
 		commandPath := filepath.Join(versionPath, "bin", commandName)
-		if _, err := findExecutable(commandPath); err == nil {
+		if _, err := pathutil.FindExecutable(commandPath); err == nil {
 			foundInVersions = append(foundInVersions, v)
 		}
 	}
@@ -418,7 +383,7 @@ func findInSystemPath(commandName string, goenvRoot string) (string, error) {
 		}
 
 		commandPath := filepath.Join(dir, commandName)
-		if foundPath, err := findExecutable(commandPath); err == nil {
+		if foundPath, err := pathutil.FindExecutable(commandPath); err == nil {
 			return foundPath, nil
 		}
 	}
@@ -444,7 +409,7 @@ func runWhenceManual(cmd *cobra.Command, commandName string, cfg *config.Config,
 		}
 
 		commandPath := filepath.Join(versionPath, "bin", commandName)
-		if foundPath, err := findExecutable(commandPath); err == nil {
+		if foundPath, err := pathutil.FindExecutable(commandPath); err == nil {
 			foundAny = true
 			if whenceFlags.path {
 				// On Windows, strip extension for display (show logical command name)

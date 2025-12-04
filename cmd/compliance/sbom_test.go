@@ -63,12 +63,50 @@ func TestSBOMProject_FlagValidation(t *testing.T) {
 			// Create temp directory for test
 			tmpDir := t.TempDir()
 			os.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
-			defer os.Unsetenv("GOENV_ROOT")
+			defer os.Unsetenv(utils.GoenvEnvVarRoot.String())
+
+			// Create a fake Go version so GetCurrentVersion() succeeds
+			testVersion := "1.21.0"
+			versionDir := filepath.Join(tmpDir, "versions", testVersion, "bin")
+			err := os.MkdirAll(versionDir, 0755)
+			require.NoError(t, err, "Failed to create version dir")
+
+			// Create a fake go binary so version validation passes
+			goBinary := filepath.Join(versionDir, "go")
+			err = os.WriteFile(goBinary, []byte("#!/bin/sh\necho go1.21.0\n"), 0755)
+			require.NoError(t, err, "Failed to create fake go binary")
+
+			// Create global version file
+			versionFile := filepath.Join(tmpDir, "version")
+			err = os.WriteFile(versionFile, []byte(testVersion+"\n"), 0644)
+			require.NoError(t, err, "Failed to create version file")
+
+			// Create mock SBOM tool in version bin directory for valid test cases
+			if !tt.expectError {
+				toolPath := filepath.Join(versionDir, sbomTool)
+				var content string
+				if utils.IsWindows() {
+					toolPath += ".exe"
+					content = "@echo off\necho {}\n"
+				} else {
+					content = "#!/bin/sh\necho '{}'\n"
+				}
+				testutil.WriteTestFile(t, toolPath, []byte(content), utils.PermFileExecutable)
+			}
+
+			// Change to tmpDir so go.mod from repo doesn't interfere
+			oldWd, err := os.Getwd()
+			require.NoError(t, err, "Failed to get working directory")
+			err = os.Chdir(tmpDir)
+			require.NoError(t, err, "Failed to change directory")
+			defer func() {
+				_ = os.Chdir(oldWd)
+			}()
 
 			// Run command
 			cmd := sbomProjectCmd
 			cmd.SetArgs([]string{})
-			err := cmd.RunE(cmd, []string{})
+			err = cmd.RunE(cmd, []string{})
 
 			if tt.expectError {
 				if err == nil {
@@ -76,9 +114,8 @@ func TestSBOMProject_FlagValidation(t *testing.T) {
 				} else if !strings.Contains(err.Error(), tt.errorText) {
 					t.Errorf("Expected error containing %q, got %q", tt.errorText, err.Error())
 				}
-			} else if !tt.expectError && err != nil {
-				// For valid cases, we expect tool-not-found error (since we don't have tools installed in test)
-				assert.Contains(t, err.Error(), "not found")
+			} else if err != nil {
+				t.Errorf("Expected no error, got %q", err.Error())
 			}
 		})
 	}
@@ -110,8 +147,8 @@ func TestResolveSBOMTool(t *testing.T) {
 
 	testutil.WriteTestFile(t, toolPath, []byte(content), utils.PermFileExecutable)
 
-	// Test resolution
-	resolvedPath, err := resolveSBOMTool(cfg, toolName)
+	// Test resolution with global version context (host bin accessible)
+	resolvedPath, err := resolveSBOMTool(cfg, toolName, "1.21.0", "")
 	require.NoError(t, err, "Failed to resolve tool")
 
 	assert.Equal(t, toolPath, resolvedPath, "Expected path")
@@ -124,8 +161,8 @@ func TestResolveSBOMTool_NotFound(t *testing.T) {
 		Root: tmpDir,
 	}
 
-	// Test resolution for non-existent tool
-	_, err := resolveSBOMTool(cfg, "nonexistent-tool")
+	// Test resolution for non-existent tool with global context
+	_, err := resolveSBOMTool(cfg, "nonexistent-tool", "1.21.0", "")
 	assert.Error(t, err, "Expected error for non-existent tool")
 
 	assert.Contains(t, err.Error(), "not found", "Expected 'not found' error %v", err)

@@ -9,17 +9,22 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/resolver"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
 // Manager handles shim operations
 type ShimManager struct {
-	config *config.Config
+	config   *config.Config
+	resolver *resolver.Resolver
 }
 
 // NewShimManager creates a new shim manager
 func NewShimManager(cfg *config.Config) *ShimManager {
-	return &ShimManager{config: cfg}
+	return &ShimManager{
+		config:   cfg,
+		resolver: resolver.New(cfg),
+	}
 }
 
 // Rehash creates or updates shims for all installed Go versions
@@ -46,51 +51,21 @@ func (s *ShimManager) Rehash() error {
 	// Collect all unique binaries across versions
 	binaries := make(map[string]bool)
 
+	// Scan each version's directories
 	for _, version := range versions {
-		// Scan version's bin directory
-		versionBinDir := filepath.Join(s.config.VersionsDir(), version, "bin")
-		entries, err := os.ReadDir(versionBinDir)
-		if err != nil {
-			continue // Skip if version doesn't have bin directory
+		dirs := s.resolver.GetBinaryDirectories(version)
+		versionBinaries, _ := resolver.CollectBinaries(dirs)
+		for binary := range versionBinaries {
+			binaries[binary] = true
 		}
+	}
 
-		for _, entry := range entries {
-			if !entry.IsDir() && utils.IsExecutableFile(filepath.Join(versionBinDir, entry.Name())) {
-				binaryName := entry.Name()
-				// On Windows, strip executable extensions from shim name
-				if utils.IsWindows() {
-					for _, ext := range utils.WindowsExecutableExtensions() {
-						if strings.HasSuffix(binaryName, ext) {
-							binaryName = binaryName[:len(binaryName)-len(ext)]
-							break
-						}
-					}
-				}
-				binaries[binaryName] = true
-			}
-		}
-
-		// Scan GOPATH binaries if not disabled
-		if !utils.GoenvEnvVarDisableGopath.IsTrue() {
-			gopathBinDir := s.getGopathBinDir(version)
-			gopathEntries, err := os.ReadDir(gopathBinDir)
-			if err == nil {
-				for _, entry := range gopathEntries {
-					if !entry.IsDir() && utils.IsExecutableFile(filepath.Join(gopathBinDir, entry.Name())) {
-						binaryName := entry.Name()
-						// On Windows, strip executable extensions from shim name
-						if utils.IsWindows() {
-							for _, ext := range utils.WindowsExecutableExtensions() {
-								if strings.HasSuffix(binaryName, ext) {
-									binaryName = binaryName[:len(binaryName)-len(ext)]
-									break
-								}
-							}
-						}
-						binaries[binaryName] = true
-					}
-				}
-			}
+	// Scan host bin directory (tools shared across all versions)
+	if s.resolver.ShouldScanGopath() {
+		hostDir := s.resolver.GetHostBinaryDirectory()
+		hostBinaries, _ := resolver.CollectBinaries([]string{hostDir})
+		for binary := range hostBinaries {
+			binaries[binary] = true
 		}
 	}
 
@@ -144,8 +119,8 @@ func (s *ShimManager) ListShims() ([]string, error) {
 func (s *ShimManager) WhichBinary(command string) (string, error) {
 	mgr := manager.NewManager(s.config)
 
-	// Get current version
-	version, _, err := mgr.GetCurrentVersion()
+	// Get current version and its source
+	version, source, err := mgr.GetCurrentVersion()
 	if err != nil {
 		return "", fmt.Errorf("no version set: %w", err)
 	}
@@ -155,33 +130,8 @@ func (s *ShimManager) WhichBinary(command string) (string, error) {
 		return command, nil
 	}
 
-	// Look in version's bin directory first
-	versionBinDir := filepath.Join(s.config.VersionsDir(), version, "bin")
-	binaryPath := s.findBinary(versionBinDir, command)
-
-	if binaryPath != "" {
-		return binaryPath, nil
-	}
-
-	// If not found and GOPATH not disabled, check GOPATH
-	if !utils.GoenvEnvVarDisableGopath.IsTrue() {
-		gopathBinDir := s.getGopathBinDir(version)
-		binaryPath = s.findBinary(gopathBinDir, command)
-		if binaryPath != "" {
-			return binaryPath, nil
-		}
-	}
-
-	return "", fmt.Errorf("command not found: %s", command)
-}
-
-// findBinary searches for a binary using utils.FindExecutable
-func (s *ShimManager) findBinary(binDir, command string) string {
-	path, err := utils.FindExecutable(binDir, command)
-	if err != nil {
-		return ""
-	}
-	return path
+	// Use resolver to find the binary (passes source to determine if host bin should be checked)
+	return s.resolver.ResolveBinary(command, version, source)
 }
 
 // WhenceVersions returns all versions that contain the specified command
@@ -192,34 +142,8 @@ func (s *ShimManager) WhenceVersions(command string) ([]string, error) {
 		return nil, errors.FailedTo("list versions", err)
 	}
 
-	var versionsWithCommand []string
-
-	for _, version := range allVersions {
-		found := false
-
-		// Check version's bin directory
-		versionBinDir := filepath.Join(s.config.VersionsDir(), version, "bin")
-		binaryPath := s.findBinary(versionBinDir, command)
-
-		if binaryPath != "" {
-			found = true
-		}
-
-		// If not found and GOPATH not disabled, check GOPATH
-		if !found && !utils.GoenvEnvVarDisableGopath.IsTrue() {
-			gopathBinDir := s.getGopathBinDir(version)
-			binaryPath = s.findBinary(gopathBinDir, command)
-			if binaryPath != "" {
-				found = true
-			}
-		}
-
-		if found {
-			versionsWithCommand = append(versionsWithCommand, version)
-		}
-	}
-
-	return versionsWithCommand, nil
+	// Use resolver to find which versions have the binary
+	return s.resolver.FindVersionsWithBinary(command, allVersions)
 }
 
 // clearShims removes all existing shim files
@@ -345,9 +269,4 @@ if "%%program%%"=="goenv" (
 	}
 
 	return nil
-}
-
-// getGopathBinDir returns the GOPATH bin directory for a version
-func (s *ShimManager) getGopathBinDir(version string) string {
-	return s.config.VersionGopathBin(version)
 }

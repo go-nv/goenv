@@ -12,7 +12,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/platform"
-	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/internal/resolver"
 	"github.com/spf13/cobra"
 )
 
@@ -108,16 +108,16 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--image is only supported with --tool=syft")
 	}
 
-	// Resolve tool path
-	toolPath, err := resolveSBOMTool(cfg, sbomTool)
-	if err != nil {
-		return err
-	}
-
-	// Get current Go version for provenance
-	goVersion, _, err := mgr.GetCurrentVersion()
+	// Get current Go version for provenance and tool resolution
+	goVersion, versionSource, err := mgr.GetCurrentVersion()
 	if err != nil {
 		goVersion = "unknown"
+	}
+
+	// Resolve tool path using version context
+	toolPath, err := resolveSBOMTool(cfg, sbomTool, goVersion, versionSource)
+	if err != nil {
+		return err
 	}
 
 	// Print provenance header to stderr (safe for CI logs)
@@ -169,15 +169,18 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// resolveSBOMTool finds the tool binary in goenv-managed paths
-func resolveSBOMTool(cfg *config.Config, tool string) (string, error) {
-	// Check host-specific bin directory first using consolidated utility
-	hostBin := cfg.HostBinDir()
-	if toolPath, err := utils.FindExecutable(hostBin, tool); err == nil {
-		return toolPath, nil
+// resolveSBOMTool finds the tool binary using version-aware resolution
+func resolveSBOMTool(cfg *config.Config, tool, version, versionSource string) (string, error) {
+	// Use resolver to respect local vs global context
+	r := resolver.New(cfg)
+	
+	if version != "unknown" && version != "" {
+		if toolPath, err := r.ResolveBinary(tool, version, versionSource); err == nil {
+			return toolPath, nil
+		}
 	}
 
-	// Check if tool is in PATH (system-wide installation)
+	// Fallback: Check if tool is in PATH (system-wide installation)
 	if path, err := exec.LookPath(tool); err == nil {
 		return path, nil
 	}
@@ -185,7 +188,7 @@ func resolveSBOMTool(cfg *config.Config, tool string) (string, error) {
 	// Tool not found - provide actionable error
 	return "", fmt.Errorf(`%s not found
 
-To install:
+To install for current version:
   goenv tools install %s@latest
 
 Or install system-wide with:
