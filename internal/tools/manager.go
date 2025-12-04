@@ -113,8 +113,22 @@ func (m *Manager) Install(opts InstallOptions) (*InstallResult, error) {
 			return nil, errors.FailedTo("load config", err)
 		}
 
-		// Append new tools to config and save
-		cfg.Tools = append(cfg.Tools, newTools...)
+		for _, tool := range newTools {
+			// Check if tool already exists in config and update it
+
+			idx := utils.FindIndex(cfg.Tools, func(t Tool) bool {
+				return t.Name == tool.Name
+			})
+
+			if idx >= 0 {
+				// Update existing tool entry
+				cfg.Tools[idx] = tool
+			} else {
+				// Add new tool entry
+				cfg.Tools = append(cfg.Tools, tool)
+			}
+		}
+
 		SaveConfig(cfgPath, cfg)
 	}
 
