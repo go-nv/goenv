@@ -168,14 +168,14 @@ func ConfigPath(goenvRoot string) string {
 func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath string, verbose bool) error {
 	if !config.Enabled {
 		if verbose {
-			fmt.Println("Default tools installation is disabled")
+			fmt.Println("Tools installation is disabled")
 		}
 		return nil
 	}
 
 	if len(config.Tools) == 0 {
 		if verbose {
-			fmt.Println("No default tools configured")
+			fmt.Println("No tools configured")
 		}
 		return nil
 	}

@@ -4,9 +4,9 @@ package tools
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
@@ -84,17 +84,38 @@ func (m *Manager) Install(opts InstallOptions) (*InstallResult, error) {
 	}
 
 	// Execute installations
+	var installedTools = make(map[string]bool)
+	var newTools []Tool
+
 	for _, version := range versions {
 		for _, pkg := range packages {
 			toolName := ExtractToolName(pkg)
 
-			if err := m.InstallSingleTool(version, pkg, opts.Verbose); err != nil {
+			if tool, err := m.InstallSingleTool(version, pkg, opts.Verbose); err != nil {
 				result.Failed = append(result.Failed, fmt.Sprintf("%s@%s", toolName, version))
 				result.Errors = append(result.Errors, fmt.Errorf("%s (using Go %s): %w", pkg, version, err))
 			} else {
 				result.Installed = append(result.Installed, fmt.Sprintf("%s@%s", toolName, version))
+				if !installedTools[toolName] {
+					installedTools[toolName] = true
+					newTools = append(newTools, tool)
+				}
 			}
 		}
+	}
+
+	if len(newTools) > 0 {
+		cfgPath := ConfigPath(m.cfg.Root)
+
+		// Load existing config
+		cfg, err := LoadConfig(cfgPath)
+		if err != nil {
+			return nil, errors.FailedTo("load config", err)
+		}
+
+		// Append new tools to config and save
+		cfg.Tools = append(cfg.Tools, newTools...)
+		SaveConfig(cfgPath, cfg)
 	}
 
 	return result, nil
@@ -103,62 +124,38 @@ func (m *Manager) Install(opts InstallOptions) (*InstallResult, error) {
 // InstallSingleTool installs a single tool package for a specific Go version.
 // This is useful for commands that need per-tool progress feedback.
 // For batch installation, use Install() instead.
-func (m *Manager) InstallSingleTool(version, packagePath string, verbose bool) error {
-	versionPath := filepath.Join(m.cfg.Root, "versions", version)
-	goRoot := versionPath
-	goBinDir := filepath.Join(goRoot, "bin")
-	
-	// Use $HOME/go/{version} as GOPATH to match the runtime environment set by sh-rehash
-	// This ensures tools installed with "goenv tools install" go to the same location
-	// as tools installed with "go install" during normal usage
-	home, err := os.UserHomeDir()
+func (m *Manager) InstallSingleTool(version, packagePath string, verbose bool) (Tool, error) {
+	// Normalize package path to ensure it has a version
+	packagePath = NormalizePackagePath(packagePath)
+
+	// Split package path from version for the Tool struct
+	// packagePath format: "golang.org/x/tools/gopls@v0.20.0"
+	parts := strings.Split(packagePath, "@")
+	pkg := parts[0]
+	ver := "@latest" // Default to latest if not specified
+	if len(parts) > 1 {
+		ver = "@" + parts[1]
+	}
+
+	cfgPath := ConfigPath(m.cfg.Root)
+
+	cfg, err := LoadConfig(cfgPath)
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
-	}
-	gopath := filepath.Join(home, "go", version)
-
-	// Check if Go binary exists (handles .bat/.exe on Windows)
-	goBin, err := utils.FindExecutable(goBinDir, "go")
-	if err != nil {
-		return fmt.Errorf("go binary not found for version %s", version)
+		return Tool{}, errors.FailedTo("load config", err)
 	}
 
-	// Ensure GOPATH exists
-	if err := utils.EnsureDirWithContext(filepath.Join(gopath, "bin"), "create GOPATH"); err != nil {
-		return err
+	newTool := Tool{
+		Name:           ExtractToolName(packagePath),
+		Package:        pkg,
+		Version:        ver,
+		UpdateStrategy: "auto", // Use stable versions
 	}
 
-	// Run go install
-	cmd := exec.Command(goBin, "install", packagePath)
-	cmd.Env = append(os.Environ(),
-		utils.EnvVarGoroot+"="+goRoot,
-		utils.EnvVarGopath+"="+gopath,
-	)
+	// Create a temporary config with a single tool to reuse the gold standard installation logic
+	cfg.Tools = []Tool{newTool}
 
-	// Set shared GOMODCACHE if not already set (matches exec.go behavior)
-	if os.Getenv(utils.EnvVarGomodcache) == "" {
-		sharedGomodcache := filepath.Join(m.cfg.Root, "shared", "go-mod")
-		cmd.Env = append(cmd.Env, utils.EnvVarGomodcache+"="+sharedGomodcache)
-	}
-
-	if verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("go install failed: %w", err)
-		}
-	} else {
-		// Capture stderr to provide helpful error messages
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			if len(output) > 0 {
-				return fmt.Errorf("%s", string(output))
-			}
-			return fmt.Errorf("go install failed: %w", err)
-		}
-	}
-
-	return nil
+	// Use the gold standard InstallTools function with host-specific GOPATH
+	return newTool, InstallTools(cfg, version, m.cfg.Root, m.cfg.HostGopath(), verbose)
 }
 
 // UninstallOptions configures tool uninstallation behavior.
@@ -263,8 +260,8 @@ func (m *Manager) UninstallSingleTool(version, toolName string) error {
 // CheckToolUpdates checks if tools have newer versions available.
 // It populates the LatestVersion and IsOutdated fields for tools with PackagePath.
 // Returns a new slice with updated Tool structs.
-func (m *Manager) CheckToolUpdates(tools []Tool) []Tool {
-	result := make([]Tool, 0, len(tools))
+func (m *Manager) CheckToolUpdates(tools []ToolMetadata) []ToolMetadata {
+	result := make([]ToolMetadata, 0, len(tools))
 
 	for _, tool := range tools {
 		// Skip tools without package path
@@ -299,8 +296,8 @@ func (m *Manager) GetStatus() (*ToolStatus, error) {
 
 	status := &ToolStatus{
 		ByVersion:   allTools,
-		AllTools:    []Tool{},
-		Outdated:    []Tool{},
+		AllTools:    []ToolMetadata{},
+		Outdated:    []ToolMetadata{},
 		TotalCount:  0,
 		UniqueTools: 0,
 	}
@@ -369,7 +366,7 @@ func (m *Manager) Sync(opts SyncOptions) (*InstallResult, error) {
 	}
 
 	// Filter tools if specific names requested
-	var toolsToSync []Tool
+	var toolsToSync []ToolMetadata
 	if len(opts.ToolNames) > 0 {
 		for _, tool := range sourceTools {
 			if slices.Contains(opts.ToolNames, tool.Name) {
@@ -410,13 +407,13 @@ func (m *Manager) Sync(opts SyncOptions) (*InstallResult, error) {
 
 // ListTools returns all tools installed for a specific version.
 // This is a convenience wrapper around detection.ListForVersion.
-func (m *Manager) ListTools(version string) ([]Tool, error) {
+func (m *Manager) ListTools(version string) ([]ToolMetadata, error) {
 	return ListForVersion(m.cfg, version)
 }
 
 // ListAllTools returns all tools across all installed Go versions.
 // This is a convenience wrapper around detection.ListAll.
-func (m *Manager) ListAllTools() (map[string][]Tool, error) {
+func (m *Manager) ListAllTools() (map[string][]ToolMetadata, error) {
 	return ListAll(m.cfg, m.versionMgr)
 }
 

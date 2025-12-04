@@ -166,7 +166,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 		}
 
 		// Install using manager API
-		if err := toolsMgr.InstallSingleTool(targetVersion, packagePath, true); err != nil {
+		if _, err := toolsMgr.InstallSingleTool(targetVersion, packagePath, true); err != nil {
 			fmt.Fprintf(cmd.OutOrStdout(), "  %sFailed to install %s: %v\n", utils.Emoji("❌ "), tool.Name, err)
 			failCount++
 			continue

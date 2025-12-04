@@ -182,7 +182,7 @@ func TestInstallToolForVersion_MissingGo(t *testing.T) {
 	// Don't create Go binary - should fail
 	mgr := manager.NewManager(cfg)
 	toolMgr := toolspkg.NewManager(cfg, mgr)
-	err = toolMgr.InstallSingleTool(version, "gopls@latest", false)
+	_, err = toolMgr.InstallSingleTool(version, "gopls@latest", false)
 	assert.Error(t, err, "Expected error when Go binary is missing")
 
 	assert.Contains(t, err.Error(), "go binary not found", "Expected 'Go binary not found' error %v", err)
