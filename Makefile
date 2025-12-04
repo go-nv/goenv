@@ -27,7 +27,7 @@ build:
 build-swap:: build swap
 
 test:
-	go run scripts/build-tool/main.go -task=test
+	unset GOENV_DEBUG && go run scripts/build-tool/main.go -task=test
 
 # Test Windows compatibility (can run on any OS)
 test-windows:
