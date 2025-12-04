@@ -225,7 +225,6 @@ func TestShRehashCommand(t *testing.T) {
 		assert.Contains(t, output, "/existing/path1")
 		assert.Contains(t, output, "/existing/path2")
 	})
-}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
