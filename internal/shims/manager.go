@@ -349,11 +349,5 @@ if "%%program%%"=="goenv" (
 
 // getGopathBinDir returns the GOPATH bin directory for a version
 func (s *ShimManager) getGopathBinDir(version string) string {
-	// Default to $HOME/go/{version}/bin
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-
-	return filepath.Join(home, "go", version, "bin")
+	return s.config.VersionGopathBin(version)
 }

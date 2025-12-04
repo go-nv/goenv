@@ -176,6 +176,57 @@ func TestShRehashCommand(t *testing.T) {
 		},
 	}
 
+	// Additional test for duplicate prevention
+	t.Run("prevents duplicate GOPATH entries when re-sourced", func(t *testing.T) {
+		if utils.IsWindows() {
+			t.Skip("Skipping Unix shell test on Windows")
+		}
+
+		tmpDir, cleanup := cmdtest.SetupTestEnv(t)
+		defer cleanup()
+
+		// Create version directory
+		versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
+		err := utils.EnsureDirWithContext(versionDir, "create test directory")
+		require.NoError(t, err)
+
+		home, _ := os.UserHomeDir()
+		versionGopath := filepath.Join(home, "go", "1.12.0")
+
+		// Simulate GOPATH that already has the version-specific path (from previous init)
+		existingGopath := versionGopath + ":/existing/path1:" + versionGopath + ":/existing/path2"
+
+		// Set environment variables
+		os.Setenv("GOENV_VERSION", "1.12.0")
+		os.Setenv("GOENV_SHELL", "bash")
+		os.Setenv("GOPATH", existingGopath)
+		defer os.Unsetenv("GOENV_VERSION")
+		defer os.Unsetenv("GOENV_SHELL")
+		defer os.Unsetenv("GOPATH")
+
+		// Execute command
+		outputBuf := &strings.Builder{}
+		cmd := &cobra.Command{}
+		cmd.SetOut(outputBuf)
+		cmd.SetErr(&strings.Builder{})
+
+		err = runShRehash(cmd, []string{"--only-manage-paths"})
+		require.NoError(t, err)
+
+		output := outputBuf.String()
+
+		// Count occurrences of the version-specific GOPATH
+		count := strings.Count(output, versionGopath)
+
+		// Should only appear once in the output, not multiple times
+		assert.Equal(t, 1, count, "Version-specific GOPATH should appear only once in output, got: %s", output)
+
+		// Verify both custom paths are still there
+		assert.Contains(t, output, "/existing/path1")
+		assert.Contains(t, output, "/existing/path2")
+	})
+}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir, cleanup := cmdtest.SetupTestEnv(t)
