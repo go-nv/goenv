@@ -196,17 +196,22 @@ Or install system-wide with:
 func buildCycloneDXCommand(toolPath string, cfg *config.Config) (*exec.Cmd, error) {
 	args := []string{}
 
-	// Output file
+	// Use the "mod" subcommand for module SBOMs (default behavior)
+	// "mod" generates SBOMs for modules, including all packages
+	// "app" would be for application binaries, "bin" for pre-built binaries
+	args = append(args, "mod")
+
+	// Output file - new format uses -output (with single dash)
 	args = append(args, "-output", sbomOutput)
 
-	// Format
+	// Format - newer versions use -output-format flag
 	if sbomFormat == "cyclonedx-json" {
 		args = append(args, "-json")
 	} else if sbomFormat != "cyclonedx-xml" {
 		return nil, fmt.Errorf("cyclonedx-gomod only supports cyclonedx-json and cyclonedx-xml formats")
 	}
 
-	// Modules only
+	// Modules only (include licenses and set type)
 	if sbomModulesOnly {
 		args = append(args, "-licenses", "-type", "library")
 	}

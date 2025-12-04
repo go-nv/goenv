@@ -150,14 +150,14 @@ func TestBuildCycloneDXCommand(t *testing.T) {
 			format:      "cyclonedx-json",
 			modulesOnly: false,
 			output:      "sbom.json",
-			expectArgs:  []string{"-output", "sbom.json", "-json"},
+			expectArgs:  []string{"mod", "-output", "sbom.json", "-json"},
 		},
 		{
 			name:        "modules only",
 			format:      "cyclonedx-json",
 			modulesOnly: true,
 			output:      "sbom.json",
-			expectArgs:  []string{"-output", "sbom.json", "-json", "-licenses", "-type", "library"},
+			expectArgs:  []string{"mod", "-output", "sbom.json", "-json", "-licenses", "-type", "library"},
 		},
 		{
 			name:        "unsupported format",
