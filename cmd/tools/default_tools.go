@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/cmdutil"
-	"github.com/go-nv/goenv/internal/defaulttools"
 	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
@@ -98,7 +98,7 @@ func init() {
 
 func runDefaultToolsList(cmd *cobra.Command, args []string) error {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 
 	// Check if config exists
 	if utils.FileNotExists(configPath) {
@@ -107,7 +107,7 @@ func runDefaultToolsList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil {
 		return errors.FailedTo("load config", err)
 	}
@@ -145,7 +145,7 @@ func runDefaultToolsList(cmd *cobra.Command, args []string) error {
 
 func runDefaultToolsInit(cmd *cobra.Command, args []string) error {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 
 	// Check if config already exists
 	if utils.PathExists(configPath) {
@@ -155,8 +155,8 @@ func runDefaultToolsInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create default config
-	toolConfig := defaulttools.DefaultConfig()
-	if err := defaulttools.SaveConfig(configPath, toolConfig); err != nil {
+	toolConfig := tools.DefaultConfig()
+	if err := tools.SaveConfig(configPath, toolConfig); err != nil {
 		return errors.FailedTo("create config", err)
 	}
 
@@ -176,9 +176,9 @@ func runDefaultToolsInit(cmd *cobra.Command, args []string) error {
 
 func runEnable(cmd *cobra.Command, args []string) error {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil {
 		return errors.FailedTo("load config", err)
 	}
@@ -189,7 +189,7 @@ func runEnable(cmd *cobra.Command, args []string) error {
 	}
 
 	toolConfig.Enabled = true
-	if err := defaulttools.SaveConfig(configPath, toolConfig); err != nil {
+	if err := tools.SaveConfig(configPath, toolConfig); err != nil {
 		return errors.FailedTo("save config", err)
 	}
 
@@ -201,9 +201,9 @@ func runEnable(cmd *cobra.Command, args []string) error {
 
 func runDisable(cmd *cobra.Command, args []string) error {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil {
 		return errors.FailedTo("load config", err)
 	}
@@ -214,7 +214,7 @@ func runDisable(cmd *cobra.Command, args []string) error {
 	}
 
 	toolConfig.Enabled = false
-	if err := defaulttools.SaveConfig(configPath, toolConfig); err != nil {
+	if err := tools.SaveConfig(configPath, toolConfig); err != nil {
 		return errors.FailedTo("save config", err)
 	}
 
@@ -227,10 +227,10 @@ func runDisable(cmd *cobra.Command, args []string) error {
 
 func runInstallTools(cmd *cobra.Command, args []string) error {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 	goVersion := args[0]
 
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil {
 		return errors.FailedTo("load config", err)
 	}
@@ -250,7 +250,7 @@ func runInstallTools(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Installing default tools for Go %s...\n", goVersion)
 	fmt.Fprintln(cmd.OutOrStdout())
 
-	if err := defaulttools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.HostGopath(), true); err != nil {
+	if err := tools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.HostGopath(), true); err != nil {
 		return errors.FailedTo("install default tools", err)
 	}
 
@@ -262,10 +262,10 @@ func runInstallTools(cmd *cobra.Command, args []string) error {
 
 func runVerify(cmd *cobra.Command, args []string) error {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 	goVersion := args[0]
 
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil {
 		return errors.FailedTo("load config", err)
 	}
@@ -278,7 +278,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Checking default tools for Go %s...\n", goVersion)
 	fmt.Fprintln(cmd.OutOrStdout())
 
-	results, err := defaulttools.VerifyTools(toolConfig, goVersion, cfg.Root)
+	results, err := tools.VerifyTools(toolConfig, goVersion, cfg.Root)
 	if err != nil {
 		return errors.FailedTo("verify tools", err)
 	}

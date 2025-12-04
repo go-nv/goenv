@@ -1,4 +1,4 @@
-package defaulttools
+package tools
 
 import (
 	"fmt"
@@ -219,13 +219,13 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 			utils.EnvVarGoroot+"="+goRoot,
 			utils.EnvVarGopath+"="+hostGopath, // Use host-specific GOPATH
 		)
-		
+
 		// Set shared GOMODCACHE if not already set (matches exec.go behavior)
 		if os.Getenv(utils.EnvVarGomodcache) == "" {
 			sharedGomodcache := filepath.Join(goenvRoot, "shared", "go-mod")
 			cmd.Env = append(cmd.Env, utils.EnvVarGomodcache+"="+sharedGomodcache)
 		}
-		
+
 		cmd.Stdout = nil // Suppress output unless there's an error
 		cmd.Stderr = nil
 

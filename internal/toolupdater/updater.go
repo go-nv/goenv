@@ -1,5 +1,5 @@
-// Package toolupdater provides automatic update functionality for Go tools.
-// It integrates with the existing tools and defaulttools packages to enable
+// Package toolupdater provides automatic update functionality for Go toolspkg.
+// It integrates with the existing tools and tools packages to enable
 // smart tool version management across Go versions.
 package toolupdater
 
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/config"
-	"github.com/go-nv/goenv/internal/defaulttools"
 	"github.com/go-nv/goenv/internal/errors"
 	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
@@ -97,15 +96,15 @@ type UpdateCheck struct {
 type Updater struct {
 	cfg         *config.Config
 	cache       *Cache
-	toolsConfig *defaulttools.Config
+	toolsConfig *toolspkg.Config
 }
 
 // NewUpdater creates a new tool updater
 func NewUpdater(cfg *config.Config) *Updater {
-	// Load defaulttools config for version overrides and strategies
-	toolsConfig, _ := defaulttools.LoadConfig(defaulttools.ConfigPath(cfg.Root))
+	// Load tools config for version overrides and strategies
+	toolsConfig, _ := toolspkg.LoadConfig(toolspkg.ConfigPath(cfg.Root))
 	if toolsConfig == nil {
-		toolsConfig = defaulttools.DefaultConfig()
+		toolsConfig = toolspkg.DefaultConfig()
 	}
 
 	return &Updater{
@@ -146,7 +145,7 @@ func (u *Updater) CheckForUpdates(opts UpdateOptions) (*UpdateResult, error) {
 	// Filter tools if specific names requested
 	toolsToCheck := tools
 	if len(opts.ToolNames) > 0 {
-		filtered := []toolspkg.Tool{}
+		filtered := []toolspkg.ToolMetadata{}
 		for _, tool := range tools {
 			if utils.SliceContains(opts.ToolNames, tool.Name) {
 				filtered = append(filtered, tool)
@@ -192,7 +191,7 @@ func (u *Updater) CheckForUpdates(opts UpdateOptions) (*UpdateResult, error) {
 }
 
 // checkToolUpdate checks if a single tool has an update available
-func (u *Updater) checkToolUpdate(tool toolspkg.Tool, opts UpdateOptions) UpdateCheck {
+func (u *Updater) checkToolUpdate(tool toolspkg.ToolMetadata, opts UpdateOptions) UpdateCheck {
 	check := UpdateCheck{
 		ToolName:        tool.Name,
 		CurrentVersion:  tool.Version,
@@ -249,8 +248,8 @@ func (u *Updater) checkToolUpdate(tool toolspkg.Tool, opts UpdateOptions) Update
 
 // resolveTargetVersion determines the target version for a tool update
 // Handles version overrides and latest_compatible strategy
-func (u *Updater) resolveTargetVersion(tool toolspkg.Tool, goVersion string) (string, string) {
-	// Get tool config from defaulttools if it exists
+func (u *Updater) resolveTargetVersion(tool toolspkg.ToolMetadata, goVersion string) (string, string) {
+	// Get tool config from tools if it exists
 	toolConfig := u.toolsConfig.GetToolByName(tool.Name)
 
 	// Check for version override first
@@ -284,7 +283,7 @@ func (u *Updater) resolveTargetVersion(tool toolspkg.Tool, goVersion string) (st
 }
 
 // findVersionOverride checks if there's a version override for the Go version
-func (u *Updater) findVersionOverride(toolConfig *defaulttools.Tool, goVersion string) string {
+func (u *Updater) findVersionOverride(toolConfig *toolspkg.Tool, goVersion string) string {
 	if toolConfig == nil || len(toolConfig.VersionOverrides) == 0 {
 		return ""
 	}
@@ -425,7 +424,7 @@ func (u *Updater) shouldUpdate(currentVersion, latestVersion string, strategy Up
 }
 
 // updateTool performs the actual tool update
-func (u *Updater) updateTool(tool toolspkg.Tool, version, goVersion string, verbose bool) error {
+func (u *Updater) updateTool(tool toolspkg.ToolMetadata, version, goVersion string, verbose bool) error {
 	// Build package path with version
 	packagePath := tool.PackagePath
 	if version != "" {

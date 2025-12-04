@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-nv/goenv/internal/defaulttools"
+	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/spf13/cobra"
@@ -37,9 +37,9 @@ func TestDefaultToolsList_WithConfig(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := defaulttools.DefaultConfig()
-	err = defaulttools.SaveConfig(configPath, config)
+	configPath := tools.ConfigPath(tmpDir)
+	config := tools.DefaultConfig()
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	buf := new(bytes.Buffer)
@@ -80,13 +80,13 @@ func TestDefaultToolsInit(t *testing.T) {
 	assert.Contains(t, output, "Created default tools configuration", "Expected success message %v", output)
 
 	// Verify config file was created
-	configPath := defaulttools.ConfigPath(tmpDir)
+	configPath := tools.ConfigPath(tmpDir)
 	if utils.FileNotExists(configPath) {
 		t.Errorf("Config file was not created at %s", configPath)
 	}
 
 	// Verify config contents
-	config, err := defaulttools.LoadConfig(configPath)
+	config, err := tools.LoadConfig(configPath)
 	require.NoError(t, err, "Failed to load created config")
 	assert.True(t, config.Enabled, "Expected config to be enabled by default")
 	assert.NotEqual(t, 0, len(config.Tools), "Expected default tools to be configured")
@@ -99,9 +99,9 @@ func TestDefaultToolsInit_AlreadyExists(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config first
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := defaulttools.DefaultConfig()
-	err = defaulttools.SaveConfig(configPath, config)
+	configPath := tools.ConfigPath(tmpDir)
+	config := tools.DefaultConfig()
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create initial config")
 
 	buf := new(bytes.Buffer)
@@ -122,10 +122,10 @@ func TestDefaultToolsEnable(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create disabled config
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := defaulttools.DefaultConfig()
+	configPath := tools.ConfigPath(tmpDir)
+	config := tools.DefaultConfig()
 	config.Enabled = false
-	err = defaulttools.SaveConfig(configPath, config)
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	buf := new(bytes.Buffer)
@@ -139,7 +139,7 @@ func TestDefaultToolsEnable(t *testing.T) {
 	assert.Contains(t, output, "Default tools enabled", "Expected success message %v", output)
 
 	// Verify config was updated
-	updatedConfig, err := defaulttools.LoadConfig(configPath)
+	updatedConfig, err := tools.LoadConfig(configPath)
 	require.NoError(t, err, "Failed to load config")
 	assert.True(t, updatedConfig.Enabled, "Expected config to be enabled")
 }
@@ -151,10 +151,10 @@ func TestDefaultToolsEnable_AlreadyEnabled(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create enabled config
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := defaulttools.DefaultConfig()
+	configPath := tools.ConfigPath(tmpDir)
+	config := tools.DefaultConfig()
 	config.Enabled = true
-	err = defaulttools.SaveConfig(configPath, config)
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	buf := new(bytes.Buffer)
@@ -175,10 +175,10 @@ func TestDefaultToolsDisable(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create enabled config
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := defaulttools.DefaultConfig()
+	configPath := tools.ConfigPath(tmpDir)
+	config := tools.DefaultConfig()
 	config.Enabled = true
-	err = defaulttools.SaveConfig(configPath, config)
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	buf := new(bytes.Buffer)
@@ -193,7 +193,7 @@ func TestDefaultToolsDisable(t *testing.T) {
 	assert.Contains(t, output, "Configuration file preserved", "Expected preservation message %v", output)
 
 	// Verify config was updated
-	updatedConfig, err := defaulttools.LoadConfig(configPath)
+	updatedConfig, err := tools.LoadConfig(configPath)
 	require.NoError(t, err, "Failed to load config")
 	if updatedConfig.Enabled {
 		t.Errorf("Expected config to be disabled")
@@ -207,10 +207,10 @@ func TestDefaultToolsDisable_AlreadyDisabled(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create disabled config
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := defaulttools.DefaultConfig()
+	configPath := tools.ConfigPath(tmpDir)
+	config := tools.DefaultConfig()
 	config.Enabled = false
-	err = defaulttools.SaveConfig(configPath, config)
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	buf := new(bytes.Buffer)
@@ -244,12 +244,12 @@ func TestDefaultToolsInstall_EmptyToolsList(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config with empty tools list
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := &defaulttools.Config{
+	configPath := tools.ConfigPath(tmpDir)
+	config := &tools.Config{
 		Enabled: true,
-		Tools:   []defaulttools.Tool{}, // Empty tools list
+		Tools:   []tools.Tool{}, // Empty tools list
 	}
-	err = defaulttools.SaveConfig(configPath, config)
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	buf := new(bytes.Buffer)
@@ -274,10 +274,10 @@ func TestDefaultToolsInstall_DisabledConfig(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarVersion.String(), "1.21.0")
 
 	// Create disabled config with tools
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := defaulttools.DefaultConfig()
+	configPath := tools.ConfigPath(tmpDir)
+	config := tools.DefaultConfig()
 	config.Enabled = false
-	err = defaulttools.SaveConfig(configPath, config)
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	// Create a fake Go version directory structure
@@ -342,12 +342,12 @@ func TestDefaultToolsVerify_EmptyToolsList(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config with no tools
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := &defaulttools.Config{
+	configPath := tools.ConfigPath(tmpDir)
+	config := &tools.Config{
 		Enabled: true,
-		Tools:   []defaulttools.Tool{},
+		Tools:   []tools.Tool{},
 	}
-	err = defaulttools.SaveConfig(configPath, config)
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	buf := new(bytes.Buffer)
@@ -368,9 +368,9 @@ func TestDefaultToolsVerify_WithTools(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 
 	// Create config
-	configPath := defaulttools.ConfigPath(tmpDir)
-	config := defaulttools.DefaultConfig()
-	err = defaulttools.SaveConfig(configPath, config)
+	configPath := tools.ConfigPath(tmpDir)
+	config := tools.DefaultConfig()
+	err = tools.SaveConfig(configPath, config)
 	require.NoError(t, err, "Failed to create config")
 
 	// Create version directory structure

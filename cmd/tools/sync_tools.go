@@ -196,7 +196,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 }
 
 // filterTools applies --select and --exclude filters to the tool list
-func filterTools(toolList []toolspkg.Tool) []toolspkg.Tool {
+func filterTools(toolList []toolspkg.ToolMetadata) []toolspkg.ToolMetadata {
 	// Build set of selected tools
 	var selectSet map[string]bool
 	if syncToolsFlags.select_ != "" {
@@ -216,7 +216,7 @@ func filterTools(toolList []toolspkg.Tool) []toolspkg.Tool {
 	}
 
 	// Filter tools
-	var filtered []toolspkg.Tool
+	var filtered []toolspkg.ToolMetadata
 	for _, tool := range toolList {
 		// If select is specified, only include selected tools
 		if selectSet != nil && !selectSet[tool.Name] {

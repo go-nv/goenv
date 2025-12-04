@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-// Tool represents an installed tool binary with comprehensive metadata.
+// ToolMetadata represents an installed tool binary with comprehensive metadata.
 // This is the unified tool representation used throughout goenv.
-type Tool struct {
+type ToolMetadata struct {
 	Name        string    // Binary name (e.g., "goimports", "gopls")
 	BinaryPath  string    // Full path to binary
 	PackagePath string    // Full package path (e.g., "golang.org/x/tools/cmd/goimports")
@@ -22,11 +22,11 @@ type Tool struct {
 
 // ToolStatus contains aggregate tool statistics across all Go versions.
 type ToolStatus struct {
-	ByVersion   map[string][]Tool // Tools grouped by Go version
-	AllTools    []Tool            // All tools across versions
-	Outdated    []Tool            // Tools with newer versions available
-	TotalCount  int               // Total number of tools
-	UniqueTools int               // Number of unique tool names
+	ByVersion   map[string][]ToolMetadata // Tools grouped by Go version
+	AllTools    []ToolMetadata            // All tools across versions
+	Outdated    []ToolMetadata            // Tools with newer versions available
+	TotalCount  int                       // Total number of tools
+	UniqueTools int                       // Number of unique tool names
 }
 
 // InstallResult contains results of a tool installation operation.

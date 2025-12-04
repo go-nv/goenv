@@ -23,17 +23,17 @@ type VersionManager interface {
 // Returns Tool structs with full metadata including binary path and modification time.
 // If extractMetadata is true, it will also extract package path and version info
 // using 'go version -m' (which is slower but provides complete information).
-func ListForVersion(cfg *config.Config, version string) ([]Tool, error) {
+func ListForVersion(cfg *config.Config, version string) ([]ToolMetadata, error) {
 	return listForVersionWithOptions(cfg, version, true)
 }
 
 // ListForVersionBasic lists tools without extracting package metadata (faster).
-func ListForVersionBasic(cfg *config.Config, version string) ([]Tool, error) {
+func ListForVersionBasic(cfg *config.Config, version string) ([]ToolMetadata, error) {
 	return listForVersionWithOptions(cfg, version, false)
 }
 
 // listForVersionWithOptions is the internal implementation with metadata extraction control.
-func listForVersionWithOptions(cfg *config.Config, version string, extractMetadata bool) ([]Tool, error) {
+func listForVersionWithOptions(cfg *config.Config, version string, extractMetadata bool) ([]ToolMetadata, error) {
 	binPath := filepath.Join(cfg.Root, "versions", version, "gopath", "bin")
 
 	entries, err := os.ReadDir(binPath)
@@ -44,7 +44,7 @@ func listForVersionWithOptions(cfg *config.Config, version string, extractMetada
 		return nil, errors.FailedTo("read tools directory", err)
 	}
 
-	var tools []Tool
+	var tools []ToolMetadata
 	seen := make(map[string]bool) // Deduplicate across platform variants
 
 	for _, entry := range entries {
@@ -74,7 +74,7 @@ func listForVersionWithOptions(cfg *config.Config, version string, extractMetada
 			continue // Skip files we can't stat
 		}
 
-		tool := Tool{
+		tool := ToolMetadata{
 			Name:       baseName,
 			BinaryPath: fullPath,
 			GoVersion:  version,
@@ -98,13 +98,13 @@ func listForVersionWithOptions(cfg *config.Config, version string, extractMetada
 
 // ListAll lists all tools across all installed Go versions.
 // Returns a map of version -> tools and handles errors gracefully.
-func ListAll(cfg *config.Config, mgr VersionManager) (map[string][]Tool, error) {
+func ListAll(cfg *config.Config, mgr VersionManager) (map[string][]ToolMetadata, error) {
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		return nil, errors.FailedTo("list installed versions", err)
 	}
 
-	result := make(map[string][]Tool)
+	result := make(map[string][]ToolMetadata)
 
 	for _, version := range versions {
 		tools, err := ListForVersion(cfg, version)
@@ -142,7 +142,7 @@ func IsInstalled(cfg *config.Config, version, toolName string) bool {
 
 // GetToolInfo retrieves detailed information about a specific tool installation.
 // Returns nil if the tool is not found.
-func GetToolInfo(cfg *config.Config, version, toolName string) (*Tool, error) {
+func GetToolInfo(cfg *config.Config, version, toolName string) (*ToolMetadata, error) {
 	tools, err := ListForVersion(cfg, version)
 	if err != nil {
 		return nil, err

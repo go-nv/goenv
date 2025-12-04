@@ -13,13 +13,13 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
-	"github.com/go-nv/goenv/internal/defaulttools"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/hooks"
 	"github.com/go-nv/goenv/internal/install"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
+	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/toolupdater"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/version"
@@ -276,10 +276,10 @@ func runInstall(cmd *cobra.Command, args []string) error {
 // installDefaultTools installs configured default tools after a successful Go installation
 func installDefaultTools(cmd *cobra.Command, goVersion string) {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 
 	// Load config (skip if file doesn't exist or has errors)
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil || !toolConfig.Enabled || len(toolConfig.Tools) == 0 {
 		return // Silently skip if not configured or disabled
 	}
@@ -290,7 +290,7 @@ func installDefaultTools(cmd *cobra.Command, goVersion string) {
 	}
 
 	// Install tools (non-verbose to avoid clutter)
-	if err := defaulttools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.HostGopath(), !installFlags.quiet); err != nil {
+	if err := tools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.HostGopath(), !installFlags.quiet); err != nil {
 		// Don't fail the whole install if default tools fail
 		if !installFlags.quiet {
 			fmt.Fprintf(cmd.OutOrStderr(), "%sSome default tools failed to install: %v\n", utils.Emoji("⚠️  "), err)
@@ -301,10 +301,10 @@ func installDefaultTools(cmd *cobra.Command, goVersion string) {
 // checkToolUpdates checks for and optionally updates tools if auto-update is enabled
 func checkToolUpdates(cmd *cobra.Command, goVersion string) {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 
 	// Load config
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil {
 		return // Silently skip if config can't be loaded
 	}
@@ -348,7 +348,7 @@ func checkToolUpdates(cmd *cobra.Command, goVersion string) {
 
 	// Mark that we checked (for throttling)
 	toolConfig.MarkChecked(goVersion)
-	_ = defaulttools.SaveConfig(configPath, toolConfig) // Best effort save
+	_ = tools.SaveConfig(configPath, toolConfig) // Best effort save
 
 	// Count updates available
 	updatesAvailable := 0

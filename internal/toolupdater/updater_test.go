@@ -355,7 +355,7 @@ func TestCheckToolUpdateWithoutPackagePath(t *testing.T) {
 	cfg := &config.Config{Root: tmpDir}
 	updater := NewUpdater(cfg)
 
-	tool := toolspkg.Tool{
+	tool := toolspkg.ToolMetadata{
 		Name:        "unknown-tool",
 		BinaryPath:  "/some/path/unknown-tool",
 		PackagePath: "", // No package path

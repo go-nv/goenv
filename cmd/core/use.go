@@ -12,11 +12,11 @@ import (
 
 	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
-	"github.com/go-nv/goenv/internal/defaulttools"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
+	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/toolupdater"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -145,28 +145,28 @@ func runUse(cmd *cobra.Command, args []string) error {
 
 	// Configure VS Code if requested OR auto-detect workspace
 	shouldConfigureVSCode := useFlags.vscode
-	
+
 	// Auto-detect VS Code workspace if flag not explicitly set
 	if !useFlags.vscode && !useFlags.quiet {
 		cwd, _ := os.Getwd()
 		vscodeSettingsPath := filepath.Join(cwd, ".vscode", "settings.json")
-		
+
 		// Check if VS Code workspace exists
 		if _, err := os.Stat(vscodeSettingsPath); err == nil {
 			// Check VS Code setting first, then env var
 			autoSync := false
-			
+
 			// Read the settings file to check for goenv.autoSync
 			if data, err := os.ReadFile(vscodeSettingsPath); err == nil {
 				// Simple JSON check - look for "goenv.autoSync": true
 				settingsStr := string(data)
-				if strings.Contains(settingsStr, `"goenv.autoSync"`) && 
-				   (strings.Contains(settingsStr, `"goenv.autoSync": true`) || 
-				    strings.Contains(settingsStr, `"goenv.autoSync":true`)) {
+				if strings.Contains(settingsStr, `"goenv.autoSync"`) &&
+					(strings.Contains(settingsStr, `"goenv.autoSync": true`) ||
+						strings.Contains(settingsStr, `"goenv.autoSync":true`)) {
 					autoSync = true
 				}
 			}
-			
+
 			// Fall back to environment variable
 			if !autoSync {
 				envAutoSync := os.Getenv("GOENV_VSCODE_AUTO_SYNC")
@@ -174,7 +174,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 					autoSync = true
 				}
 			}
-			
+
 			if autoSync {
 				// Auto-sync enabled
 				shouldConfigureVSCode = true
@@ -184,7 +184,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(cmd.OutOrStdout(), "\n%sDetected VS Code workspace. Update settings for Go %s? [Y/n]: ", utils.Emoji("💡 "), version)
 				var response string
 				fmt.Fscanln(cmd.InOrStdin(), &response)
-				
+
 				// Default to Yes if user just presses Enter
 				if response == "" || response == "y" || response == "Y" || response == "yes" {
 					shouldConfigureVSCode = true
@@ -192,7 +192,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	
+
 	if shouldConfigureVSCode {
 		if !useFlags.quiet && !useFlags.vscode {
 			fmt.Fprintf(cmd.OutOrStdout(), "%sConfiguring VS Code...\n", utils.Emoji("🔧 "))
@@ -468,10 +468,10 @@ func updateVersionFile(conflict VersionFileConflict, newVersion string) error {
 // checkToolUpdatesForUse checks for tool updates when switching Go versions
 func checkToolUpdatesForUse(cmd *cobra.Command, goVersion string) {
 	cfg, _ := cmdutil.SetupContext()
-	configPath := defaulttools.ConfigPath(cfg.Root)
+	configPath := tools.ConfigPath(cfg.Root)
 
 	// Load config
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil {
 		return // Silently skip if config can't be loaded
 	}
@@ -515,7 +515,7 @@ func checkToolUpdatesForUse(cmd *cobra.Command, goVersion string) {
 
 	// Mark that we checked (for throttling)
 	toolConfig.MarkChecked(goVersion)
-	_ = defaulttools.SaveConfig(configPath, toolConfig) // Best effort save
+	_ = tools.SaveConfig(configPath, toolConfig) // Best effort save
 
 	// Count updates available
 	updatesAvailable := 0

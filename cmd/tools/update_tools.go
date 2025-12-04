@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/go-nv/goenv/internal/cmdutil"
-	"github.com/go-nv/goenv/internal/defaulttools"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/toolupdater"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -61,14 +61,14 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 	cfg, mgr := cmdutil.SetupContext()
 
 	// Load config to get update strategies
-	configPath := defaulttools.ConfigPath(cfg.Root)
-	toolConfig, err := defaulttools.LoadConfig(configPath)
+	configPath := tools.ConfigPath(cfg.Root)
+	toolConfig, err := tools.LoadConfig(configPath)
 	if err != nil {
 		// Config load error is not fatal, use defaults
 		if updateToolsFlags.verbose {
 			fmt.Fprintf(cmd.OutOrStderr(), "Warning: Failed to load config: %v\n", err)
 		}
-		toolConfig = defaulttools.DefaultConfig()
+		toolConfig = tools.DefaultConfig()
 	}
 
 	// Determine update strategy
