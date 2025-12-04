@@ -7,21 +7,23 @@ import (
 
 // commonTools maps common tool names to their full package paths
 var commonTools = map[string]string{
-	"gotestsum":      "gotest.tools/gotestsum",
-	"gopls":          "golang.org/x/tools/gopls",
-	"goimports":      "golang.org/x/tools/cmd/goimports",
-	"golangci-lint":  "github.com/golangci/golangci-lint/cmd/golangci-lint",
-	"staticcheck":    "honnef.co/go/tools/cmd/staticcheck",
-	"dlv":            "github.com/go-delve/delve/cmd/dlv",
-	"gofumpt":        "mvdan.cc/gofumpt",
-	"mockgen":        "go.uber.org/mock/mockgen",
-	"goreleaser":     "github.com/goreleaser/goreleaser",
-	"air":            "github.com/cosmtrek/air",
-	"migrate":        "github.com/golang-migrate/migrate/v4/cmd/migrate",
-	"swag":           "github.com/swaggo/swag/cmd/swag",
-	"wire":           "github.com/google/wire/cmd/wire",
-	"protoc-gen-go":  "google.golang.org/protobuf/cmd/protoc-gen-go",
-	"goose":          "github.com/pressly/goose/v3/cmd/goose",
+	"gotestsum":     "gotest.tools/gotestsum",
+	"gopls":         "golang.org/x/tools/gopls",
+	"goimports":     "golang.org/x/tools/cmd/goimports",
+	"golangci-lint": "github.com/golangci/golangci-lint/cmd/golangci-lint",
+	"staticcheck":   "honnef.co/go/tools/cmd/staticcheck",
+	"dlv":           "github.com/go-delve/delve/cmd/dlv",
+	"gofumpt":       "mvdan.cc/gofumpt",
+	"mockgen":       "go.uber.org/mock/mockgen",
+	"goreleaser":    "github.com/goreleaser/goreleaser",
+	"air":           "github.com/cosmtrek/air",
+	"migrate":       "github.com/golang-migrate/migrate/v4/cmd/migrate",
+	"swag":          "github.com/swaggo/swag/cmd/swag",
+	"wire":          "github.com/google/wire/cmd/wire",
+	"protoc-gen-go": "google.golang.org/protobuf/cmd/protoc-gen-go",
+	"goose":         "github.com/pressly/goose/v3/cmd/goose",
+	"cyclonedx":     "github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod",
+	"syft":          "github.com/anchore/syft/cmd/syft",
 }
 
 // ExtractToolName extracts the binary name from a package path.
@@ -72,17 +74,17 @@ func NormalizePackagePath(path string) string {
 		version = path[idx:]
 		path = path[:idx]
 	}
-	
+
 	// Check if it's a common tool name
 	if fullPath, exists := commonTools[path]; exists {
 		path = fullPath
 	}
-	
+
 	// Add @latest if no version specified
 	if version == "" {
 		version = "@latest"
 	}
-	
+
 	return path + version
 }
 
