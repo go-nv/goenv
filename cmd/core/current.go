@@ -47,10 +47,17 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 
 	_, mgr := cmdutil.SetupContext()
 
-	version, source, err := mgr.GetCurrentVersion()
+	// Get resolved version (e.g., "1.25" → "1.25.4")
+	resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
+		if versionSpec != "" && source != "" {
+			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", versionSpec, source)
+		}
 		return errors.FailedTo("determine active version", err)
 	}
+
+	// Use the resolved version for display
+	version := resolvedVersion
 
 	// --file flag: just show the source file
 	if currentFlags.file {

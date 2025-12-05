@@ -217,6 +217,31 @@ func (m *Manager) GetCurrentVersion() (string, string, error) {
 	return "", "", fmt.Errorf("no version set")
 }
 
+// GetCurrentVersionResolved returns the currently active Go version with partial versions resolved.
+// For example, if the version file contains "1.25", this will return "1.25.4" (the latest installed patch).
+// This is the method to use when you need an actual installed version path or binary.
+// Returns: (resolvedVersion, originalSpec, source, error)
+func (m *Manager) GetCurrentVersionResolved() (string, string, string, error) {
+	// Get the raw version spec from files/env
+	versionSpec, source, err := m.GetCurrentVersion()
+	if err != nil {
+		return "", "", "", err
+	}
+
+	// Return system version as-is (doesn't need resolution)
+	if versionSpec == SystemVersion {
+		return SystemVersion, SystemVersion, source, nil
+	}
+
+	// Resolve partial versions (e.g., "1.25" → "1.25.4")
+	resolvedVersion, err := m.ResolveVersionSpec(versionSpec)
+	if err != nil {
+		return "", versionSpec, source, err
+	}
+
+	return resolvedVersion, versionSpec, source, nil
+}
+
 // GetLocalVersion reads version from local .go-version file
 func (m *Manager) GetLocalVersion() (string, error) {
 	return m.readVersionFile(m.findLocalVersionFile())

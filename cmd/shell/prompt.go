@@ -137,15 +137,16 @@ func getActiveVersionCached(mgr *manager.Manager, ttl int) (string, error) {
 	}
 
 	// Cache miss or expired - query version
-	version, _, err := mgr.GetCurrentVersion()
+	// Use GetCurrentVersionResolved to handle partial versions
+	resolvedVersion, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		return "", err
 	}
 
 	// Update cache (ignore errors - caching is optional)
-	_ = writeCache(cachePath, version)
+	_ = writeCache(cachePath, resolvedVersion)
 
-	return version, nil
+	return resolvedVersion, nil
 }
 
 // generateCacheKey creates a unique cache key for the current context

@@ -65,21 +65,12 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 	cfg, mgr := cmdutil.SetupContext()
 
-	// Get the current version
-	currentVersion, source, err := mgr.GetCurrentVersion()
+	// Get the current version with resolution (e.g., "1.25" → "1.25.4")
+	currentVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
-		return errors.FailedTo("determine active Go version", err)
-	}
-
-	// Resolve and validate the version (handles partial versions like "1.25" → "1.25.5")
-	if currentVersion != manager.SystemVersion {
-		resolvedVersion, err := mgr.ResolveVersionSpec(currentVersion)
-		if err != nil {
-			// Provide enhanced error message with suggestions
-			installed, _ := mgr.ListInstalledVersions()
-			return errors.VersionNotInstalledDetailed(currentVersion, source, installed)
-		}
-		currentVersion = resolvedVersion
+		// Provide enhanced error message with suggestions
+		installed, _ := mgr.ListInstalledVersions()
+		return errors.VersionNotInstalledDetailed(versionSpec, source, installed)
 	}
 
 	if cfg.Debug {
@@ -386,5 +377,3 @@ func prependToPath(env []string, dir string) []string {
 	// PATH not found, add it
 	return append(env, pathPrefix+dir)
 }
-
-

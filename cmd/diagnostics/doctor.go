@@ -1842,7 +1842,7 @@ func fixVSCodeSync(cmd *cobra.Command, cfg *config.Config) error {
 
 func fixVSCodeGoExtension(cmd *cobra.Command, cfg *config.Config) error {
 	settingsPath, _ := vscode.GetUserSettingsPath()
-	
+
 	// Show warning about what will happen
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintf(cmd.OutOrStdout(), "  ⚠️  WARNING: This will modify your VS Code user settings file.\n")
@@ -1853,7 +1853,7 @@ func fixVSCodeGoExtension(cmd *cobra.Command, cfg *config.Config) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "     • Only Go-related keys will be modified\n")
 	fmt.Fprintf(cmd.OutOrStdout(), "     • All other settings will be preserved\n")
 	fmt.Fprintln(cmd.OutOrStdout())
-	
+
 	// Check if in non-interactive mode
 	if doctorNonInteractive {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Running in non-interactive mode - proceeding with fix\n")
@@ -1862,15 +1862,15 @@ func fixVSCodeGoExtension(cmd *cobra.Command, cfg *config.Config) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Continue? [y/N]: ")
 		var response string
 		fmt.Fscanln(cmd.InOrStdin(), &response)
-		
+
 		if response != "y" && response != "Y" && response != "yes" {
 			fmt.Fprintf(cmd.OutOrStdout(), "  Cancelled by user\n")
 			return nil // Not an error, user chose not to proceed
 		}
 	}
-	
+
 	fmt.Fprintf(cmd.OutOrStdout(), "\n  Fixing VS Code Go extension settings...\n")
-	
+
 	if err := vscode.FixGoExtensionSettings(); err != nil {
 		return errors.FailedTo("fix Go extension settings", err)
 	}
@@ -2428,9 +2428,21 @@ func checkInstalledVersions(cfg *config.Config, mgr *manager.Manager) checkResul
 }
 
 func checkCurrentVersion(cfg *config.Config, mgr *manager.Manager) checkResult {
-	version, source, err := mgr.GetCurrentVersion()
+	// Use GetCurrentVersionResolved to handle partial versions (e.g., "1.25" → "1.25.4")
+	resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
 
 	if err != nil {
+		if versionSpec != "" && source != "" {
+			return checkResult{
+				id:        "current-go-version",
+				name:      "Current Go version",
+				status:    StatusError,
+				message:   fmt.Sprintf("Version '%s' is set but not installed (set by %s)", versionSpec, source),
+				advice:    fmt.Sprintf("Install the version with 'goenv install %s'", versionSpec),
+				issueType: IssueTypeVersionNotInstalled,
+				fixData:   versionSpec,
+			}
+		}
 		return checkResult{
 			id:        "current-go-version",
 			name:      "Current Go version",
@@ -2441,7 +2453,7 @@ func checkCurrentVersion(cfg *config.Config, mgr *manager.Manager) checkResult {
 		}
 	}
 
-	if version == manager.SystemVersion {
+	if resolvedVersion == manager.SystemVersion {
 		return checkResult{
 			id:      "current-go-version",
 			name:    "Current Go version",
@@ -2450,53 +2462,48 @@ func checkCurrentVersion(cfg *config.Config, mgr *manager.Manager) checkResult {
 		}
 	}
 
-	// Validate version is installed
-	if err := mgr.ValidateVersion(version); err != nil {
-		return checkResult{
-			id:        "current-go-version",
-			name:      "Current Go version",
-			status:    StatusError,
-			message:   fmt.Sprintf("Version '%s' is set but not installed (set by %s)", version, source),
-			advice:    fmt.Sprintf("Install the version with 'goenv install %s'", version),
-			issueType: IssueTypeVersionNotInstalled,
-			fixData:   version,
-		}
-	}
-
+	// Version already validated by GetCurrentVersionResolved
 	// Check if the installation is corrupted (missing go binary)
-	// Use GetVersionPath to resolve partial versions (e.g., "1.25" -> "1.25.4")
-	versionPath, err := mgr.GetVersionPath(version)
+	versionPath, err := mgr.GetVersionPath(resolvedVersion)
 	if err != nil {
 		return checkResult{
 			id:        "current-go-version",
 			name:      "Current Go version",
 			status:    StatusError,
-			message:   fmt.Sprintf("Version '%s' is set but not installed (set by %s)", version, source),
-			advice:    fmt.Sprintf("Install the version with 'goenv install %s'", version),
+			message:   fmt.Sprintf("Version '%s' is set but not installed (set by %s)", versionSpec, source),
+			advice:    fmt.Sprintf("Install the version with 'goenv install %s'", versionSpec),
 			issueType: IssueTypeVersionNotInstalled,
-			fixData:   version,
+			fixData:   versionSpec,
 		}
 	}
 	goBinaryBase := filepath.Join(versionPath, "bin", "go")
 
 	// Check if go binary exists (handles .exe and .bat on Windows)
 	if _, err := pathutil.FindExecutable(goBinaryBase); err != nil {
+		displayVersion := resolvedVersion
+		if versionSpec != resolvedVersion {
+			displayVersion = fmt.Sprintf("%s (resolved from %s)", resolvedVersion, versionSpec)
+		}
 		return checkResult{
 			id:        "current-go-version",
 			name:      "Current Go version",
 			status:    StatusError,
-			message:   fmt.Sprintf("Version '%s' is CORRUPTED - go binary missing (set by %s)", version, source),
-			advice:    fmt.Sprintf("Reinstall: goenv uninstall %s && goenv install %s", version, version),
+			message:   fmt.Sprintf("Version '%s' is CORRUPTED - go binary missing (set by %s)", displayVersion, source),
+			advice:    fmt.Sprintf("Reinstall: goenv uninstall %s && goenv install %s", resolvedVersion, resolvedVersion),
 			issueType: IssueTypeVersionCorrupted,
-			fixData:   version,
+			fixData:   resolvedVersion,
 		}
 	}
 
+	displayVersion := resolvedVersion
+	if versionSpec != resolvedVersion {
+		displayVersion = fmt.Sprintf("%s (resolved from %s)", resolvedVersion, versionSpec)
+	}
 	return checkResult{
 		id:      "current-go-version",
 		name:    "Current Go version",
 		status:  StatusOK,
-		message: fmt.Sprintf("%s (set by %s)", version, source),
+		message: fmt.Sprintf("%s (set by %s)", displayVersion, source),
 	}
 }
 
@@ -2713,7 +2720,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 
 	// Get current Go version to validate against
 	mgr := manager.NewManager(cfg)
-	currentVersion, _, err := mgr.GetCurrentVersion()
+	currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || currentVersion == "" {
 		// Can't determine current version - do basic check
 		return checkResult{
@@ -2853,9 +2860,9 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 		}
 	}
 
-	// Get current Go version
+	// Get current Go version (resolved, e.g., "1.25" → "1.25.4")
 	mgr := manager.NewManager(cfg)
-	currentVersion, _, err := mgr.GetCurrentVersion()
+	currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		return checkResult{
 			id:      "gomod-version",
@@ -2917,8 +2924,8 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 }
 
 func checkWhichGo(cfg *config.Config, mgr *manager.Manager) checkResult {
-	// Get what goenv thinks the version should be
-	expectedVersion, source, err := mgr.GetCurrentVersion()
+	// Get what goenv thinks the version should be (resolved, e.g., "1.25" → "1.25.4")
+	expectedVersion, _, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		return checkResult{
 			id:      "actual-go-binary",
@@ -3031,8 +3038,8 @@ func checkWhichGo(cfg *config.Config, mgr *manager.Manager) checkResult {
 }
 
 func checkToolMigration(cfg *config.Config, mgr *manager.Manager) checkResult {
-	// Get current version
-	currentVersion, _, err := mgr.GetCurrentVersion()
+	// Get current version (resolved, e.g., "1.25" → "1.25.4")
+	currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || currentVersion == "" || currentVersion == manager.SystemVersion {
 		// Can't check if no version is set or using system
 		return checkResult{
@@ -3134,7 +3141,8 @@ func checkToolMigration(cfg *config.Config, mgr *manager.Manager) checkResult {
 }
 
 func checkGocacheIsolation(cfg *config.Config, mgr *manager.Manager) checkResult {
-	version, _, err := mgr.GetCurrentVersion()
+	// Get resolved version (e.g., "1.25" → "1.25.4")
+	version, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || version == "" {
 		return checkResult{
 			id:      "build-cache-isolation",
@@ -3329,7 +3337,8 @@ func listToolsForVersion(cfg *config.Config, version string) ([]string, error) {
 }
 
 func checkCacheMountType(cfg *config.Config, mgr *manager.Manager) checkResult {
-	version, _, err := mgr.GetCurrentVersion()
+	// Get resolved version (e.g., "1.25" → "1.25.4")
+	version, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || version == "" {
 		return checkResult{
 			id:      "cache-mount-type",
@@ -3444,7 +3453,8 @@ func checkGoToolchain() checkResult {
 }
 
 func checkCacheIsolationEffectiveness(cfg *config.Config, mgr *manager.Manager) checkResult {
-	version, _, err := mgr.GetCurrentVersion()
+	// Get resolved version (e.g., "1.25" → "1.25.4")
+	version, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || version == "" || version == manager.SystemVersion {
 		return checkResult{
 			id:      "architecture-aware-cache-isolation",
@@ -3617,7 +3627,8 @@ func checkRosetta(cfg *config.Config) checkResult {
 
 	// Check current Go version architecture
 	mgr := manager.NewManager(cfg)
-	currentVersion, _, err := mgr.GetCurrentVersion()
+	// Get resolved version (e.g., "1.25" → "1.25.4")
+	currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || currentVersion == "" || currentVersion == manager.SystemVersion {
 		// Can't check Go version
 		return checkResult{
@@ -3805,8 +3816,8 @@ func checkLibcCompatibility(_ *config.Config) checkResult {
 }
 
 func checkMacOSDeploymentTarget(cfg *config.Config, mgr *manager.Manager) checkResult {
-	// Get current Go binary
-	version, _, err := mgr.GetCurrentVersion()
+	// Get current Go binary (resolved, e.g., "1.25" → "1.25.4")
+	version, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || version == "" || version == manager.SystemVersion {
 		return checkResult{
 			id:      "macos-deployment-target",

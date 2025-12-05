@@ -68,21 +68,22 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Check 2: Current version
-	versionSpec, source, err := mgr.GetCurrentVersion()
+	resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s\n", utils.Gray("none (not set)"))
 		fmt.Fprintf(cmd.OutOrStdout(), "  Set with: %s\n", utils.Yellow("goenv global <version>"))
 	} else {
-		// Check if it's installed
+		// Display resolved version (already validated as installed by GetCurrentVersionResolved)
 		installed := ""
-		if versionSpec != manager.SystemVersion {
-			if mgr.IsVersionInstalled(versionSpec) {
-				installed = utils.Green(" ✓")
-			} else {
-				installed = utils.Red(" ✗ not installed")
-			}
+		if resolvedVersion != manager.SystemVersion {
+			installed = utils.Green(" ✓")
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s%s\n", utils.BoldBlue(versionSpec), installed)
+		// Show both spec and resolved if different
+		displayVersion := resolvedVersion
+		if versionSpec != resolvedVersion && versionSpec != manager.SystemVersion {
+			displayVersion = fmt.Sprintf("%s (resolved from %s)", resolvedVersion, versionSpec)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s%s\n", utils.BoldBlue(displayVersion), installed)
 
 		// Show source
 		sourceDisplay := source

@@ -35,13 +35,18 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 
 	_, mgr := cmdutil.SetupContext()
 
-	version, _, err := mgr.GetCurrentVersion()
+	// Get resolved version (e.g., "1.25" → "1.25.4")
+	resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
+		// Handle resolution errors
+		if versionSpec != "" && source != "" {
+			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", versionSpec, source)
+		}
 		return errors.FailedTo("determine version", err)
 	}
 
 	// Handle multiple versions separated by ':'
-	versions := utils.SplitVersions(version)
+	versions := utils.SplitVersions(resolvedVersion)
 
 	if len(versions) > 1 {
 		// Multiple versions - check each one and report errors for missing ones
@@ -51,8 +56,6 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 		for _, v := range versions {
 			if !mgr.IsVersionInstalled(v) && v != manager.SystemVersion {
 				hasErrors = true
-				// Get source info for error message
-				_, source, _ := mgr.GetCurrentVersion()
 				errorMessages = append(errorMessages, fmt.Sprintf("goenv: version '%s' is not installed (set by %s)", v, source))
 			}
 		}
@@ -73,12 +76,8 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 			return errors.SomeVersionsNotInstalled()
 		}
 	} else {
-		// Single version - validate it
-		if version != manager.SystemVersion && !mgr.IsVersionInstalled(version) {
-			_, source, _ := mgr.GetCurrentVersion()
-			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", version, source)
-		}
-		fmt.Fprintln(cmd.OutOrStdout(), version)
+		// Single version - already resolved and validated by GetCurrentVersionResolved
+		fmt.Fprintln(cmd.OutOrStdout(), resolvedVersion)
 	}
 
 	return nil

@@ -78,7 +78,8 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 	case 1:
 		// One arg: source → current version
 		sourceVersion = args[0]
-		targetVersion, _, err = mgr.GetCurrentVersion()
+		// Use GetCurrentVersionResolved to handle partial versions
+		targetVersion, _, _, err = mgr.GetCurrentVersionResolved()
 		if err != nil || targetVersion == "" {
 			return fmt.Errorf("cannot determine current Go version: use 'goenv local' or 'goenv global' to set one")
 		}
@@ -94,6 +95,7 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve versions (handles partial versions like "1.25" → "1.25.5")
+	// Note: sourceVersion and targetVersion are already resolved if from GetCurrentVersionResolved
 	resolvedSource, err := mgr.ResolveVersionSpec(sourceVersion)
 	if err != nil {
 		return errors.VersionNotInstalled(sourceVersion, "source")
