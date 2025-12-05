@@ -1,5 +1,8 @@
 name-template: "$RESOLVED_VERSION"
 tag-template: "$RESOLVED_VERSION"
+version-template: '2.$MINOR.$PATCH'
+filter-by-commitish: true
+commitish: master
 categories:
   - title: "🚀 Features"
     labels:
@@ -15,6 +18,10 @@ categories:
       - "bug"
   - title: "🧰 Maintenance"
     label: "chore"
+  - title: "🏗️ Build System"
+    labels:
+      - "build"
+      - "build-system"
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
 autolabeler:
@@ -34,23 +41,32 @@ autolabeler:
   - label: "enhancement"
     branch:
       - '/feature\/.+/i'
+  - label: "build-system"
+    files:
+      - "scripts/build-tool/*"
+      - "Makefile"
+      - "build.*"
+      - ".goreleaser.yml"
+    title:
+      - "/build/i"
   - label: "go-version"
     branch:
       - '/feature\/.+/i'
     files:
-      - "plugins/go-build/share/go-build/*"
+      - "internal/version/embedded_versions.go"
+      - "scripts/generate_embedded_versions/*"
     body:
       - '/(add|support) go(lang)? [0-9]+\.[0-9]+(\.[0-9]+)?/i'
 version-resolver:
   major:
     labels:
-      - "major"
+      - "major-release"
   minor:
     labels:
-      - "minor"
+      - "minor-release"
   patch:
     labels:
-      - "patch"
+      - "patch-release"
   default: patch
 template: |
   ## Changes since $PREVIOUS_TAG
