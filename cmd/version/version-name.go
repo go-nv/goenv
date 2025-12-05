@@ -35,28 +35,35 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 
 	_, mgr := cmdutil.SetupContext()
 
-	// Get resolved version (e.g., "1.25" → "1.25.4")
-	resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
+	// Get current version spec (may contain multiple versions separated by ':')
+	versionSpec, source, err := mgr.GetCurrentVersion()
 	if err != nil {
-		// Handle resolution errors
-		if versionSpec != "" && source != "" {
-			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", versionSpec, source)
-		}
 		return errors.FailedTo("determine version", err)
 	}
 
 	// Handle multiple versions separated by ':'
-	versions := utils.SplitVersions(resolvedVersion)
+	versions := utils.SplitVersions(versionSpec)
 
 	if len(versions) > 1 {
-		// Multiple versions - check each one and report errors for missing ones
+		// Multiple versions - resolve and check each one
 		hasErrors := false
 		var errorMessages []string
+		var resolvedVersions []string
 
 		for _, v := range versions {
-			if !mgr.IsVersionInstalled(v) && v != manager.SystemVersion {
+			// System version doesn't need resolution
+			if v == manager.SystemVersion {
+				resolvedVersions = append(resolvedVersions, v)
+				continue
+			}
+
+			// Try to resolve partial versions
+			resolved, err := mgr.ResolveVersionSpec(v)
+			if err != nil {
 				hasErrors = true
 				errorMessages = append(errorMessages, fmt.Sprintf("goenv: version '%s' is not installed (set by %s)", v, source))
+			} else {
+				resolvedVersions = append(resolvedVersions, resolved)
 			}
 		}
 
@@ -65,18 +72,24 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 			cmd.PrintErrln(errMsg)
 		}
 
-		// Then print successfully installed versions
-		for _, v := range versions {
-			if mgr.IsVersionInstalled(v) || v == manager.SystemVersion {
-				fmt.Fprintln(cmd.OutOrStdout(), v)
-			}
+		// Then print successfully resolved versions
+		for _, v := range resolvedVersions {
+			fmt.Fprintln(cmd.OutOrStdout(), v)
 		}
 
 		if hasErrors {
 			return errors.SomeVersionsNotInstalled()
 		}
 	} else {
-		// Single version - already resolved and validated by GetCurrentVersionResolved
+		// Single version - use the existing resolution logic
+		resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
+		if err != nil {
+			// Handle resolution errors
+			if versionSpec != "" && source != "" {
+				return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", versionSpec, source)
+			}
+			return errors.FailedTo("determine version", err)
+		}
 		fmt.Fprintln(cmd.OutOrStdout(), resolvedVersion)
 	}
 

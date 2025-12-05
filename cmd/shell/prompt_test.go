@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
@@ -31,6 +32,11 @@ func TestPromptCommand(t *testing.T) {
 			name:          "basic prompt output",
 			args:          []string{},
 			checkNonEmpty: true, // Should output some version
+			setupFunc: func(t *testing.T, tmpDir string) {
+				// Create a mock Go version so prompt has something to display
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.23.2")
+				t.Setenv(utils.GoenvEnvVarVersion.String(), "1.23.2")
+			},
 		},
 		// Note: The following tests just verify non-empty output
 		// Integration tests with actual CLI flag parsing would test formatting
@@ -40,6 +46,10 @@ func TestPromptCommand(t *testing.T) {
 				"GOENV_DISABLE_PROMPT": "1",
 			},
 			unexpectedOutput: "1.23",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.23.2")
+				t.Setenv(utils.GoenvEnvVarVersion.String(), "1.23.2")
+			},
 		},
 		{
 			name: "prompt with prefix from env var",
@@ -48,6 +58,10 @@ func TestPromptCommand(t *testing.T) {
 				"GOENV_PROMPT_SUFFIX": "]",
 			},
 			expectedOutput: "[",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.23.2")
+				t.Setenv(utils.GoenvEnvVarVersion.String(), "1.23.2")
+			},
 		},
 		{
 			name: "prompt with format from env var",
@@ -55,6 +69,10 @@ func TestPromptCommand(t *testing.T) {
 				"GOENV_PROMPT_FORMAT": "go:%s",
 			},
 			expectedOutput: "go:",
+			setupFunc: func(t *testing.T, tmpDir string) {
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.23.2")
+				t.Setenv(utils.GoenvEnvVarVersion.String(), "1.23.2")
+			},
 		},
 	}
 

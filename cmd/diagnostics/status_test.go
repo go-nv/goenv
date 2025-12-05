@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,11 +94,8 @@ func TestStatusCommand_WithCurrentVersion(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 	t.Setenv(utils.GoenvEnvVarVersion.String(), "1.21.5")
 
-	// Create version directory
-	versionsDir := filepath.Join(tmpDir, "versions")
-	versionDir := filepath.Join(versionsDir, "1.21.5")
-	err = utils.EnsureDir(filepath.Join(versionDir, "bin"))
-	require.NoError(t, err, "Failed to create version directory")
+	// Create mock Go version installation
+	cmdtest.CreateMockGoVersion(t, tmpDir, "1.21.5")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)

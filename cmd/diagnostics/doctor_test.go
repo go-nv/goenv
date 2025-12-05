@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/platform"
@@ -659,14 +660,18 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 
 			// Setup version if needed
 			if tt.setupVersion != "" && tt.setupVersion != manager.SystemVersion {
-				versionDir := filepath.Join(versionsDir, tt.setupVersion)
-				binDir := filepath.Join(versionDir, "bin")
-				err = utils.EnsureDirWithContext(binDir, "create test directory")
-				require.NoError(t, err, "Failed to create bin directory")
+				// Create a proper mock Go version installation
+				cmdtest.CreateMockGoVersion(t, tmpDir, tt.setupVersion)
 
 				// Create version file to set current version
 				versionFile := filepath.Join(tmpDir, "version")
 				testutil.WriteTestFile(t, versionFile, []byte(tt.setupVersion+"\n"), utils.PermFileDefault)
+
+				// Also set GOENV_VERSION env var to ensure version is detected
+				t.Setenv(utils.GoenvEnvVarVersion.String(), tt.setupVersion)
+
+				// Get the version directory
+				versionDir := filepath.Join(versionsDir, tt.setupVersion)
 
 				// Setup caches if requested
 				if tt.setupCache {

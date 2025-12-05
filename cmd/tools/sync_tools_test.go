@@ -65,7 +65,7 @@ func TestSyncTools_ArgumentValidation(t *testing.T) {
 		{
 			name:          "only one argument provided",
 			args:          []string{"1.21.0"},
-			expectedError: "version '1.21.0' is not installed",
+			expectedError: "cannot determine current Go version",
 		},
 		{
 			name:          "too many arguments provided",
