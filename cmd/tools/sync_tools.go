@@ -93,6 +93,19 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 		targetVersion = args[1]
 	}
 
+	// Resolve versions (handles partial versions like "1.25" → "1.25.5")
+	resolvedSource, err := mgr.ResolveVersionSpec(sourceVersion)
+	if err != nil {
+		return errors.VersionNotInstalled(sourceVersion, "source")
+	}
+	sourceVersion = resolvedSource
+
+	resolvedTarget, err := mgr.ResolveVersionSpec(targetVersion)
+	if err != nil {
+		return errors.VersionNotInstalled(targetVersion, "target")
+	}
+	targetVersion = resolvedTarget
+
 	// Validate source and target versions
 	if sourceVersion == targetVersion {
 		return fmt.Errorf("source and target versions are the same: %s (nothing to sync)", sourceVersion)

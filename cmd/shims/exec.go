@@ -71,13 +71,15 @@ func runExec(cmd *cobra.Command, args []string) error {
 		return errors.FailedTo("determine active Go version", err)
 	}
 
-	// Validate that the version is installed
+	// Resolve and validate the version (handles partial versions like "1.25" → "1.25.5")
 	if currentVersion != manager.SystemVersion {
-		if err := mgr.ValidateVersion(currentVersion); err != nil {
+		resolvedVersion, err := mgr.ResolveVersionSpec(currentVersion)
+		if err != nil {
 			// Provide enhanced error message with suggestions
 			installed, _ := mgr.ListInstalledVersions()
 			return errors.VersionNotInstalledDetailed(currentVersion, source, installed)
 		}
+		currentVersion = resolvedVersion
 	}
 
 	if cfg.Debug {
