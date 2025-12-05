@@ -142,8 +142,6 @@ Provides actionable advice for fixing any issues found.`,
 	RunE: runVSCodeDoctor,
 }
 
-
-
 var vscodeSetupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Complete VS Code setup for goenv",
@@ -319,7 +317,8 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 
 		// Get Go version - use provided version or current active version
 		if version == "" {
-			version, _, err = mgr.GetCurrentVersion()
+			// Use GetCurrentVersionResolved to handle partial versions (e.g., "1.25" → "1.25.5")
+			version, _, _, err = mgr.GetCurrentVersionResolved()
 			if err != nil {
 				return errors.FailedTo("get current Go version", err)
 			}
@@ -680,9 +679,9 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no VS Code settings found. Run 'goenv vscode init' first")
 	}
 
-	// Get current Go version
+	// Get current Go version (resolved, e.g., "1.25" → "1.25.5")
 	cfg, mgr := cmdutil.SetupContext()
-	version, _, err := mgr.GetCurrentVersion()
+	version, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		return errors.FailedTo("get current Go version", err)
 	}
@@ -808,9 +807,9 @@ func runVSCodeStatus(cmd *cobra.Command, args []string) error {
 	vscodeDir := filepath.Join(cwd, ".vscode")
 	settingsFile := filepath.Join(vscodeDir, "settings.json")
 
-	// Get current Go version
+	// Get current Go version (resolved, e.g., "1.25" → "1.25.5")
 	_, mgr := cmdutil.SetupContext()
-	version, source, err := mgr.GetCurrentVersion()
+	version, _, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		version = "none"
 		source = "none"
@@ -942,8 +941,8 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	// Check 2: Go version configured
-	version, source, err := mgr.GetCurrentVersion()
+	// Check 2: Go version configured (resolved, e.g., "1.25" → "1.25.5")
+	version, _, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		checks = append(checks, diagnosticCheck{
 			Name:    "Go Version",
@@ -1251,7 +1250,7 @@ func runVSCodeSetup(cmd *cobra.Command, args []string) error {
 	if !vscodeSetupFlags.dryRun {
 		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 1/4: Checking Go extension user settings\n",
 			utils.Emoji("🔍 "))
-		
+
 		issue, err := vscode.CheckGoExtensionSettings()
 		if err != nil {
 			fmt.Fprintf(cmd.OutOrStdout(), "  ℹ️  Could not check user settings (not critical)\n")
