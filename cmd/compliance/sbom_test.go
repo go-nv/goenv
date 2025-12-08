@@ -83,10 +83,13 @@ func TestSBOMProject_FlagValidation(t *testing.T) {
 
 			// Create mock SBOM tool in version bin directory for valid test cases
 			if !tt.expectError {
+				// On Windows, we need to create a .bat file that will be found by the tool resolver
+				// The resolver will find cyclonedx-gomod.bat when looking for cyclonedx-gomod
 				toolPath := filepath.Join(versionDir, sbomTool)
 				var content string
 				if utils.IsWindows() {
-					toolPath += ".exe"
+					// Create a .bat file instead of .exe to avoid PE executable validation issues
+					toolPath += ".bat"
 					content = "@echo off\necho {}\n"
 				} else {
 					content = "#!/bin/sh\necho '{}'\n"
