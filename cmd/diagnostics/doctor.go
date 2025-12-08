@@ -27,6 +27,7 @@ import (
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/shims"
+	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
@@ -2164,6 +2165,10 @@ func checkPath(cfg *config.Config) checkResult {
 	hasShims := false
 	shimsPosition := -1
 
+	// Check if goenv binary is actually accessible in PATH
+	goenvPath, goenvInPath := exec.LookPath("goenv")
+	_ = goenvPath // We only care if it's found
+
 	for i, dir := range pathDirs {
 		if dir == goenvBin {
 			hasBin = true
@@ -2174,14 +2179,22 @@ func checkPath(cfg *config.Config) checkResult {
 		}
 	}
 
+	// If goenv is in PATH but the expected bin directory isn't, check if bin dir actually exists
 	if !hasBin {
-		return checkResult{
-			id:      "path-configuration",
-			name:    "PATH configuration",
-			status:  StatusError,
-			message: fmt.Sprintf("%s not in PATH", goenvBin),
-			advice:  fmt.Sprintf("Add 'export PATH=\"%s:$PATH\"' to your shell config", goenvBin),
+		// If goenv binary is accessible via PATH, we're good
+		if goenvInPath == nil {
+			hasBin = true
+		} else if utils.FileExists(goenvBin) {
+			// The bin directory exists but isn't in PATH - this is an error
+			return checkResult{
+				id:      "path-configuration",
+				name:    "PATH configuration",
+				status:  StatusError,
+				message: fmt.Sprintf("%s not in PATH", goenvBin),
+				advice:  fmt.Sprintf("Add 'export PATH=\"%s:$PATH\"' to your shell config", goenvBin),
+			}
 		}
+		// Otherwise, goenv is installed elsewhere (e.g., Homebrew) and bin dir doesn't exist - that's fine
 	}
 
 	if !hasShims {
@@ -3297,41 +3310,14 @@ func checkCacheArchitecture(cfg *config.Config) checkResult {
 
 // Helper to list tools for a version without importing tooldetect (to avoid circular deps)
 func listToolsForVersion(cfg *config.Config, version string) ([]string, error) {
-	gopathBin := filepath.Join(cfg.VersionsDir(), version, "gopath", "bin")
-
-	// Check if directory exists
-	if utils.FileNotExists(gopathBin) {
-		return []string{}, nil
-	}
-
-	// Read directory
-	entries, err := os.ReadDir(gopathBin)
+	toolsMetadata, err := tools.ListForVersion(cfg, version)
 	if err != nil {
 		return nil, err
 	}
 
-	// Filter for executables
-	var tools []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		name := entry.Name()
-		// Remove Windows executable extensions for deduplication
-		if utils.IsWindows() {
-			for _, ext := range utils.WindowsExecutableExtensions() {
-				name = strings.TrimSuffix(name, ext)
-			}
-		}
-
-		// Skip common non-tool files
-		if name == ".DS_Store" {
-			continue
-		}
-
-		tools = append(tools, name)
-	}
+	tools := utils.MapSlice(toolsMetadata, func(t tools.ToolMetadata) string {
+		return t.Name
+	})
 
 	return tools, nil
 }
