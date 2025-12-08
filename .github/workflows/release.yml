@@ -19,7 +19,7 @@ jobs:
       - name: Add goenv to PATH
         run: export PATH="$PATH:./bin/goenv"
       - name: Create Homebrew PR
-        uses: dawidd6/action-homebrew-bump-formula@v6
+        uses: dawidd6/action-homebrew-bump-formula@v7
         with:
           # Required, custom GitHub access token with the 'public_repo' and 'workflow' scopes
           token: ${{ secrets.GH_HOMEBREW_TOKEN }}
