@@ -169,7 +169,7 @@ func (m *Manager) InstallSingleTool(goVersion, packagePath string, verbose bool)
 	cfg.Tools = []Tool{newTool}
 
 	// Use the gold standard InstallTools function with host-specific GOPATH
-	return newTool, InstallTools(cfg, goVersion, m.cfg.Root, m.cfg.VersionBinDir(goVersion), verbose)
+	return newTool, InstallTools(cfg, goVersion, m.cfg.Root, m.cfg.VersionDir(goVersion), verbose)
 }
 
 // UninstallOptions configures tool uninstallation behavior.

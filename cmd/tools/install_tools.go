@@ -79,7 +79,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		}
 		targetVersions = versions
 	} else {
-		currentVersion, source, err := mgr.GetCurrentVersion()
+		currentVersion, _, source, err := mgr.GetCurrentVersionResolved()
 		if err != nil {
 			return errors.FailedTo("determine Go version", err)
 		}
@@ -152,7 +152,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 						errMsg := result.Errors[i].Error()
 						fmt.Fprintf(cmd.ErrOrStderr(), "  %s Failed to install %s: %v\n",
 							utils.Red("✗"), toolName, result.Errors[i])
-						
+
 						// Provide helpful hint for common errors
 						if strings.Contains(errMsg, "missing dot in first path element") {
 							fmt.Fprintf(cmd.ErrOrStderr(), "    %s Hint: Use the full package path, e.g., gotest.tools/gotestsum@latest\n",

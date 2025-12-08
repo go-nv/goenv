@@ -173,7 +173,7 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 func resolveSBOMTool(cfg *config.Config, tool, version, versionSource string) (string, error) {
 	// Use resolver to respect local vs global context
 	r := resolver.New(cfg)
-	
+
 	if version != "unknown" && version != "" {
 		if toolPath, err := r.ResolveBinary(tool, version, versionSource); err == nil {
 			return toolPath, nil

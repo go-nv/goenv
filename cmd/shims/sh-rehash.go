@@ -58,7 +58,10 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get current version
-	currentVersion, _, _ := mgr.GetCurrentVersion()
+	currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
+	if err != nil {
+		return err
+	}
 
 	// If version is "system", don't export GOPATH/GOROOT
 	if currentVersion == manager.SystemVersion || currentVersion == "" {
@@ -101,7 +104,8 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	gorootValue := filepath.Join(cfg.Root, "versions", currentVersion)
 
 	// Generate shell-specific output
-	if shellType == shellutil.ShellTypeFish {
+	switch shellType {
+	case shellutil.ShellTypeFish:
 		// Fish shell
 		if !disableGoroot {
 			fmt.Fprintf(cmd.OutOrStdout(), "set -gx GOROOT \"%s\"\n", gorootValue)
@@ -112,7 +116,8 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 		}
 
 		// Fish doesn't support hash -r
-	} else if shellType == shellutil.ShellTypePowerShell {
+
+	case shellutil.ShellTypePowerShell:
 		// PowerShell
 		if !disableGoroot {
 			fmt.Fprintf(cmd.OutOrStdout(), "$env:GOROOT = \"%s\"\n", gorootValue)
@@ -123,7 +128,8 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 		}
 
 		// PowerShell doesn't need hash -r equivalent
-	} else if shellType == shellutil.ShellTypeCmd {
+
+	case shellutil.ShellTypeCmd:
 		// CMD
 		if !disableGoroot {
 			fmt.Fprintf(cmd.OutOrStdout(), "set GOROOT=%s\n", gorootValue)
@@ -134,7 +140,8 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 		}
 
 		// CMD doesn't need hash -r equivalent
-	} else {
+
+	default:
 		// Bash, zsh, ksh, etc.
 		if !disableGoroot {
 			fmt.Fprintf(cmd.OutOrStdout(), "export GOROOT=\"%s\"\n", gorootValue)

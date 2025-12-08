@@ -78,7 +78,7 @@ func TestUpdateTools_VersionValidation(t *testing.T) {
 		{
 			name:          "go version not installed",
 			setupVersion:  "1.21.0",
-			expectedError: "version '1.21.0' is not installed",
+			expectedError: "version '1.21.0' not installed",
 		},
 	}
 

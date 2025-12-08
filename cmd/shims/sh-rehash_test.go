@@ -55,9 +55,7 @@ func TestShRehashCommand(t *testing.T) {
 				"GOENV_DISABLE_GOPATH": "1",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 			},
 			expectedOutput: "hash -r 2>/dev/null || true",
 		},
@@ -71,9 +69,7 @@ func TestShRehashCommand(t *testing.T) {
 				"GOENV_DISABLE_GOPATH": "1",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 			},
 			expectedOutput: "",
 		},
@@ -87,9 +83,7 @@ func TestShRehashCommand(t *testing.T) {
 				"GOENV_DISABLE_GOPATH": "1",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 			},
 			expectedOutput: "hash -r 2>/dev/null || true",
 		},
@@ -103,9 +97,7 @@ func TestShRehashCommand(t *testing.T) {
 				"GOENV_DISABLE_GOPATH": "1",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 			},
 			expectedOutput: "hash -r 2>/dev/null || true",
 		},
@@ -119,14 +111,12 @@ func TestShRehashCommand(t *testing.T) {
 				"GOENV_DISABLE_GOPATH": "0",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 			},
 			expectedOutput: "export GOPATH=",
 		},
 		{
-			name: "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'fish', it echoes only export of 'GOPATH'",
+			name: "when current set 'version' is not 'system', 'GOENV_DISABLE_GOROOT' is 1, 'GOENV_DISABLE_GOPATH' is 0, shell is 'fish', it echoes export of 'GOPATH'",
 			args: []string{"--only-manage-paths"},
 			envVars: map[string]string{
 				"GOENV_VERSION":        "1.12.0",
@@ -135,9 +125,7 @@ func TestShRehashCommand(t *testing.T) {
 				"GOENV_DISABLE_GOPATH": "0",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 			},
 			expectedOutput: "set -gx GOPATH",
 		},
@@ -151,9 +139,7 @@ func TestShRehashCommand(t *testing.T) {
 				"GOENV_DISABLE_GOPATH": "0",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 			},
 			expectedOutput: "export GOROOT=",
 		},
@@ -168,9 +154,7 @@ func TestShRehashCommand(t *testing.T) {
 				"GOPATH":               "/custom/gopath",
 			},
 			setupFunc: func(t *testing.T, tmpDir string) {
-				versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-				err = utils.EnsureDirWithContext(versionDir, "create test directory")
-				require.NoError(t, err, "Failed to create version directory")
+				cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 			},
 			expectedOutput: "export GOPATH=",
 		},
@@ -186,9 +170,7 @@ func TestShRehashCommand(t *testing.T) {
 		defer cleanup()
 
 		// Create version directory
-		versionDir := filepath.Join(tmpDir, "versions", "1.12.0")
-		err := utils.EnsureDirWithContext(versionDir, "create test directory")
-		require.NoError(t, err)
+		cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 
 		home, _ := os.UserHomeDir()
 		versionGopath := filepath.Join(home, "go", "1.12.0")
@@ -333,9 +315,7 @@ func TestShRehashGOPATHDuplication(t *testing.T) {
 			defer cleanup()
 
 			// Create version directory
-			versionDir := filepath.Join(tmpDir, "versions", tt.version)
-			err := utils.EnsureDirWithContext(versionDir, "create test directory")
-			require.NoError(t, err, "Failed to create version directory")
+			cmdtest.CreateMockGoVersion(t, tmpDir, tt.version)
 
 			home, err := os.UserHomeDir()
 			require.NoError(t, err)

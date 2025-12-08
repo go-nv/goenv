@@ -50,7 +50,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		}
 		targetVersions = versions
 	} else {
-		currentVersion, _, err := mgr.GetCurrentVersion()
+		currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
 		if err != nil {
 			return errors.FailedTo("determine Go version", err)
 		}

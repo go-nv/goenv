@@ -94,7 +94,7 @@ func runUpdateTools(cmd *cobra.Command, args []string) error {
 		}
 		targetVersions = versions
 	} else {
-		goVersion, _, err := mgr.GetCurrentVersion()
+		goVersion, _, _, err := mgr.GetCurrentVersionResolved()
 		if err != nil {
 			return errors.FailedTo("determine Go version", err)
 		}
