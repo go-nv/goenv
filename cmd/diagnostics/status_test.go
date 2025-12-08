@@ -59,27 +59,20 @@ func TestStatusCommand_Initialized(t *testing.T) {
 }
 
 func TestStatusCommand_WithInstalledVersions(t *testing.T) {
-	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarShell.String(), "bash")
 
-	// Create versions directory with some installed versions
-	versionsDir := filepath.Join(tmpDir, "versions")
-	version1 := filepath.Join(versionsDir, "1.21.5")
-	version2 := filepath.Join(versionsDir, "1.22.3")
-
-	err = utils.EnsureDir(filepath.Join(version1, "bin"))
-	require.NoError(t, err, "Failed to create version1")
-	err = utils.EnsureDir(filepath.Join(version2, "bin"))
-	require.NoError(t, err, "Failed to create version2")
+	// Create mock Go version installations (with go binary)
+	cmdtest.CreateMockGoVersion(t, tmpDir, "1.21.5")
+	cmdtest.CreateMockGoVersion(t, tmpDir, "1.22.3")
 
 	buf := new(bytes.Buffer)
 	statusCmd.SetOut(buf)
 	statusCmd.SetErr(buf)
 
-	err = runStatus(statusCmd, []string{})
+	err := runStatus(statusCmd, []string{})
 	require.NoError(t, err, "runStatus() unexpected error")
 
 	output := buf.String()
