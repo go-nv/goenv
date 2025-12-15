@@ -59,7 +59,9 @@ func init() {
 }
 
 func runSyncTools(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	var sourceVersion, targetVersion string

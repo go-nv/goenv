@@ -22,7 +22,8 @@ func init() {
 }
 
 func runGoenvRoot(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	fmt.Fprintln(cmd.OutOrStdout(), cfg.Root)
 	return nil
 }

@@ -42,7 +42,8 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv refresh [--verbose]")
 	}
 
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 
 	cacheFiles := []string{
 		filepath.Join(cfg.Root, "versions-cache.json"),

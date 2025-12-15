@@ -58,7 +58,9 @@ func init() {
 }
 
 func runUpdateTools(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Load config to get update strategies
 	configPath := tools.ConfigPath(cfg.Root)

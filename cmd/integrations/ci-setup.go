@@ -12,6 +12,7 @@ import (
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/install"
+	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -83,7 +84,8 @@ func init() {
 }
 
 func runCISetup(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 
 	// Two-phase installation mode
 	if ciInstall {
@@ -371,7 +373,8 @@ func runCIInstallPhase(cmd *cobra.Command, args []string, cfg *config.Config) er
 // Uses manager API for consistent version file parsing across all formats
 func discoverVersionsFromFiles() ([]string, error) {
 	versions := make(map[string]bool) // Use map to deduplicate
-	cfg, mgr := cmdutil.SetupContext()
+	cfg := config.Load()
+	mgr := manager.NewManager(cfg)
 	_ = cfg // unused but required by SetupContext
 
 	// Check for version files in priority order

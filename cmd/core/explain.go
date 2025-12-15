@@ -61,7 +61,9 @@ func runExplain(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv explain [--verbose]")
 	}
 
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Get current version and source
 	version, source, err := mgr.GetCurrentVersion()

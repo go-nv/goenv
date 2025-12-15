@@ -243,7 +243,9 @@ type cacheTotals struct {
 }
 
 func runCacheStatus(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Get installed versions (for validation)
 	versions, err := mgr.ListInstalledVersions()
@@ -446,7 +448,9 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 }
 
 func runCacheClean(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	contexts := cmdutil.GetContexts(cmd)
+	cfg := contexts.Config
+	mgr := contexts.Manager
 	ctx := cmdutil.NewInteractiveContext(cmd)
 
 	// Default to 'build' if no argument provided
@@ -630,7 +634,9 @@ func runCacheClean(cmd *cobra.Command, args []string) error {
 }
 
 func runCacheMigrate(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	contexts := cmdutil.GetContexts(cmd)
+	cfg := contexts.Config
+	mgr := contexts.Manager
 	ctx := cmdutil.NewInteractiveContext(cmd)
 
 	// Get installed versions
@@ -709,7 +715,9 @@ func runCacheMigrate(cmd *cobra.Command, args []string) error {
 }
 
 func runCacheInfo(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Get installed versions
 	versions, err := mgr.ListInstalledVersions()

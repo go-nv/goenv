@@ -44,7 +44,9 @@ type toolStatus struct {
 }
 
 func runStatus(cmd *cobra.Command, jsonOutput bool) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Get all installed Go versions
 	versions, err := mgr.ListInstalledVersions()

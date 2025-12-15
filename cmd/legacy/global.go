@@ -44,7 +44,8 @@ func init() {
 func RunGlobal(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if globalFlags.complete {
-		_, mgr := cmdutil.SetupContext()
+		ctx := cmdutil.GetContexts(cmd)
+		mgr := ctx.Manager
 		versions, err := mgr.ListInstalledVersions()
 		if err == nil {
 			for _, v := range versions {
@@ -65,7 +66,9 @@ func RunGlobal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv global [version]")
 	}
 
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	if len(args) == 0 {
 		// Show current global version(s) - read raw file to preserve multi-line format

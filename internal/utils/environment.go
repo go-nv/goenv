@@ -1,8 +1,11 @@
 package utils
 
 import (
+	"context"
 	"os"
 	"strings"
+
+	"github.com/sethvargo/go-envconfig"
 )
 
 type GoenvEnvVar string
@@ -204,4 +207,84 @@ func IsMinGW() bool {
 	// Check if SHELL points to bash/sh but we're on Windows
 	shell := os.Getenv(EnvVarShell)
 	return strings.Contains(shell, "bash") || strings.Contains(shell, "/sh")
+}
+
+// GoenvEnvironment holds all GOENV_* environment variables.
+// Uses go-envconfig with PrefixLookuper to automatically map GOENV_* vars.
+// Field names map to env vars like: VERSION -> GOENV_VERSION
+type GoenvEnvironment struct {
+	// String Env Vars
+	Version          string `env:"VERSION"`
+	Root             string `env:"ROOT"`
+	Debug            string `env:"DEBUG"`
+	Dir              string `env:"DIR"`
+	Shell            string `env:"SHELL"`
+	AutoInstallFlags string `env:"AUTO_INSTALL_FLAGS"`
+	RcFile           string `env:"RC_FILE"`
+	PathOrder        string `env:"PATH_ORDER"`
+	ShimDebug        string `env:"SHIM_DEBUG"`
+	HooksConfig      string `env:"HOOKS_CONFIG"`
+	HooksLog         string `env:"HOOKS_LOG"`
+	InstallRoot      string `env:"INSTALL_ROOT"`
+	InstallTimeout   string `env:"INSTALL_TIMEOUT"`
+	InstallRetries   string `env:"INSTALL_RETRIES"`
+	InstallResume    string `env:"INSTALL_RESUME"`
+	GocacheDir       string `env:"GOCACHE_DIR"`
+	FileArg          string `env:"FILE_ARG"`
+	PromptPrefix     string `env:"PROMPT_PREFIX"`
+	PromptSuffix     string `env:"PROMPT_SUFFIX"`
+	PromptFormat     string `env:"PROMPT_FORMAT"`
+	PromptIcon       string `env:"PROMPT_ICON"`
+	VersionOrigin    string `env:"VERSION_ORIGIN"`
+
+	// Bool Env Vars
+	DisableGoroot       bool `env:"DISABLE_GOROOT,default=false"`
+	DisableGopath       bool `env:"DISABLE_GOPATH,default=false"`
+	AutoInstall         bool `env:"AUTO_INSTALL,default=false"`
+	NoAutoRehash        bool `env:"NO_AUTO_REHASH,default=false"`
+	Offline             bool `env:"OFFLINE,default=false"`
+	AutoRehash          bool `env:"AUTO_REHASH,default=false"`
+	DisableGocache      bool `env:"DISABLE_GOCACHE,default=false"`
+	DisableGomod        bool `env:"DISABLE_GOMOD,default=false"`
+	DisablePrompt       bool `env:"DISABLE_PROMPT,default=false"`
+	DisablePromptHelper bool `env:"DISABLE_PROMPT_HELPER,default=false"`
+	PromptNoSystem      bool `env:"PROMPT_NO_SYSTEM,default=false"`
+	PromptProjectOnly   bool `env:"PROMPT_PROJECT_ONLY,default=false"`
+	CacheBgRefresh      bool `env:"CACHE_BG_REFRESH,default=false"`
+	AssumeYes           bool `env:"ASSUME_YES,default=false"`
+}
+
+// LoadEnvironment parses all GOENV_* environment variables using go-envconfig.
+// It uses PrefixLookuper to automatically prepend "GOENV_" to all field names.
+func LoadEnvironment(ctx context.Context) (*GoenvEnvironment, error) {
+	var env GoenvEnvironment
+	if err := envconfig.ProcessWith(ctx, &envconfig.Config{
+		Target:   &env,
+		Lookuper: envconfig.PrefixLookuper("GOENV_", envconfig.OsLookuper()),
+	}); err != nil {
+		return nil, err
+	}
+	return &env, nil
+}
+
+// Context key type for type-safe context storage
+type environmentContextKey string
+
+const EnvironmentContextKey environmentContextKey = "goenv.environment"
+
+// EnvironmentToContext stores the environment in the context.
+func EnvironmentToContext(ctx context.Context, env *GoenvEnvironment) context.Context {
+	return context.WithValue(ctx, EnvironmentContextKey, env)
+}
+
+// EnvironmentFromContext retrieves the environment from the context.
+// Returns nil if not found or if context is nil.
+func EnvironmentFromContext(ctx context.Context) *GoenvEnvironment {
+	if ctx == nil {
+		return nil
+	}
+	if env, ok := ctx.Value(EnvironmentContextKey).(*GoenvEnvironment); ok {
+		return env
+	}
+	return nil
 }

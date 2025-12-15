@@ -50,13 +50,41 @@ func DefaultRoot() string {
 	return filepath.Join(home, ".goenv")
 }
 
-// Load loads configuration from environment variables
+// Load loads configuration from environment variables (legacy method).
+// Prefer LoadFromEnvironment when using the new context-based approach.
 func Load() *Config {
 	cfg := &Config{
 		Root:       DefaultRoot(),
 		CurrentDir: getCurrentDir(),
 		Shell:      utils.GoenvEnvVarShell.UnsafeValue(),
 		Debug:      utils.GoenvEnvVarDebug.UnsafeValue() != "",
+	}
+
+	return cfg
+}
+
+// LoadFromEnvironment creates a Config from a parsed GoenvEnvironment struct.
+// This is the preferred method when using the context-based approach.
+func LoadFromEnvironment(env *utils.GoenvEnvironment) *Config {
+	root := env.Root
+	if root == "" {
+		root = DefaultRoot()
+	} else {
+		root = pathutil.ExpandPath(root)
+	}
+
+	dir := env.Dir
+	if dir == "" {
+		dir = getCurrentDir()
+	} else {
+		dir = pathutil.ExpandPath(dir)
+	}
+
+	cfg := &Config{
+		Root:       root,
+		CurrentDir: dir,
+		Shell:      env.Shell,
+		Debug:      env.Debug != "",
 	}
 
 	return cfg

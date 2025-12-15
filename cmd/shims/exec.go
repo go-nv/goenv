@@ -63,7 +63,9 @@ func runExec(cmd *cobra.Command, args []string) error {
 		args = args[1:]
 	}
 
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Get the current version with resolution (e.g., "1.25" → "1.25.4")
 	currentVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()

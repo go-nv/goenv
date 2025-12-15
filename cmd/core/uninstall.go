@@ -41,7 +41,9 @@ func init() {
 }
 
 func runUninstall(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Handle completion mode
 	if uninstallFlags.complete {

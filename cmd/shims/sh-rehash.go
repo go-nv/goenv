@@ -35,7 +35,9 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Determine shell type
 	shellType := shell.ResolveShell("", true)

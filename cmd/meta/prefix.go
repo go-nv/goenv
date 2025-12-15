@@ -36,7 +36,8 @@ func RunPrefix(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv prefix [version]")
 	}
 
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	// Handle completion mode
 	if PrefixFlags.Complete {

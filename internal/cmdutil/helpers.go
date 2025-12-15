@@ -1,27 +1,93 @@
 package cmdutil
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/spf13/cobra"
 )
 
-// SetupContext initializes the common context (config + manager) that most commands need.
-// This is a convenience function to reduce boilerplate in command implementations.
+// AllContextKeys is a slice containing all available context keys.
+// Use this with GetContexts() when you need all context values.
+var AllContextKeys = []any{
+	config.ConfigContextKey,
+	manager.ManagerContextKey,
+	utils.EnvironmentContextKey,
+}
+
+// CmdContext holds all available context values that can be retrieved from command context.
+// Use GetContexts to populate this struct with the values you need.
+type CmdContext struct {
+	Config      *config.Config
+	Manager     *manager.Manager
+	Environment *utils.GoenvEnvironment
+}
+
+// GetContexts retrieves multiple context values at once from the command's context.
+// Pass the context keys you want to retrieve, and it returns a Contexts struct with the values.
+// If no keys are provided, all available context values are retrieved.
+//
+// Available keys:
+//   - config.ConfigContextKey
+//   - manager.ManagerContextKey
+//   - utils.EnvironmentContextKey
 //
 // Example usage:
 //
 //	func runMyCommand(cmd *cobra.Command, args []string) error {
-//	    cfg, mgr := cmdutil.SetupContext()
-//	    // ... use cfg and mgr
+//	    // Get all contexts
+//	    ctx := cmdutil.GetContexts(cmd)
+//
+//	    // Or get specific contexts
+//	    ctx := cmdutil.GetContexts(cmd,
+//	        config.ConfigContextKey,
+//	        manager.ManagerContextKey,
+//	    )
+//	    // Use ctx.Config and ctx.Manager
 //	}
-func SetupContext() (*config.Config, *manager.Manager) {
-	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
-	return cfg, mgr
+func GetContexts(cmd *cobra.Command, keys ...any) *CmdContext {
+	// If no keys specified, default to all keys
+	if len(keys) == 0 {
+		keys = AllContextKeys
+	}
+
+	ctx := cmd.Context()
+	// Handle nil context (common in tests)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	result := &CmdContext{}
+
+	for _, key := range keys {
+		switch key {
+		case config.ConfigContextKey:
+			result.Config = config.FromContext(ctx)
+			// Fallback for tests that don't set up context
+			if result.Config == nil {
+				result.Config = config.Load()
+			}
+		case manager.ManagerContextKey:
+			result.Manager = manager.FromContext(ctx)
+			// Fallback for tests that don't set up context
+			if result.Manager == nil {
+				if result.Config == nil {
+					result.Config = config.Load()
+				}
+				result.Manager = manager.NewManager(result.Config)
+			}
+		case utils.EnvironmentContextKey:
+			result.Environment = utils.EnvironmentFromContext(ctx)
+			// No fallback for environment - it's optional
+		}
+	}
+
+	return result
 }
 
 // OutputJSON encodes data as JSON and writes it to the given writer.

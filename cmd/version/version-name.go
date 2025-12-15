@@ -33,7 +33,8 @@ func runVersionName(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv version-name")
 	}
 
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	// Get current version spec (may contain multiple versions separated by ':')
 	versionSpec, source, err := mgr.GetCurrentVersion()

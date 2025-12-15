@@ -54,7 +54,8 @@ func init() {
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 
 	fmt.Fprintf(cmd.OutOrStdout(), "%sChecking for goenv updates...\n", utils.Emoji("🔄 "))
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -396,7 +397,7 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 	apiURL := "https://api.github.com/repos/go-nv/goenv/releases/latest"
 
 	// Try to load cached ETag
-	cfg, _ := cmdutil.SetupContext()
+	cfg := config.Load()
 	etagFile := filepath.Join(cfg.Root, "cache", "update-etag")
 	cachedETag, _ := os.ReadFile(etagFile)
 

@@ -35,7 +35,8 @@ func init() {
 }
 
 func runAlias(cmd *cobra.Command, args []string) error {
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	switch len(args) {
 	case 0:

@@ -126,7 +126,9 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv versions [--bare] [--skip-aliases] [--used]")
 	}
 
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// If --used flag is set, show usage analysis
 	if VersionsFlags.Used {

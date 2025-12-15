@@ -97,7 +97,8 @@ func init() {
 }
 
 func runDefaultToolsList(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 
 	// Check if config exists
@@ -144,7 +145,8 @@ func runDefaultToolsList(cmd *cobra.Command, args []string) error {
 }
 
 func runDefaultToolsInit(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 
 	// Check if config already exists
@@ -175,7 +177,8 @@ func runDefaultToolsInit(cmd *cobra.Command, args []string) error {
 }
 
 func runEnable(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 
 	toolConfig, err := tools.LoadConfig(configPath)
@@ -200,7 +203,8 @@ func runEnable(cmd *cobra.Command, args []string) error {
 }
 
 func runDisable(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 
 	toolConfig, err := tools.LoadConfig(configPath)
@@ -226,7 +230,8 @@ func runDisable(cmd *cobra.Command, args []string) error {
 }
 
 func runInstallTools(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 	goVersion := args[0]
 
@@ -261,7 +266,8 @@ func runInstallTools(cmd *cobra.Command, args []string) error {
 }
 
 func runVerify(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 	goVersion := args[0]
 

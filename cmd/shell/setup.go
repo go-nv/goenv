@@ -73,7 +73,8 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	contexts := cmdutil.GetContexts(cmd)
+	cfg := contexts.Config
 	ctx := cmdutil.NewInteractiveContext(cmd)
 	// Use command streams and setupStdin for testing
 	ctx.Reader = setupStdin

@@ -46,7 +46,8 @@ type commandInfo struct {
 }
 
 func runExplore(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 
 	// Define command catalog organized by user intent
 	catalog := map[string][]commandInfo{

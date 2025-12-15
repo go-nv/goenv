@@ -45,7 +45,8 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv current [--verbose] [--file]")
 	}
 
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	// Get resolved version (e.g., "1.25" → "1.25.4")
 	resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()

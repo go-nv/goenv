@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
@@ -40,6 +41,30 @@ var RootCmd = &cobra.Command{
 - Automatically download the latest Go versions
 - Manage Go installations with ease`,
 	SuggestionsMinimumDistance: 2,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		ctx := cmd.Context()
+
+		// Parse all GOENV_* environment variables once
+		env, err := utils.LoadEnvironment(ctx)
+		if err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Failed to load environment: %v\n", err)
+			os.Exit(1)
+		}
+		ctx = utils.EnvironmentToContext(ctx, env)
+
+		// Create config and manager once
+		cfg := config.LoadFromEnvironment(env)
+		ctx = config.ToContext(ctx, cfg)
+
+		mgr := manager.NewManager(cfg)
+		ctx = manager.ToContext(ctx, mgr)
+
+		// Store updated context back to command
+		cmd.SetContext(ctx)
+
+		// Propagate output options
+		utils.SetOutputOptions(NoColor, Plain)
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Only run smart detection if no subcommands or flags were provided
 		// This prevents blocking on stdin when user runs "goenv --version" etc.
@@ -53,7 +78,9 @@ var RootCmd = &cobra.Command{
 		// Check for .go-version or go.mod in current directory
 		cwd, err := os.Getwd()
 		if err == nil {
-			cfg, mgr := cmdutil.SetupContext()
+			ctx := cmdutil.GetContexts(cmd)
+			cfg := ctx.Config
+			mgr := ctx.Manager
 
 			// Check if GOENV_AUTO_INSTALL is enabled
 			autoInstall := utils.GoenvEnvVarAutoInstall.IsTrue()
@@ -223,7 +250,8 @@ func customHelpFunc(cmd *cobra.Command, args []string) {
 	}
 
 	// This is the root command - check for first-run scenario
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	hasVersions := utils.HasAnyVersionsInstalled(cfg.Root)
 
 	if !hasVersions {

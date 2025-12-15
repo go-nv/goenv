@@ -71,7 +71,8 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 
 	if initFlags.complete {
 		for _, option := range []string{"-", "--no-rehash", "bash", "fish", "ksh", "zsh", "powershell", "cmd"} {
@@ -590,7 +591,9 @@ func init() {
 }
 
 func runShShell(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Handle completion request
 	if len(args) == 1 && args[0] == "--complete" {

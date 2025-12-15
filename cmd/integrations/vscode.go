@@ -313,7 +313,9 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 
 	// Convert to explicit paths if requested (using platform-specific env vars for portability)
 	if useAbsolutePaths {
-		cfg, mgr := cmdutil.SetupContext()
+		ctx := cmdutil.GetContexts(cmd)
+		cfg := ctx.Config
+		mgr := ctx.Manager
 
 		// Get Go version - use provided version or current active version
 		if version == "" {
@@ -680,7 +682,9 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get current Go version (resolved, e.g., "1.25" → "1.25.5")
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 	version, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		return errors.FailedTo("get current Go version", err)
@@ -808,7 +812,8 @@ func runVSCodeStatus(cmd *cobra.Command, args []string) error {
 	settingsFile := filepath.Join(vscodeDir, "settings.json")
 
 	// Get current Go version (resolved, e.g., "1.25" → "1.25.5")
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 	version, _, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		version = "none"
@@ -918,7 +923,8 @@ func runVSCodeDoctor(cmd *cobra.Command, args []string) error {
 		return errors.FailedTo("get current directory", err)
 	}
 
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	var checks []diagnosticCheck
 

@@ -2,18 +2,94 @@ package cmdutil
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestSetupContext(t *testing.T) {
-	cfg, mgr := SetupContext()
+func TestGetContexts(t *testing.T) {
+	// Create test config, manager, and environment
+	cfg := config.Load()
+	mgr := manager.NewManager(cfg)
+	env := &utils.GoenvEnvironment{
+		Root:  cfg.Root,
+		Shell: "bash",
+		Debug: "1",
+	}
 
-	assert.NotNil(t, cfg, "SetupContext returned nil config")
+	// Create command with context
+	cmd := &cobra.Command{Use: "test"}
+	ctx := context.Background()
+	ctx = config.ToContext(ctx, cfg)
+	ctx = manager.ToContext(ctx, mgr)
+	ctx = utils.EnvironmentToContext(ctx, env)
+	cmd.SetContext(ctx)
 
-	assert.NotNil(t, mgr, "SetupContext returned nil manager")
+	t.Run("get all contexts", func(t *testing.T) {
+		result := GetContexts(cmd,
+			config.ConfigContextKey,
+			manager.ManagerContextKey,
+			utils.EnvironmentContextKey,
+		)
+
+		require.NotNil(t, result)
+		assert.Equal(t, cfg, result.Config)
+		assert.Equal(t, mgr, result.Manager)
+		assert.Equal(t, env, result.Environment)
+	})
+
+	t.Run("get only config", func(t *testing.T) {
+		result := GetContexts(cmd, config.ConfigContextKey)
+
+		require.NotNil(t, result)
+		assert.Equal(t, cfg, result.Config)
+		assert.Nil(t, result.Manager)
+		assert.Nil(t, result.Environment)
+	})
+
+	t.Run("get config and manager", func(t *testing.T) {
+		result := GetContexts(cmd,
+			config.ConfigContextKey,
+			manager.ManagerContextKey,
+		)
+
+		require.NotNil(t, result)
+		assert.Equal(t, cfg, result.Config)
+		assert.Equal(t, mgr, result.Manager)
+		assert.Nil(t, result.Environment)
+	})
+
+	t.Run("get no contexts", func(t *testing.T) {
+		result := GetContexts(cmd)
+
+		require.NotNil(t, result)
+		// When no keys specified, all contexts are retrieved
+		assert.Equal(t, cfg, result.Config)
+		assert.Equal(t, mgr, result.Manager)
+		assert.Equal(t, env, result.Environment)
+	})
+
+	t.Run("fallback when context not set", func(t *testing.T) {
+		// Create command WITHOUT context values set
+		emptyCmd := &cobra.Command{Use: "test"}
+		emptyCmd.SetContext(context.Background())
+
+		// Should fallback to creating new instances
+		result := GetContexts(emptyCmd, config.ConfigContextKey, manager.ManagerContextKey)
+		require.NotNil(t, result.Config)
+		require.NotNil(t, result.Manager)
+
+		// Config and Manager should be created via fallback
+		assert.NotNil(t, result.Config.Root)
+		assert.NotNil(t, result.Manager)
+	})
 }
 
 func TestOutputJSON(t *testing.T) {

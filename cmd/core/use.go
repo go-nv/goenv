@@ -89,7 +89,9 @@ func runUse(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Resolve version spec (handles "latest", "stable", etc.)
 	version, err := mgr.ResolveVersionSpec(versionSpec)
@@ -335,7 +337,8 @@ func detectVersionFileConflicts(dir string, targetVersion string) []VersionFileC
 // readVersionFileSimple reads a version from any supported version file
 // using the manager API for consistent parsing
 func readVersionFileSimple(path string) string {
-	cfg, mgr := cmdutil.SetupContext()
+	cfg := config.Load()
+	mgr := manager.NewManager(cfg)
 	_ = cfg // unused but required by SetupContext
 
 	version, err := mgr.ReadVersionFile(path)
@@ -467,7 +470,8 @@ func updateVersionFile(conflict VersionFileConflict, newVersion string) error {
 
 // checkToolUpdatesForUse checks for tool updates when switching Go versions
 func checkToolUpdatesForUse(cmd *cobra.Command, goVersion string) {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 
 	// Load config

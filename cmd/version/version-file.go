@@ -26,7 +26,9 @@ func init() {
 }
 
 func runVersionFile(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	var targetDir string
 	if len(args) > 0 {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/utils"
@@ -32,7 +32,8 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	utils.GoenvEnvVarRoot.Set(tempRoot)
 	defer utils.GoenvEnvVarRoot.Set(oldRoot)
 
-	cfg, mgr := cmdutil.SetupContext()
+	cfg := config.Load()
+	mgr := manager.NewManager(cfg)
 
 	// Check if we have a Go version installed to test with
 	versions, err := mgr.ListInstalledVersions()
@@ -174,7 +175,9 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 	utils.GoenvEnvVarRoot.Set(tempRoot)
 	defer utils.GoenvEnvVarRoot.Set(oldRoot)
 
-	cfg, mgr := cmdutil.SetupContext()
+	// Test doesn't have a cobra command, so use direct initialization
+	cfg := config.Load()
+	mgr := manager.NewManager(cfg)
 
 	// Check if we have a Go version installed
 	versions, err := mgr.ListInstalledVersions()

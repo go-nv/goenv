@@ -79,7 +79,8 @@ func runListInstalled(cmd *cobra.Command) error {
 
 // runListRemote shows available versions from golang.org
 func runListRemote(cmd *cobra.Command) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	if cfg.Debug {
 		fmt.Println("Debug: Fetching available Go versions...")
 	}

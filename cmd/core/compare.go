@@ -42,7 +42,9 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	version1 := args[0]
 	version2 := args[1]
 
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Resolve version specs
 	resolvedV1, err1 := mgr.ResolveVersionSpec(version1)

@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
-	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
+	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/stretchr/testify/assert"
@@ -399,7 +399,8 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 // hasSystemGoInTest checks if system Go is available during test execution
 // This is needed because CI/macOS systems may have Go installed in PATH
 func hasSystemGoInTest() bool {
-	_, mgr := cmdutil.SetupContext()
+	cfg := config.Load()
+	mgr := manager.NewManager(cfg)
 	return mgr.HasSystemGo()
 }
 

@@ -41,7 +41,9 @@ func init() {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Header
 	fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", utils.Emoji("📊 "), utils.BoldBlue("goenv Status"))

@@ -5,7 +5,7 @@ import (
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
-	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/spf13/cobra"
 )
@@ -61,7 +61,7 @@ func init() {
 	toolsCmd.AddCommand(defaultToolsCmd) // from default_tools.go
 
 	// Add uninstall command
-	cfg, _ := cmdutil.SetupContext()
+	cfg := config.Load()
 	toolsCmd.AddCommand(NewUninstallCommand(cfg)) // from uninstall_tools.go
 
 	// Add new subcommands

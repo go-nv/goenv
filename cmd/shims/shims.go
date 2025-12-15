@@ -122,7 +122,8 @@ func RunRehash(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv rehash")
 	}
 
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	shimMgr := shims.NewShimManager(cfg)
 
 	if cfg.Debug {
@@ -162,7 +163,8 @@ func runShims(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv shims [--short]")
 	}
 
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	shimMgr := shims.NewShimManager(cfg)
 
 	shimList, err := shimMgr.ListShims()
@@ -192,7 +194,9 @@ func runWhich(cmd *cobra.Command, args []string) error {
 	}
 
 	commandName := args[0]
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Try using shim manager first (if available)
 	shimMgr := shims.NewShimManager(cfg)
@@ -218,7 +222,9 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	}
 
 	commandName := args[0]
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Try using shim manager first
 	shimMgr := shims.NewShimManager(cfg)
@@ -253,6 +259,7 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	// Fallback: manual search
 	return runWhenceManual(cmd, commandName, cfg, mgr)
 }
+
 // runWhichManual implements which command logic manually for testing/fallback
 func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config, mgr *manager.Manager) error {
 	// Get current version(s)

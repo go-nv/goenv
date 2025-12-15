@@ -89,7 +89,8 @@ func init() {
 func runInstall(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if installFlags.complete {
-		cfg, _ := cmdutil.SetupContext()
+		ctx := cmdutil.GetContexts(cmd)
+		cfg := ctx.Config
 		fetcher := version.NewFetcherWithOptions(version.FetcherOptions{Debug: false})
 		releases, err := fetcher.FetchWithFallback(cfg.Root)
 		if err == nil {
@@ -100,7 +101,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 
 	// Validate flags
 	if installFlags.ipv4 && installFlags.ipv6 {
@@ -275,7 +277,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 // installDefaultTools installs configured default tools after a successful Go installation
 func installDefaultTools(cmd *cobra.Command, goVersion string) {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 
 	// Load config (skip if file doesn't exist or has errors)
@@ -300,7 +303,8 @@ func installDefaultTools(cmd *cobra.Command, goVersion string) {
 
 // checkToolUpdates checks for and optionally updates tools if auto-update is enabled
 func checkToolUpdates(cmd *cobra.Command, goVersion string) {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	configPath := tools.ConfigPath(cfg.Root)
 
 	// Load config

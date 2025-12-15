@@ -30,7 +30,8 @@ func runUnalias(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv unalias <name>")
 	}
 
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	name := args[0]
 	if err := mgr.DeleteAlias(name); err != nil {

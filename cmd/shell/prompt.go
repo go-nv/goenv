@@ -80,7 +80,8 @@ func runPrompt(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	// Get active version (with caching)
 	version, err := getActiveVersionCached(mgr, promptFlags.cacheTTL)
@@ -220,7 +221,8 @@ func isGoProject() bool {
 	// Check for .tool-versions with go entry
 	// Use manager API for consistent parsing
 	if utils.PathExists(config.ToolVersionsFileName) {
-		cfg, mgr := cmdutil.SetupContext()
+		cfg := config.Load()
+		mgr := manager.NewManager(cfg)
 		_ = cfg // unused but required by SetupContext
 
 		// Try to read version from .tool-versions

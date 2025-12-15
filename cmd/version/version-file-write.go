@@ -29,7 +29,8 @@ func init() {
 }
 
 func runVersionFileWrite(cmd *cobra.Command, args []string) error {
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	filename := args[0]
 	versions := args[1:]

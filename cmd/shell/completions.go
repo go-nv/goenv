@@ -38,7 +38,8 @@ func runCompletions(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(cmd.OutOrStdout(), "--help")
 
 	// Try to find the command
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 
 	// Check if it's a Cobra registered command first
 	for _, subCmd := range cmdpkg.RootCmd.Commands() {

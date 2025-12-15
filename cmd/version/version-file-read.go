@@ -27,7 +27,8 @@ func init() {
 }
 
 func runVersionFileRead(cmd *cobra.Command, args []string) error {
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	filename := args[0]
 	version, err := mgr.ReadVersionFile(filename)

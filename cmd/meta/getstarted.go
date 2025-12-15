@@ -33,7 +33,8 @@ func init() {
 }
 
 func runGetStarted(cmd *cobra.Command, args []string) error {
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 
 	// Show welcome message
 	fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n\n", utils.Emoji("👋 "), utils.BoldBlue("Welcome to goenv!"))

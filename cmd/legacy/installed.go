@@ -35,7 +35,8 @@ func runInstalled(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("usage: goenv installed [version]")
 	}
 
-	_, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := ctx.Manager
 
 	// Handle completion
 	if installedFlags.complete {

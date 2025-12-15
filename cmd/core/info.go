@@ -44,7 +44,9 @@ func init() {
 
 func runInfo(cmd *cobra.Command, args []string) error {
 	version := args[0]
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	// Resolve version spec (handles aliases, "latest", etc.)
 	resolvedVersion, err := mgr.ResolveVersionSpec(version)

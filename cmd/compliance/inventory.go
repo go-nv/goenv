@@ -55,7 +55,9 @@ func init() {
 }
 
 func runInventoryGo(cmd *cobra.Command, args []string) error {
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {

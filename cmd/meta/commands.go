@@ -47,7 +47,8 @@ func runCommands(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	cfg, _ := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
 	commands := []string{}
 
 	// Add installed versions

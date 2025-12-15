@@ -67,7 +67,8 @@ func init() {
 func RunLocal(cmd *cobra.Command, args []string) error {
 	// Handle completion mode
 	if localFlags.complete {
-		_, mgr := cmdutil.SetupContext()
+		ctx := cmdutil.GetContexts(cmd)
+		mgr := ctx.Manager
 		versions, err := mgr.ListInstalledVersions()
 		if err == nil {
 			for _, v := range versions {
@@ -92,7 +93,9 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--from-gomod flag cannot be used with a version argument")
 	}
 
-	cfg, mgr := cmdutil.SetupContext()
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
 
 	if localFlags.unset {
 		if len(args) > 0 {

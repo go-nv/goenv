@@ -13,9 +13,41 @@ The `cmdutil` package consolidates these patterns into reusable functions.
 
 ## Functions
 
-### SetupContext()
+### GetContexts(cmd, keys...)
 
-Initializes the common context (config + manager) that most commands need.
+**NEW**: Retrieves multiple context values at once from the command's context.
+This is the recommended way to access config, manager, and environment in commands.
+
+**Usage:**
+```go
+func runMyCommand(cmd *cobra.Command, args []string) error {
+    ctx := cmdutil.GetContexts(cmd,
+        config.ConfigContextKey,
+        manager.ManagerContextKey,
+    )
+    
+    cfg := ctx.Config
+    mgr := ctx.Manager
+    // ...
+}
+```
+
+**Available Keys:**
+- `config.ConfigContextKey` - Retrieves `*config.Config`
+- `manager.ManagerContextKey` - Retrieves `*manager.Manager`
+- `utils.EnvironmentContextKey` - Retrieves `*utils.GoenvEnvironment`
+
+**Benefits:**
+- Only retrieves what you need
+- Single call to get all contexts
+- Type-safe access
+- Reuses instances from `PersistentPreRun` (efficient)
+
+### SetupContext() [DEPRECATED]
+
+**OLD**: Initializes the common context (config + manager) that most commands need.
+
+**⚠️ DEPRECATED**: Use `GetContexts()` instead for better performance and consistency.
 
 **Before:**
 ```go
@@ -26,10 +58,23 @@ func runMyCommand(cmd *cobra.Command, args []string) error {
 }
 ```
 
-**After:**
+**Old Way:**
 ```go
 func runMyCommand(cmd *cobra.Command, args []string) error {
     cfg, mgr := cmdutil.SetupContext()
+    // ...
+}
+```
+
+**New Way:**
+```go
+func runMyCommand(cmd *cobra.Command, args []string) error {
+    ctx := cmdutil.GetContexts(cmd,
+        config.ConfigContextKey,
+        manager.ManagerContextKey,
+    )
+    cfg := ctx.Config
+    mgr := ctx.Manager
     // ...
 }
 ```
