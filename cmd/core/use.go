@@ -92,6 +92,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
 
 	// Resolve version spec (handles "latest", "stable", etc.)
 	version, err := mgr.ResolveVersionSpec(versionSpec)
@@ -219,7 +220,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 	if !useFlags.quiet {
 		fmt.Fprintf(cmd.OutOrStdout(), "\n%sUpdating shims...\n", utils.Emoji("🔄 "))
 	}
-	if err := runRehashForUse(cfg); err != nil {
+	if err := runRehashForUse(cfg, env); err != nil {
 		fmt.Fprintf(cmd.OutOrStderr(), "%sWarning: Failed to update shims: %v\n", utils.Emoji("⚠️  "), err)
 	}
 
@@ -252,8 +253,8 @@ func runUse(cmd *cobra.Command, args []string) error {
 }
 
 // runRehashForUse is a helper to run rehash without output
-func runRehashForUse(cfg *config.Config) error {
-	shimMgr := shims.NewShimManager(cfg)
+func runRehashForUse(cfg *config.Config, env *utils.GoenvEnvironment) error {
+	shimMgr := shims.NewShimManager(cfg, env)
 	return shimMgr.Rehash()
 }
 
@@ -338,7 +339,7 @@ func detectVersionFileConflicts(dir string, targetVersion string) []VersionFileC
 // using the manager API for consistent parsing
 func readVersionFileSimple(path string) string {
 	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	_ = cfg // unused but required by SetupContext
 
 	version, err := mgr.ReadVersionFile(path)

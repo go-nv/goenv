@@ -66,6 +66,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
 
 	// Get the current version with resolution (e.g., "1.25" → "1.25.4")
 	currentVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
@@ -80,7 +81,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prepare environment
-	env := os.Environ()
+	execEnv := os.Environ()
 
 	// Expand GOPATH early if it needs expansion (handles $HOME, ~/, etc.)
 	// This ensures Go doesn't error on shell metacharacters or variables
@@ -89,7 +90,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		expanded := pathutil.ExpandPath(gopath)
 		if expanded != gopath {
 			gopath = expanded
-			env = setEnvVar(env, utils.EnvVarGopath, expanded)
+			execEnv = setEnvVar(execEnv, utils.EnvVarGopath, expanded)
 		}
 	}
 
@@ -103,13 +104,13 @@ func runExec(cmd *cobra.Command, args []string) error {
 		goBinPath := filepath.Join(versionPath, "bin")
 
 		// Set GOROOT
-		env = setEnvVar(env, utils.EnvVarGoroot, versionPath)
+		execEnv = setEnvVar(execEnv, utils.EnvVarGoroot, versionPath)
 
 		// Prepend to PATH
-		env = prependToPath(env, goBinPath)
+		execEnv = prependToPath(execEnv, goBinPath)
 
 		// Set GOPATH if not disabled
-		if utils.GoenvEnvVarDisableGopath.UnsafeValue() != "1" {
+		if !env.HasDisableGopath() {
 			// Build version-specific GOPATH: $HOME/go/{version}
 			homeDir, _ := os.UserHomeDir()
 			versionGopath := filepath.Join(homeDir, "go", currentVersion)
@@ -122,7 +123,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 				versionGopath = versionGopath + string(os.PathListSeparator) + gopath
 			}
 
-			env = setEnvVar(env, utils.EnvVarGopath, versionGopath)
+			execEnv = setEnvVar(execEnv, utils.EnvVarGopath, versionGopath)
 		}
 
 		// Set per-version and per-architecture GOCACHE
@@ -144,8 +145,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 			var versionGocache string
 
 			// Determine target GOOS/GOARCH for cache isolation
-			goos := utils.GetEnvValue(env, "GOOS")
-			goarch := utils.GetEnvValue(env, "GOARCH")
+			goos := utils.GetEnvValue(execEnv, "GOOS")
+			goarch := utils.GetEnvValue(execEnv, "GOARCH")
 			if goos == "" {
 				goos = "host" // Use "host" as marker when targeting host platform
 			}
@@ -158,7 +159,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 			// Build cache path with architecture AND ABI variant suffix
 			// ABI variants affect binary compatibility even when GOOS/GOARCH match
-			cacheSuffix := buildCacheSuffix(goBinaryPath, goos, goarch, env)
+			cacheSuffix := buildCacheSuffix(goBinaryPath, goos, goarch, execEnv)
 
 			if customGocacheDir != "" {
 				// Use custom GOCACHE directory if specified
@@ -167,12 +168,12 @@ func runExec(cmd *cobra.Command, args []string) error {
 				// Use GOENV_ROOT/versions/{version}/go-build-{GOOS}-{GOARCH} as default GOCACHE
 				versionGocache = filepath.Join(versionPath, cacheSuffix)
 			}
-			env = setEnvVar(env, utils.EnvVarGocache, versionGocache)
+			execEnv = setEnvVar(execEnv, utils.EnvVarGocache, versionGocache)
 
 			// Write build.info file for CGO builds (diagnostic data)
 			// Non-blocking - failures don't affect execution
-			if cgo.IsCGOEnabled(env) {
-				buildInfo := cgo.GetBuildInfo(env)
+			if cgo.IsCGOEnabled(execEnv) {
+				buildInfo := cgo.GetBuildInfo(execEnv)
 				if writer, err := cache.TryNewAtomicWriter(versionGocache); err == nil && writer != nil {
 					defer writer.Close()
 					if buildInfoJSON, err := json.MarshalIndent(buildInfo, "", "  "); err == nil {
@@ -196,7 +197,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		// Respects existing GOMODCACHE if already set (via go env -w or environment)
 		if os.Getenv(utils.EnvVarGomodcache) == "" {
 			versionGomodcache := filepath.Join(cfg.Root, "shared", "go-mod")
-			env = setEnvVar(env, utils.EnvVarGomodcache, versionGomodcache)
+			execEnv = setEnvVar(execEnv, utils.EnvVarGomodcache, versionGomodcache)
 		}
 	}
 
@@ -218,7 +219,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	if currentVersion != manager.SystemVersion {
 		// Use centralized resolver to find the binary
 		// Pass version source to control whether host bin is checked
-		r := resolver.New(cfg)
+		r := resolver.New(cfg, env)
 		var err error
 		commandPath, err = r.ResolveBinary(command, currentVersion, source)
 		if err != nil {
@@ -288,7 +289,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 	// Execute with the modified environment
 	execCmd := exec.Command(commandPath, commandArgs...)
-	execCmd.Env = env
+	execCmd.Env = execEnv
 	execCmd.Stdin = os.Stdin
 	execCmd.Stdout = cmd.OutOrStdout()
 	execCmd.Stderr = cmd.ErrOrStderr()
@@ -303,12 +304,12 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 	// Auto-rehash after successful 'go install' command
 	// Skip if GOENV_NO_AUTO_REHASH environment variable is set
-	if err == nil && shouldAutoRehash(command, commandArgs) && utils.GoenvEnvVarNoAutoRehash.UnsafeValue() != "1" {
+	if err == nil && shouldAutoRehash(command, commandArgs) && !env.HasNoAutoRehash() {
 		if cfg.Debug {
 			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after go install")
 		}
 		// Run rehash silently - don't fail if it errors
-		_ = runRehashSilent(cfg)
+		_ = runRehashSilent(cfg, env)
 	}
 
 	return err
@@ -342,8 +343,8 @@ func shouldAutoRehash(command string, args []string) bool {
 }
 
 // runRehashSilent runs rehash without printing output
-func runRehashSilent(cfg *config.Config) error {
-	shimMgr := shims.NewShimManager(cfg)
+func runRehashSilent(cfg *config.Config, env *utils.GoenvEnvironment) error {
+	shimMgr := shims.NewShimManager(cfg, env)
 	return shimMgr.Rehash()
 }
 

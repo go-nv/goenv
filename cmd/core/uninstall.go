@@ -170,8 +170,12 @@ func checkActiveVersionAndOffer(cmd *cobra.Command, cfg *config.Config, mgr *man
 		return true // Proceed without checks
 	}
 
+	// Get environment from context
+	ctxs := cmdutil.GetContexts(cmd)
+	env := ctxs.Environment
+
 	// Check if version is active in various contexts
-	isActive, context := isVersionActive(cfg, version)
+	isActive, context := isVersionActive(cfg, env, version)
 
 	if !isActive {
 		return true // Not active, safe to proceed
@@ -291,9 +295,9 @@ func promptVersionSelection(cmd *cobra.Command, requestedVersion string, matchin
 }
 
 // isVersionActive checks if a version is currently active
-func isVersionActive(cfg *config.Config, version string) (bool, string) {
+func isVersionActive(cfg *config.Config, env *utils.GoenvEnvironment, version string) (bool, string) {
 	// Check GOENV_VERSION environment variable
-	if envVersion := utils.GoenvEnvVarVersion.UnsafeValue(); envVersion != "" {
+	if envVersion := env.GetVersion(); envVersion != "" {
 		if envVersion == version {
 			return true, "(via GOENV_VERSION environment variable)"
 		}

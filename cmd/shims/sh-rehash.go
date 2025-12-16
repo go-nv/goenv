@@ -38,6 +38,12 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
+	
+	// Fallback: Load environment if not already in context (e.g., in tests)
+	if env == nil {
+		env, _ = utils.LoadEnvironment(cmd.Context())
+	}
 
 	// Determine shell type
 	shellType := shell.ResolveShell("", true)
@@ -71,8 +77,8 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check environment variables for disabling GOROOT/GOPATH
-	disableGoroot := utils.GoenvEnvVarDisableGoroot.UnsafeValue() == "1"
-	disableGopath := utils.GoenvEnvVarDisableGopath.UnsafeValue() == "1"
+	disableGoroot := env.HasDisableGoroot()
+	disableGopath := env.HasDisableGopath()
 
 	// Build GOPATH value: $HOME/go/{version}
 	home, err := os.UserHomeDir()

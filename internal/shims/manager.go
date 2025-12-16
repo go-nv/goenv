@@ -1,6 +1,7 @@
 package shims
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,14 +17,19 @@ import (
 // Manager handles shim operations
 type ShimManager struct {
 	config   *config.Config
+	env      *utils.GoenvEnvironment
 	resolver *resolver.Resolver
 }
 
 // NewShimManager creates a new shim manager
-func NewShimManager(cfg *config.Config) *ShimManager {
+func NewShimManager(cfg *config.Config, env *utils.GoenvEnvironment) *ShimManager {
+	if env == nil {
+		env = utils.EnvironmentFromContextOrLoad(context.Background())
+	}
 	return &ShimManager{
 		config:   cfg,
-		resolver: resolver.New(cfg),
+		env:      env,
+		resolver: resolver.New(cfg, env),
 	}
 }
 
@@ -42,7 +48,7 @@ func (s *ShimManager) Rehash() error {
 	}
 
 	// Get all installed versions
-	mgr := manager.NewManager(s.config)
+	mgr := manager.NewManager(s.config, s.env)
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		return errors.FailedTo("list installed versions", err)
@@ -117,7 +123,7 @@ func (s *ShimManager) ListShims() ([]string, error) {
 
 // WhichBinary returns the full path to the binary that would be executed
 func (s *ShimManager) WhichBinary(command string) (string, error) {
-	mgr := manager.NewManager(s.config)
+	mgr := manager.NewManager(s.config, s.env)
 
 	// Get current version and its source
 	version, source, err := mgr.GetCurrentVersion()
@@ -136,7 +142,7 @@ func (s *ShimManager) WhichBinary(command string) (string, error) {
 
 // WhenceVersions returns all versions that contain the specified command
 func (s *ShimManager) WhenceVersions(command string) ([]string, error) {
-	mgr := manager.NewManager(s.config)
+	mgr := manager.NewManager(s.config, s.env)
 	allVersions, err := mgr.ListInstalledVersions()
 	if err != nil {
 		return nil, errors.FailedTo("list versions", err)

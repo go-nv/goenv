@@ -124,7 +124,8 @@ func RunRehash(cmd *cobra.Command, args []string) error {
 
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
-	shimMgr := shims.NewShimManager(cfg)
+	env := ctx.Environment
+	shimMgr := shims.NewShimManager(cfg, env)
 
 	if cfg.Debug {
 		fmt.Fprintln(cmd.OutOrStdout(), "Debug: Rehashing goenv shims...")
@@ -165,7 +166,8 @@ func runShims(cmd *cobra.Command, args []string) error {
 
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
-	shimMgr := shims.NewShimManager(cfg)
+	env := ctx.Environment
+	shimMgr := shims.NewShimManager(cfg, env)
 
 	shimList, err := shimMgr.ListShims()
 	if err != nil {
@@ -197,9 +199,10 @@ func runWhich(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
 
 	// Try using shim manager first (if available)
-	shimMgr := shims.NewShimManager(cfg)
+	shimMgr := shims.NewShimManager(cfg, env)
 	binaryPath, err := shimMgr.WhichBinary(commandName)
 	if err == nil {
 		fmt.Fprintln(cmd.OutOrStdout(), binaryPath)
@@ -225,9 +228,10 @@ func runWhence(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
 
 	// Try using shim manager first
-	shimMgr := shims.NewShimManager(cfg)
+	shimMgr := shims.NewShimManager(cfg, env)
 	versions, err := shimMgr.WhenceVersions(commandName)
 	if err == nil && len(versions) > 0 {
 		for _, version := range versions {

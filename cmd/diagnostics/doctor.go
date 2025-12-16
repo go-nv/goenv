@@ -176,6 +176,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
 	results := []checkResult{}
 
 	// Validate and parse --fail-on flag
@@ -240,13 +241,13 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	results = append(results, checkNetwork())
 
 	// Check 11: VS Code integration
-	results = append(results, checkVSCodeIntegration(cfg))
+	results = append(results, checkVSCodeIntegration(cfg, env))
 
 	// Check 11b: VS Code Go extension PATH injection
 	results = append(results, checkVSCodeGoExtension())
 
 	// Check 12: go.mod version compatibility
-	results = append(results, checkGoModVersion(cfg))
+	results = append(results, checkGoModVersion(cfg, env))
 
 	// Check 13: Verify 'which go' matches expected version
 	results = append(results, checkWhichGo(cfg, mgr))
@@ -273,7 +274,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	results = append(results, checkCacheIsolationEffectiveness(cfg, mgr))
 
 	// Check 19: Rosetta detection (macOS only)
-	results = append(results, checkRosetta(cfg))
+	results = append(results, checkRosetta(cfg, env))
 
 	// Check 20: PATH order (goenv shims before system Go)
 	results = append(results, checkPathOrder(cfg))
@@ -1740,7 +1741,8 @@ func detectFixableIssues(results []checkResult, cfg *config.Config) []fixableIss
 // Fix helper functions
 
 func fixRehash(cmd *cobra.Command, cfg *config.Config) error {
-	shimMgr := shims.NewShimManager(cfg)
+	ctx := cmdutil.GetContexts(cmd)
+	shimMgr := shims.NewShimManager(cfg, ctx.Environment)
 	return shimMgr.Rehash()
 }
 
@@ -1809,7 +1811,8 @@ func fixReinstallCorrupted(cmd *cobra.Command, cfg *config.Config, version strin
 }
 
 func fixSetVersion(cmd *cobra.Command, cfg *config.Config) error {
-	mgr := manager.NewManager(cfg)
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := manager.NewManager(cfg, ctx.Environment)
 	versions, err := mgr.ListInstalledVersions()
 	if err != nil || len(versions) == 0 {
 		return fmt.Errorf("no versions installed")
@@ -1824,7 +1827,8 @@ func fixInstallLatest(cmd *cobra.Command, cfg *config.Config) error {
 }
 
 func fixGoModVersion(cmd *cobra.Command, cfg *config.Config, version string) error {
-	mgr := manager.NewManager(cfg)
+	ctx := cmdutil.GetContexts(cmd)
+	mgr := manager.NewManager(cfg, ctx.Environment)
 	if mgr.IsVersionInstalled(version) {
 		fmt.Fprintf(cmd.OutOrStdout(), "  Run: goenv local %s\n", version)
 	} else {
@@ -2693,7 +2697,7 @@ func checkNetwork() checkResult {
 	}
 }
 
-func checkVSCodeIntegration(cfg *config.Config) checkResult {
+func checkVSCodeIntegration(cfg *config.Config, env *utils.GoenvEnvironment) checkResult {
 	// Get current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -2734,7 +2738,7 @@ func checkVSCodeIntegration(cfg *config.Config) checkResult {
 	}
 
 	// Get current Go version to validate against
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, env)
 	currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || currentVersion == "" {
 		// Can't determine current version - do basic check
@@ -2861,7 +2865,7 @@ func checkVSCodeGoExtension() checkResult {
 	}
 }
 
-func checkGoModVersion(cfg *config.Config) checkResult {
+func checkGoModVersion(cfg *config.Config, env *utils.GoenvEnvironment) checkResult {
 	cwd, _ := os.Getwd()
 	gomodPath := filepath.Join(cwd, config.GoModFileName)
 
@@ -2876,7 +2880,7 @@ func checkGoModVersion(cfg *config.Config) checkResult {
 	}
 
 	// Get current Go version (resolved, e.g., "1.25" → "1.25.4")
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, env)
 	currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		return checkResult{
@@ -3540,7 +3544,7 @@ func checkCacheIsolationEffectiveness(cfg *config.Config, mgr *manager.Manager) 
 	}
 }
 
-func checkRosetta(cfg *config.Config) checkResult {
+func checkRosetta(cfg *config.Config, env *utils.GoenvEnvironment) checkResult {
 	// Only relevant on macOS
 	if !platform.IsMacOS() {
 		return checkResult{
@@ -3614,7 +3618,7 @@ func checkRosetta(cfg *config.Config) checkResult {
 	}
 
 	// Check current Go version architecture
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, env)
 	// Get resolved version (e.g., "1.25" → "1.25.4")
 	currentVersion, _, _, err := mgr.GetCurrentVersionResolved()
 	if err != nil || currentVersion == "" || currentVersion == manager.SystemVersion {

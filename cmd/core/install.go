@@ -103,6 +103,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
+	env := ctx.Environment
 
 	// Validate flags
 	if installFlags.ipv4 && installFlags.ipv6 {
@@ -155,7 +156,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		goVersion = resolved // Use resolved version for installation
 	} else {
 		// Try to detect version from current directory (as documented in help text)
-		mgr := manager.NewManager(cfg)
+		mgr := manager.NewManager(cfg, env)
 		detectedVersion, source, err := mgr.GetCurrentVersion()
 
 		if err == nil && detectedVersion != "" && detectedVersion != "system" {
@@ -253,13 +254,13 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 		// Auto-rehash to update shims for new Go version and installed tools
 		// Skip if --no-rehash flag or GOENV_NO_AUTO_REHASH environment variable is set
-		shouldRehash := !installFlags.noRehash && !utils.GoenvEnvVarNoAutoRehash.IsTrue()
+		shouldRehash := !installFlags.noRehash && !env.HasNoAutoRehash()
 
 		if shouldRehash {
 			if cfg.Debug {
 				fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after installation")
 			}
-			shimMgr := shims.NewShimManager(cfg)
+			shimMgr := shims.NewShimManager(cfg, env)
 			_ = shimMgr.Rehash() // Don't fail the install if rehash fails
 		} else if cfg.Debug {
 			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Skipping auto-rehash (disabled via flag or environment)")

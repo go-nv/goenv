@@ -13,6 +13,7 @@ import (
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/resolver"
+	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -100,6 +101,7 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
 
 	// Validate flags
 	if sbomImage != "" && sbomDir != "." {
@@ -117,7 +119,7 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve tool path using version context
-	toolPath, err := resolveSBOMTool(cfg, sbomTool, goVersion, versionSource)
+	toolPath, err := resolveSBOMTool(cfg, env, sbomTool, goVersion, versionSource)
 	if err != nil {
 		return err
 	}
@@ -172,9 +174,9 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 }
 
 // resolveSBOMTool finds the tool binary using version-aware resolution
-func resolveSBOMTool(cfg *config.Config, tool, version, versionSource string) (string, error) {
+func resolveSBOMTool(cfg *config.Config, env *utils.GoenvEnvironment, tool, version, versionSource string) (string, error) {
 	// Use resolver to respect local vs global context
-	r := resolver.New(cfg)
+	r := resolver.New(cfg, env)
 
 	if version != "unknown" && version != "" {
 		if toolPath, err := r.ResolveBinary(tool, version, versionSource); err == nil {

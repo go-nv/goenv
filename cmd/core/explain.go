@@ -64,6 +64,7 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
 
 	// Get current version and source
 	version, source, err := mgr.GetCurrentVersion()
@@ -99,13 +100,13 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	}
 
 	// Explain the source based on type
-	explainSource(cmd, version, source, cfg)
+	explainSource(cmd, version, source, cfg, env)
 
 	// Show version resolution order
 	if explainFlags.verbose {
-		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-		showResolutionOrder(cmd, cfg)
+		fmt.Fprintln(cmd.OutOrStdout(), "")
+		fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		showResolutionOrder(cmd, cfg, env)
 	}
 
 	// Additional helpful commands
@@ -122,10 +123,10 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func explainSource(cmd *cobra.Command, version, source string, cfg *config.Config) {
+func explainSource(cmd *cobra.Command, version, source string, cfg *config.Config, env *utils.GoenvEnvironment) {
 	// Determine the type of source
 	switch {
-	case strings.Contains(source, utils.GoenvEnvVarVersion.String()):
+	case strings.Contains(source, "GOENV_VERSION"):
 		explainEnvironmentVariable(cmd, version)
 
 	case strings.Contains(source, config.VersionFileName) && !strings.Contains(source, cfg.Root):
@@ -153,7 +154,7 @@ func explainEnvironmentVariable(cmd *cobra.Command, version string) {
 	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintf(cmd.OutOrStdout(), "The %s environment variable is set to %s.\n",
-		utils.Cyan(utils.GoenvEnvVarVersion.String()), utils.Green(version))
+		utils.Cyan("GOENV_VERSION"), utils.Green(version))
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintln(cmd.OutOrStdout(), "This takes the HIGHEST PRIORITY over all other version sources.")
 	fmt.Fprintln(cmd.OutOrStdout(), "It overrides both local .go-version files and the global default.")
@@ -314,20 +315,20 @@ func explainUnknown(cmd *cobra.Command, version, source string) {
 	fmt.Fprintln(cmd.OutOrStdout(), "   goenv local 1.23.0")
 }
 
-func showResolutionOrder(cmd *cobra.Command, cfg *config.Config) {
+func showResolutionOrder(cmd *cobra.Command, cfg *config.Config, env *utils.GoenvEnvironment) {
 	fmt.Fprintf(cmd.OutOrStdout(), "%s Version Resolution Order\n", utils.Emoji("📚"))
-	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(cmd.OutOrStdout(), "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Fprintln(cmd.OutOrStdout())
 	fmt.Fprintln(cmd.OutOrStdout(), "goenv searches for version settings in this order:")
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// 1. GOENV_VERSION
-	envVersion := utils.GoenvEnvVarVersion.UnsafeValue()
+	envVersion := env.GetVersion()
 	if envVersion != "" {
-		fmt.Fprintf(cmd.OutOrStdout(), "1. %s %s\n", utils.Green("✓"), utils.BoldGreen(fmt.Sprintf("%s environment variable", utils.GoenvEnvVarVersion.String())))
+		fmt.Fprintf(cmd.OutOrStdout(), "1. %s %s\n", utils.Green("✓"), utils.BoldGreen("GOENV_VERSION environment variable"))
 		fmt.Fprintf(cmd.OutOrStdout(), "   Currently: %s\n", utils.Cyan(envVersion))
 	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "1. %s %s environment variable\n", utils.Gray("○"), utils.GoenvEnvVarVersion.String())
+		fmt.Fprintf(cmd.OutOrStdout(), "1. %s %s environment variable\n", utils.Gray("○"), "GOENV_VERSION")
 		fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.Gray("Not set"))
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
@@ -352,8 +353,7 @@ func showResolutionOrder(cmd *cobra.Command, cfg *config.Config) {
 	// 4. go.mod
 	gomodFile := filepath.Join(cwd, config.GoModFileName)
 	if utils.PathExists(gomodFile) {
-		disableGoMod := utils.GoenvEnvVarDisableGomod.UnsafeValue()
-		if disableGoMod == "1" || disableGoMod == "true" {
+		if env.HasDisableGomod() {
 			fmt.Fprintf(cmd.OutOrStdout(), "4. %s go.mod file\n", utils.Gray("○"))
 			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.Yellow("Found but disabled by GOENV_DISABLE_GOMOD"))
 		} else {

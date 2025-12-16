@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -222,7 +223,8 @@ func isGoProject() bool {
 	// Use manager API for consistent parsing
 	if utils.PathExists(config.ToolVersionsFileName) {
 		cfg := config.Load()
-		mgr := manager.NewManager(cfg)
+		env, _ := utils.LoadEnvironment(context.Background())
+		mgr := manager.NewManager(cfg, env)
 		_ = cfg // unused but required by SetupContext
 
 		// Try to read version from .tool-versions

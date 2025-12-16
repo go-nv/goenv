@@ -44,14 +44,20 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
+	env := ctx.Environment
+	
+	// Fallback: Load environment if not already in context (e.g., in tests)
+	if env == nil {
+		env, _ = utils.LoadEnvironment(cmd.Context())
+	}
 
 	// Header
 	fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", utils.Emoji("📊 "), utils.BoldBlue("goenv Status"))
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Check 1: Initialization status
-	goenvShell := utils.GoenvEnvVarShell.UnsafeValue()
-	goenvRoot := utils.GoenvEnvVarRoot.UnsafeValue()
+	goenvShell := env.GetShell()
+	goenvRoot := env.GetRoot()
 
 	if goenvShell != "" {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", utils.Green("✓"), utils.Green("goenv is initialized"))
@@ -158,7 +164,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(cmd.OutOrStdout())
 
 	// Check 5: Auto-rehash setting
-	autoRehash := utils.GoenvEnvVarAutoRehash.IsTrue()
+	autoRehash := env.HasAutoRehash()
 	if autoRehash {
 		fmt.Fprintf(cmd.OutOrStdout(), "Auto-rehash: %s\n", utils.Green("✓ enabled"))
 	} else {
@@ -167,7 +173,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 6: Auto-install setting
-	autoInstall := utils.GoenvEnvVarAutoInstall.IsTrue()
+	autoInstall := env.HasAutoInstall()
 	if autoInstall {
 		fmt.Fprintf(cmd.OutOrStdout(), "Auto-install: %s\n", utils.Green("✓ enabled"))
 	} else {

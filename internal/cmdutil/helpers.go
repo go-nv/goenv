@@ -79,11 +79,17 @@ func GetContexts(cmd *cobra.Command, keys ...any) *CmdContext {
 				if result.Config == nil {
 					result.Config = config.Load()
 				}
-				result.Manager = manager.NewManager(result.Config)
+				if result.Environment == nil {
+					result.Environment, _ = utils.LoadEnvironment(ctx)
+				}
+				result.Manager = manager.NewManager(result.Config, result.Environment)
 			}
 		case utils.EnvironmentContextKey:
 			result.Environment = utils.EnvironmentFromContext(ctx)
-			// No fallback for environment - it's optional
+			// Fallback for tests that don't set up context
+			if result.Environment == nil {
+				result.Environment, _ = utils.LoadEnvironment(ctx)
+			}
 		}
 	}
 

@@ -1,6 +1,7 @@
 package compliance
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -150,8 +151,11 @@ func TestResolveSBOMTool(t *testing.T) {
 
 	testutil.WriteTestFile(t, toolPath, []byte(content), utils.PermFileExecutable)
 
+	env, err := utils.LoadEnvironment(context.Background())
+	require.NoError(t, err, "Failed to load environment")
+
 	// Test resolution with global version context (host bin accessible)
-	resolvedPath, err := resolveSBOMTool(cfg, toolName, "1.21.0", "")
+	resolvedPath, err := resolveSBOMTool(cfg, env, toolName, "1.21.0", "")
 	require.NoError(t, err, "Failed to resolve tool")
 
 	assert.Equal(t, toolPath, resolvedPath, "Expected path")
@@ -164,8 +168,11 @@ func TestResolveSBOMTool_NotFound(t *testing.T) {
 		Root: tmpDir,
 	}
 
+	env, err := utils.LoadEnvironment(context.Background())
+	require.NoError(t, err, "Failed to load environment")
+
 	// Test resolution for non-existent tool with global context
-	_, err := resolveSBOMTool(cfg, "nonexistent-tool", "1.21.0", "")
+	_, err = resolveSBOMTool(cfg, env, "nonexistent-tool", "1.21.0", "")
 	assert.Error(t, err, "Expected error for non-existent tool")
 
 	assert.Contains(t, err.Error(), "not found", "Expected 'not found' error %v", err)

@@ -66,14 +66,14 @@ func Load() *Config {
 // LoadFromEnvironment creates a Config from a parsed GoenvEnvironment struct.
 // This is the preferred method when using the context-based approach.
 func LoadFromEnvironment(env *utils.GoenvEnvironment) *Config {
-	root := env.Root
+	root := env.GetRoot()
 	if root == "" {
 		root = DefaultRoot()
 	} else {
 		root = pathutil.ExpandPath(root)
 	}
 
-	dir := env.Dir
+	dir := env.GetDir()
 	if dir == "" {
 		dir = getCurrentDir()
 	} else {
@@ -83,8 +83,8 @@ func LoadFromEnvironment(env *utils.GoenvEnvironment) *Config {
 	cfg := &Config{
 		Root:       root,
 		CurrentDir: dir,
-		Shell:      env.Shell,
-		Debug:      env.Debug != "",
+		Shell:      env.GetShell(),
+		Debug:      env.GetDebug() != "",
 	}
 
 	return cfg

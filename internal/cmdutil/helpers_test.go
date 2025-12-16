@@ -17,7 +17,7 @@ import (
 func TestGetContexts(t *testing.T) {
 	// Create test config, manager, and environment
 	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	env := &utils.GoenvEnvironment{
 		Root:  cfg.Root,
 		Shell: "bash",

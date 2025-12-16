@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -13,11 +14,15 @@ import (
 // Resolver handles binary resolution for goenv
 type Resolver struct {
 	config *config.Config
+	env    *utils.GoenvEnvironment
 }
 
 // New creates a new binary resolver
-func New(cfg *config.Config) *Resolver {
-	return &Resolver{config: cfg}
+func New(cfg *config.Config, env *utils.GoenvEnvironment) *Resolver {
+	if env == nil {
+		env = utils.EnvironmentFromContextOrLoad(context.Background())
+	}
+	return &Resolver{config: cfg, env: env}
 }
 
 // ResolveBinary finds the full path to a binary for the given version.
@@ -30,7 +35,7 @@ func New(cfg *config.Config) *Resolver {
 func (r *Resolver) ResolveBinary(command, version, versionSource string) (string, error) {
 	versionBinDir := r.config.VersionBinDir(version)
 	versionGopathBin := r.config.VersionGopathBin(version)
-	gopathDisabled := utils.GoenvEnvVarDisableGopath.IsTrue()
+	gopathDisabled := r.env.HasDisableGopath()
 
 	// Check version bin first
 	if path, err := utils.FindExecutable(versionBinDir, command); err == nil {
@@ -69,7 +74,7 @@ func isGlobalVersion(versionSource string) bool {
 // Only checks version-specific directories (version bin and version GOPATH).
 // Host bin is not considered since it's only for global version.
 func (r *Resolver) FindVersionsWithBinary(command string, allVersions []string) ([]string, error) {
-	gopathDisabled := utils.GoenvEnvVarDisableGopath.IsTrue()
+	gopathDisabled := r.env.HasDisableGopath()
 
 	var versionsWithCommand []string
 	for _, version := range allVersions {
@@ -95,7 +100,7 @@ func (r *Resolver) GetBinaryDirectories(version string) []string {
 	}
 
 	// Add version-specific GOPATH bin if not disabled
-	if !utils.GoenvEnvVarDisableGopath.IsTrue() {
+	if !r.env.HasDisableGopath() {
 		dirs = append(dirs, r.config.VersionGopathBin(version))
 	}
 
@@ -109,7 +114,7 @@ func (r *Resolver) GetHostBinaryDirectory() string {
 
 // ShouldScanGopath returns whether version-specific GOPATH directories should be scanned
 func (r *Resolver) ShouldScanGopath() bool {
-	return !utils.GoenvEnvVarDisableGopath.IsTrue()
+	return !r.env.HasDisableGopath()
 }
 
 // CollectBinaries scans directories and returns a map of unique binary names.

@@ -56,7 +56,7 @@ var RootCmd = &cobra.Command{
 		cfg := config.LoadFromEnvironment(env)
 		ctx = config.ToContext(ctx, cfg)
 
-		mgr := manager.NewManager(cfg)
+		mgr := manager.NewManager(cfg, env)
 		ctx = manager.ToContext(ctx, mgr)
 
 		// Store updated context back to command
@@ -81,13 +81,14 @@ var RootCmd = &cobra.Command{
 			ctx := cmdutil.GetContexts(cmd)
 			cfg := ctx.Config
 			mgr := ctx.Manager
+			env := ctx.Environment
 
 			// Check if GOENV_AUTO_INSTALL is enabled
-			autoInstall := utils.GoenvEnvVarAutoInstall.IsTrue()
+			autoInstall := env.HasAutoInstall()
 
 			if autoInstall {
 				// Use auto-install workflow
-				additionalFlags := utils.GoenvEnvVarAutoInstallFlags.UnsafeValue()
+				additionalFlags := env.GetAutoInstallFlags()
 
 				setup := &workflow.AutoInstallSetup{
 					Config:          cfg,

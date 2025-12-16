@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -124,7 +126,7 @@ func TestFindCurrentVersionToolTargets(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarVersion.String(), version)
 
 	// Find targets
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	targets := findCurrentVersionToolTargets(cfg, mgr, []string{"gopls", "staticcheck", "nonexistent"})
 
 	if len(targets) != 3 {
@@ -254,7 +256,7 @@ func TestRunUninstall_StripVersionSuffix(t *testing.T) {
 	assert.Equal(t, "gopls", toolName)
 
 	// Now verify findCurrentVersionToolTargets works with the clean name
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	targets := findCurrentVersionToolTargets(cfg, mgr, []string{toolName})
 	if len(targets) != 1 {
 		t.Fatalf("expected length %v, got %v", 1, len(targets))
@@ -277,7 +279,7 @@ func TestExecuteUninstalls(t *testing.T) {
 	testutil.WriteTestFile(t, goplsExe, []byte("fake"), utils.PermFileExecutable)
 
 	// Create manager
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	targets := []toolUninstallTarget{
@@ -321,7 +323,7 @@ func TestExecuteUninstalls_MultipleTools(t *testing.T) {
 	testutil.WriteTestFile(t, staticcheck, []byte("fake"), utils.PermFileExecutable)
 
 	// Create manager
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	targets := []toolUninstallTarget{
@@ -369,7 +371,7 @@ func TestExecuteUninstalls_PartialFailure(t *testing.T) {
 	testutil.WriteTestFile(t, gopls, []byte("fake"), utils.PermFileExecutable)
 
 	// Create manager
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	// Create target with non-existent file (will fail to remove)
@@ -470,6 +472,7 @@ func TestRunUninstall_Integration(t *testing.T) {
 	testutil.WriteTestFile(t, gopls, []byte("fake"), utils.PermFileExecutable)
 	testutil.WriteTestFile(t, staticcheck, []byte("fake"), utils.PermFileExecutable)
 
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarVersion.String(), version)
 
 	// Run uninstall with dry-run
@@ -478,7 +481,11 @@ func TestRunUninstall_Integration(t *testing.T) {
 	uninstallAllVersions = false
 	uninstallGlobal = false
 
-	err = runUninstall(cfg, []string{"gopls"})
+	cmd := &cobra.Command{}
+
+	cmd.SetContext(context.Background())
+
+	err = runUninstall(cmd, []string{"gopls"})
 	assert.NoError(t, err)
 
 	// Files should still exist after dry-run
@@ -488,7 +495,7 @@ func TestRunUninstall_Integration(t *testing.T) {
 
 	// Run actual uninstall
 	uninstallDryRun = false
-	err = runUninstall(cfg, []string{"gopls"})
+	err = runUninstall(cmd, []string{"gopls"})
 	assert.NoError(t, err)
 
 	// gopls should be removed
@@ -504,9 +511,9 @@ func TestRunUninstall_Integration(t *testing.T) {
 
 func TestRunUninstall_NoToolsFound(t *testing.T) {
 	tmpDir := t.TempDir()
-	cfg := &config.Config{
-		Root: tmpDir,
-	}
+	cmd := &cobra.Command{}
+
+	cmd.SetContext(context.Background())
 
 	version := "1.23.0"
 	cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
@@ -514,7 +521,7 @@ func TestRunUninstall_NoToolsFound(t *testing.T) {
 	t.Setenv(utils.GoenvEnvVarVersion.String(), version)
 
 	uninstallForce = true
-	err := runUninstall(cfg, []string{"nonexistent"})
+	err := runUninstall(cmd, []string{"nonexistent"})
 
 	// Should not return error, just print message
 	assert.NoError(t, err)

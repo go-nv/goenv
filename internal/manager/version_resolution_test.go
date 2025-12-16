@@ -44,7 +44,7 @@ func setupTestVersions(t *testing.T, versions []string) (string, *Manager) {
 	cfg := &config.Config{}
 	cfg.Root = tmpDir
 
-	mgr := NewManager(cfg)
+	mgr := NewManager(cfg, nil)
 	return tmpDir, mgr
 }
 
