@@ -79,7 +79,7 @@ func (r *Resolver) FindVersionsWithBinary(command string, allVersions []string) 
 	var versionsWithCommand []string
 	for _, version := range allVersions {
 		dirs := []string{r.config.VersionBinDir(version)}
-		
+
 		if !gopathDisabled {
 			dirs = append(dirs, r.config.VersionGopathBin(version))
 		}
@@ -139,7 +139,7 @@ func CollectBinaries(dirs []string) (map[string]bool, error) {
 			}
 
 			binaryName := entry.Name()
-			
+
 			// On Windows, strip executable extensions from binary name
 			if utils.IsWindows() {
 				for _, ext := range utils.WindowsExecutableExtensions() {

@@ -45,7 +45,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	cfg := ctx.Config
 	mgr := ctx.Manager
 	env := ctx.Environment
-	
+
 	// Fallback: Load environment if not already in context (e.g., in tests)
 	if env == nil {
 		env, _ = utils.LoadEnvironment(cmd.Context())

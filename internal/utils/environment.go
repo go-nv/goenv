@@ -298,7 +298,7 @@ func EnvironmentFromContextOrLoad(ctx context.Context) *GoenvEnvironment {
 	if env := EnvironmentFromContext(ctx); env != nil {
 		return env
 	}
-	
+
 	// Fallback: load from environment variables
 	if ctx == nil {
 		ctx = context.Background()
