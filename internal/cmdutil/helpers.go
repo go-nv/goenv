@@ -80,7 +80,7 @@ func GetContexts(cmd *cobra.Command, keys ...any) *CmdContext {
 					result.Config = config.Load()
 				}
 				if result.Environment == nil {
-					result.Environment, _ = utils.LoadEnvironment(ctx)
+					result.Environment = utils.EnvironmentFromContextOrLoad(ctx)
 				}
 				result.Manager = manager.NewManager(result.Config, result.Environment)
 			}
@@ -88,7 +88,7 @@ func GetContexts(cmd *cobra.Command, keys ...any) *CmdContext {
 			result.Environment = utils.EnvironmentFromContext(ctx)
 			// Fallback for tests that don't set up context
 			if result.Environment == nil {
-				result.Environment, _ = utils.LoadEnvironment(ctx)
+				result.Environment = utils.EnvironmentFromContextOrLoad(ctx)
 			}
 		}
 	}

@@ -42,7 +42,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 
 	// Fallback: Load environment if not already in context (e.g., in tests)
 	if env == nil {
-		env, _ = utils.LoadEnvironment(cmd.Context())
+		env = utils.EnvironmentFromContextOrLoad(cmd.Context())
 	}
 
 	// Determine shell type

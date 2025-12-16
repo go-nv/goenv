@@ -223,7 +223,7 @@ func isGoProject() bool {
 	// Use manager API for consistent parsing
 	if utils.PathExists(config.ToolVersionsFileName) {
 		cfg := config.Load()
-		env, _ := utils.LoadEnvironment(context.Background())
+		env := utils.EnvironmentFromContextOrLoad(context.Background())
 		mgr := manager.NewManager(cfg, env)
 		_ = cfg // unused but required by SetupContext
 
