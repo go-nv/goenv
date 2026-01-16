@@ -2,6 +2,7 @@ package manager
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ const LatestVersion = "latest"
 // Manager handles version management operations
 type Manager struct {
 	config *config.Config
+	env    *utils.GoenvEnvironment
 }
 
 // UnsetLocalVersion removes the local version file in the current directory, if it exists
@@ -52,7 +54,7 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 		searchDir = targetDir
 	} else {
 		// No target - check GOENV_DIR first, then PWD
-		searchDir = utils.GoenvEnvVarDir.UnsafeValue()
+		searchDir = m.env.GetDir()
 		if searchDir == "" {
 			var err error
 			searchDir, err = os.Getwd()
@@ -98,7 +100,7 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 	}
 
 	// If no target directory specified, try PWD if different from GOENV_DIR
-	if utils.GoenvEnvVarDir.UnsafeValue() != "" {
+	if m.env.GetDir() != "" {
 		pwdDir, err := os.Getwd()
 		if err == nil && pwdDir != searchDir {
 			// Search from PWD
@@ -129,9 +131,13 @@ func (m *Manager) FindVersionFile(targetDir string) (string, error) {
 }
 
 // NewManager creates a new version manager
-func NewManager(cfg *config.Config) *Manager {
+func NewManager(cfg *config.Config, env *utils.GoenvEnvironment) *Manager {
+	if env == nil {
+		env = utils.EnvironmentFromContextOrLoad(context.Background())
+	}
 	return &Manager{
 		config: cfg,
+		env:    env,
 	}
 }
 
@@ -169,8 +175,8 @@ func (m *Manager) ListInstalledVersions() ([]string, error) {
 // GetCurrentVersion returns the currently active Go version
 func (m *Manager) GetCurrentVersion() (string, string, error) {
 	// Check GOENV_VERSION environment variable first (highest precedence)
-	if envVersion := utils.GoenvEnvVarVersion.UnsafeValue(); envVersion != "" {
-		return envVersion, fmt.Sprintf("%s environment variable", utils.GoenvEnvVarVersion.String()), nil
+	if envVersion := m.env.GetVersion(); envVersion != "" {
+		return envVersion, "GOENV_VERSION environment variable", nil
 	}
 
 	// Check for local version file (including go.mod if enabled)

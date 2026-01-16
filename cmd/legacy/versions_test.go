@@ -400,7 +400,7 @@ func TestVersionsSystemGoOnly(t *testing.T) {
 // This is needed because CI/macOS systems may have Go installed in PATH
 func hasSystemGoInTest() bool {
 	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	return mgr.HasSystemGo()
 }
 

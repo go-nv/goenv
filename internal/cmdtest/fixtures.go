@@ -38,7 +38,7 @@ func NewFixture(t *testing.T) *Fixture {
 	root, cleanup := SetupTestEnv(t)
 
 	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil) // nil triggers fallback environment loading
 
 	return &Fixture{
 		T:       t,

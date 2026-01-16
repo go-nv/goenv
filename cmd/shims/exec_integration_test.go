@@ -33,7 +33,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	defer utils.GoenvEnvVarRoot.Set(oldRoot)
 
 	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 
 	// Check if we have a Go version installed to test with
 	versions, err := mgr.ListInstalledVersions()
@@ -62,7 +62,7 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	}
 
 	// Count shims before
-	shimMgr := shims.NewShimManager(cfg)
+	shimMgr := shims.NewShimManager(cfg, nil)
 	shimsDir := filepath.Join(cfg.Root, "shims")
 	_ = utils.EnsureDirWithContext(shimsDir, "create test directory")
 
@@ -177,7 +177,7 @@ func TestExec_RealGoInstallIntegration(t *testing.T) {
 
 	// Test doesn't have a cobra command, so use direct initialization
 	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 
 	// Check if we have a Go version installed
 	versions, err := mgr.ListInstalledVersions()

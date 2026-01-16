@@ -73,7 +73,7 @@ func (h *CommandHelp) format(substituteVersions bool) string {
 func getLatestInstalledVersion() string {
 	// Note: Using direct initialization since no cmd parameter available
 	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 
 	installed, err := mgr.ListInstalledVersions()
 	if err != nil || len(installed) == 0 {

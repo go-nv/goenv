@@ -47,7 +47,7 @@ func TestInstallCommand_AllFlag(t *testing.T) {
 	}()
 
 	// Test that the function validates versions correctly
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	foundVersions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err, "ListInstalledVersions failed")
 
@@ -114,7 +114,7 @@ func TestInstallCommand_NoVersionsInstalled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to get installed versions
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	versions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err)
 
@@ -180,7 +180,7 @@ func TestInstallToolForVersion_MissingGo(t *testing.T) {
 	require.NoError(t, err)
 
 	// Don't create Go binary - should fail
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	toolMgr := toolspkg.NewManager(cfg, mgr)
 	_, err = toolMgr.InstallSingleTool(version, "gopls@latest", false)
 	assert.Error(t, err, "Expected error when Go binary is missing")

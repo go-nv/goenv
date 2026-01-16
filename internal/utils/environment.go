@@ -288,3 +288,283 @@ func EnvironmentFromContext(ctx context.Context) *GoenvEnvironment {
 	}
 	return nil
 }
+
+// EnvironmentFromContextOrLoad retrieves the environment from context,
+// or loads it if not found. This is a convenience function for code that
+// may not have environment in context (e.g., tests, utility functions).
+// Returns a default environment if loading fails.
+func EnvironmentFromContextOrLoad(ctx context.Context) *GoenvEnvironment {
+	// Try to get from context first
+	if env := EnvironmentFromContext(ctx); env != nil {
+		return env
+	}
+
+	// Fallback: load from environment variables
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	env, err := LoadEnvironment(ctx)
+	if err != nil {
+		// Return empty environment as last resort
+		return &GoenvEnvironment{}
+	}
+	return env
+}
+
+// Helper methods for GoenvEnvironment - String values
+// These provide nil-safe access to environment variables
+
+func (e *GoenvEnvironment) GetVersion() string {
+	if e == nil {
+		return ""
+	}
+	return e.Version
+}
+
+func (e *GoenvEnvironment) GetRoot() string {
+	if e == nil {
+		return ""
+	}
+	return e.Root
+}
+
+func (e *GoenvEnvironment) GetDebug() string {
+	if e == nil {
+		return ""
+	}
+	return e.Debug
+}
+
+func (e *GoenvEnvironment) GetDir() string {
+	if e == nil {
+		return ""
+	}
+	return e.Dir
+}
+
+func (e *GoenvEnvironment) GetShell() string {
+	if e == nil {
+		return ""
+	}
+	return e.Shell
+}
+
+func (e *GoenvEnvironment) GetAutoInstallFlags() string {
+	if e == nil {
+		return ""
+	}
+	return e.AutoInstallFlags
+}
+
+func (e *GoenvEnvironment) GetRcFile() string {
+	if e == nil {
+		return ""
+	}
+	return e.RcFile
+}
+
+func (e *GoenvEnvironment) GetPathOrder() string {
+	if e == nil {
+		return ""
+	}
+	return e.PathOrder
+}
+
+func (e *GoenvEnvironment) GetShimDebug() string {
+	if e == nil {
+		return ""
+	}
+	return e.ShimDebug
+}
+
+func (e *GoenvEnvironment) GetHooksConfig() string {
+	if e == nil {
+		return ""
+	}
+	return e.HooksConfig
+}
+
+func (e *GoenvEnvironment) GetHooksLog() string {
+	if e == nil {
+		return ""
+	}
+	return e.HooksLog
+}
+
+func (e *GoenvEnvironment) GetInstallRoot() string {
+	if e == nil {
+		return ""
+	}
+	return e.InstallRoot
+}
+
+func (e *GoenvEnvironment) GetInstallTimeout() string {
+	if e == nil {
+		return ""
+	}
+	return e.InstallTimeout
+}
+
+func (e *GoenvEnvironment) GetInstallRetries() string {
+	if e == nil {
+		return ""
+	}
+	return e.InstallRetries
+}
+
+func (e *GoenvEnvironment) GetInstallResume() string {
+	if e == nil {
+		return ""
+	}
+	return e.InstallResume
+}
+
+func (e *GoenvEnvironment) GetGocacheDir() string {
+	if e == nil {
+		return ""
+	}
+	return e.GocacheDir
+}
+
+func (e *GoenvEnvironment) GetFileArg() string {
+	if e == nil {
+		return ""
+	}
+	return e.FileArg
+}
+
+func (e *GoenvEnvironment) GetPromptPrefix() string {
+	if e == nil {
+		return ""
+	}
+	return e.PromptPrefix
+}
+
+func (e *GoenvEnvironment) GetPromptSuffix() string {
+	if e == nil {
+		return ""
+	}
+	return e.PromptSuffix
+}
+
+func (e *GoenvEnvironment) GetPromptFormat() string {
+	if e == nil {
+		return ""
+	}
+	return e.PromptFormat
+}
+
+func (e *GoenvEnvironment) GetPromptIcon() string {
+	if e == nil {
+		return ""
+	}
+	return e.PromptIcon
+}
+
+func (e *GoenvEnvironment) GetVersionOrigin() string {
+	if e == nil {
+		return ""
+	}
+	return e.VersionOrigin
+}
+
+// Helper methods for GoenvEnvironment - Boolean values
+// These provide nil-safe access to boolean environment variables
+
+func (e *GoenvEnvironment) HasDisableGoroot() bool {
+	if e == nil {
+		return false
+	}
+	return e.DisableGoroot
+}
+
+func (e *GoenvEnvironment) HasDisableGopath() bool {
+	if e == nil {
+		return false
+	}
+	return e.DisableGopath
+}
+
+func (e *GoenvEnvironment) HasAutoInstall() bool {
+	if e == nil {
+		return false
+	}
+	return e.AutoInstall
+}
+
+func (e *GoenvEnvironment) HasNoAutoRehash() bool {
+	if e == nil {
+		return false
+	}
+	return e.NoAutoRehash
+}
+
+func (e *GoenvEnvironment) HasOffline() bool {
+	if e == nil {
+		return false
+	}
+	return e.Offline
+}
+
+func (e *GoenvEnvironment) HasAutoRehash() bool {
+	if e == nil {
+		return false
+	}
+	return e.AutoRehash
+}
+
+func (e *GoenvEnvironment) HasDisableGocache() bool {
+	if e == nil {
+		return false
+	}
+	return e.DisableGocache
+}
+
+func (e *GoenvEnvironment) HasDisableGomod() bool {
+	if e == nil {
+		return false
+	}
+	return e.DisableGomod
+}
+
+func (e *GoenvEnvironment) HasDisablePrompt() bool {
+	if e == nil {
+		return false
+	}
+	return e.DisablePrompt
+}
+
+func (e *GoenvEnvironment) HasDisablePromptHelper() bool {
+	if e == nil {
+		return false
+	}
+	return e.DisablePromptHelper
+}
+
+func (e *GoenvEnvironment) HasPromptNoSystem() bool {
+	if e == nil {
+		return false
+	}
+	return e.PromptNoSystem
+}
+
+func (e *GoenvEnvironment) HasPromptProjectOnly() bool {
+	if e == nil {
+		return false
+	}
+	return e.PromptProjectOnly
+}
+
+func (e *GoenvEnvironment) HasCacheBgRefresh() bool {
+	if e == nil {
+		return false
+	}
+	return e.CacheBgRefresh
+}
+
+func (e *GoenvEnvironment) HasAssumeYes() bool {
+	if e == nil {
+		return false
+	}
+	return e.AssumeYes
+}

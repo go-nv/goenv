@@ -54,7 +54,7 @@ func TestMultiVersionToolManagement(t *testing.T) {
 	}
 
 	// Test 1: Verify ListInstalledVersions
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	installedVersions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err)
 	assert.Len(t, installedVersions, 3)

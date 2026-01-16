@@ -27,7 +27,7 @@ func TestStatusCommand_NoVersions(t *testing.T) {
 	err = utils.EnsureDirWithContext(versionsDir, "create test directory")
 	require.NoError(t, err)
 
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	versions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err)
 
@@ -152,7 +152,7 @@ func TestStatusCommand_Categorization(t *testing.T) {
 	}
 
 	// Get versions and collect tools
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	foundVersions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err, "ListInstalledVersions failed")
 
@@ -225,7 +225,7 @@ func TestStatusCommand_EmptyTools(t *testing.T) {
 		cmdtest.CreateTestBinary(t, tmpDir, v, "go")
 	}
 
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	foundVersions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err, "ListInstalledVersions failed")
 

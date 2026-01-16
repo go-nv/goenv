@@ -2,6 +2,7 @@ package diagnostics
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -712,7 +713,7 @@ func TestCheckCacheIsolationEffectiveness(t *testing.T) {
 
 			// Load config which will read from environment variables
 			cfg := config.Load()
-			mgr := manager.NewManager(cfg)
+			mgr := manager.NewManager(cfg, nil)
 			result := checkCacheIsolationEffectiveness(cfg, mgr)
 
 			assert.Equal(t, tt.expectedStatus, result.status, "Expected status")
@@ -732,8 +733,10 @@ func TestCheckRosetta(t *testing.T) {
 
 	// Load config which will read from environment variables
 	cfg := config.Load()
+	env, err := utils.LoadEnvironment(context.Background())
+	assert.NoError(t, err, "Failed to load environment")
 
-	result := checkRosetta(cfg)
+	result := checkRosetta(cfg, env)
 
 	// Should always return a valid result
 	assert.Equal(t, "Rosetta detection", result.name, "Expected name")
@@ -862,7 +865,7 @@ func TestCheckMacOSDeploymentTarget(t *testing.T) {
 	versionFile := filepath.Join(tmpDir, "version")
 	testutil.WriteTestFile(t, versionFile, []byte("1.23.0\n"), utils.PermFileDefault)
 
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	result := checkMacOSDeploymentTarget(cfg, mgr)
 
 	assert.Equal(t, "macOS deployment target", result.name, "Expected check name 'macOS deployment target'")
@@ -996,7 +999,7 @@ func TestPlatformChecksCrossOSBehavior(t *testing.T) {
 	// Test macOS checks on non-macOS platforms
 	if !platform.IsMacOS() {
 		t.Run("MacOSChecksOnNonMacOS", func(t *testing.T) {
-			mgr := manager.NewManager(cfg)
+			mgr := manager.NewManager(cfg, nil)
 			result := checkMacOSDeploymentTarget(cfg, mgr)
 			assert.Equal(t, "macos-deployment-target", result.id, "Expected id 'macos-deployment-target'")
 			// Check should handle non-macOS gracefully

@@ -49,7 +49,7 @@ func TestListCommand_AllFlag(t *testing.T) {
 	defer func() { listAllVersions = false }()
 
 	// Get all versions
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	foundVersions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err, "ListInstalledVersions failed")
 
@@ -293,7 +293,7 @@ func TestListCommand_MultipleVersions(t *testing.T) {
 	}
 
 	// Get all versions
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	foundVersions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err, "ListInstalledVersions failed")
 

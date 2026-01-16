@@ -28,7 +28,7 @@ func TestOutdatedCommand_NoVersions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get installed versions - should be empty
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	versions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err)
 
@@ -186,7 +186,7 @@ func TestOutdatedCommand_WithVersions(t *testing.T) {
 		cmdtest.CreateMockGoVersion(t, tmpDir, v)
 	}
 
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	foundVersions, err := mgr.ListInstalledVersions()
 	require.NoError(t, err, "ListInstalledVersions failed")
 

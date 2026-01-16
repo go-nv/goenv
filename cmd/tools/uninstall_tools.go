@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
 	toolspkg "github.com/go-nv/goenv/internal/tools"
@@ -59,7 +60,7 @@ Examples:
   goenv tools uninstall gopls --dry-run --verbose`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUninstall(cfg, args)
+			return runUninstall(cmd, args)
 		},
 	}
 
@@ -80,8 +81,12 @@ type toolUninstallTarget struct {
 	BinaryFiles []string
 }
 
-func runUninstall(cfg *config.Config, toolNames []string) error {
-	mgr := manager.NewManager(cfg)
+func runUninstall(cmd *cobra.Command, toolNames []string) error {
+	ctx := cmdutil.GetContexts(cmd)
+
+	cfg := ctx.Config
+
+	mgr := manager.NewManager(cfg, ctx.Environment)
 	toolsMgr := toolspkg.NewManager(cfg, mgr)
 
 	// Parse tool names (strip @version if present, we remove the binary regardless)

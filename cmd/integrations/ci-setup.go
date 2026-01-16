@@ -374,7 +374,7 @@ func runCIInstallPhase(cmd *cobra.Command, args []string, cfg *config.Config) er
 func discoverVersionsFromFiles() ([]string, error) {
 	versions := make(map[string]bool) // Use map to deduplicate
 	cfg := config.Load()
-	mgr := manager.NewManager(cfg)
+	mgr := manager.NewManager(cfg, nil)
 	_ = cfg // unused but required by SetupContext
 
 	// Check for version files in priority order
@@ -419,6 +419,6 @@ func installVersion(cfg *config.Config, version string, noRehash bool) error {
 
 // rehashShims regenerates shims for all installed versions
 func rehashShims(cfg *config.Config) error {
-	shimMgr := shims.NewShimManager(cfg)
+	shimMgr := shims.NewShimManager(cfg, nil)
 	return shimMgr.Rehash()
 }
