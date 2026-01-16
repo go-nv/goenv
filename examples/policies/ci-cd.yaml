@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../../schemas/policy-schema.json
+# CI/CD Pipeline Policy
+# Balanced policy for continuous integration workflows
+
+version: "1"
+
+options:
+  fail_on_error: true
+  fail_on_warning: false
+  verbose: false
+
+rules:
+  # Supply chain - warn but don't block
+  - name: warn-local-replaces
+    type: supply-chain
+    severity: warning
+    description: Local replaces should be temporary for development
+    check: replace-directives
+    blocked:
+      - local-path
+
+  # Security - strict
+  - name: block-retracted-versions
+    type: security
+    severity: error
+    description: Retracted versions indicate security issues
+    check: retracted-versions
+
+  # Completeness - ensure CI generates full metadata
+  - name: require-build-metadata
+    type: completeness
+    severity: error
+    description: CI builds must include full provenance
+    check: required-metadata
+    required:
+      - goenv:go_version
+      - goenv:platform
+      - goenv:timestamp
+      - goenv:build_context.goos
+      - goenv:build_context.goarch
+
+  # License - permissive
+  - name: block-agpl-only
+    type: license
+    severity: error
+    description: AGPL has network copyleft requirements
+    check: license-compliance
+    blocked:
+      - AGPL-3.0
+      - AGPL-1.0

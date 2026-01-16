@@ -26,6 +26,9 @@ build:
 
 build-swap:: build swap
 
+# alias for build-swap
+bs: build-swap
+
 test:
 	unset GOENV_DEBUG && go run scripts/build-tool/main.go -task=test
 
@@ -73,6 +76,9 @@ release:
 
 snapshot:
 	go run scripts/build-tool/main.go -task=snapshot
+
+restore:
+	go run ./scripts/swap/main.go bash
 
 swap:
 	go run ./scripts/swap/main.go go

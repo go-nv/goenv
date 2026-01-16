@@ -3,5 +3,18 @@
   "makefile.configureOnOpen": false,
   "go.toolsGopath": "${env:HOME}/go/tools",
   "go.goroot": "${env:HOME}/.goenv/versions/1.23.2",
-  "go.gopath": "${env:HOME}/go/1.23.2"
+  "go.gopath": "${env:HOME}/go/1.23.2",
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml",
+    "https://json.schemastore.org/github-action.json": ".github/actions/*/action.yml"
+  },
+  "yaml.customTags": [
+    "!Policy scalar"
+  ],
+  "yaml.validate": true,
+  "files.associations": {
+    "*-policy.yaml": "yaml",
+    ".goenv-policy.yaml": "yaml",
+    "examples/policies/*.yaml": "yaml"
+  }
 }

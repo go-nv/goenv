@@ -24,6 +24,11 @@ var commonTools = map[string]string{
 	"goose":         "github.com/pressly/goose/v3/cmd/goose",
 	"cyclonedx":     "github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod",
 	"syft":          "github.com/anchore/syft/cmd/syft",
+	// Security scanners for SBOM vulnerability analysis (Phase 4A)
+	"grype": "github.com/anchore/grype/cmd/grype",
+	"trivy": "github.com/aquasecurity/trivy/cmd/trivy",
+	// Commercial security scanners (Phase 4B)
+	"snyk": "github.com/snyk/cli/cmd/snyk",
 }
 
 // ExtractToolName extracts the binary name from a package path.

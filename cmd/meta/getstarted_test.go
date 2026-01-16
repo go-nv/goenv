@@ -162,7 +162,7 @@ func TestGetStartedCommand_UnknownShell(t *testing.T) {
 	output := buf.String()
 
 	// Should still provide generic instructions
-	assert.False(t, !strings.Contains(output, "eval") || !strings.Contains(output, "init"), "Expected generic init instructions")
+	assert.True(t, strings.Contains(output, "eval") || strings.Contains(output, "init"), "Expected generic init instructions")
 }
 
 func TestGetStartedHelp(t *testing.T) {

@@ -49,7 +49,17 @@ Common tools:
   - honnef.co/go/tools/cmd/staticcheck    (static analysis)
   - github.com/go-delve/delve/cmd/dlv     (debugger)
   - gotest.tools/gotestsum                (test runner with nice output)
-  - mvdan.cc/gofumpt                       (stricter gofmt)`,
+  - mvdan.cc/gofumpt                       (stricter gofmt)
+
+Security & SBOM tools:
+  - github.com/anchore/grype/cmd/grype    (vulnerability scanner)
+  - github.com/aquasecurity/trivy/cmd/trivy (security scanner)
+  - github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod (SBOM generator)
+  - github.com/anchore/syft/cmd/syft      (SBOM generator)
+
+Short aliases available:
+  goenv tools install grype@latest        (expands to full path)
+  goenv tools install trivy@latest        (expands to full path)`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runInstall,
 }

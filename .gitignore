@@ -16,6 +16,8 @@
 /goenv
 goenv-*
 *.exe
+coverage.out
+*.out
 
 // No docs at root
 /*.md
@@ -25,3 +27,7 @@ scripts/swap/swap
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
 cmd/aliases/.go-version
+
+sbom*.json
+
+.goenv/*
