@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=./schemas/policy-schema.json
+# goenv SBOM Policy Configuration
+# Version: 1.0
+# Description: Example policy for validating Go project SBOMs
+
+version: "1"
+
+# Policy options
+options:
+  fail_on_error: true
+  fail_on_warning: false
+  verbose: false
+
+# Validation rules
+rules:
+  # Supply Chain Security Rules
+  - name: no-local-replaces
+    type: supply-chain
+    severity: error
+    description: Prevent local path replace directives that bypass checksum verification
+    check: replace-directives
+    blocked:
+      - local-path
+
+  - name: no-vendoring
+    type: supply-chain
+    severity: warning
+    description: Discourage vendored dependencies (optional - adjust per org policy)
+    check: vendoring-status
+    blocked:
+      - vendored
+
+  # Security Rules
+  - name: block-retracted-versions
+    type: security
+    severity: error
+    description: Prevent use of retracted module versions
+    check: retracted-versions
+
+  - name: require-cgo-disabled
+    type: security
+    severity: warning
+    description: Recommend disabling CGO for reduced attack surface
+    check: cgo-disabled
+    required:
+      - "false"
+
+  # Completeness Rules
+  - name: require-stdlib-component
+    type: completeness
+    severity: warning
+    description: Ensure standard library component is included in SBOM
+    check: required-components
+    required:
+      - golang-stdlib
+
+  - name: require-goenv-metadata
+    type: completeness
+    severity: info
+    description: Ensure Go-aware metadata is present
+    check: required-metadata
+    required:
+      - goenv:go_version
+      - goenv:platform
+      - goenv:build_context.goos
+      - goenv:build_context.goarch
+
+  # License Compliance Rules
+  - name: block-gpl-licenses
+    type: license
+    severity: error
+    description: Block copyleft licenses (adjust per org policy)
+    check: license-compliance
+    blocked:
+      - GPL-2.0
+      - GPL-3.0
+      - AGPL-3.0
+
+  - name: warn-lgpl-licenses
+    type: license
+    severity: warning
+    description: Warn on LGPL licenses requiring disclosure
+    check: license-compliance
+    blocked:
+      - LGPL-2.1
+      - LGPL-3.0
