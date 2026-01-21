@@ -183,7 +183,7 @@ func (hm *HookManager) generateHookScript(config HookConfig) string {
 		outputPath = filepath.Join(hm.RepoRoot, outputPath)
 	}
 
-	sbomCmd := fmt.Sprintf("    %s sbom generate --output %s --format %s",
+	sbomCmd := fmt.Sprintf("    %s sbom project --output %s --format %s",
 		hm.GoenvPath, outputPath, config.Format)
 
 	if config.Quiet {

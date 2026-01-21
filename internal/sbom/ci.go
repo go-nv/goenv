@@ -127,7 +127,7 @@ func (c *CIChecker) CheckSBOM(sbomPath string, maxAge time.Duration) (*CICheckRe
 		result.SBOMExists = false
 		result.Passed = false
 		result.Recommendations = append(result.Recommendations,
-			"Generate SBOM with: goenv sbom generate")
+			"Generate SBOM with: goenv sbom project")
 		return result, nil
 	}
 	if err != nil {
@@ -152,7 +152,7 @@ func (c *CIChecker) CheckSBOM(sbomPath string, maxAge time.Duration) (*CICheckRe
 			result.IsStale = true
 			result.StaleReason = "go.mod modified after SBOM generation"
 			result.Recommendations = append(result.Recommendations,
-				"Regenerate SBOM with: goenv sbom generate")
+				"Regenerate SBOM with: goenv sbom project")
 		}
 	}
 
@@ -165,7 +165,7 @@ func (c *CIChecker) CheckSBOM(sbomPath string, maxAge time.Duration) (*CICheckRe
 		}
 		if len(result.Recommendations) == 0 {
 			result.Recommendations = append(result.Recommendations,
-				"Regenerate SBOM with: goenv sbom generate")
+				"Regenerate SBOM with: goenv sbom project")
 		}
 	}
 
@@ -181,7 +181,7 @@ func (c *CIChecker) CheckSBOM(sbomPath string, maxAge time.Duration) (*CICheckRe
 			}
 			if len(result.Recommendations) == 0 {
 				result.Recommendations = append(result.Recommendations,
-					"Regenerate SBOM with: goenv sbom generate")
+					"Regenerate SBOM with: goenv sbom project")
 			}
 		}
 	}
@@ -204,7 +204,7 @@ func (c *CIChecker) FormatCIOutput(result *CICheckResult) string {
 	case PlatformGitHubActions:
 		if !result.Passed {
 			if !result.SBOMExists {
-				buf.WriteString("::error file=go.mod,title=SBOM Missing::SBOM file not found. Generate with: goenv sbom generate\n")
+				buf.WriteString("::error file=go.mod,title=SBOM Missing::SBOM file not found. Generate with: goenv sbom project\n")
 			} else if result.IsStale {
 				buf.WriteString(fmt.Sprintf("::error file=%s,title=SBOM Stale::%s\n",
 					filepath.Base(result.SBOMPath), result.StaleReason))

@@ -2,6 +2,7 @@ package sbom
 
 import (
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -1026,8 +1027,8 @@ func ComputeSBOMDigest(sbomPath, algorithm string) (string, error) {
 		hash := sha256.Sum256(canonical)
 		return hex.EncodeToString(hash[:]), nil
 	case "sha512":
-		// Note: Would need crypto/sha512 import for this
-		return "", fmt.Errorf("sha512 not yet implemented")
+		hash := sha512.Sum512(canonical)
+		return hex.EncodeToString(hash[:]), nil
 	default:
 		return "", fmt.Errorf("unsupported hash algorithm: %s", algorithm)
 	}

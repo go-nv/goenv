@@ -143,11 +143,11 @@ func runCICheck(cmd *cobra.Command, args []string) error {
 			fmt.Println()
 			if !result.SBOMExists {
 				fmt.Println("SBOM file not found. Please generate one with:")
-				fmt.Println("  goenv sbom generate")
+				fmt.Println("  goenv sbom project")
 			} else if result.IsStale {
 				fmt.Printf("SBOM is stale: %s\n", result.StaleReason)
 				fmt.Println("Please regenerate with:")
-				fmt.Println("  goenv sbom generate")
+				fmt.Println("  goenv sbom project")
 			}
 		}
 	}
@@ -186,7 +186,7 @@ func runCIScan(cmd *cobra.Command, args []string) error {
 		}
 
 		if sbomPath == "" {
-			return fmt.Errorf("SBOM file not found. Generate with: goenv sbom generate")
+			return fmt.Errorf("SBOM file not found. Generate with: goenv sbom project")
 		}
 	}
 

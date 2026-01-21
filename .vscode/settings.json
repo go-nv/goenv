@@ -16,5 +16,6 @@
     "*-policy.yaml": "yaml",
     ".goenv-policy.yaml": "yaml",
     "examples/policies/*.yaml": "yaml"
-  }
+  },
+  "snyk.advanced.autoSelectOrganization": true
 }

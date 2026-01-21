@@ -32,9 +32,15 @@ goenv sbom project \
   --format=cyclonedx-json \
   --output=sbom.json
 
-# SPDX format
+# CycloneDX format (XML)
 goenv sbom project \
   --tool=cyclonedx-gomod \
+  --format=cyclonedx-xml \
+  --output=sbom.cdx.xml
+
+# SPDX format (requires syft, not cyclonedx-gomod)
+goenv sbom project \
+  --tool=syft \
   --format=spdx-json \
   --output=sbom.spdx.json
 
