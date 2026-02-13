@@ -1,0 +1,95 @@
+# yaml-language-server: $schema=../../schemas/policy-schema.json
+# Strict Enterprise Security Policy
+# For regulated industries with high security requirements
+
+version: "1"
+
+options:
+  fail_on_error: true
+  fail_on_warning: true  # Treat warnings as failures
+  verbose: true
+
+rules:
+  # Strict supply chain controls
+  - name: no-local-dependencies
+    type: supply-chain
+    severity: error
+    description: All dependencies must be from versioned module proxies
+    check: replace-directives
+    blocked:
+      - local-path
+      - file-path
+
+  - name: no-vendoring-allowed
+    type: supply-chain
+    severity: error
+    description: Vendoring bypasses module proxy verification
+    check: vendoring-status
+    blocked:
+      - vendored
+
+  # Security requirements
+  - name: no-retracted-versions
+    type: security
+    severity: error
+    description: Zero tolerance for retracted versions
+    check: retracted-versions
+
+  - name: cgo-must-be-disabled
+    type: security
+    severity: error
+    description: CGO increases attack surface and complicates security analysis
+    check: cgo-disabled
+    required:
+      - "false"
+
+  # Completeness requirements
+  - name: stdlib-required
+    type: completeness
+    severity: error
+    description: Standard library must be tracked for vulnerability scanning
+    check: required-components
+    required:
+      - golang-stdlib
+
+  - name: full-metadata-required
+    type: completeness
+    severity: error
+    description: Complete build provenance required for audit compliance
+    check: required-metadata
+    required:
+      - goenv:go_version
+      - goenv:platform
+      - goenv:timestamp
+      - goenv:build_context.cgo_enabled
+      - goenv:build_context.goos
+      - goenv:build_context.goarch
+      - goenv:build_context.compiler
+      - goenv:module_context.vendored
+      - goenv:module_context.go_mod_digest
+      - goenv:module_context.go_sum_digest
+
+  # License compliance - strict
+  - name: no-copyleft-licenses
+    type: license
+    severity: error
+    description: Copyleft licenses prohibited in proprietary software
+    check: license-compliance
+    blocked:
+      - GPL-2.0
+      - GPL-2.0-only
+      - GPL-2.0-or-later
+      - GPL-3.0
+      - GPL-3.0-only
+      - GPL-3.0-or-later
+      - AGPL-1.0
+      - AGPL-3.0
+      - LGPL-2.0
+      - LGPL-2.1
+      - LGPL-3.0
+
+  - name: no-unknown-licenses
+    type: license
+    severity: error
+    description: All licenses must be identified and approved
+    check: license-compliance

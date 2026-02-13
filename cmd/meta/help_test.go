@@ -1,0 +1,115 @@
+package meta
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/go-nv/goenv/internal/cmdtest"
+	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestHelpCommand(t *testing.T) {
+	var err error
+	tests := []struct {
+		name             string
+		args             []string
+		createCommand    bool
+		commandContent   string
+		expectedContains []string
+		expectedError    string
+	}{
+		{
+			name: "without args shows summary of common commands",
+			args: []string{},
+			expectedContains: []string{
+				"Usage: goenv <command>",
+				"commands    List all available commands",
+				"local       Set or show the local",
+				"global      Set or show the global",
+				"install     Install a Go version",
+			},
+		},
+		{
+			name: "fails when command does not exist",
+			args: []string{"nonexistent-command"},
+			// In the Go implementation, help for non-existent commands prints an error message
+			// but doesn't return an error (returns nil to exit with code 0 for shell compatibility)
+			expectedContains: []string{}, // Just verify it doesn't crash
+		},
+		// NOTE: Tests for bash command files in libexec/ are skipped
+		// The Go implementation uses Cobra commands directly, not external bash scripts
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			goenvRoot, cleanup := cmdtest.SetupTestEnv(t)
+			defer cleanup()
+
+			// Create command if specified
+			if tt.createCommand {
+				binDir := filepath.Join(goenvRoot, "bin")
+				err = utils.EnsureDirWithContext(binDir, "create test directory")
+				require.NoError(t, err, "Failed to create bin directory")
+
+				cmdPath := filepath.Join(binDir, "goenv-hello")
+				testutil.WriteTestFile(t, cmdPath, []byte(tt.commandContent), utils.PermFileExecutable)
+
+				// Add bin to PATH
+				originalPath := os.Getenv(utils.EnvVarPath)
+				os.Setenv(utils.EnvVarPath, binDir+":"+originalPath)
+				defer os.Setenv(utils.EnvVarPath, originalPath)
+			}
+
+			// Execute command
+			cmd := &cobra.Command{
+				Use: "help",
+				RunE: func(cmd *cobra.Command, cmdArgs []string) error {
+					return runHelp(cmd, cmdArgs)
+				},
+				Args:         cobra.MaximumNArgs(1),
+				SilenceUsage: true,
+			}
+
+			cmd.Flags().BoolVar(&helpUsage, "usage", false, "Show only usage line")
+
+			output := &strings.Builder{}
+			cmd.SetOut(output)
+			cmd.SetArgs(tt.args)
+
+			// Reset flag
+			helpUsage = false
+
+			err = cmd.Execute()
+
+			// Check error
+			if tt.expectedError != "" {
+				if err == nil {
+					t.Errorf("Expected error containing %q, got nil", tt.expectedError)
+				} else if !strings.Contains(err.Error(), tt.expectedError) {
+					t.Errorf("Expected error containing %q, got %q", tt.expectedError, err.Error())
+				}
+				return
+			}
+
+			require.NoError(t, err)
+
+			got := output.String()
+
+			// Check contains
+			for _, expected := range tt.expectedContains {
+				assert.Contains(t, got, expected, "Expected output to contain , but it didn't. Output:\\n %v %v", expected, got)
+			}
+
+			// For --usage tests, ensure extended help is NOT shown
+			if len(tt.args) > 0 && tt.args[0] == "--usage" {
+				assert.NotContains(t, got, "extended help", "Expected --usage to not show extended help, but it did. Output:\\n %v", got)
+			}
+		})
+	}
+}

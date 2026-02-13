@@ -13,14 +13,33 @@ jobs:
   build:
     strategy:
       matrix:
-        os: ["ubuntu-latest", "macos-latest"]
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
         goenv_native_ext: ["", "1"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - name: Remove golang
-        run: sudo rm -rf $(which go)
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+      - name: Build goenv
+        shell: bash
+        run: make build
       - name: Run Unit Tests
-        run: make test
+        shell: bash
+        run: |
+          echo "Running tests with GOENV_NATIVE_EXT=${{ matrix.goenv_native_ext }}"
+          make test 2>&1 | tee test_output.log
+          test_exit_code=${PIPESTATUS[0]}
+          if [ $test_exit_code -ne 0 ]; then
+            echo "Tests failed with exit code $test_exit_code"
+            echo "=== First 100 lines of output ==="
+            head -100 test_output.log
+            echo "=== Last 100 lines of output ==="
+            tail -100 test_output.log
+            echo "=== Searching for FAIL ==="
+            grep -B 5 -A 5 "FAIL" test_output.log || true
+            exit $test_exit_code
+          fi
         env:
           GOENV_NATIVE_EXT: ${{ matrix.goenv_native_ext }}
