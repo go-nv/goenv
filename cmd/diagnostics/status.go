@@ -86,27 +86,61 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		if resolvedVersion != manager.SystemVersion {
 			installed = utils.Green(" ✓")
 		}
-		// Show both spec and resolved if different
-		displayVersion := resolvedVersion
-		if versionSpec != resolvedVersion && versionSpec != manager.SystemVersion {
-			displayVersion = fmt.Sprintf("%s (resolved from %s)", resolvedVersion, versionSpec)
+
+		// Special handling for system Go
+		if resolvedVersion == manager.SystemVersion {
+			// Get system Go version and path
+			systemVersion, vErr := mgr.GetSystemGoVersion()
+			systemPath, pErr := mgr.GetSystemGoDir()
+
+			if vErr == nil && systemVersion != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s %s\n",
+					utils.BoldBlue("system"),
+					utils.Gray(fmt.Sprintf("(Go %s)", systemVersion)))
+
+				if pErr == nil && systemPath != "" {
+					// Show system Go location
+					displayPath := systemPath
+					if homeDir, err := os.UserHomeDir(); err == nil {
+						displayPath = strings.Replace(displayPath, homeDir, "~", 1)
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "  Location: %s\n", utils.Gray(displayPath))
+				}
+			} else {
+				// System Go set but not found or can't get version
+				fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s %s\n",
+					utils.BoldYellow("system"),
+					utils.Red("(not found in PATH)"))
+				fmt.Fprintf(cmd.OutOrStdout(), "  %s\n",
+					utils.Yellow("Warning: System Go is set but not available"))
+			}
+		} else {
+			// Show both spec and resolved if different
+			displayVersion := resolvedVersion
+			if versionSpec != resolvedVersion && versionSpec != manager.SystemVersion {
+				displayVersion = fmt.Sprintf("%s (resolved from %s)", resolvedVersion, versionSpec)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s%s\n", utils.BoldBlue(displayVersion), installed)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Current version: %s%s\n", utils.BoldBlue(displayVersion), installed)
 
 		// Show source
 		sourceDisplay := source
-		if strings.HasPrefix(source, cfg.Root) {
-			// Make path relative for cleaner display
-			relPath, err := filepath.Rel(cfg.Root, source)
-			if err == nil && !strings.HasPrefix(relPath, "..") {
-				sourceDisplay = "$GOENV_ROOT/" + relPath
+		if sourceDisplay != "" {
+			if strings.HasPrefix(source, cfg.Root) {
+				// Make path relative for cleaner display
+				relPath, err := filepath.Rel(cfg.Root, source)
+				if err == nil && !strings.HasPrefix(relPath, "..") {
+					sourceDisplay = "$GOENV_ROOT/" + relPath
+				}
 			}
+			// Abbreviate home directory
+			if homeDir, err := os.UserHomeDir(); err == nil {
+				sourceDisplay = strings.Replace(sourceDisplay, homeDir, "~", 1)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "  Set by: %s\n", utils.Gray(sourceDisplay))
+		} else if resolvedVersion == manager.SystemVersion {
+			fmt.Fprintf(cmd.OutOrStdout(), "  Set by: %s\n", utils.Gray("default (no version file)"))
 		}
-		// Abbreviate home directory
-		if homeDir, err := os.UserHomeDir(); err == nil {
-			sourceDisplay = strings.Replace(sourceDisplay, homeDir, "~", 1)
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "  Set by: %s\n", utils.Gray(sourceDisplay))
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
 

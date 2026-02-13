@@ -532,6 +532,45 @@ find . -name .go-version -exec grep -l "system" {} \;
 
 ## Best Practices
 
+### Decision Matrix: System Go vs goenv-managed
+
+**Use system Go when:**
+
+| Scenario | Why System Go | Example |
+|----------|--------------|---------|
+| **Legacy system scripts** | Already expect `/usr/local/go/bin/go` | Cron jobs, system monitoring |
+| **Corporate mandate** | IT policy requires system Go | Enterprise environments |
+| **CI/CD pre-installed** | Go already in CI image | Docker images with Go pre-installed |
+| **OS integration** | OS packages depend on system Go | Some Linux distro tools |
+| **Root-level tools** | System admin tools using Go | Infrastructure tools |
+| **No version control needed** | One Go version is sufficient | Single-language company |
+
+**Use goenv-managed Go when:**
+
+| Scenario | Why goenv-managed | Example |
+|----------|-------------------|---------|
+| **Multiple projects** | Need different Go versions | Maintaining v1.21 and v1.25 projects |
+| **Development** | Full version control | Active development work |
+| **Testing compatibility** | Test against multiple versions | Library maintainers |
+| **Team consistency** | `.go-version` ensures same version | Team collaboration |
+| **Latest features** | Access to newest releases | Early adopter projects |
+| **Tool isolation** | Keep tools separate per version | gopls, golangci-lint per project |
+| **Reproducible builds** | Exact version in version control | Production deployments |
+
+**Quick decision flowchart:**
+
+```
+Do you need multiple Go versions?
+├─ Yes → Use goenv-managed
+└─ No
+   └─ Is this a development project?
+      ├─ Yes → Use goenv-managed (better control)
+      └─ No
+         └─ Is Go required by system tools/scripts?
+            ├─ Yes → Use system Go
+            └─ No → Either works (goenv recommended)
+```
+
 ### 1. Clear Documentation
 
 Document which Go is expected:
@@ -640,6 +679,32 @@ goenv use 1.25.2
 # Week 4: System Go only for legacy
 # Most projects use goenv now
 ```
+
+### 8. Recommendation Summary
+
+**For new users:**
+
+1. **Keep system Go installed** - Useful as fallback, no need to remove
+2. **Configure PATH correctly** - goenv shims must come first
+3. **Use goenv for development** - Better control and isolation
+4. **Use system Go for system tools** - If needed by OS/infrastructure
+5. **Document your choice** - Make it clear in project README
+
+**For teams:**
+
+1. **Standardize on goenv** - Use `.go-version` files for consistency
+2. **Allow system Go as fallback** - For emergency situations
+3. **Document local requirements** - README should specify approach
+4. **Test both paths** - Ensure project works with goenv and system Go
+5. **CI/CD flexibility** - Support both installation methods
+
+**For enterprises:**
+
+1. **Respect corporate Go installations** - Use `goenv use system` when required
+2. **Supplement with goenv** - For development flexibility
+3. **Isolate by project** - Use `.go-version` files per project
+4. **Security updates** - Monitor both system Go and goenv versions
+5. **Audit trail** - Use `goenv doctor` to verify configuration
 
 ## When to Remove System Go
 

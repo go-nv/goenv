@@ -104,11 +104,36 @@ build.bat build         # Build goenv.exe
 
 ### Testing
 
-**Unix/macOS:**
+**Basic Testing (Unix/macOS):**
 
 ```bash
-make test               # Run all Go tests
+make test               # Run all Go tests (default)
 ```
+
+**Enhanced Testing with gotestsum (Unix/macOS):**
+
+The enhanced test targets automatically download and use [gotestsum](https://github.com/gotestyourself/gotestsum) on first run (no installation needed):
+
+```bash
+make test-quick         # Clean, readable output + failures saved to file
+make test-debug         # Debug mode - only show failures in terminal  
+make test-verbose       # Detailed test output
+make test-report        # Generate JUnit XML + HTML coverage + failures summary
+make test-watch         # Watch mode - reruns tests on file changes
+make test-coverage      # Quick coverage summary
+```
+
+**Test Reports & Output Files:**
+- **Failures only**: `.test-results/failures.txt` (easy to parse - check this first!)
+- **Full output**: `.test-results/full-output.log` (complete test run details)
+- **JUnit XML**: `.test-results/junit.xml` (for CI integration)
+- **Coverage HTML**: `.test-results/coverage.html` (visual coverage report)
+- **JSON output**: `.test-results/test-output.json` (machine-readable format)
+
+**Efficient Debugging Workflow:**
+1. Run `make test-quick` or `make test-debug`
+2. Check `.test-results/failures.txt` - contains only failures (small file, easy to parse)
+3. If needed, check `.test-results/full-output.log` for full context
 
 **Windows (PowerShell):**
 
@@ -120,6 +145,19 @@ make test               # Run all Go tests
 
 ```batch
 build.bat test          # Run all Go tests
+```
+
+**Example Development Workflow:**
+
+```bash
+# Start watch mode in one terminal
+make test-watch
+
+# Make changes, tests auto-run
+
+# When ready, generate full report
+make test-report
+open .test-results/coverage.html  # View coverage
 ```
 
 ### Cleaning

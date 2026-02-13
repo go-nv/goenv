@@ -334,10 +334,10 @@ func TestVersionsNoVersionsInstalled(t *testing.T) {
 
 	err := cmd.Execute()
 
-	// Should fail with warning when no versions installed and no system go
+	// Should fail with error when no versions installed and no system go
 	assert.Error(t, err, "Expected error when no versions installed and no system go")
 
-	assert.Contains(t, err.Error(), "Warning: no Go detected", "Expected 'Warning: no Go detected' error %v", err)
+	assert.Contains(t, err.Error(), "no Go versions installed", "Expected 'no Go versions installed' error %v", err)
 }
 
 func TestVersionsSystemGoOnly(t *testing.T) {

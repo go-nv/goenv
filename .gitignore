@@ -19,6 +19,9 @@ goenv-*
 coverage.out
 *.out
 
+# Test results and reports
+.test-results/
+
 // No docs at root
 /*.md
 

@@ -264,6 +264,79 @@ env | grep GO
 - [How It Works - Version Detection](./user-guide/HOW_IT_WORKS.md#version-detection)
 - [GOPATH Integration](./advanced/GOPATH_INTEGRATION.md)
 
+### Should I use system Go or install via goenv?
+
+**Quick answer: Use goenv-managed versions for development.**
+
+**When to use system Go (`goenv use system`):**
+
+✅ **Legacy system scripts** - Scripts that expect Go in `/usr/local/go/bin/`
+✅ **Corporate/enterprise requirements** - Your IT department mandates system Go
+✅ **CI/CD baseline** - System Go is pre-installed in CI environment
+✅ **Quick one-off scripts** - No project setup needed
+✅ **Root-level tools** - System administration tools using Go
+
+**When to use goenv-managed versions:**
+
+✅ **Development projects** - Full control over Go version
+✅ **Multiple projects** - Different projects need different Go versions
+✅ **Testing compatibility** - Test your code against multiple Go versions
+✅ **Latest features** - Access to newest Go releases immediately
+✅ **Reproducible builds** - Exact version control for team consistency
+✅ **Tool isolation** - Keep tools separate per Go version
+
+**Comparison:**
+
+| Aspect | System Go | goenv-managed |
+|--------|-----------|---------------|
+| **Updates** | OS package manager | `goenv install` |
+| **Multiple versions** | ❌ Only one | ✅ Unlimited |
+| **Version control** | Limited | Exact (.go-version) |
+| **Tool isolation** | ❌ Global | ✅ Per-version |
+| **CI/CD** | Pre-installed | Install on demand |
+| **Security updates** | OS packages | Manual update |
+
+**Best practice - Hybrid approach:**
+
+```bash
+# System Go as fallback
+which go
+# /usr/local/go/bin/go (system)
+
+# goenv for development
+cd ~/my-project
+goenv use 1.25.2
+which go
+# ~/.goenv/shims/go → 1.25.2
+
+# System Go still accessible if needed
+/usr/local/go/bin/go version
+```
+
+**Recommendation for new users:**
+
+1. **Install goenv** - Even if you have system Go
+2. **Start with goenv-managed versions** - Better control and isolation
+3. **Keep system Go** - Useful as fallback, no need to uninstall
+4. **Use `goenv status`** - Check which Go you're actually using
+
+**Real-world example:**
+
+```bash
+# Development - use latest
+cd ~/active-projects/api-server
+goenv use 1.25.2
+
+# Legacy project - use older version
+cd ~/legacy/old-service
+goenv use 1.21.8
+
+# System scripts - use system Go
+cd /opt/monitoring-tools
+goenv use system
+# Or don't use goenv at all for system tools
+```
+
 ## Version Management
 
 ### How do I install a specific Go version?

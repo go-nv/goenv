@@ -29,6 +29,7 @@ import (
 	"github.com/go-nv/goenv/internal/shims"
 	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/internal/version"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
 )
@@ -309,6 +310,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 26: Multiple goenv installations
 	results = append(results, checkMultipleInstallations())
+
+	// Check 27: System Go version status (if using system Go)
+	results = append(results, checkSystemGoVersion(cfg, mgr))
 
 	// Count results
 	okCount := 0
@@ -1134,6 +1138,110 @@ func checkProfileSourcingIssues(cfg *config.Config) checkResult {
 		message:   message,
 		advice:    adviceStr,
 		issueType: IssueTypeProfileDuplicates,
+	}
+}
+
+// checkSystemGoVersion warns if the user is relying on system Go and it's outdated
+func checkSystemGoVersion(cfg *config.Config, mgr *manager.Manager) checkResult {
+	// Check if current version is system
+	currentVersion, _, err := mgr.GetCurrentVersion()
+	if err != nil || currentVersion != manager.SystemVersion {
+		// Not using system Go, skip check
+		return checkResult{
+			id:      "system-go-version",
+			name:    "System Go version",
+			status:  StatusOK,
+			message: "Not using system Go (using goenv-managed version)",
+		}
+	}
+
+	// Using system Go - check if it exists and get version
+	if !mgr.HasSystemGo() {
+		return checkResult{
+			id:      "system-go-version",
+			name:    "System Go version",
+			status:  StatusError,
+			message: "System Go is set as current version but not found in PATH",
+			advice:  "Either install Go in your system PATH or switch to a goenv-managed version with: goenv install <version> && goenv use <version>",
+		}
+	}
+
+	systemVersion, err := mgr.GetSystemGoVersion()
+	if err != nil {
+		return checkResult{
+			id:      "system-go-version",
+			name:    "System Go version",
+			status:  StatusWarning,
+			message: fmt.Sprintf("System Go found but version check failed: %v", err),
+			advice:  "Run 'go version' manually to verify system Go is working correctly",
+		}
+	}
+
+	// Try to get list of available versions to compare
+	fetcher := version.NewFetcherWithCache(cfg.Root)
+	versions, err := fetcher.FetchAllVersions()
+	if err != nil || len(versions) == 0 {
+		// Can't check without version data, just report what we found
+		return checkResult{
+			id:      "system-go-version",
+			name:    "System Go version",
+			status:  StatusOK,
+			message: fmt.Sprintf("Using system Go %s (unable to check if outdated)", systemVersion),
+		}
+	}
+
+	// Find the latest stable version (extract version numbers without 'go' prefix)
+	var latestStable string
+	for _, v := range versions {
+		if !version.IsPrerelease(v) {
+			// Take first stable version (list is sorted newest first)
+			latestStable = utils.NormalizeGoVersion(v)
+			break
+		}
+	}
+
+	if latestStable == "" {
+		return checkResult{
+			id:      "system-go-version",
+			name:    "System Go version",
+			status:  StatusOK,
+			message: fmt.Sprintf("Using system Go %s", systemVersion),
+		}
+	}
+
+	// Compare versions
+	comparison := utils.CompareGoVersions(systemVersion, latestStable)
+
+	if comparison < 0 {
+		// System Go is older than latest
+		// Count how many versions behind
+		versionsBehind := 0
+		for _, v := range versions {
+			if version.IsPrerelease(v) {
+				continue
+			}
+			normalizedV := utils.NormalizeGoVersion(v)
+			if utils.CompareGoVersions(normalizedV, systemVersion) > 0 {
+				versionsBehind++
+			}
+		}
+
+		// Always show warning if outdated, regardless of how far behind
+		return checkResult{
+			id:      "system-go-version",
+			name:    "System Go version",
+			status:  StatusWarning,
+			message: fmt.Sprintf("System Go %s is outdated (latest: %s, %d versions behind)", systemVersion, latestStable, versionsBehind),
+			advice:  fmt.Sprintf("Consider upgrading system Go or switching to goenv-managed version:\n   goenv install %s\n   goenv use %s --global", latestStable, latestStable),
+		}
+	}
+
+	// System Go is up-to-date or newer (might be beta)
+	return checkResult{
+		id:      "system-go-version",
+		name:    "System Go version",
+		status:  StatusOK,
+		message: fmt.Sprintf("Using system Go %s (latest stable: %s)", systemVersion, latestStable),
 	}
 }
 

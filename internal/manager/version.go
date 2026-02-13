@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -772,82 +773,93 @@ func maxVersion(versions []string) string {
 }
 
 // HasSystemGo checks if system Go is available in PATH
-// findExecutableInPath looks for an executable in a specific directory, handling Windows extensions
-func findExecutableInPath(dir, name string) (string, error) {
-	// On Windows, try common executable extensions
-	if utils.IsWindows() {
-		for _, ext := range utils.WindowsExecutableExtensions() {
-			path := filepath.Join(dir, name+ext)
-			if utils.PathExists(path) {
-				return path, nil
-			}
-		}
-		// Also try without extension
-		path := filepath.Join(dir, name)
-		if utils.PathExists(path) {
-			return path, nil
-		}
-		return "", fmt.Errorf("executable not found")
-	}
-
-	// On Unix, check if file exists
-	path := filepath.Join(dir, name)
-	if utils.PathExists(path) {
-		return path, nil
-	}
-	return "", fmt.Errorf("executable not found")
-}
-
+// System Go is defined as any 'go' binary found in PATH that is NOT in the goenv ecosystem
+// (i.e., not under ~/.goenv/versions/ or ~/.goenv/shims/)
 func (m *Manager) HasSystemGo() bool {
-	// Try to find 'go' in PATH
-	// This is equivalent to the BATS test helper stub_system_go check
-	if goBinary, err := m.GetGoBinaryPath("system"); err == nil {
-		// Check if the system go actually exists
-		if utils.PathExists(goBinary) {
-			return true
-		}
-
-		// For system go, GetGoBinaryPath returns "go", so we need to check PATH
-		// Simple check using which-like logic
-		pathEnv := os.Getenv(utils.EnvVarPath)
-		if pathEnv == "" {
-			return false
-		}
-
-		pathDirs := strings.Split(pathEnv, string(os.PathListSeparator))
-		for _, dir := range pathDirs {
-			if dir == "" {
-				continue
-			}
-			if _, err := findExecutableInPath(dir, "go"); err == nil {
-				return true
-			}
-		}
-	}
-
-	return false
+	goBinary, err := m.findSystemGoInPath()
+	return err == nil && goBinary != ""
 }
 
-// GetSystemGoDir returns the directory containing the system Go binary
-func (m *Manager) GetSystemGoDir() (string, error) {
+// findSystemGoInPath locates a 'go' binary in PATH that's outside the goenv ecosystem
+// Returns the full path to system Go, or empty string and error if not found
+func (m *Manager) findSystemGoInPath() (string, error) {
 	pathEnv := os.Getenv(utils.EnvVarPath)
 	if pathEnv == "" {
-		return "", fmt.Errorf("system go not found in PATH")
+		return "", fmt.Errorf("PATH environment variable is empty")
 	}
+
+	// Get goenv-managed paths to exclude
+	goenvVersionsDir := m.config.VersionsDir()
+	goenvShimsDir := filepath.Join(m.config.Root, "shims")
 
 	pathDirs := strings.Split(pathEnv, string(os.PathListSeparator))
 	for _, dir := range pathDirs {
 		if dir == "" {
 			continue
 		}
-		if _, err := findExecutableInPath(dir, "go"); err == nil {
-			// Return the parent directory (not the bin dir)
-			// For /usr/bin/go, return /usr
-			return filepath.Dir(dir), nil
+
+		// Skip goenv-managed directories
+		absDir, err := filepath.Abs(dir)
+		if err != nil {
+			absDir = dir
+		}
+
+		// Check if this directory is under goenv control
+		if strings.HasPrefix(absDir, goenvVersionsDir) || strings.HasPrefix(absDir, goenvShimsDir) {
+			continue
+		}
+
+		// Look for 'go' executable using cross-platform detection
+		if goBinary, err := utils.FindExecutable(dir, "go"); err == nil {
+			return goBinary, nil
 		}
 	}
 
 	return "", fmt.Errorf("system go not found in PATH")
+}
+
+// GetSystemGoDir returns the directory containing the system Go binary
+// For /usr/local/go/bin/go, returns /usr/local/go
+// For /usr/bin/go, returns /usr
+func (m *Manager) GetSystemGoDir() (string, error) {
+	goBinary, err := m.findSystemGoInPath()
+	if err != nil {
+		return "", err
+	}
+
+	// Return the parent directory of the bin directory
+	// /usr/local/go/bin/go -> /usr/local/go
+	// /usr/bin/go -> /usr
+	binDir := filepath.Dir(goBinary)
+	return filepath.Dir(binDir), nil
+}
+
+// GetSystemGoVersion returns the version string of system Go if available
+// Returns empty string and error if system Go is not found
+func (m *Manager) GetSystemGoVersion() (string, error) {
+	goBinary, err := m.findSystemGoInPath()
+	if err != nil {
+		return "", err
+	}
+
+	// Execute 'go version' to get version info
+	cmd := exec.Command(goBinary, "version")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get system go version: %w", err)
+	}
+
+	// Parse output: "go version go1.21.5 darwin/arm64"
+	version := strings.TrimSpace(string(output))
+	if strings.HasPrefix(version, "go version ") {
+		parts := strings.Fields(version)
+		if len(parts) >= 3 {
+			// Extract "go1.21.5" and normalize to "1.21.5"
+			return utils.NormalizeGoVersion(parts[2]), nil
+		}
+	}
+
+	return version, nil
 }
 
 // ListAliases returns all defined aliases as a map of name -> version
