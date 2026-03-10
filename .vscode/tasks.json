@@ -1,0 +1,232 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build goenv",
+            "type": "shell",
+            "command": "${command:shellCommand.execute}",
+            "windows": {
+                "command": "powershell",
+                "args": [
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "${workspaceFolder}/build.ps1",
+                    "build"
+                ]
+            },
+            "linux": {
+                "command": "make",
+                "args": ["build"]
+            },
+            "osx": {
+                "command": "make",
+                "args": ["build"]
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": "$go"
+        },
+        {
+            "label": "Test goenv",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": [
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "${workspaceFolder}/build.ps1",
+                    "test"
+                ]
+            },
+            "linux": {
+                "command": "make",
+                "args": ["test"]
+            },
+            "osx": {
+                "command": "make",
+                "args": ["test"]
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": "$go"
+        },
+        {
+            "label": "Clean build artifacts",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": [
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "${workspaceFolder}/build.ps1",
+                    "clean"
+                ]
+            },
+            "linux": {
+                "command": "make",
+                "args": ["clean"]
+            },
+            "osx": {
+                "command": "make",
+                "args": ["clean"]
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Install goenv",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": [
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "${workspaceFolder}/build.ps1",
+                    "install"
+                ]
+            },
+            "linux": {
+                "command": "make",
+                "args": ["install"]
+            },
+            "osx": {
+                "command": "make",
+                "args": ["install"]
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Update dependencies",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": [
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "${workspaceFolder}/build.ps1",
+                    "dev-deps"
+                ]
+            },
+            "linux": {
+                "command": "make",
+                "args": ["dev-deps"]
+            },
+            "osx": {
+                "command": "make",
+                "args": ["dev-deps"]
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Cross-compile for all platforms",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": [
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "${workspaceFolder}/build.ps1",
+                    "cross-build"
+                ]
+            },
+            "linux": {
+                "command": "make",
+                "args": ["cross-build"]
+            },
+            "osx": {
+                "command": "make",
+                "args": ["cross-build"]
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Show version",
+            "type": "shell",
+            "windows": {
+                "command": "powershell",
+                "args": [
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "${workspaceFolder}/build.ps1",
+                    "version"
+                ]
+            },
+            "linux": {
+                "command": "make",
+                "args": ["version"]
+            },
+            "osx": {
+                "command": "make",
+                "args": ["version"]
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Go: Test Package",
+            "type": "shell",
+            "command": "go",
+            "args": [
+                "test",
+                "-v",
+                "${relativeFileDirname}"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": "$go"
+        },
+        {
+            "label": "Go: Test Current File",
+            "type": "shell",
+            "command": "go",
+            "args": [
+                "test",
+                "-v",
+                "-run",
+                "^${selectedText}$",
+                "${relativeFileDirname}"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": "$go"
+        }
+    ]
+}

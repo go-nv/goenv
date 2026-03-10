@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=../../schemas/policy-schema.json
+# Open Source Project Policy  
+# Permissive policy for open source Go projects
+
+version: "1"
+
+options:
+  fail_on_error: false
+  fail_on_warning: false
+  verbose: true
+
+rules:
+  # Just warn about potential issues
+  - name: warn-retracted-versions
+    type: security
+    severity: warning
+    description: Consider updating retracted versions
+    check: retracted-versions
+
+  - name: suggest-stdlib-tracking
+    type: completeness
+    severity: info
+    description: Track stdlib for vulnerability awareness
+    check: required-components
+    required:
+      - golang-stdlib
+
+  - name: suggest-goenv-metadata
+    type: completeness
+    severity: info
+    description: Enhanced metadata helps users
+    check: required-metadata
+    required:
+      - goenv:go_version
+      - goenv:platform

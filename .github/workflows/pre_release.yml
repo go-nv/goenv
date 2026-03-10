@@ -1,0 +1,38 @@
+name: Pre Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Debug mode"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  do_prerelease:
+    if: github.repository_owner == 'go-nv'
+    strategy:
+      matrix:
+        os: ["ubuntu-latest"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: master
+          token: ${{ secrets.GH_TOKEN }}
+      - name: Install JQ
+        run: sudo apt install jq
+      - name: Update App Version
+        run: |
+          if [[ "${{ github.event.inputs.debug }}" == "true" ]]; then
+            echo "Debug mode enabled"
+            ./.github/scripts/update_app_version.sh 2>&1 | tee -a debug.log
+            cat debug.log
+          else
+            ./.github/scripts/update_app_version.sh
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          DEBUG: ${{ github.event.inputs.debug }}
