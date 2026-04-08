@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   release:
     types: [published]
+  push:
+    tags:
+      - "2.*"
 
 jobs:
   # Update Homebrew formula (macOS/Linux)
