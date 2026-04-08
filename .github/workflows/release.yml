@@ -5,7 +5,7 @@ on:
     types: [published]
 jobs:
   release:
-    if: github.repository_owner == 'go-nv'
+    if: github.repository_owner == 'go-nv' && startsWith(github.event.release.tag_name, '2.')
     strategy:
       matrix:
         os: ["ubuntu-latest"]
