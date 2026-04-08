@@ -2,7 +2,7 @@ name: Build Release Binaries
 
 on:
   release:
-    types: [published, prereleased]
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -69,9 +69,10 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          args: release --clean --skip=validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ steps.tag.outputs.tag }}
 
       - name: Upload release artifacts
         if: steps.check_assets.outputs.skip_build == 'false'
