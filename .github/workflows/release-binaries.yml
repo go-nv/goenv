@@ -2,11 +2,11 @@ name: Build Release Binaries
 
 on:
   release:
-    types: [published]
+    types: [published, prereleased]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v2.0.0)'
+        description: "Tag to release (e.g., v2.0.0)"
         required: false
 
 permissions:
@@ -18,17 +18,53 @@ jobs:
     name: Build Cross-Platform Binaries
     runs-on: ubuntu-latest
     steps:
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if binaries already exist
+        id: check_assets
+        run: |
+          ASSET_COUNT=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/releases/tags/${{ steps.tag.outputs.tag }} \
+            --jq '.assets | length' 2>/dev/null || echo "0")
+
+          echo "asset_count=$ASSET_COUNT" >> $GITHUB_OUTPUT
+
+          if [ "$ASSET_COUNT" -gt 0 ]; then
+            echo "::notice::Release already has $ASSET_COUNT asset(s). Skipping build."
+            echo "skip_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "::notice::No assets found. Proceeding with build."
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Checkout
+        if: steps.check_assets.outputs.skip_build == 'false'
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ steps.tag.outputs.tag }}
 
       - name: Set up Go
+        if: steps.check_assets.outputs.skip_build == 'false'
         uses: actions/setup-go@v5
         with:
           go-version: stable
 
       - name: Run GoReleaser
+        if: steps.check_assets.outputs.skip_build == 'false'
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -38,6 +74,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload release artifacts
+        if: steps.check_assets.outputs.skip_build == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
