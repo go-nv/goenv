@@ -16,6 +16,7 @@ permissions:
 jobs:
   goreleaser:
     name: Build Cross-Platform Binaries
+    if: startsWith(github.event.release.tag_name, '3.')
     runs-on: ubuntu-latest
     steps:
       - name: Determine tag

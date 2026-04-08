@@ -4,16 +4,13 @@ on:
   workflow_dispatch:
   release:
     types: [published]
-  push:
-    tags:
-      - "2.*"
 
 jobs:
   # Update Homebrew formula (macOS/Linux)
   # Only runs for 2.x.x releases (master branch)
   homebrew:
     name: Update Homebrew
-    if: github.repository_owner == 'go-nv'
+    if: github.repository_owner == 'go-nv' && startsWith(github.event.release.tag_name, '2.')
     strategy:
       matrix:
         os: ["ubuntu-latest"]
