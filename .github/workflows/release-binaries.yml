@@ -82,3 +82,24 @@ jobs:
           name: release-artifacts
           path: dist/*
           retention-days: 7
+
+  homebrew:
+    name: Update Homebrew goenv@3
+    needs: goreleaser
+    if: github.repository_owner == 'go-nv' && startsWith(github.event.release.tag_name, '3.')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Create Homebrew PR for goenv@3
+        uses: dawidd6/action-homebrew-bump-formula@v5
+        with:
+          token: ${{ secrets.GH_HOMEBREW_TOKEN }}
+          no_fork: false
+          formula: goenv@3
+          tag: ${{ github.event.release.tag_name }}
+          revision: ${{ github.sha }}
+          force: true
