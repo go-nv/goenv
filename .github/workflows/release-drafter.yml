@@ -6,12 +6,12 @@ on:
     # branches to consider in the event; optional, defaults to all
     branches:
       - master
-      - v3
+      - main
   # pull_request event is required only for autolabeler
   pull_request:
     branches:
       - master
-      - v3
+      - main
     # Only following types are handled by the action, but one can default to all as well
     types:
       - opened
@@ -21,7 +21,7 @@ on:
   pull_request_target:
     branches:
       - master
-      - v3
+      - main
     types:
       - opened
       - reopened
@@ -45,13 +45,13 @@ jobs:
       - name: Determine config file
         id: config
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/v3" ]] || [[ "${{ github.base_ref }}" == "v3" ]]; then
-            echo "config-name=release-drafter-v3.yml" >> $GITHUB_OUTPUT
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.base_ref }}" == "main" ]]; then
+            echo "config-name=release-drafter-main.yml" >> $GITHUB_OUTPUT
           else
             echo "config-name=release-drafter.yml" >> $GITHUB_OUTPUT
           fi
 
-      # Drafts your next Release notes as Pull Requests are merged into "master" or "v3"
+      # Drafts your next Release notes as Pull Requests are merged into "master" or "main"
       - uses: release-drafter/release-drafter@v7.1.1
         # (Optional) specify config name to use, relative to .github/. Default: release-drafter.yml
         with:

@@ -2,7 +2,7 @@ name-template: '$RESOLVED_VERSION'
 tag-template: '$RESOLVED_VERSION'
 version-template: '3.$MINOR.$PATCH'
 filter-by-commitish: true
-commitish: v3
+commitish: main
 categories:
   - title: '🚀 Features'
     labels:
