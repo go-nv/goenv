@@ -60,7 +60,7 @@ jobs:
 
       - name: Set up Go
         if: steps.check_assets.outputs.skip_build == 'false'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: stable
 
