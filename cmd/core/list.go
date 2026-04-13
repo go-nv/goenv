@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/go-nv/goenv/cmd/legacy"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
@@ -72,6 +73,7 @@ func runListInstalled(cmd *cobra.Command) error {
 	legacy.VersionsFlags.Bare = listFlags.bare
 	legacy.VersionsFlags.SkipAliases = listFlags.skipAliases
 	legacy.VersionsFlags.Json = listFlags.json
+	legacy.VersionsFlags.SuppressDeprecationWarning = true // Don't show warning when called from 'list'
 
 	// Reuse the versions command implementation
 	return legacy.RunVersions(cmd, []string{})

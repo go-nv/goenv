@@ -117,6 +117,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Handle --list flag
 	if installFlags.list {
+		// Set remote flag so runList shows available versions, not installed ones
+		listFlags.remote = true
 		return runList(cmd, args)
 	}
 
