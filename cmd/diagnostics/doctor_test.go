@@ -1390,3 +1390,112 @@ func TestCheckObsoleteEnvVars(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckSystemGoVersion(t *testing.T) {
+	tests := []struct {
+		name           string
+		currentVersion string
+		hasSystemGo    bool
+		systemVersion  string
+		expectedStatus Status
+		shouldContain  string
+		shouldAdvice   string
+	}{
+		{
+			name:           "Using goenv version, no system Go",
+			currentVersion: "1.23.2",
+			hasSystemGo:    false,
+			expectedStatus: StatusOK,
+			shouldContain:  "No system Go installation detected",
+		},
+		{
+			name:           "Using goenv version, system Go exists",
+			currentVersion: "1.23.2",
+			hasSystemGo:    true,
+			systemVersion:  "1.26.2",
+			expectedStatus: StatusOK,
+			shouldContain:  "System Go 1.26.2 detected but not active",
+			shouldAdvice:   "goenv use system --global",
+		},
+		{
+			name:           "Using system Go, it exists",
+			currentVersion: "system",
+			hasSystemGo:    true,
+			systemVersion:  "1.26.2",
+			expectedStatus: StatusOK,
+			shouldContain:  "Using system Go 1.26.2",
+		},
+		{
+			name:           "Using system Go, but not found",
+			currentVersion: "system",
+			hasSystemGo:    false,
+			expectedStatus: StatusError,
+			shouldContain:  "System Go is set as current version but not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use cmdtest for proper environment isolation
+			testRoot, cleanup := cmdtest.SetupTestEnv(t)
+			defer cleanup()
+
+			cfg := &config.Config{Root: testRoot}
+
+			// Setup current version if not "system"
+			if tt.currentVersion != "" && tt.currentVersion != "system" {
+				cmdtest.CreateTestVersion(t, testRoot, tt.currentVersion)
+
+				// Create version file
+				versionFile := filepath.Join(testRoot, "version")
+				err := os.WriteFile(versionFile, []byte(tt.currentVersion), 0o644)
+				require.NoError(t, err)
+			} else if tt.currentVersion == "system" {
+				// Set GOENV_VERSION to system
+				t.Setenv(utils.GoenvEnvVarVersion.String(), "system")
+			}
+
+			// Setup system Go if needed
+			if tt.hasSystemGo {
+				systemGoDir := t.TempDir()
+				err := utils.EnsureDir(filepath.Join(systemGoDir, "bin"))
+				require.NoError(t, err)
+
+				// Create mock go binary
+				goBinary := filepath.Join(systemGoDir, "bin", "go")
+				if utils.IsWindows() {
+					goBinary += ".exe"
+				}
+
+				// Create a script that outputs version
+				versionScript := "#!/bin/bash\necho 'go version go" + tt.systemVersion + " darwin/arm64'\n"
+				if utils.IsWindows() {
+					versionScript = "@echo off\r\necho go version go" + tt.systemVersion + " windows/amd64\r\n"
+				}
+				err = os.WriteFile(goBinary, []byte(versionScript), 0o755)
+				require.NoError(t, err)
+
+				// Add system Go to PATH
+				oldPath := os.Getenv(utils.EnvVarPath)
+				newPath := oldPath + string(os.PathListSeparator) + filepath.Join(systemGoDir, "bin")
+				t.Setenv(utils.EnvVarPath, newPath)
+			}
+
+			// Create manager
+			mgr := manager.NewManager(cfg, nil)
+
+			// Run check
+			result := checkSystemGoVersion(cfg, mgr)
+
+			// Verify result
+			assert.Equal(t, "system-go-version", result.id)
+			assert.Equal(t, "System Go version", result.name)
+			assert.Equal(t, tt.expectedStatus, result.status, "Status mismatch: %s", result.message)
+			assert.Contains(t, result.message, tt.shouldContain, "Message: %s", result.message)
+
+			if tt.shouldAdvice != "" {
+				assert.Contains(t, result.advice, tt.shouldAdvice, "Advice: %s", result.advice)
+			}
+		})
+	}
+}
