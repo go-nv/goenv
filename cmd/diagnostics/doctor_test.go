@@ -1463,21 +1463,33 @@ func TestCheckSystemGoVersion(t *testing.T) {
 
 				// Create mock go binary
 				goBinary := filepath.Join(systemGoDir, "bin", "go")
+				var versionScript string
+				
 				if utils.IsWindows() {
-					goBinary += ".bat" // Use .bat on Windows for batch scripts
-				}
-
-				// Create a script that outputs version
-				versionScript := "#!/bin/bash\necho 'go version go" + tt.systemVersion + " darwin/arm64'\n"
-				if utils.IsWindows() {
-					versionScript = "@echo off\r\necho go version go" + tt.systemVersion + " windows/amd64\r\n"
+					goBinary += ".bat"
+					// Use CRLF and ensure it always exits 0
+					versionScript = "@echo off\r\n" +
+						"echo go version go" + tt.systemVersion + " windows/amd64\r\n" +
+						"exit /b 0\r\n"
+				} else {
+					// Use /bin/sh (not bash-specific) and explicitly exit 0
+					versionScript = "#!/bin/sh\n" +
+						"echo \"go version go" + tt.systemVersion + " darwin/arm64\"\n" +
+						"exit 0\n"
 				}
 				err = os.WriteFile(goBinary, []byte(versionScript), 0o755)
 				require.NoError(t, err)
 
 				// Prepend system Go to PATH so it wins over any runner-installed Go
-				// This ensures the test is hermetic and doesn't pick up the CI runner's Go
-				t.Setenv(utils.EnvVarPath, filepath.Join(systemGoDir, "bin"))
+				// On Windows, keep existing PATH so shell tools (cmd.exe) remain available
+				oldPath := os.Getenv(utils.EnvVarPath)
+				if utils.IsWindows() {
+					// Prepend but keep existing PATH for Windows system tools
+					t.Setenv(utils.EnvVarPath, filepath.Join(systemGoDir, "bin")+string(os.PathListSeparator)+oldPath)
+				} else {
+					// On Unix, only use mock directory to ensure hermetic test
+					t.Setenv(utils.EnvVarPath, filepath.Join(systemGoDir, "bin"))
+				}
 			} else {
 				// Explicitly set PATH to empty to ensure no system Go can be found
 				// This makes the "not found" test case work correctly on CI runners
