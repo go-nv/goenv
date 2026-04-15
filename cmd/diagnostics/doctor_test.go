@@ -1464,7 +1464,7 @@ func TestCheckSystemGoVersion(t *testing.T) {
 				// Create mock go binary
 				goBinary := filepath.Join(systemGoDir, "bin", "go")
 				if utils.IsWindows() {
-					goBinary += ".exe"
+					goBinary += ".bat" // Use .bat on Windows for batch scripts
 				}
 
 				// Create a script that outputs version
@@ -1475,10 +1475,13 @@ func TestCheckSystemGoVersion(t *testing.T) {
 				err = os.WriteFile(goBinary, []byte(versionScript), 0o755)
 				require.NoError(t, err)
 
-				// Add system Go to PATH
-				oldPath := os.Getenv(utils.EnvVarPath)
-				newPath := oldPath + string(os.PathListSeparator) + filepath.Join(systemGoDir, "bin")
-				t.Setenv(utils.EnvVarPath, newPath)
+				// Prepend system Go to PATH so it wins over any runner-installed Go
+				// This ensures the test is hermetic and doesn't pick up the CI runner's Go
+				t.Setenv(utils.EnvVarPath, filepath.Join(systemGoDir, "bin"))
+			} else {
+				// Explicitly set PATH to empty to ensure no system Go can be found
+				// This makes the "not found" test case work correctly on CI runners
+				t.Setenv(utils.EnvVarPath, "")
 			}
 
 			// Create manager
