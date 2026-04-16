@@ -51,12 +51,13 @@ Examples:
 }
 
 var VersionsFlags struct {
-	Bare        bool
-	SkipAliases bool
-	Complete    bool
-	Json        bool
-	Used        bool
-	Depth       int
+	Bare                       bool
+	SkipAliases                bool
+	Complete                   bool
+	Json                       bool
+	Used                       bool
+	Depth                      int
+	SuppressDeprecationWarning bool // Internal flag to suppress warning when called from 'goenv list'
 }
 
 func init() {
@@ -116,10 +117,12 @@ func RunVersions(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Deprecation warning
-	fmt.Fprintf(cmd.OutOrStderr(), "%sDeprecation warning: 'goenv versions' is a legacy command. Use 'goenv list' instead.\n", utils.Emoji("⚠️  "))
-	fmt.Fprintf(cmd.OutOrStderr(), "  Modern command: goenv list\n")
-	fmt.Fprintf(cmd.OutOrStderr(), "  See: goenv help list\n\n")
+	// Deprecation warning (suppressed when called internally from 'goenv list')
+	if !VersionsFlags.SuppressDeprecationWarning {
+		fmt.Fprintf(cmd.OutOrStderr(), "%sDeprecation warning: 'goenv versions' is a legacy command. Use 'goenv list' instead.\n", utils.Emoji("⚠️  "))
+		fmt.Fprintf(cmd.OutOrStderr(), "  Modern command: goenv list\n")
+		fmt.Fprintf(cmd.OutOrStderr(), "  See: goenv help list\n\n")
+	}
 
 	// Handle invalid arguments (BATS test expects usage error)
 	if err := cmdutil.ValidateMaxArgs(args, 0, "no arguments"); err != nil {
