@@ -1469,6 +1469,11 @@ func TestCheckSystemGoVersion(t *testing.T) {
 					// On Windows, create a real compiled executable to avoid exec.Command issues with .bat files
 					goBinary += ".exe"
 
+					// Find the real Go compiler before modifying PATH
+					// This ensures we can compile even if PATH gets modified
+					realGoPath, err := exec.LookPath("go")
+					require.NoError(t, err, "Failed to find Go compiler in PATH")
+
 					// Create a temporary Go source file
 					sourceFile := filepath.Join(systemGoDir, "go.go")
 					sourceCode := `package main
@@ -1480,8 +1485,8 @@ func main() {
 					err = os.WriteFile(sourceFile, []byte(sourceCode), 0o644)
 					require.NoError(t, err)
 
-					// Compile it to create the executable
-					cmd := exec.Command("go", "build", "-o", goBinary, sourceFile)
+					// Compile it to create the executable using absolute path to real Go
+					cmd := exec.Command(realGoPath, "build", "-o", goBinary, sourceFile)
 					output, err := cmd.CombinedOutput()
 					require.NoError(t, err, "Failed to compile mock go.exe: %s", output)
 				} else {
