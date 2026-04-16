@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -1441,9 +1442,16 @@ func TestCheckSystemGoVersion(t *testing.T) {
 			// This is needed to compile mock executables later
 			var realGoPath string
 			if utils.IsWindows() && tt.hasSystemGo {
-				var err error
-				realGoPath, err = exec.LookPath("go")
-				require.NoError(t, err, "Failed to find Go compiler in PATH before test setup")
+				// Use runtime.GOROOT() to find the Go installation, then construct path to compiler
+				goroot := runtime.GOROOT()
+				if goroot == "" {
+					t.Skipf("Skipping test: GOROOT not available (needed to compile mock executable)")
+				}
+				realGoPath = filepath.Join(goroot, "bin", "go.exe")
+				// Verify the compiler exists
+				if _, err := os.Stat(realGoPath); err != nil {
+					t.Skipf("Skipping test: Go compiler not found at %s: %v", realGoPath, err)
+				}
 			}
 
 			// Use cmdtest for proper environment isolation
