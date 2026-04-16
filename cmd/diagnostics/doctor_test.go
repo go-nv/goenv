@@ -1437,6 +1437,15 @@ func TestCheckSystemGoVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// On Windows, find the real Go compiler BEFORE any environment setup
+			// This is needed to compile mock executables later
+			var realGoPath string
+			if utils.IsWindows() && tt.hasSystemGo {
+				var err error
+				realGoPath, err = exec.LookPath("go")
+				require.NoError(t, err, "Failed to find Go compiler in PATH before test setup")
+			}
+
 			// Use cmdtest for proper environment isolation
 			testRoot, cleanup := cmdtest.SetupTestEnv(t)
 			defer cleanup()
@@ -1469,11 +1478,6 @@ func TestCheckSystemGoVersion(t *testing.T) {
 					// On Windows, create a real compiled executable to avoid exec.Command issues with .bat files
 					goBinary += ".exe"
 
-					// Find the real Go compiler before modifying PATH
-					// This ensures we can compile even if PATH gets modified
-					realGoPath, err := exec.LookPath("go")
-					require.NoError(t, err, "Failed to find Go compiler in PATH")
-
 					// Create a temporary Go source file
 					sourceFile := filepath.Join(systemGoDir, "go.go")
 					sourceCode := `package main
@@ -1485,7 +1489,7 @@ func main() {
 					err = os.WriteFile(sourceFile, []byte(sourceCode), 0o644)
 					require.NoError(t, err)
 
-					// Compile it to create the executable using absolute path to real Go
+					// Compile it to create the executable using the saved real Go path
 					cmd := exec.Command(realGoPath, "build", "-o", goBinary, sourceFile)
 					output, err := cmd.CombinedOutput()
 					require.NoError(t, err, "Failed to compile mock go.exe: %s", output)
