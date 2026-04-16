@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -1463,25 +1464,37 @@ func TestCheckSystemGoVersion(t *testing.T) {
 
 				// Create mock go binary
 				goBinary := filepath.Join(systemGoDir, "bin", "go")
-				var versionScript string
-				
+
 				if utils.IsWindows() {
-					goBinary += ".bat"
-					// Use CRLF and ensure it always exits 0
-					versionScript = "@echo off\r\n" +
-						"echo go version go" + tt.systemVersion + " windows/amd64\r\n" +
-						"exit /b 0\r\n"
+					// On Windows, create a real compiled executable to avoid exec.Command issues with .bat files
+					goBinary += ".exe"
+
+					// Create a temporary Go source file
+					sourceFile := filepath.Join(systemGoDir, "go.go")
+					sourceCode := `package main
+import "fmt"
+func main() {
+	fmt.Println("go version go` + tt.systemVersion + ` windows/amd64")
+}
+`
+					err = os.WriteFile(sourceFile, []byte(sourceCode), 0o644)
+					require.NoError(t, err)
+
+					// Compile it to create the executable
+					cmd := exec.Command("go", "build", "-o", goBinary, sourceFile)
+					output, err := cmd.CombinedOutput()
+					require.NoError(t, err, "Failed to compile mock go.exe: %s", output)
 				} else {
 					// Use /bin/sh (not bash-specific) and explicitly exit 0
-					versionScript = "#!/bin/sh\n" +
+					versionScript := "#!/bin/sh\n" +
 						"echo \"go version go" + tt.systemVersion + " darwin/arm64\"\n" +
 						"exit 0\n"
+					err = os.WriteFile(goBinary, []byte(versionScript), 0o755)
+					require.NoError(t, err)
 				}
-				err = os.WriteFile(goBinary, []byte(versionScript), 0o755)
-				require.NoError(t, err)
 
 				// Prepend system Go to PATH so it wins over any runner-installed Go
-				// On Windows, keep existing PATH so shell tools (cmd.exe) remain available
+				// On Windows, keep existing PATH so shell tools remain available
 				oldPath := os.Getenv(utils.EnvVarPath)
 				if utils.IsWindows() {
 					// Prepend but keep existing PATH for Windows system tools
