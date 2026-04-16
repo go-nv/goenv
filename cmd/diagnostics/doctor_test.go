@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -1386,6 +1388,158 @@ func TestCheckObsoleteEnvVars(t *testing.T) {
 			for _, expected := range tt.expectInAdvice {
 				assert.Contains(t, result.advice, expected,
 					"Expected %q in advice: %s", expected, result.advice)
+			}
+		})
+	}
+}
+
+func TestCheckSystemGoVersion(t *testing.T) {
+	tests := []struct {
+		name           string
+		currentVersion string
+		hasSystemGo    bool
+		systemVersion  string
+		expectedStatus Status
+		shouldContain  string
+		shouldAdvice   string
+	}{
+		{
+			name:           "Using goenv version, no system Go",
+			currentVersion: "1.23.2",
+			hasSystemGo:    false,
+			expectedStatus: StatusOK,
+			shouldContain:  "No system Go installation detected",
+		},
+		{
+			name:           "Using goenv version, system Go exists",
+			currentVersion: "1.23.2",
+			hasSystemGo:    true,
+			systemVersion:  "1.26.2",
+			expectedStatus: StatusOK,
+			shouldContain:  "System Go 1.26.2 detected but not active",
+			shouldAdvice:   "goenv use system --global",
+		},
+		{
+			name:           "Using system Go, it exists",
+			currentVersion: "system",
+			hasSystemGo:    true,
+			systemVersion:  "1.26.2",
+			expectedStatus: StatusOK,
+			shouldContain:  "Using system Go 1.26.2",
+		},
+		{
+			name:           "Using system Go, but not found",
+			currentVersion: "system",
+			hasSystemGo:    false,
+			expectedStatus: StatusError,
+			shouldContain:  "System Go is set as current version but not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// On Windows, find the real Go compiler BEFORE any environment setup
+			// This is needed to compile mock executables later
+			var realGoPath string
+			if utils.IsWindows() && tt.hasSystemGo {
+				// Use runtime.GOROOT() to find the Go installation, then construct path to compiler
+				goroot := runtime.GOROOT()
+				if goroot == "" {
+					t.Skipf("Skipping test: GOROOT not available (needed to compile mock executable)")
+				}
+				realGoPath = filepath.Join(goroot, "bin", "go.exe")
+				// Verify the compiler exists
+				if _, err := os.Stat(realGoPath); err != nil {
+					t.Skipf("Skipping test: Go compiler not found at %s: %v", realGoPath, err)
+				}
+			}
+
+			// Use cmdtest for proper environment isolation
+			testRoot, cleanup := cmdtest.SetupTestEnv(t)
+			defer cleanup()
+
+			cfg := &config.Config{Root: testRoot}
+
+			// Setup current version if not "system"
+			if tt.currentVersion != "" && tt.currentVersion != "system" {
+				cmdtest.CreateTestVersion(t, testRoot, tt.currentVersion)
+
+				// Create version file
+				versionFile := filepath.Join(testRoot, "version")
+				err := os.WriteFile(versionFile, []byte(tt.currentVersion), 0o644)
+				require.NoError(t, err)
+			} else if tt.currentVersion == "system" {
+				// Set GOENV_VERSION to system
+				t.Setenv(utils.GoenvEnvVarVersion.String(), "system")
+			}
+
+			// Setup system Go if needed
+			if tt.hasSystemGo {
+				systemGoDir := t.TempDir()
+				err := utils.EnsureDir(filepath.Join(systemGoDir, "bin"))
+				require.NoError(t, err)
+
+				// Create mock go binary
+				goBinary := filepath.Join(systemGoDir, "bin", "go")
+
+				if utils.IsWindows() {
+					// On Windows, create a real compiled executable to avoid exec.Command issues with .bat files
+					goBinary += ".exe"
+
+					// Create a temporary Go source file
+					sourceFile := filepath.Join(systemGoDir, "go.go")
+					sourceCode := `package main
+import "fmt"
+func main() {
+	fmt.Println("go version go` + tt.systemVersion + ` windows/amd64")
+}
+`
+					err = os.WriteFile(sourceFile, []byte(sourceCode), 0o644)
+					require.NoError(t, err)
+
+					// Compile it to create the executable using the saved real Go path
+					cmd := exec.Command(realGoPath, "build", "-o", goBinary, sourceFile)
+					output, err := cmd.CombinedOutput()
+					require.NoError(t, err, "Failed to compile mock go.exe: %s", output)
+				} else {
+					// Use /bin/sh (not bash-specific) and explicitly exit 0
+					versionScript := "#!/bin/sh\n" +
+						"echo \"go version go" + tt.systemVersion + " darwin/arm64\"\n" +
+						"exit 0\n"
+					err = os.WriteFile(goBinary, []byte(versionScript), 0o755)
+					require.NoError(t, err)
+				}
+
+				// Prepend system Go to PATH so it wins over any runner-installed Go
+				// On Windows, keep existing PATH so shell tools remain available
+				oldPath := os.Getenv(utils.EnvVarPath)
+				if utils.IsWindows() {
+					// Prepend but keep existing PATH for Windows system tools
+					t.Setenv(utils.EnvVarPath, filepath.Join(systemGoDir, "bin")+string(os.PathListSeparator)+oldPath)
+				} else {
+					// On Unix, only use mock directory to ensure hermetic test
+					t.Setenv(utils.EnvVarPath, filepath.Join(systemGoDir, "bin"))
+				}
+			} else {
+				// Explicitly set PATH to empty to ensure no system Go can be found
+				// This makes the "not found" test case work correctly on CI runners
+				t.Setenv(utils.EnvVarPath, "")
+			}
+
+			// Create manager
+			mgr := manager.NewManager(cfg, nil)
+
+			// Run check
+			result := checkSystemGoVersion(cfg, mgr)
+
+			// Verify result
+			assert.Equal(t, "system-go-version", result.id)
+			assert.Equal(t, "System Go version", result.name)
+			assert.Equal(t, tt.expectedStatus, result.status, "Status mismatch: %s", result.message)
+			assert.Contains(t, result.message, tt.shouldContain, "Message: %s", result.message)
+
+			if tt.shouldAdvice != "" {
+				assert.Contains(t, result.advice, tt.shouldAdvice, "Advice: %s", result.advice)
 			}
 		})
 	}

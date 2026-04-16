@@ -1145,18 +1145,44 @@ func checkProfileSourcingIssues(cfg *config.Config) checkResult {
 func checkSystemGoVersion(cfg *config.Config, mgr *manager.Manager) checkResult {
 	// Check if current version is system
 	currentVersion, _, err := mgr.GetCurrentVersion()
-	if err != nil || currentVersion != manager.SystemVersion {
-		// Not using system Go, skip check
+	usingSystemGo := err == nil && currentVersion == manager.SystemVersion
+
+	// Check if system Go exists in PATH (outside goenv directories)
+	hasSystemGo := mgr.HasSystemGo()
+
+	if !usingSystemGo && !hasSystemGo {
+		// Not using system Go and no system Go found
 		return checkResult{
 			id:      "system-go-version",
 			name:    "System Go version",
 			status:  StatusOK,
-			message: "Not using system Go (using goenv-managed version)",
+			message: "No system Go installation detected (using goenv-managed version)",
+		}
+	}
+
+	if !usingSystemGo && hasSystemGo {
+		// System Go exists but not using it - provide informative message
+		systemVersion, err := mgr.GetSystemGoVersion()
+		if err != nil {
+			return checkResult{
+				id:      "system-go-version",
+				name:    "System Go version",
+				status:  StatusOK,
+				message: "System Go detected in PATH but using goenv-managed version",
+				advice:  "To switch to system Go: goenv use system --global",
+			}
+		}
+		return checkResult{
+			id:      "system-go-version",
+			name:    "System Go version",
+			status:  StatusOK,
+			message: fmt.Sprintf("System Go %s detected but not active (using goenv-managed version)", systemVersion),
+			advice:  "To switch to system Go: goenv use system --global",
 		}
 	}
 
 	// Using system Go - check if it exists and get version
-	if !mgr.HasSystemGo() {
+	if !hasSystemGo {
 		return checkResult{
 			id:      "system-go-version",
 			name:    "System Go version",
