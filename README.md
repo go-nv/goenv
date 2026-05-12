@@ -55,7 +55,7 @@ git clone https://github.com/go-nv/goenv.git ~/.goenv
 
 ### Legacy Version (v2.x)
 
-goenv v2 is maintained for legacy support with a **minimum 2-year commitment** (until April 2028 or End of Support, whichever comes first). During this period, v2 will receive:
+goenv v2 is maintained for legacy support with a **minimum 2-year commitment** (until December 2028 or End of Support, whichever comes first). During this period, v2 will receive:
 - Security patches and critical bug fixes
 - Maintenance through the `master` branch
 - Support for existing production deployments
@@ -76,7 +76,7 @@ git clone -b master https://github.com/go-nv/goenv.git ~/.goenv
 
 **Migration:** v3 is fully backward compatible with v2. Most users can migrate immediately without changes. See our [migration guide](./docs/MIGRATION.md) for details.
 
-**End of Support Date:** v2 support will be discontinued on or before **April 9, 2028**.
+**End of Support Date:** v2 support will be discontinued on or before **December 31, 2028**.
 
 ---
 
