@@ -53,7 +53,7 @@ jobs:
 
       - name: Checkout
         if: steps.check_assets.outputs.skip_build == 'false'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ steps.tag.outputs.tag }}
