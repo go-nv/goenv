@@ -101,7 +101,10 @@ release:
     
     ```bash
     # Linux/macOS
-    curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
+    curl -sfL https://raw.githubusercontent.com/go-nv/goenv/main/install.sh | bash
+    
+    # Windows (PowerShell)
+    irm https://raw.githubusercontent.com/go-nv/goenv/main/install.ps1 | iex
     
     # Or download directly:
     # Linux (x64):   goenv_{{ .Version }}_linux_amd64.tar.gz

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # goenv installer script for Linux/macOS
-# Usage: curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
+# Usage: curl -sfL https://raw.githubusercontent.com/go-nv/goenv/main/install.sh | bash
 
 set -e
 
@@ -125,7 +125,44 @@ install_binary() {
     echo -e "${GREEN}✓ goenv installed successfully!${NC}"
 }
 
-# Print setup instructions
+# Auto-configure shell profile
+setup_shell_profile() {
+    local shell_config
+    
+    # Detect shell config file
+    if [ -n "$BASH_VERSION" ]; then
+        if [ -f "$HOME/.bash_profile" ]; then
+            shell_config="$HOME/.bash_profile"
+        else
+            shell_config="$HOME/.bashrc"
+        fi
+    elif [ -n "$ZSH_VERSION" ]; then
+        shell_config="$HOME/.zshrc"
+    else
+        shell_config="$HOME/.profile"
+    fi
+    
+    # Check if goenv is already configured
+    if [ -f "$shell_config" ] && grep -q "goenv init" "$shell_config"; then
+        echo -e "${GREEN}✓ goenv is already configured in ${shell_config}${NC}"
+        return 0
+    fi
+    
+    # Add goenv configuration with markers
+    echo -e "${YELLOW}Adding goenv configuration to ${shell_config}...${NC}"
+    
+    cat >> "$shell_config" << 'EOF'
+
+# goenv - Go version manager (auto-configured by installer)
+export GOENV_ROOT="$HOME/.goenv"
+export PATH="$GOENV_ROOT/bin:$PATH"
+eval "$(goenv init -)"
+EOF
+    
+    echo -e "${GREEN}✓ Shell profile configured successfully!${NC}"
+}
+
+# Print setup completion message
 print_instructions() {
     local shell_config
     
@@ -147,14 +184,7 @@ print_instructions() {
     echo -e "${GREEN}Installation complete!${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "${YELLOW}Add the following to your shell configuration:${NC}"
-    echo -e "  ${shell_config}"
-    echo ""
-    echo '  export GOENV_ROOT="$HOME/.goenv"'
-    echo '  export PATH="$GOENV_ROOT/bin:$PATH"'
-    echo '  eval "$(goenv init -)"'
-    echo ""
-    echo -e "${YELLOW}Then reload your shell:${NC}"
+    echo -e "${YELLOW}To start using goenv, reload your shell:${NC}"
     echo "  exec \$SHELL"
     echo ""
     echo -e "${YELLOW}Or source your config now:${NC}"
@@ -179,6 +209,7 @@ main() {
     detect_platform
     get_latest_version
     install_binary
+    setup_shell_profile
     print_instructions
 }
 
