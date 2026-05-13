@@ -96,8 +96,14 @@ The ZPlug plugin will install and initialise `goenv` and add `goenv` and `goenv-
 You can also install goenv using the [Homebrew](http://brew.sh)
 package manager for Mac OS X.
 
+**For the current version (v3 - recommended):**
+
     brew update
     brew install goenv
+
+**For the legacy version (v2 - for existing deployments):**
+
+    brew install goenv@2 && brew link goenv@2
 
 To upgrade goenv in the future, use `upgrade` instead of `install`.
 
