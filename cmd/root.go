@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/cmdutil"
@@ -61,6 +62,19 @@ var RootCmd = &cobra.Command{
 
 		// Store updated context back to command
 		cmd.SetContext(ctx)
+
+		// Remove stale goenv shim left over from v2.
+		// v2's goenv-rehash bakes the Homebrew Cellar path into shims at creation
+		// time (e.g. exec "/opt/homebrew/Cellar/goenv/2.2.38_1/libexec/goenv").
+		// After upgrading to v3, the old shim may still point to a deleted Cellar
+		// path, shadowing the real v3 binary. We only remove it if it contains
+		// "libexec/goenv" — the v2 fingerprint — to avoid deleting anything unexpected.
+		goenvShim := filepath.Join(cfg.ShimsDir(), "goenv")
+		if data, err := os.ReadFile(goenvShim); err == nil {
+			if strings.Contains(string(data), "libexec/goenv") {
+				_ = os.Remove(goenvShim)
+			}
+		}
 
 		// Propagate output options
 		utils.SetOutputOptions(NoColor, Plain)
