@@ -122,6 +122,17 @@ install_binary() {
     # Cleanup
     rm -rf "$tmp_dir"
     
+    # Remove stale goenv shim from v2 installations.
+    # v2's goenv-rehash bakes the Homebrew Cellar path into shims at creation time
+    # (e.g. exec "/opt/homebrew/Cellar/goenv/2.2.38_1/libexec/goenv"). After
+    # upgrading to v3, the old shim shadows the real v3 binary. We only remove
+    # it if it contains "libexec/goenv" — the v2 fingerprint.
+    if [ -f "$GOENV_ROOT/shims/goenv" ] && grep -q 'libexec/goenv' "$GOENV_ROOT/shims/goenv" 2>/dev/null; then
+        echo -e "${YELLOW}Removing stale v2 goenv shim...${NC}"
+        rm -f "$GOENV_ROOT/shims/goenv"
+        echo -e "${GREEN}✓ Stale shim removed${NC}"
+    fi
+    
     echo -e "${GREEN}✓ goenv installed successfully!${NC}"
 }
 

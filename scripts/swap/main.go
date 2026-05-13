@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
@@ -405,6 +406,24 @@ Options:
 		}
 
 		swapGoenvBinary(target)
+	}
+
+	// Remove stale goenv shim from v2 that may shadow the new binary.
+	// Only remove if it contains "libexec/goenv" — the v2 fingerprint.
+	goenvRoot := os.Getenv("GOENV_ROOT")
+	if goenvRoot == "" {
+		homeDir, _ := os.UserHomeDir()
+		goenvRoot = filepath.Join(homeDir, ".goenv")
+	}
+	staleShim := filepath.Join(goenvRoot, "shims", "goenv")
+	if data, err := os.ReadFile(staleShim); err == nil {
+		if strings.Contains(string(data), "libexec/goenv") {
+			if err := os.Remove(staleShim); err == nil {
+				success("Removed stale v2 goenv shim from " + staleShim)
+			} else {
+				warn(fmt.Sprintf("Could not remove stale shim %s: %v", staleShim, err))
+			}
+		}
 	}
 
 	fmt.Println()
