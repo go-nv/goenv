@@ -1424,8 +1424,8 @@ func TestCheckSystemGoVersion(t *testing.T) {
 			currentVersion: "system",
 			hasSystemGo:    true,
 			systemVersion:  "1.26.2",
-			expectedStatus: StatusOK,
-			shouldContain:  "Using system Go 1.26.2",
+			expectedStatus: StatusWarning, // Changed from StatusOK - version 1.26.2 is outdated (1.26.3 is latest)
+			shouldContain:  "System Go 1.26.2 is outdated",
 		},
 		{
 			name:           "Using system Go, but not found",

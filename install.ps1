@@ -1,5 +1,5 @@
 # goenv installer script for Windows PowerShell
-# Usage: iwr -useb https://raw.githubusercontent.com/go-nv/goenv/master/install.ps1 | iex
+# Usage: iwr -useb https://raw.githubusercontent.com/go-nv/goenv/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
@@ -112,7 +112,44 @@ function Install-Binary {
     }
 }
 
-# Print setup instructions
+# Auto-configure PowerShell profile
+function Setup-PowerShellProfile {
+    $profilePath = $PROFILE
+    
+    # Create profile directory if it doesn't exist
+    $profileDir = Split-Path -Parent $profilePath
+    if (-not (Test-Path $profileDir)) {
+        New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+    }
+    
+    # Create profile file if it doesn't exist
+    if (-not (Test-Path $profilePath)) {
+        New-Item -ItemType File -Path $profilePath -Force | Out-Null
+    }
+    
+    # Check if goenv is already configured
+    $profileContent = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue
+    if ($profileContent -and $profileContent -match "goenv init") {
+        Write-ColorOutput Green "goenv is already configured in $profilePath"
+        return
+    }
+    
+    # Add goenv configuration with comment marker
+    Write-ColorOutput Yellow "Adding goenv configuration to $profilePath..."
+    
+    $goenvConfig = @"
+
+# goenv - Go version manager (auto-configured by installer)
+`$env:GOENV_ROOT = "`$HOME\.goenv"
+`$env:PATH = "`$env:GOENV_ROOT\bin;`$env:PATH"
+& goenv init - | Invoke-Expression
+"@
+    
+    Add-Content -Path $profilePath -Value $goenvConfig
+    Write-ColorOutput Green "PowerShell profile configured successfully!"
+}
+
+# Print setup completion message
 function Show-Instructions {
     $profilePath = $PROFILE
     
@@ -121,21 +158,10 @@ function Show-Instructions {
     Write-ColorOutput Green "Installation complete!"
     Write-ColorOutput Green "=============================================="
     Write-Output ""
-    Write-ColorOutput Yellow "Add the following to your PowerShell profile:"
-    Write-Output "  $profilePath"
-    Write-Output ""
-    Write-Output "  `$env:GOENV_ROOT = \"`$HOME\.goenv\""
-    Write-Output "  `$env:PATH = \"`$env:GOENV_ROOT\bin;`$env:PATH\""
-    Write-Output "  & goenv init - | Invoke-Expression"
-    Write-Output ""
-    Write-ColorOutput Yellow "Quick setup command (copy and paste):"
-    Write-Output ""
-    Write-Output "  `$env:GOENV_ROOT = \"`$HOME\.goenv\""
-    Write-Output "  `$env:PATH = \"`$env:GOENV_ROOT\bin;`$env:PATH\""
-    Write-Output "  & goenv init - | Invoke-Expression"
-    Write-Output ""
-    Write-ColorOutput Yellow "Then reload your profile:"
+    Write-ColorOutput Yellow "To start using goenv, reload your profile:"
     Write-Output "  . `$PROFILE"
+    Write-Output ""
+    Write-ColorOutput Yellow "Or restart your PowerShell session"
     Write-Output ""
     Write-ColorOutput Yellow "Quick start:"
     Write-Output "  goenv install 1.22.0     # Install Go 1.22.0"
@@ -158,6 +184,7 @@ function Main {
     
     $version = Get-LatestVersion
     Install-Binary -Version $version -Arch $arch
+    Setup-PowerShellProfile
     Show-Instructions
 }
 
