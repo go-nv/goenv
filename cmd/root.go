@@ -72,7 +72,9 @@ var RootCmd = &cobra.Command{
 		goenvShim := filepath.Join(cfg.ShimsDir(), "goenv")
 		if data, err := os.ReadFile(goenvShim); err == nil {
 			if strings.Contains(string(data), "libexec/goenv") {
-				_ = os.Remove(goenvShim)
+				if err := os.Remove(goenvShim); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to remove stale v2 goenv shim %q: %v\n", goenvShim, err)
+				}
 			}
 		}
 
