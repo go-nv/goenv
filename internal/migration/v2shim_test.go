@@ -3,6 +3,7 @@ package migration
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -101,8 +102,11 @@ exec "goenv" "$@"
 	})
 
 	t.Run("returns error when removal fails", func(t *testing.T) {
-		// This test is platform-dependent and may not work in all environments
-		// Skip if we can't create a read-only directory
+		// Skip on Windows - Unix permission model doesn't apply
+		if runtime.GOOS == "windows" {
+			t.Skip("Skipping permission test on Windows - different permission model")
+		}
+
 		shimPath := filepath.Join(shimsDir, "goenv")
 		v2Content := `#!/usr/bin/env bash
 exec "/opt/homebrew/Cellar/goenv/2.2.38_1/libexec/goenv" "$@"
@@ -111,9 +115,9 @@ exec "/opt/homebrew/Cellar/goenv/2.2.38_1/libexec/goenv" "$@"
 			t.Fatalf("Failed to create shim: %v", err)
 		}
 
-		// Make directory read-only (Unix-like systems)
+		// Make directory read-only (Unix-like systems only)
 		if err := os.Chmod(shimsDir, 0555); err != nil {
-			t.Skip("Cannot test permission error on this platform")
+			t.Skipf("Cannot test permission error: %v", err)
 		}
 		defer os.Chmod(shimsDir, 0755) // Restore permissions
 
