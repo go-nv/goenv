@@ -7,7 +7,9 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # Configuration
-$GOENV_ROOT = if ($env:GOENV_ROOT) { $env:GOENV_ROOT } else { Join-Path (if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) ".goenv" }
+# Use if/else instead of ?? operator for PowerShell 5.1 compatibility
+$defaultHome = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
+$GOENV_ROOT = if ($env:GOENV_ROOT) { $env:GOENV_ROOT } else { Join-Path $defaultHome ".goenv" }
 $GITHUB_REPO = "go-nv/goenv"
 $INSTALL_DIR = Join-Path $GOENV_ROOT "bin"
 
@@ -106,14 +108,20 @@ function Install-Binary {
         
         # Remove stale goenv shim from v2 installations.
         # v2's goenv-rehash bakes the Cellar/libexec path into shims at creation time.
-        # Only remove if it contains "libexec/goenv" — the v2 fingerprint.
-        $staleShim = Join-Path (Join-Path $GOENV_ROOT "shims") "goenv"
+        # Match both forward and backslashes to support all v2 installations.
+        # Use nested Join-Path for PowerShell 5.1 compatibility (no 3-arg support).
+        $shimsPath = Join-Path $GOENV_ROOT "shims"
+        $staleShim = Join-Path $shimsPath "goenv"
         if (Test-Path $staleShim) {
             $shimContent = Get-Content $staleShim -Raw -ErrorAction SilentlyContinue
-            if ($shimContent -and $shimContent -match "libexec/goenv") {
+            if ($shimContent -and $shimContent -match "libexec[\\/]goenv") {
                 Write-ColorOutput Yellow "Removing stale v2 goenv shim..."
-                Remove-Item -Path $staleShim -Force -ErrorAction SilentlyContinue
-                Write-ColorOutput Green "Stale shim removed"
+                $removed = Remove-Item -Path $staleShim -Force -ErrorAction SilentlyContinue -PassThru
+                if ($removed) {
+                    Write-ColorOutput Green "Stale shim removed"
+                } else {
+                    Write-ColorOutput Yellow "Warning: Failed to remove stale v2 goenv shim"
+                }
             }
         }
     }

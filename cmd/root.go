@@ -3,12 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/migration"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/go-nv/goenv/internal/workflow"
@@ -63,19 +63,10 @@ var RootCmd = &cobra.Command{
 		// Store updated context back to command
 		cmd.SetContext(ctx)
 
-		// Remove stale goenv shim left over from v2.
-		// v2's goenv-rehash bakes the Homebrew Cellar path into shims at creation
-		// time (e.g. exec "/opt/homebrew/Cellar/goenv/2.2.38_1/libexec/goenv").
-		// After upgrading to v3, the old shim may still point to a deleted Cellar
-		// path, shadowing the real v3 binary. We only remove it if it contains
-		// "libexec/goenv" — the v2 fingerprint — to avoid deleting anything unexpected.
-		goenvShim := filepath.Join(cfg.ShimsDir(), "goenv")
-		if data, err := os.ReadFile(goenvShim); err == nil {
-			if strings.Contains(string(data), "libexec/goenv") {
-				if err := os.Remove(goenvShim); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to remove stale v2 goenv shim %q: %v\n", goenvShim, err)
-				}
-			}
+		// Remove stale goenv shim left over from v2 installations.
+		// Uses helper function to handle both forward and backslash paths.
+		if _, err := migration.RemoveStaleV2Shim(cfg.ShimsDir()); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %v\n", err)
 		}
 
 		// Propagate output options
