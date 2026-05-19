@@ -298,7 +298,11 @@ func renderInitScript(shell shellutil.ShellType, cfg *config.Config, noRehash bo
 		// Clean up any version bin directories from PATH (e.g., from venv capture)
 		builder.WriteString("# Remove any goenv version bin directories from PATH\n")
 		builder.WriteString("_NEW_PATH=\"\"\n")
-		builder.WriteString("while IFS=: read -ra PATHARRAY; do\n")
+		if shell == shellutil.ShellTypeZsh {
+			builder.WriteString("while IFS=: read -rA PATHARRAY; do\n") // required captial A for zsh read command
+		} else {
+			builder.WriteString("while IFS=: read -ra PATHARRAY; do\n")
+		}
 		builder.WriteString("  for i in \"${PATHARRAY[@]}\"; do\n")
 		builder.WriteString("    case \"$i\" in\n")
 		builder.WriteString("      \"$GOENV_ROOT\"/versions/*/bin) ;;\n")
@@ -310,7 +314,11 @@ func renderInitScript(shell shellutil.ShellType, cfg *config.Config, noRehash bo
 		builder.WriteString("unset _NEW_PATH\n")
 		builder.WriteString("# Remove shims from PATH if present (to re-add in correct position)\n")
 		builder.WriteString("_NEW_PATH=\"\"\n")
-		builder.WriteString("while IFS=: read -ra PATHARRAY; do\n")
+		if shell == shellutil.ShellTypeZsh {
+			builder.WriteString("while IFS=: read -rA PATHARRAY; do\n") // required captial A for zsh read command
+		} else {
+			builder.WriteString("while IFS=: read -ra PATHARRAY; do\n")
+		}
 		builder.WriteString("  for i in \"${PATHARRAY[@]}\"; do\n")
 		builder.WriteString("    case \"$i\" in\n")
 		builder.WriteString("      \"$GOENV_ROOT\"/shims) ;;\n")
