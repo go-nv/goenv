@@ -8,6 +8,7 @@ import (
 	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/migration"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/go-nv/goenv/internal/workflow"
@@ -61,6 +62,12 @@ var RootCmd = &cobra.Command{
 
 		// Store updated context back to command
 		cmd.SetContext(ctx)
+
+		// Remove stale goenv shim left over from v2 installations.
+		// Uses helper function to handle both forward and backslash paths.
+		if _, err := migration.RemoveStaleV2Shim(cfg.ShimsDir()); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %v\n", err)
+		}
 
 		// Propagate output options
 		utils.SetOutputOptions(NoColor, Plain)

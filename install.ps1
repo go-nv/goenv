@@ -3,19 +3,25 @@
 
 $ErrorActionPreference = "Stop"
 
-# Configuration
-$GOENV_ROOT = if ($env:GOENV_ROOT) { $env:GOENV_ROOT } else { "$HOME\.goenv" }
-$GITHUB_REPO = "go-nv/goenv"
-$INSTALL_DIR = "$GOENV_ROOT\bin"
+# Ensure TLS 1.2 for GitHub API/downloads (older Windows defaults to TLS 1.0)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# Colors
-function Write-ColorOutput($ForegroundColor) {
-    $fc = $host.UI.RawUI.ForegroundColor
-    $host.UI.RawUI.ForegroundColor = $ForegroundColor
-    if ($args) {
-        Write-Output $args
-    }
-    $host.UI.RawUI.ForegroundColor = $fc
+# Configuration
+# Use if/else instead of ?? operator for PowerShell 5.1 compatibility
+$defaultHome = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
+$GOENV_ROOT = if ($env:GOENV_ROOT) { $env:GOENV_ROOT } else { Join-Path $defaultHome ".goenv" }
+$GITHUB_REPO = "go-nv/goenv"
+$INSTALL_DIR = Join-Path $GOENV_ROOT "bin"
+
+# Colors — use Write-Host which works in non-interactive/piped contexts
+function Write-ColorOutput {
+    param(
+        [Parameter(Position=0)]
+        [System.ConsoleColor]$ForegroundColor,
+        [Parameter(Position=1, ValueFromRemainingArguments)]
+        [string[]]$Message
+    )
+    Write-Host ($Message -join ' ') -ForegroundColor $ForegroundColor
 }
 
 # Detect architecture
@@ -85,7 +91,7 @@ function Install-Binary {
         # Copy binary
         $binaryPath = Join-Path $tmpDir "goenv.exe"
         if (Test-Path $binaryPath) {
-            Copy-Item -Path $binaryPath -Destination "$INSTALL_DIR\goenv.exe" -Force
+            Copy-Item -Path $binaryPath -Destination (Join-Path $INSTALL_DIR "goenv.exe") -Force
         } else {
             throw "Binary not found in archive"
         }
@@ -93,19 +99,38 @@ function Install-Binary {
         # Copy completions if they exist
         $completionsPath = Join-Path $tmpDir "completions"
         if (Test-Path $completionsPath) {
-            $targetCompletions = "$GOENV_ROOT\completions"
+            $targetCompletions = Join-Path $GOENV_ROOT "completions"
             New-Item -ItemType Directory -Path $targetCompletions -Force | Out-Null
             Copy-Item -Path "$completionsPath\*" -Destination $targetCompletions -Recurse -Force -ErrorAction SilentlyContinue
         }
         
         Write-ColorOutput Green "goenv installed successfully!"
+        
+        # Remove stale goenv shim from v2 installations.
+        # v2's goenv-rehash bakes the Cellar/libexec path into shims at creation time.
+        # Match both forward and backslashes to support all v2 installations.
+        # Use nested Join-Path for PowerShell 5.1 compatibility (no 3-arg support).
+        $shimsPath = Join-Path $GOENV_ROOT "shims"
+        $staleShim = Join-Path $shimsPath "goenv"
+        if (Test-Path $staleShim) {
+            $shimContent = Get-Content $staleShim -Raw -ErrorAction SilentlyContinue
+            if ($shimContent -and $shimContent -match "libexec[\\/]goenv") {
+                Write-ColorOutput Yellow "Removing stale v2 goenv shim..."
+                $removed = Remove-Item -Path $staleShim -Force -ErrorAction SilentlyContinue -PassThru
+                if ($removed) {
+                    Write-ColorOutput Green "Stale shim removed"
+                } else {
+                    Write-ColorOutput Yellow "Warning: Failed to remove stale v2 goenv shim"
+                }
+            }
+        }
     }
     catch {
         Write-ColorOutput Red "Installation failed: $_"
         exit 1
     }
     finally {
-        # Cleanup
+        # Cleanup temp directory
         if (Test-Path $tmpDir) {
             Remove-Item -Path $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
         }
@@ -113,7 +138,7 @@ function Install-Binary {
 }
 
 # Auto-configure PowerShell profile
-function Setup-PowerShellProfile {
+function Initialize-PowerShellProfile {
     $profilePath = $PROFILE
     
     # Create profile directory if it doesn't exist
@@ -184,7 +209,7 @@ function Main {
     
     $version = Get-LatestVersion
     Install-Binary -Version $version -Arch $arch
-    Setup-PowerShellProfile
+    Initialize-PowerShellProfile
     Show-Instructions
 }
 
