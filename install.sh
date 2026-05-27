@@ -134,6 +134,7 @@ install_binary() {
 		else
 			echo -e "${YELLOW}⚠ Warning: Failed to remove stale v2 goenv shim${NC}"
 		fi
+  fi
     
     echo -e "${GREEN}✓ goenv installed successfully!${NC}"
 }
