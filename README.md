@@ -85,7 +85,7 @@ The fastest way to get started. Download a pre-built binary - no Go installation
 
 ```bash
 # Automatic install (Linux/macOS)
-curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
+curl -sfL https://raw.githubusercontent.com/go-nv/goenv/main/install.sh | bash
 
 # Or download manually from releases:
 # https://github.com/go-nv/goenv/releases/latest
@@ -93,7 +93,7 @@ curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
 
 ```powershell
 # Automatic install (Windows)
-iwr -useb https://raw.githubusercontent.com/go-nv/goenv/master/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/go-nv/goenv/main/install.ps1 | iex
 ```
 
 Then add to your shell config:
