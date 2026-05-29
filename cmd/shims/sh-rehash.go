@@ -80,12 +80,18 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	disableGoroot := env.HasDisableGoroot()
 	disableGopath := env.HasDisableGopath()
 
-	// Build GOPATH value: $HOME/go/{version}
+	// Build GOPATH value: $GOENV_ROOT/versions/{version}/gopath
+	// This must match the rehash scan path (config.VersionGopathBin), so
+	// "go install" writes binaries where rehash will pick them up.
+	gopathValue := cfg.VersionGopath(currentVersion)
+
+	// Resolve $HOME for legacy GOPATH-filtering below. We no longer write to
+	// $HOME/go/{version}, but a user-set GOPATH may still contain stale entries
+	// from older goenv versions; strip those to prevent duplication.
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
 		home = os.Getenv(utils.EnvVarHome) // Fallback
 	}
-	gopathValue := filepath.Join(home, "go", currentVersion)
 
 	// Preserve existing GOPATH by prepending version-specific path.
 	// This allows users to keep source code in existing locations while

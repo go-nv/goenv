@@ -207,11 +207,18 @@ func (c *Config) VersionGoBinary(version string) string {
 	return goBinary
 }
 
+// VersionGopath returns the gopath directory for a specific version
+// This is the GOPATH that "go install" should use for version-scoped tool installs
+// Example: /Users/user/.goenv/versions/1.21.0/gopath
+func (c *Config) VersionGopath(version string) string {
+	return filepath.Join(c.VersionDir(version), "gopath")
+}
+
 // VersionGopathBin returns the gopath/bin directory for a specific version
 // This is where tools installed with "go install" are placed
 // Example: /Users/user/.goenv/versions/1.21.0/gopath/bin
 func (c *Config) VersionGopathBin(version string) string {
-	return filepath.Join(c.VersionDir(version), "gopath", "bin")
+	return filepath.Join(c.VersionGopath(version), "bin")
 }
 
 // FindVersionGoBinary returns the path to the Go binary for a specific version,

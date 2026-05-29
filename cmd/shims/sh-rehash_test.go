@@ -173,10 +173,15 @@ func TestShRehashCommand(t *testing.T) {
 		cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
 
 		home, _ := os.UserHomeDir()
-		versionGopath := filepath.Join(home, "go", "1.12.0")
+		// Legacy v2 GOPATH layout. Option B no longer writes here, but we still
+		// strip these entries so users upgrading from v2 don't carry stale paths.
+		legacyVersionGopath := filepath.Join(home, "go", "1.12.0")
+		// What sh-rehash will now output for the version-specific GOPATH.
+		versionGopath := filepath.Join(tmpDir, "versions", "1.12.0", "gopath")
 
-		// Simulate GOPATH that already has the version-specific path (from previous init)
-		existingGopath := versionGopath + ":/existing/path1:" + versionGopath + ":/existing/path2"
+		// Simulate GOPATH that already has the legacy version-specific path (from
+		// previous init under v2). It should be filtered out of the output.
+		existingGopath := legacyVersionGopath + ":/existing/path1:" + legacyVersionGopath + ":/existing/path2"
 
 		// Set environment variables
 		os.Setenv("GOENV_VERSION", "1.12.0")
@@ -197,11 +202,13 @@ func TestShRehashCommand(t *testing.T) {
 
 		output := outputBuf.String()
 
-		// Count occurrences of the version-specific GOPATH
+		// Version-specific GOPATH (v3-native layout) should appear exactly once.
 		count := strings.Count(output, versionGopath)
-
-		// Should only appear once in the output, not multiple times
 		assert.Equal(t, 1, count, "Version-specific GOPATH should appear only once in output, got: %s", output)
+
+		// Legacy $HOME/go/<ver> entries should be filtered out entirely.
+		assert.NotContains(t, output, legacyVersionGopath,
+			"Legacy $HOME/go/<ver> entry must be stripped, got: %s", output)
 
 		// Verify both custom paths are still there
 		assert.Contains(t, output, "/existing/path1")
@@ -320,21 +327,26 @@ func TestShRehashGOPATHDuplication(t *testing.T) {
 			home, err := os.UserHomeDir()
 			require.NoError(t, err)
 
-			versionPath := filepath.Join(home, "go", tt.version)
+			// versionPath is the v3-native path that sh-rehash now writes.
+			versionPath := filepath.Join(tmpDir, "versions", tt.version, "gopath")
+			// legacyVersionPath is the v2-style path; existing GOPATH entries
+			// matching this prefix must be filtered out so users upgrading from
+			// v2 don't carry stale entries forward.
+			legacyVersionPath := filepath.Join(home, "go", tt.version)
 
 			// Set up existing GOPATH based on test case
 			var existingPath string
 			switch tt.name {
 			case "filters out duplicate goenv-managed paths on re-init":
-				existingPath = versionPath
+				existingPath = legacyVersionPath
 			case "filters triple duplication":
-				existingPath = strings.Join([]string{versionPath, versionPath, versionPath}, string(os.PathListSeparator))
+				existingPath = strings.Join([]string{legacyVersionPath, legacyVersionPath, legacyVersionPath}, string(os.PathListSeparator))
 			case "preserves custom paths while filtering duplicates":
-				existingPath = strings.Join([]string{versionPath, "/custom/path", versionPath}, string(os.PathListSeparator))
+				existingPath = strings.Join([]string{legacyVersionPath, "/custom/path", legacyVersionPath}, string(os.PathListSeparator))
 			case "preserves $HOME/go if present":
-				existingPath = strings.Join([]string{versionPath, filepath.Join(home, "go")}, string(os.PathListSeparator))
+				existingPath = strings.Join([]string{legacyVersionPath, filepath.Join(home, "go")}, string(os.PathListSeparator))
 			case "fish shell filters duplicates":
-				existingPath = versionPath
+				existingPath = legacyVersionPath
 			}
 
 			// Set environment
@@ -399,13 +411,18 @@ func TestShRehashGOPATHDuplication(t *testing.T) {
 				"%s: Expected version path to appear %d time(s), but appeared %d time(s) in GOPATH: %s",
 				tt.description, tt.expectedCount, count, gopathValue)
 
+			// Legacy $HOME/go/<ver> entries must be stripped under Option B.
+			assert.NotContains(t, pathSegments, legacyVersionPath,
+				"%s: Legacy $HOME/go/<ver> entry must be filtered, got: %s",
+				tt.description, gopathValue)
+
 			// Additional checks for specific test cases
 			switch tt.name {
 			case "preserves custom paths while filtering duplicates":
 				assert.Contains(t, gopathValue, "/custom/path",
 					"Should preserve custom path")
 			case "preserves $HOME/go if present":
-				assert.Contains(t, gopathValue, filepath.Join(home, "go"),
+				assert.Contains(t, pathSegments, filepath.Join(home, "go"),
 					"Should preserve $HOME/go")
 			}
 		})

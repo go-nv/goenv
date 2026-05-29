@@ -80,9 +80,9 @@ func TestExec_AutoRehashAfterGoInstall(t *testing.T) {
 	// 2. Running rehash manually (simulating what exec does)
 	// 3. Verifying the shim was created
 
-	// Create a mock GOPATH for testing
-	gopath := filepath.Join(tempRoot, "go", testVersion)
-	gopathBin := filepath.Join(gopath, "bin")
+	// Create a mock GOPATH for testing (must match the v3-native layout that
+	// Rehash scans: $GOENV_ROOT/versions/{version}/gopath/bin).
+	gopathBin := cfg.VersionGopathBin(testVersion)
 	_ = utils.EnsureDirWithContext(gopathBin, "create test directory")
 
 	// Create a mock tool binary
