@@ -128,7 +128,9 @@ func ListAll(cfg *config.Config, mgr VersionManager) (map[string][]ToolMetadata,
 
 // IsInstalled checks if a specific tool is installed for a given Go version.
 func IsInstalled(cfg *config.Config, version, toolName string) bool {
-	binPath := filepath.Join(cfg.Root, "versions", version, "gopath", "bin")
+	// Use the canonical per-version GOPATH/bin (master parity:
+	// $HOME/go/{version}/bin) rather than re-deriving it from cfg.Root.
+	binPath := cfg.VersionGopathBin(version)
 
 	// Check for the tool with various possible extensions
 	candidates := []string{

@@ -21,7 +21,8 @@ import (
 func TestListCommand_AllFlag(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Root: tmpDir,
+		Root:       tmpDir,
+		GopathHome: tmpDir,
 	}
 
 	// Create multiple versions with tools
@@ -36,7 +37,7 @@ func TestListCommand_AllFlag(t *testing.T) {
 		cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
 
 		// Create individual tool binaries using helper (handles .bat on Windows)
-		cfg := &config.Config{Root: tmpDir}
+		cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 		binPath := cfg.VersionGopathBin(version)
 
 		for _, tool := range tools {
@@ -85,12 +86,13 @@ func TestListCommand_JSONOutput(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Root: tmpDir,
+		Root:       tmpDir,
+		GopathHome: tmpDir,
 	}
 
 	// Create a version with tools
 	version := "1.23.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err)
 
@@ -153,7 +155,8 @@ func TestListCommand_EmptyVersion(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Root: tmpDir,
+		Root:       tmpDir,
+		GopathHome: tmpDir,
 	}
 
 	// Create version with no tools
@@ -173,11 +176,12 @@ func TestListCommand_HiddenFiles(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Root: tmpDir,
+		Root:       tmpDir,
+		GopathHome: tmpDir,
 	}
 
 	version := "1.23.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err)
 
@@ -204,11 +208,12 @@ func TestListCommand_PlatformVariants(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Root: tmpDir,
+		Root:       tmpDir,
+		GopathHome: tmpDir,
 	}
 
 	version := "1.23.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err)
 
@@ -235,12 +240,13 @@ func TestListCommand_RunE(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Root: tmpDir,
+		Root:       tmpDir,
+		GopathHome: tmpDir,
 	}
 
 	// Create a version with tools
 	version := "1.23.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err)
 
@@ -276,7 +282,8 @@ func TestListCommand_MultipleVersions(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
-		Root: tmpDir,
+		Root:       tmpDir,
+		GopathHome: tmpDir,
 	}
 
 	// Create multiple versions
@@ -286,7 +293,7 @@ func TestListCommand_MultipleVersions(t *testing.T) {
 		cmdtest.CreateTestBinary(t, tmpDir, v, "go")
 
 		// Create tools using helper (handles .bat on Windows)
-		binPath := filepath.Join(tmpDir, "versions", v, "gopath", "bin")
+		binPath := cfg.VersionGopathBin(v)
 		err = utils.EnsureDirWithContext(binPath, "create test directory")
 		require.NoError(t, err)
 		cmdtest.CreateToolExecutable(t, binPath, "gopls")

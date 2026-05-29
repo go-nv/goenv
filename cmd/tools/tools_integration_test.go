@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
@@ -22,8 +21,12 @@ func TestMultiVersionToolManagement(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
+	// Master parity: per-version GOPATH/bin lives at $HOME/go/{ver}/bin.
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
 	cfg := &config.Config{
-		Root: tmpDir,
+		Root:       tmpDir,
+		GopathHome: tmpDir,
 	}
 
 	// Create 3 Go versions
@@ -33,8 +36,7 @@ func TestMultiVersionToolManagement(t *testing.T) {
 		cmdtest.CreateTestBinary(t, tmpDir, v, "go")
 
 		// Create GOPATH/bin directory
-		versionPath := filepath.Join(tmpDir, "versions", v)
-		gopath := filepath.Join(versionPath, "gopath", "bin")
+		gopath := cfg.VersionGopathBin(v)
 		err = utils.EnsureDirWithContext(gopath, "create test directory")
 		require.NoError(t, err)
 	}
@@ -47,7 +49,7 @@ func TestMultiVersionToolManagement(t *testing.T) {
 	}
 
 	for version, tools := range toolInstallations {
-		binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+		binPath := cfg.VersionGopathBin(version)
 		for _, tool := range tools {
 			cmdtest.CreateToolExecutable(t, binPath, tool)
 		}

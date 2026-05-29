@@ -437,7 +437,8 @@ func (u *Updater) updateTool(tool toolspkg.ToolMetadata, version, goVersion stri
 	versionPath := filepath.Join(u.cfg.Root, "versions", goVersion)
 	goRoot := versionPath
 	goBin := filepath.Join(goRoot, "bin", "go")
-	gopath := filepath.Join(versionPath, "gopath")
+	// Master parity: per-version GOPATH lives at $HOME/go/{goVersion}.
+	gopath := u.cfg.VersionGopath(goVersion)
 
 	// Check if Go binary exists
 	if utils.FileNotExists(goBin) {

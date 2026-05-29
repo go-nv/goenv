@@ -248,11 +248,13 @@ func TestInstallTools_Failure(t *testing.T) {
 func TestVerifyTools(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
+	// Master parity: VerifyTools looks at $HOME/go/{version}/bin.
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
 	goVersion := "1.21.0"
 
 	// Setup version structure
-	versionPath := filepath.Join(tmpDir, "versions", goVersion)
-	gopathBin := filepath.Join(versionPath, "gopath", "bin")
+	gopathBin := filepath.Join(tmpDir, "go", goVersion, "bin")
 
 	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
 	require.NoError(t, err, "Failed to create gopath bin directory")
@@ -304,11 +306,13 @@ func TestVerifyTools(t *testing.T) {
 func TestVerifyTools_NoBinaryName(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
+	// Master parity: VerifyTools looks at $HOME/go/{version}/bin.
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
 	goVersion := "1.21.0"
 
 	// Setup version structure
-	versionPath := filepath.Join(tmpDir, "versions", goVersion)
-	gopathBin := filepath.Join(versionPath, "gopath", "bin")
+	gopathBin := filepath.Join(tmpDir, "go", goVersion, "bin")
 
 	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
 	require.NoError(t, err, "Failed to create gopath bin directory")

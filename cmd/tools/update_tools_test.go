@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-nv/goenv/internal/cmdtest"
 	"github.com/go-nv/goenv/internal/manager"
@@ -24,10 +25,29 @@ type testToolInfo struct {
 
 // setupUpdateTestEnv creates a test environment for update tests
 func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shouldCreateVersion bool) string {
-	var err error
 	tmpDir := t.TempDir()
+	// Use a separate, manually-managed directory for HOME. Go subprocesses
+	// (e.g. `go version -m` invoked from ListForVersion's metadata
+	// extraction) write Library/Application Support/go/telemetry/* under
+	// HOME on macOS regardless of GOTELEMETRY=off. t.TempDir's automatic
+	// RemoveAll can race with telemetry's background writer ("directory
+	// not empty"), so we own cleanup here with a small retry loop.
+	homeDir, err := os.MkdirTemp("", "goenv-test-home-*")
+	require.NoError(t, err, "Failed to create HOME tempdir")
+	t.Cleanup(func() {
+		for i := 0; i < 5; i++ {
+			if err := os.RemoveAll(homeDir); err == nil {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	})
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)
+	// Master parity: per-version GOPATH lives at $HOME/go/{ver}.
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	t.Setenv("GOTELEMETRY", "off")
 
 	oldDir, _ := os.Getwd()
 	os.Chdir(tmpDir)
@@ -52,7 +72,9 @@ func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shou
 		}
 		testutil.WriteTestFile(t, goBinary, []byte(mockScript), utils.PermFileExecutable)
 
-		gopathBin := filepath.Join(versionPath, "gopath", "bin")
+		// Create GOPATH/bin at the canonical per-version location
+		// ($HOME/go/{version}/bin) — see config.VersionGopathBin.
+		gopathBin := filepath.Join(homeDir, "go", version, "bin")
 		err = utils.EnsureDirWithContext(gopathBin, "create test directory")
 		require.NoError(t, err, "Failed to create GOPATH/bin")
 

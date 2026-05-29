@@ -22,6 +22,12 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 	var err error
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	// Master parity: tools live at $HOME/go/{version}/bin. Redirect HOME so
+	// VersionGopathBin resolves into the test sandbox.
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
+
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	for _, version := range versions {
 		versionPath := filepath.Join(tmpDir, "versions", version)
@@ -34,8 +40,8 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 		// Create mock go binary using helper (handles .bat on Windows)
 		cmdtest.CreateToolExecutable(t, goBinDir, "go")
 
-		// Create GOPATH/bin directory
-		gopathBin := filepath.Join(versionPath, "gopath", "bin")
+		// Create GOPATH/bin directory under $HOME/go/{version}/bin
+		gopathBin := cfg.VersionGopathBin(version)
 		err = utils.EnsureDirWithContext(gopathBin, "create test directory")
 		require.NoError(t, err, "Failed to create GOPATH/bin")
 
@@ -381,7 +387,7 @@ func TestSyncToolsWindowsCompatibility(t *testing.T) {
 		cmdtest.CreateMockGoVersionWithTools(t, tmpDir, version)
 
 		if version == "1.21.0" {
-			cfg := &config.Config{Root: tmpDir}
+			cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 			gopathBin := cfg.VersionGopathBin(version)
 			toolPath := filepath.Join(gopathBin, "mockgopls.bat")
 			toolBatchContent := "@echo off\necho mock tool\n"

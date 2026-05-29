@@ -31,6 +31,11 @@ type Config struct {
 	CurrentDir string // GOENV_DIR - current working directory for version resolution
 	Shell      string // GOENV_SHELL - shell type for init command
 	Debug      bool   // GOENV_DEBUG - debug mode
+
+	// GopathHome overrides the home directory used to compute the per-version
+	// GOPATH location ($HOME/go/{version}). When empty, os.UserHomeDir() is
+	// consulted. Primarily used by tests to redirect GOPATH into a tmp dir.
+	GopathHome string
 }
 
 // DefaultRoot returns the default goenv root directory
@@ -207,11 +212,31 @@ func (c *Config) VersionGoBinary(version string) string {
 	return goBinary
 }
 
-// VersionGopathBin returns the gopath/bin directory for a specific version
-// This is where tools installed with "go install" are placed
-// Example: /Users/user/.goenv/versions/1.21.0/gopath/bin
+// VersionGopath returns the per-version GOPATH directory. This is the
+// directory that the shims set as GOPATH and that "go install" treats as
+// its workspace. Master parity: $HOME/go/{version}.
+//
+// If GopathHome is set on the Config, it overrides the home directory (used
+// by tests). Otherwise os.UserHomeDir() is used. As a last-resort fallback
+// (no home available, e.g. unprivileged sandbox) we return the legacy
+// per-version path under GOENV_ROOT to avoid panicking.
+func (c *Config) VersionGopath(version string) string {
+	if c.GopathHome != "" {
+		return filepath.Join(c.GopathHome, "go", version)
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, "go", version)
+	}
+	return filepath.Join(c.VersionDir(version), "gopath")
+}
+
+// VersionGopathBin returns the gopath/bin directory for a specific version.
+// This is where tools installed with "go install" are placed.
+// Master parity: $HOME/go/{version}/bin (matches the bash implementation
+// of `goenv rehash` and the GOPATH that shims export).
+// Example: /Users/user/go/1.21.0/bin
 func (c *Config) VersionGopathBin(version string) string {
-	return filepath.Join(c.VersionDir(version), "gopath", "bin")
+	return filepath.Join(c.VersionGopath(version), "bin")
 }
 
 // FindVersionGoBinary returns the path to the Go binary for a specific version,

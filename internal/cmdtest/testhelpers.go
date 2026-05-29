@@ -369,8 +369,17 @@ func CreateMockGoVersionWithTools(t *testing.T, tmpDir, version string) string {
 	// Create base version
 	versionPath := CreateMockGoVersion(t, tmpDir, version)
 
-	// Create gopath/bin directory
-	cfg := &config.Config{Root: tmpDir}
+	// Redirect HOME to tmpDir so any Config built later in the test (with
+	// just a Root field) still resolves VersionGopathBin into the sandbox.
+	// Master parity moved the per-version GOPATH from
+	// $GOENV_ROOT/versions/{ver}/gopath to $HOME/go/{ver}; this keeps the
+	// existing test ergonomics (`cfg := &config.Config{Root: tmpDir}`)
+	// without forcing every test to set GopathHome explicitly.
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir) // Windows equivalent
+
+	// Create gopath/bin directory.
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 	gopathBin := cfg.VersionGopathBin(version)
 	if err := utils.EnsureDirWithContext(gopathBin, "create test directory"); err != nil {
 		t.Fatalf("Failed to create gopath bin: %v", err)

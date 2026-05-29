@@ -172,8 +172,10 @@ func findCurrentVersionToolTargets(cfg *config.Config, mgr *manager.Manager, too
 		return nil
 	}
 
-	gopath := filepath.Join(cfg.Root, "versions", currentVersion, "gopath")
-	binPath := filepath.Join(gopath, "bin")
+	// Master parity: per-version GOPATH lives at $HOME/go/{version}, so its
+	// bin directory is $HOME/go/{version}/bin. Use cfg.VersionGopathBin for
+	// a single source of truth shared with exec / sh-rehash.
+	binPath := cfg.VersionGopathBin(currentVersion)
 
 	var targets []toolUninstallTarget
 	for _, toolName := range toolNames {
@@ -209,8 +211,8 @@ func findAllVersionToolTargets(cfg *config.Config, toolNames []string) []toolUni
 		}
 
 		version := entry.Name()
-		gopath := filepath.Join(versionsDir, version, "gopath")
-		binPath := filepath.Join(gopath, "bin")
+		// Master parity: per-version GOPATH/bin is $HOME/go/{version}/bin.
+		binPath := cfg.VersionGopathBin(version)
 
 		// Check if bin directory exists
 		if !utils.DirExists(binPath) {

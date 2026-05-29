@@ -112,8 +112,9 @@ func runExec(cmd *cobra.Command, args []string) error {
 		// Set GOPATH if not disabled
 		if !env.HasDisableGopath() {
 			// Build version-specific GOPATH: $HOME/go/{version}
-			homeDir, _ := os.UserHomeDir()
-			versionGopath := filepath.Join(homeDir, "go", currentVersion)
+			// Centralised in config.VersionGopath so exec, sh-rehash and
+			// rehash all agree on where "go install" deposits binaries.
+			versionGopath := cfg.VersionGopath(currentVersion)
 
 			// Preserve existing GOPATH by prepending version-specific path.
 			// This allows users to keep source code in existing locations while

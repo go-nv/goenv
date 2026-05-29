@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	goenvconfig "github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
@@ -261,8 +262,10 @@ func VerifyTools(config *Config, goVersion string, goenvRoot string) (map[string
 		return results, nil
 	}
 
-	versionPath := filepath.Join(goenvRoot, "versions", goVersion)
-	gopathBin := filepath.Join(versionPath, "gopath", "bin")
+	// Master parity: tools land in $HOME/go/{goVersion}/bin. Build the path
+	// through goenvconfig.Config so we share the helper used by exec/sh-rehash.
+	cfg := &goenvconfig.Config{Root: goenvRoot}
+	gopathBin := cfg.VersionGopathBin(goVersion)
 
 	for _, tool := range config.Tools {
 		binaryName := tool.Binary

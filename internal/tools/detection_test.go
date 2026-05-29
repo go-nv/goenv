@@ -29,10 +29,10 @@ func TestListForVersion(t *testing.T) {
 	var err error
 	// Create temporary directory structure
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	version := "1.21.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err, "Failed to create bin directory")
 
@@ -62,7 +62,7 @@ func TestListForVersion(t *testing.T) {
 
 func TestListForVersion_NonExistent(t *testing.T) {
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	// Test with non-existent version
 	result, err := ListForVersion(cfg, "1.99.0")
@@ -74,10 +74,10 @@ func TestListForVersion_NonExistent(t *testing.T) {
 func TestListForVersion_EmptyDirectory(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	version := "1.21.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err, "Failed to create bin directory")
 
@@ -91,10 +91,10 @@ func TestListForVersion_EmptyDirectory(t *testing.T) {
 func TestListForVersion_PlatformVariants(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	version := "1.21.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err, "Failed to create bin directory")
 
@@ -118,10 +118,10 @@ func TestListForVersion_PlatformVariants(t *testing.T) {
 func TestListForVersion_HiddenFiles(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	version := "1.21.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err, "Failed to create bin directory")
 
@@ -145,12 +145,12 @@ func TestListForVersion_HiddenFiles(t *testing.T) {
 func TestListAll(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	// Create tools for multiple versions
 	versions := []string{"1.20.0", "1.21.0"}
 	for _, version := range versions {
-		binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+		binPath := cfg.VersionGopathBin(version)
 		err = utils.EnsureDirWithContext(binPath, "create test directory")
 		require.NoError(t, err, "Failed to create bin directory")
 
@@ -178,7 +178,7 @@ func TestListAll(t *testing.T) {
 
 func TestListAll_EmptyVersions(t *testing.T) {
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	mgr := &mockVersionManager{versions: []string{}}
 
@@ -191,10 +191,10 @@ func TestListAll_EmptyVersions(t *testing.T) {
 func TestIsInstalled(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	version := "1.21.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err, "Failed to create bin directory")
 
@@ -239,10 +239,10 @@ func TestIsInstalled(t *testing.T) {
 func TestIsInstalled_PlatformVariants(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	version := "1.21.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err, "Failed to create bin directory")
 
@@ -257,10 +257,10 @@ func TestIsInstalled_PlatformVariants(t *testing.T) {
 func TestGetToolInfo(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	version := "1.21.0"
-	binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+	binPath := cfg.VersionGopathBin(version)
 	err = utils.EnsureDirWithContext(binPath, "create test directory")
 	require.NoError(t, err, "Failed to create bin directory")
 
@@ -288,12 +288,12 @@ func TestGetToolInfo(t *testing.T) {
 func TestCollectUniqueTools(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
-	cfg := &config.Config{Root: tmpDir}
+	cfg := &config.Config{Root: tmpDir, GopathHome: tmpDir}
 
 	// Create same tools across multiple versions
 	versions := []string{"1.20.0", "1.21.0"}
 	for _, version := range versions {
-		binPath := filepath.Join(tmpDir, "versions", version, "gopath", "bin")
+		binPath := cfg.VersionGopathBin(version)
 		err = utils.EnsureDirWithContext(binPath, "create test directory")
 		require.NoError(t, err, "Failed to create bin directory")
 
@@ -303,7 +303,7 @@ func TestCollectUniqueTools(t *testing.T) {
 	}
 
 	// Add version-specific tool
-	binPath := filepath.Join(tmpDir, "versions", "1.21.0", "gopath", "bin")
+	binPath := cfg.VersionGopathBin("1.21.0")
 	toolPath := filepath.Join(binPath, "gopls")
 	testutil.WriteTestFile(t, toolPath, []byte("test"), utils.PermFileExecutable)
 

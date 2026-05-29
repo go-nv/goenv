@@ -168,8 +168,10 @@ func (m *Manager) InstallSingleTool(goVersion, packagePath string, verbose bool)
 	// Create a temporary config with a single tool to reuse the gold standard installation logic
 	cfg.Tools = []Tool{newTool}
 
-	// Use the gold standard InstallTools function with host-specific GOPATH
-	return newTool, InstallTools(cfg, goVersion, m.cfg.Root, m.cfg.VersionDir(goVersion), verbose)
+	// Use the gold standard InstallTools function with the per-version GOPATH
+	// ($HOME/go/{goVersion}) so installed tools land where exec/sh-rehash
+	// expect them (master parity).
+	return newTool, InstallTools(cfg, goVersion, m.cfg.Root, m.cfg.VersionGopath(goVersion), verbose)
 }
 
 // UninstallOptions configures tool uninstallation behavior.
@@ -245,7 +247,9 @@ func (m *Manager) Uninstall(opts UninstallOptions) (*UninstallResult, error) {
 // This is useful for commands that need per-tool progress feedback.
 // For batch uninstallation, use Uninstall() instead.
 func (m *Manager) UninstallSingleTool(version, toolName string) error {
-	binPath := filepath.Join(m.cfg.Root, "versions", version, "gopath", "bin")
+	// Master parity: the canonical per-version GOPATH/bin is
+	// $HOME/go/{version}/bin (centralised in config.VersionGopathBin).
+	binPath := m.cfg.VersionGopathBin(version)
 
 	// Find and remove all platform variants
 	candidates := []string{

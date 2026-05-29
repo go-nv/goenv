@@ -255,7 +255,10 @@ func runInstallTools(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Installing default tools for Go %s...\n", goVersion)
 	fmt.Fprintln(cmd.OutOrStdout())
 
-	if err := tools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.SafeResolvePath(goVersion), true); err != nil {
+	// Master parity: install tools into the per-version GOPATH
+	// ($HOME/go/{goVersion}) so they line up with what exec/sh-rehash export
+	// at runtime.
+	if err := tools.InstallTools(toolConfig, goVersion, cfg.Root, cfg.VersionGopath(goVersion), true); err != nil {
 		return errors.FailedTo("install default tools", err)
 	}
 
