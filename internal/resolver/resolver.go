@@ -47,6 +47,14 @@ func (r *Resolver) ResolveBinary(command, version, versionSource string) (string
 		if path, err := utils.FindExecutable(versionGopathBin, command); err == nil {
 			return path, nil
 		}
+
+		// Also check the legacy "$HOME/go/{version}/bin" location, since the
+		// shims currently install binaries there. See LegacyHomeGopathBin doc.
+		if legacyBin := r.config.LegacyHomeGopathBin(version); legacyBin != "" {
+			if path, err := utils.FindExecutable(legacyBin, command); err == nil {
+				return path, nil
+			}
+		}
 	}
 
 	// ONLY check host bin if using global version (not project-specific)
@@ -82,6 +90,9 @@ func (r *Resolver) FindVersionsWithBinary(command string, allVersions []string) 
 
 		if !gopathDisabled {
 			dirs = append(dirs, r.config.VersionGopathBin(version))
+			if legacyBin := r.config.LegacyHomeGopathBin(version); legacyBin != "" {
+				dirs = append(dirs, legacyBin)
+			}
 		}
 
 		if _, err := pathutil.ResolveBinary(command, dirs); err == nil {
@@ -102,6 +113,12 @@ func (r *Resolver) GetBinaryDirectories(version string) []string {
 	// Add version-specific GOPATH bin if not disabled
 	if !r.env.HasDisableGopath() {
 		dirs = append(dirs, r.config.VersionGopathBin(version))
+
+		// Also include the legacy "$HOME/go/{version}/bin" location, because
+		// the shims currently install binaries there. See LegacyHomeGopathBin.
+		if legacyBin := r.config.LegacyHomeGopathBin(version); legacyBin != "" {
+			dirs = append(dirs, legacyBin)
+		}
 	}
 
 	return dirs
