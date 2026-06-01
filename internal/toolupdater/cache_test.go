@@ -205,13 +205,13 @@ func TestCacheGetAllEntries(t *testing.T) {
 func TestCacheGetStats(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
-	cache := NewCacheWithTTL(cfg, 100*time.Millisecond)
+	cache := NewCacheWithTTL(cfg, 200*time.Millisecond)
 
 	// Add some entries
 	cache.SetLatestVersion("pkg1", "v1.0.0")
 	time.Sleep(50 * time.Millisecond)
 	cache.SetLatestVersion("pkg2", "v2.0.0")
-	time.Sleep(60 * time.Millisecond) // pkg1 is now expired
+	time.Sleep(160 * time.Millisecond) // pkg1 is now expired (210ms old), pkg2 is still valid (160ms old)
 
 	stats := cache.GetStats()
 
@@ -221,18 +221,18 @@ func TestCacheGetStats(t *testing.T) {
 
 	assert.Equal(t, 1, stats.ExpiredEntries, "Expected 1 expired entry")
 
-	assert.Equal(t, 100*time.Millisecond, stats.TTL, "Expected TTL")
+	assert.Equal(t, 200*time.Millisecond, stats.TTL, "Expected TTL")
 }
 
 func TestCachePrune(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
-	cache := NewCacheWithTTL(cfg, 50*time.Millisecond)
+	cache := NewCacheWithTTL(cfg, 100*time.Millisecond)
 
 	// Add entries
 	cache.SetLatestVersion("pkg1", "v1.0.0")
-	time.Sleep(60 * time.Millisecond)
+	time.Sleep(120 * time.Millisecond) // Ensure pkg1 is expired
 	cache.SetLatestVersion("pkg2", "v2.0.0") // Fresh entry
 
 	// Prune expired entries
