@@ -125,8 +125,20 @@ func runExec(cmd *cobra.Command, args []string) error {
 			// This allows users to keep source code in existing locations while
 			// giving priority to version-specific installed tools/packages.
 			// See: https://github.com/go-nv/goenv/issues/147
+			// Filter out goenv-managed paths to prevent duplication when goenv exec
+			// is called from inside an already-managed shell (e.g. a tool that
+			// shells out to `go env GOPATH` through the shim).
 			if gopath != "" {
-				versionGopath = versionGopath + string(os.PathListSeparator) + gopath
+				goPathPattern := filepath.Join(homeDir, "go")
+				var filteredPaths []string
+				for _, p := range filepath.SplitList(gopath) {
+					if !strings.HasPrefix(p, goPathPattern+string(filepath.Separator)) || p == goPathPattern {
+						filteredPaths = append(filteredPaths, p)
+					}
+				}
+				if len(filteredPaths) > 0 {
+					versionGopath = versionGopath + string(os.PathListSeparator) + strings.Join(filteredPaths, string(os.PathListSeparator))
+				}
 			}
 
 			execEnv = setEnvVar(execEnv, utils.EnvVarGopath, versionGopath)
