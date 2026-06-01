@@ -214,6 +214,25 @@ func (c *Config) VersionGopathBin(version string) string {
 	return filepath.Join(c.VersionDir(version), "gopath", "bin")
 }
 
+// LegacyHomeGopathBin returns the legacy GOPATH bin directory for a specific
+// version under the user's home directory.
+//
+// This exists because the shims (cmd/shims/exec.go and cmd/shims/sh-rehash.go)
+// currently set GOPATH to "$HOME/go/{version}" when launching the Go toolchain,
+// so "go install" actually writes binaries to "$HOME/go/{version}/bin" rather
+// than to the v3-managed VersionGopathBin path. Until those shims are aligned,
+// rehash and ResolveBinary must scan this legacy location as well.
+//
+// Returns the empty string if the user's home directory cannot be determined.
+// Example: /Users/user/go/1.21.0/bin
+func (c *Config) LegacyHomeGopathBin(version string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	return filepath.Join(home, "go", version, "bin")
+}
+
 // FindVersionGoBinary returns the path to the Go binary for a specific version,
 // handling platform-specific executable extensions (.exe on Windows)
 // Returns an error if the binary doesn't exist
