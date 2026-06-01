@@ -254,6 +254,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			for _, release := range releases {
 				if release.Stable {
 					goVersion = release.Version
+					// Strip "go" prefix if present (e.g., "go1.26.3" -> "1.26.3")
+					goVersion = strings.TrimPrefix(goVersion, "go")
 					break
 				}
 			}
