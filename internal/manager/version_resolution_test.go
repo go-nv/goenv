@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -50,11 +51,11 @@ func setupTestVersions(t *testing.T, versions []string) (string, *Manager) {
 
 func TestValidateVersion_PartialVersionResolution(t *testing.T) {
 	tests := []struct {
-		name           string
+		name              string
 		installedVersions []string
 		versionToValidate string
-		expectError    bool
-		description    string
+		expectError       bool
+		description       string
 	}{
 		{
 			name:              "exact version match",
@@ -352,6 +353,164 @@ func TestPartialVersionResolution_EdgeCases(t *testing.T) {
 			if hasError != expectError {
 				t.Errorf("%s: ValidateVersion(%q) error state = %v, expected %v (err: %v)",
 					tt.description, tt.partialVersion, hasError, expectError, err)
+			}
+		})
+	}
+}
+
+// TestGetCurrentVersionResolved_GoModForwardCompatibility tests the go.mod forward compatibility
+// logic, which is critical for Go 1.26+ where `go mod init` defaults to (N-1).0
+//
+// Version selection strategy when go.mod is the version source:
+// 1. Lowest minor version that satisfies the constraint (most conservative)
+// 2. Highest patch of that minor (always want bug/security fixes)
+//
+// Examples:
+//   - go.mod says "go 1.25", installed [1.25.4, 1.26.1, 1.27.0] → pick 1.25.4
+//   - go.mod says "go 1.25", installed [1.26.1, 1.27.0] → pick 1.26.1 (no 1.25.x available)
+//   - go.mod says "go 1.25", installed [1.25.2, 1.25.3, 1.25.4] → pick 1.25.4
+//
+// NOTE: This version selection only applies when go.mod is the ONLY source.
+// If .go-version or GOENV_VERSION exists, those take precedence per version source priority.
+func TestGetCurrentVersionResolved_GoModForwardCompatibility(t *testing.T) {
+	testCases := []struct {
+		description       string
+		installedVersions []string
+		goModVersion      string
+		expectedVersion   string // empty string means we expect an error
+		shouldError       bool
+	}{
+		// PRIMARY TEST CASE: Lowest minor that satisfies, highest patch of that minor
+		{
+			description:       "go.mod 1.25, installed [1.25.4, 1.26.1, 1.27.0] - should use 1.25.4 (lowest satisfying minor, highest patch)",
+			installedVersions: []string{"1.25.4", "1.26.1", "1.27.0"},
+			goModVersion:      "1.25",
+			expectedVersion:   "1.25.4",
+			shouldError:       false,
+		},
+
+		// Forward compatibility cases - when only newer minors are available
+		{
+			description:       "go.mod 1.25, installed 1.26.0 - should use 1.26.0 (only newer minor available)",
+			installedVersions: []string{"1.26.0"},
+			goModVersion:      "1.25",
+			expectedVersion:   "1.26.0",
+			shouldError:       false,
+		},
+		{
+			description:       "go.mod 1.25, installed [1.26.0, 1.27.0] - should use 1.26.0 (lowest satisfying minor)",
+			installedVersions: []string{"1.26.0", "1.27.0"},
+			goModVersion:      "1.25",
+			expectedVersion:   "1.26.0",
+			shouldError:       false,
+		},
+
+		// Highest patch preference - when multiple patches of target minor exist
+		{
+			description:       "go.mod 1.25, installed [1.25.2, 1.25.3, 1.25.4] - should use 1.25.4 (highest patch)",
+			installedVersions: []string{"1.25.2", "1.25.3", "1.25.4"},
+			goModVersion:      "1.25",
+			expectedVersion:   "1.25.4",
+			shouldError:       false,
+		},
+		{
+			description:       "go.mod 1.25, installed [1.25.0, 1.25.4, 1.26.0] - should use 1.25.4 (highest patch of target minor)",
+			installedVersions: []string{"1.25.0", "1.25.4", "1.26.0"},
+			goModVersion:      "1.25",
+			expectedVersion:   "1.25.4",
+			shouldError:       false,
+		},
+
+		// Exact/partial match cases
+		{
+			description:       "go.mod 1.25, installed 1.25.4 - should use 1.25.4 (exact match)",
+			installedVersions: []string{"1.25.4"},
+			goModVersion:      "1.25",
+			expectedVersion:   "1.25.4",
+			shouldError:       false,
+		},
+		{
+			description:       "go.mod 1.25.3, installed 1.25.3 - should use 1.25.3 (exact match)",
+			installedVersions: []string{"1.25.3"},
+			goModVersion:      "1.25.3",
+			expectedVersion:   "1.25.3",
+			shouldError:       false,
+		},
+
+		// Backward incompatibility cases (should error)
+		{
+			description:       "go.mod 1.26, installed 1.25.0 - should error (can't use older version)",
+			installedVersions: []string{"1.25.0"},
+			goModVersion:      "1.26",
+			expectedVersion:   "",
+			shouldError:       true,
+		},
+		{
+			description:       "go.mod 1.26.5, installed 1.26.3 - should error (can't use older patch version)",
+			installedVersions: []string{"1.26.3"},
+			goModVersion:      "1.26.5",
+			expectedVersion:   "",
+			shouldError:       true,
+		},
+
+		// No versions installed case
+		{
+			description:       "go.mod 1.25, no versions installed - should error",
+			installedVersions: []string{},
+			goModVersion:      "1.25",
+			expectedVersion:   "",
+			shouldError:       true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.description, func(t *testing.T) {
+			rootDir, mgr := setupTestVersions(t, tt.installedVersions)
+
+			// Create a go.mod file in the test directory
+			goModPath := filepath.Join(rootDir, "go.mod")
+			goModContent := fmt.Sprintf("module testmodule\n\ngo %s\n", tt.goModVersion)
+			if err := os.WriteFile(goModPath, []byte(goModContent), 0644); err != nil {
+				t.Fatalf("Failed to create go.mod: %v", err)
+			}
+
+			// Change to the test directory so go.mod is found
+			originalWd, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("Failed to get current directory: %v", err)
+			}
+			defer os.Chdir(originalWd)
+
+			if err := os.Chdir(rootDir); err != nil {
+				t.Fatalf("Failed to change to test directory: %v", err)
+			}
+
+			// Call GetCurrentVersionResolved
+			resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
+
+			if tt.shouldError {
+				if err == nil {
+					t.Errorf("%s: expected error but got none; resolved version: %s",
+						tt.description, resolvedVersion)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tt.description, err)
+				}
+				if resolvedVersion != tt.expectedVersion {
+					t.Errorf("%s: GetCurrentVersionResolved() = %q, expected %q",
+						tt.description, resolvedVersion, tt.expectedVersion)
+				}
+				// Verify the versionSpec matches the go.mod version
+				if versionSpec != tt.goModVersion {
+					t.Errorf("%s: versionSpec = %q, expected %q",
+						tt.description, versionSpec, tt.goModVersion)
+				}
+				// Verify the source is go.mod
+				if !filepath.IsAbs(source) || filepath.Base(source) != "go.mod" {
+					t.Errorf("%s: source = %q, expected go.mod path",
+						tt.description, source)
+				}
 			}
 		})
 	}

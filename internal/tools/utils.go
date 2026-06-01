@@ -7,6 +7,11 @@ import (
 
 // commonTools maps common tool names to their full package paths
 var commonTools = map[string]string{
+	"impl":          "github.com/josharian/impl",
+	"gomodifytags":  "github.com/fatih/gomodifytags",
+	"vscgo":         "github.com/golang/vscode-go/vscgo",
+	"goplay":        "github.com/haya14busa/goplay/cmd/goplay",
+	"gotests":       "github.com/cweill/gotests",
 	"gotestsum":     "gotest.tools/gotestsum",
 	"gopls":         "golang.org/x/tools/gopls",
 	"goimports":     "golang.org/x/tools/cmd/goimports",
@@ -29,6 +34,17 @@ var commonTools = map[string]string{
 	"trivy": "github.com/aquasecurity/trivy/cmd/trivy",
 	// Commercial security scanners (Phase 4B)
 	"snyk": "github.com/snyk/cli/cmd/snyk",
+}
+
+var VSCodeTools = []string{
+	"gopls",
+	"dlv",
+	"vscgo",
+	"goplay",
+	"gomodifytags",
+	"impl",
+	"gotests",
+	"staticcheck",
 }
 
 // ExtractToolName extracts the binary name from a package path.
@@ -100,4 +116,31 @@ func NormalizePackagePaths(paths []string) []string {
 		normalized = append(normalized, NormalizePackagePath(path))
 	}
 	return normalized
+}
+
+// BuildVSCodeToolsConfig creates a Config for VSCode Go extension tools.
+func BuildVSCodeToolsConfig() *Config {
+	toolConfig := &Config{
+		Enabled: true,
+		Tools:   make([]Tool, 0, len(VSCodeTools)),
+	}
+
+	for _, toolName := range VSCodeTools {
+		pkg := NormalizePackagePath(toolName)
+		toolConfig.Tools = append(toolConfig.Tools, Tool{
+			Name:    toolName,
+			Package: pkg,
+			Version: "latest",
+			Binary:  toolName,
+		})
+	}
+
+	return toolConfig
+}
+
+// InstallVSCodeToolsForVersion installs all VSCode Go extension tools for a specific Go version.
+// Returns an error if the version is not installed or if installation fails.
+func InstallVSCodeToolsForVersion(goVersion, goenvRoot, versionPath string, verbose bool) error {
+	toolConfig := BuildVSCodeToolsConfig()
+	return InstallTools(toolConfig, goVersion, goenvRoot, versionPath, verbose)
 }

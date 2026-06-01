@@ -54,11 +54,12 @@ func init() {
 	cmdpkg.RootCmd.AddCommand(toolsCmd)
 
 	// Add subcommands (each defined in their own file)
-	toolsCmd.AddCommand(installToolsCmd) // from install_tools.go
-	toolsCmd.AddCommand(listToolsCmd)    // from list_tools.go
-	toolsCmd.AddCommand(updateToolsCmd)  // from update_tools.go
-	toolsCmd.AddCommand(syncToolsCmd)    // from sync_tools.go
-	toolsCmd.AddCommand(defaultToolsCmd) // from default_tools.go
+	toolsCmd.AddCommand(installToolsCmd)  // from install_tools.go
+	toolsCmd.AddCommand(installVSCodeCmd) // from install_vscode.go
+	toolsCmd.AddCommand(listToolsCmd)     // from list_tools.go
+	toolsCmd.AddCommand(updateToolsCmd)   // from update_tools.go
+	toolsCmd.AddCommand(syncToolsCmd)     // from sync_tools.go
+	toolsCmd.AddCommand(defaultToolsCmd)  // from default_tools.go
 
 	// Add uninstall command
 	cfg := config.Load()

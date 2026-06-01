@@ -27,7 +27,7 @@ func TestDefaultToolsList_NoConfig(t *testing.T) {
 
 	output := buf.String()
 	assert.Contains(t, output, "No default tools configuration found", "Expected 'No default tools configuration found' message %v", output)
-	assert.Contains(t, output, "goenv tools default init", "Expected init suggestion %v", output)
+	assert.Contains(t, output, "goenv tools default-tools init", "Expected init suggestion %v", output)
 }
 
 func TestDefaultToolsList_WithConfig(t *testing.T) {
