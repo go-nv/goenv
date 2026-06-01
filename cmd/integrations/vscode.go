@@ -562,7 +562,6 @@ func generateSettings(template string) (VSCodeSettings, error) {
 			"go.goroot":      "${env:GOROOT}",
 			"go.gopath":      "${env:GOPATH}",
 			"go.toolsGopath": homeEnvVar + "/go/tools",
-			"goenv.autoSync": false, // Set to true to auto-update on version change
 		}, nil
 
 	case "advanced":
@@ -570,7 +569,6 @@ func generateSettings(template string) (VSCodeSettings, error) {
 			"go.goroot":                         "${env:GOROOT}",
 			"go.gopath":                         "${env:GOPATH}",
 			"go.toolsGopath":                    homeEnvVar + "/go/tools",
-			"goenv.autoSync":                    false, // Set to true to auto-update on version change
 			"go.toolsManagement.autoUpdate":     true,
 			"go.formatTool":                     "gofumpt",
 			"go.lintTool":                       "golangci-lint",
@@ -598,7 +596,6 @@ func generateSettings(template string) (VSCodeSettings, error) {
 			"go.goroot":                          "${env:GOROOT}",
 			"go.gopath":                          "${env:GOPATH}",
 			"go.toolsGopath":                     homeEnvVar + "/go/tools",
-			"goenv.autoSync":                     false, // Set to true to auto-update on version change
 			"go.inferGopath":                     false,
 			"go.formatTool":                      "gofumpt",
 			"go.testExplorer.enable":             true,
