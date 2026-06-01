@@ -30,6 +30,14 @@ func VersionNotInstalledDetailed(version, source string, installedVersions []str
 
 	sb.WriteString("\n")
 
+	// Add context for go.mod files (Go 1.26+ behavior)
+	if source != "" && strings.Contains(source, "go.mod") {
+		sb.WriteString("Note: Starting in Go 1.26, 'go mod init' defaults to setting the go\n")
+		sb.WriteString("directive to one version behind for backward compatibility.\n")
+		sb.WriteString("This is normal and expected behavior.\n")
+		sb.WriteString("\n")
+	}
+
 	// Suggest installation
 	sb.WriteString("To install this version:\n")
 	sb.WriteString(fmt.Sprintf("  goenv install %s\n", version))

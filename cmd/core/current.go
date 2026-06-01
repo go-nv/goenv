@@ -52,7 +52,9 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 	resolvedVersion, versionSpec, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		if versionSpec != "" && source != "" {
-			return fmt.Errorf("goenv: version '%s' is not installed (set by %s)", versionSpec, source)
+			// Version specified but not installed - provide helpful error
+			installed, _ := mgr.ListInstalledVersions()
+			return errors.VersionNotInstalledDetailed(versionSpec, source, installed)
 		}
 		return errors.FailedTo("determine active version", err)
 	}
