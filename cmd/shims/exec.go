@@ -63,6 +63,12 @@ func runExec(cmd *cobra.Command, args []string) error {
 		args = args[1:]
 	}
 
+	// Recursion guard: detect if we're being called from a shim that we spawned
+	const recursionEnvVar = "_GOENV_EXEC_ACTIVE"
+	if os.Getenv(recursionEnvVar) != "" {
+		return fmt.Errorf("goenv: infinite recursion detected — shim is calling goenv exec again. Run 'goenv rehash' to regenerate shims")
+	}
+
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
@@ -226,9 +232,15 @@ func runExec(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("goenv: %s: command not found", command)
 		}
 	} else {
-		// For system version, use PATH lookup
+		// For system version, use PATH lookup but exclude shims directory
+		// to prevent infinite recursion (shim → goenv exec → shim → ...)
+		shimsDir := cfg.ShimsDir()
+		originalPath := os.Getenv("PATH")
+		filteredPath := pathutil.FilterFromPath(originalPath, shimsDir)
+		os.Setenv("PATH", filteredPath)
 		var err error
 		commandPath, err = exec.LookPath(command)
+		os.Setenv("PATH", originalPath)
 		if err != nil {
 			return fmt.Errorf("goenv: %s: command not found", command)
 		}
@@ -288,6 +300,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute with the modified environment
+	// Set recursion guard so shims don't re-enter goenv exec
+	execEnv = setEnvVar(execEnv, recursionEnvVar, "1")
 	execCmd := exec.Command(commandPath, commandArgs...)
 	execCmd.Env = execEnv
 	execCmd.Stdin = os.Stdin

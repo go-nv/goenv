@@ -69,3 +69,16 @@ func ResolveBinary(command string, dirs []string) (string, error) {
 	}
 	return "", os.ErrNotExist
 }
+
+// FilterFromPath removes all occurrences of a directory from a PATH-style string.
+func FilterFromPath(pathEnv, dirToRemove string) string {
+	cleanDir := filepath.Clean(dirToRemove)
+	parts := strings.Split(pathEnv, string(os.PathListSeparator))
+	var filtered []string
+	for _, p := range parts {
+		if filepath.Clean(p) != cleanDir {
+			filtered = append(filtered, p)
+		}
+	}
+	return strings.Join(filtered, string(os.PathListSeparator))
+}

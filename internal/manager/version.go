@@ -243,10 +243,47 @@ func (m *Manager) GetCurrentVersionResolved() (string, string, string, error) {
 	// Resolve partial versions (e.g., "1.25" → "1.25.4")
 	resolvedVersion, err := m.ResolveVersionSpec(versionSpec)
 	if err != nil {
+		// When the source is go.mod, the version is a minimum requirement, not exact.
+		// Try to find any installed version >= the requested version.
+		if strings.HasSuffix(source, "go.mod") {
+			if compatible := m.findCompatibleVersion(versionSpec); compatible != "" {
+				return compatible, versionSpec, source, nil
+			}
+		}
 		return "", versionSpec, source, err
 	}
 
 	return resolvedVersion, versionSpec, source, nil
+}
+
+// findCompatibleVersion finds the minimum installed version that satisfies
+// a go.mod version constraint (i.e., any version >= spec).
+func (m *Manager) findCompatibleVersion(spec string) string {
+	installed, err := m.ListInstalledVersions()
+	if err != nil || len(installed) == 0 {
+		return ""
+	}
+
+	normalizedSpec := utils.NormalizeGoVersion(spec)
+	var compatible []string
+	for _, v := range installed {
+		if utils.CompareGoVersions(utils.NormalizeGoVersion(v), normalizedSpec) >= 0 {
+			compatible = append(compatible, v)
+		}
+	}
+
+	if len(compatible) == 0 {
+		return ""
+	}
+
+	// Return the minimum compatible version (closest to what was requested)
+	min := compatible[0]
+	for _, v := range compatible[1:] {
+		if utils.CompareGoVersions(v, min) < 0 {
+			min = v
+		}
+	}
+	return min
 }
 
 // GetLocalVersion reads version from local .go-version file

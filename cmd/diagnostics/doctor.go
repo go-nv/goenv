@@ -107,6 +107,7 @@ const (
 	IssueTypeNone                IssueType = ""
 	IssueTypeShimsMissing        IssueType = "shims-missing"
 	IssueTypeShimsEmpty          IssueType = "shims-empty"
+	IssueTypeShimsStale          IssueType = "shims-stale"
 	IssueTypeCacheStale          IssueType = "cache-stale"
 	IssueTypeCacheArchMismatch   IssueType = "cache-arch-mismatch"
 	IssueTypeOldModCaches        IssueType = "old-mod-caches"
@@ -225,6 +226,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 5: Shims directory
 	results = append(results, checkShimsDir(cfg))
+
+	// Check 5b: Shim content (detect stale/incompatible shims)
+	results = append(results, checkShimContent(cfg))
 
 	// Check 6: Installed versions
 	results = append(results, checkInstalledVersions(cfg, mgr))
@@ -2517,6 +2521,57 @@ func checkShimsDir(cfg *config.Config) checkResult {
 		name:    "Shims directory",
 		status:  StatusOK,
 		message: fmt.Sprintf("Found %d shim(s)", shimCount),
+	}
+}
+
+func checkShimContent(cfg *config.Config) checkResult {
+	shimsDir := cfg.ShimsDir()
+
+	entries, err := os.ReadDir(shimsDir)
+	if err != nil || len(entries) == 0 {
+		return checkResult{
+			id:      "shim-content",
+			name:    "Shim compatibility",
+			status:  StatusOK,
+			message: "No shims to check",
+		}
+	}
+
+	// Check a sample of shims (the "go" shim is the most important)
+	staleCount := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		shimPath := filepath.Join(shimsDir, entry.Name())
+		content, err := os.ReadFile(shimPath)
+		if err != nil {
+			continue
+		}
+		contentStr := string(content)
+		// Current v3 shims contain "goenv exec" and "goenv shim"
+		// Old v2 shims may contain different patterns like "GOENV_VERSION" or "goenv-exec"
+		if !strings.Contains(contentStr, "goenv exec") {
+			staleCount++
+		}
+	}
+
+	if staleCount > 0 {
+		return checkResult{
+			id:        "shim-content",
+			name:      "Shim compatibility",
+			status:    StatusWarning,
+			message:   fmt.Sprintf("%d shim(s) appear stale or from an older goenv version", staleCount),
+			advice:    "Run 'goenv rehash' to regenerate shims for the current goenv version",
+			issueType: IssueTypeShimsStale,
+		}
+	}
+
+	return checkResult{
+		id:      "shim-content",
+		name:    "Shim compatibility",
+		status:  StatusOK,
+		message: "All shims are up to date",
 	}
 }
 
