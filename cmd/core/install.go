@@ -27,7 +27,7 @@ import (
 )
 
 var installCmd = &cobra.Command{
-	Use:     "install [version]",
+	Use:     "install [version|latest|unstable]",
 	Short:   "Install a Go version",
 	GroupID: string(cmdpkg.GroupVersions),
 	Long: `Install a specific Go version.
@@ -35,9 +35,19 @@ var installCmd = &cobra.Command{
 If no version is specified, goenv will:
   1. Check for .go-version in current directory or parent directories
   2. Check for go.mod and use the go directive
-  3. Fall back to installing the latest stable version`,
+  3. Fall back to installing the latest stable version
+
+Special keywords:
+  latest    - Install the latest stable version
+  unstable  - Install the latest unstable/beta version`,
 	Example: `  # Auto-detect from .go-version or go.mod
   goenv install
+
+  # Install latest stable version
+  goenv install latest
+
+  # Install latest unstable/beta version
+  goenv install unstable
 
   # Install specific version
   goenv install 1.21.5
@@ -135,27 +145,65 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		goVersion = args[0]
 
-		// Resolve partial versions (e.g., "1.21" -> "1.21.13")
-		// This handles cases like: goenv install 1.21
+		// Fetch releases for version resolution
 		fetcher := version.NewFetcherWithOptions(version.FetcherOptions{Debug: cfg.Debug})
 		releases, err := fetcher.FetchWithFallback(cfg.Root)
 		if err != nil {
 			return errors.FailedTo("get versions", err)
 		}
 
-		resolved, err := resolvePartialVersion(goVersion, releases)
-		if err != nil {
-			return err
-		}
+		// Handle special keywords: "latest" and "unstable"
+		if goVersion == "latest" {
+			// Find latest stable version
+			for _, release := range releases {
+				if release.Stable {
+					resolved := release.Version
+					if !installFlags.quiet {
+						fmt.Fprintf(cmd.OutOrStdout(), "%sResolved latest to %s\n",
+							utils.Emoji("🔍 "),
+							utils.Cyan(resolved))
+					}
+					goVersion = resolved
+					break
+				}
+			}
+			if goVersion == "latest" {
+				return fmt.Errorf("no stable version found")
+			}
+		} else if goVersion == "unstable" {
+			// Find latest unstable/beta version (first non-stable release)
+			for _, release := range releases {
+				if !release.Stable {
+					resolved := release.Version
+					if !installFlags.quiet {
+						fmt.Fprintf(cmd.OutOrStdout(), "%sResolved unstable to %s\n",
+							utils.Emoji("🔍 "),
+							utils.Cyan(resolved))
+					}
+					goVersion = resolved
+					break
+				}
+			}
+			if goVersion == "unstable" {
+				return fmt.Errorf("no unstable version found")
+			}
+		} else {
+			// Resolve partial versions (e.g., "1.21" -> "1.21.13")
+			// This handles cases like: goenv install 1.21
+			resolved, err := resolvePartialVersion(goVersion, releases)
+			if err != nil {
+				return err
+			}
 
-		if resolved != goVersion && !installFlags.quiet {
-			fmt.Fprintf(cmd.OutOrStdout(), "%sResolved %s to %s (latest patch)\n",
-				utils.Emoji("🔍 "),
-				utils.Cyan(goVersion),
-				utils.Cyan(resolved))
-		}
+			if resolved != goVersion && !installFlags.quiet {
+				fmt.Fprintf(cmd.OutOrStdout(), "%sResolved %s to %s (latest patch)\n",
+					utils.Emoji("🔍 "),
+					utils.Cyan(goVersion),
+					utils.Cyan(resolved))
+			}
 
-		goVersion = resolved // Use resolved version for installation
+			goVersion = resolved // Use resolved version for installation
+		}
 	} else {
 		// Try to detect version from current directory (as documented in help text)
 		mgr := manager.NewManager(cfg, env)
