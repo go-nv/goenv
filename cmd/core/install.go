@@ -158,6 +158,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			for _, release := range releases {
 				if release.Stable {
 					resolved := release.Version
+					// Strip "go" prefix if present (e.g., "go1.26.3" -> "1.26.3")
+					resolved = strings.TrimPrefix(resolved, "go")
 					if !installFlags.quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "%sResolved latest to %s\n",
 							utils.Emoji("🔍 "),
@@ -175,6 +177,8 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			for _, release := range releases {
 				if !release.Stable {
 					resolved := release.Version
+					// Strip "go" prefix if present (e.g., "go1.27rc1" -> "1.27rc1")
+					resolved = strings.TrimPrefix(resolved, "go")
 					if !installFlags.quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "%sResolved unstable to %s\n",
 							utils.Emoji("🔍 "),
