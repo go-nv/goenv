@@ -14,6 +14,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
+	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
@@ -49,9 +50,14 @@ The settings configure:
   - go.toolsGopath for Go tools installation
   - Recommended Go extension
 
-This makes VS Code automatically detect and use goenv-managed Go versions.`,
+This makes VS Code automatically detect and use goenv-managed Go versions.
+
+Optionally install VSCode Go extension tools with --install-tools flag.`,
 	Example: `  # Initialize VS Code in current directory
   goenv vscode init
+
+  # Initialize and install VSCode tools
+  goenv vscode init --install-tools
 
   # Force overwrite existing configuration
   goenv vscode init --force
@@ -152,10 +158,14 @@ This command performs all necessary configuration:
   2. Initializes workspace .vscode/settings.json
   3. Syncs with current Go version
   4. Validates configuration (doctor checks)
+  5. Optionally installs VSCode Go extension tools (with --install-tools)
 
 Perfect for both first-time setup and fixing integration issues.`,
 	Example: `  # Complete VS Code setup in one command
   goenv vscode setup
+
+  # Setup and install all VSCode tools
+  goenv vscode setup --install-tools
 
   # Setup with advanced template
   goenv vscode setup --template advanced
@@ -180,6 +190,7 @@ var VSCodeInitFlags struct {
 	Launch         bool
 	TerminalEnv    bool
 	Devcontainer   bool
+	InstallTools   bool
 }
 
 var vscodeSyncFlags struct {
@@ -196,10 +207,11 @@ var vscodeDoctorFlags struct {
 }
 
 var vscodeSetupFlags struct {
-	template string
-	dryRun   bool
-	strict   bool
-	json     bool
+	template     string
+	dryRun       bool
+	strict       bool
+	json         bool
+	installTools bool
 }
 
 func init() {
@@ -223,6 +235,7 @@ func init() {
 	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.Launch, "launch", false, "Generate launch.json for debugging")
 	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.TerminalEnv, "terminal-env", false, "Configure integrated terminal environment")
 	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.Devcontainer, "devcontainer", false, "Generate .devcontainer configuration")
+	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.InstallTools, "install-tools", false, "Install VSCode Go extension tools after initialization")
 
 	// Sync flags
 	vscodeSyncCmd.Flags().BoolVar(&vscodeSyncFlags.dryRun, "dry-run", false, "Preview changes without writing files")
@@ -239,6 +252,7 @@ func init() {
 	vscodeSetupCmd.Flags().BoolVar(&vscodeSetupFlags.dryRun, "dry-run", false, "Preview what would be done")
 	vscodeSetupCmd.Flags().BoolVar(&vscodeSetupFlags.strict, "strict", false, "Exit with error if doctor validation fails")
 	vscodeSetupCmd.Flags().BoolVar(&vscodeSetupFlags.json, "json", false, "Output doctor results in JSON")
+	vscodeSetupCmd.Flags().BoolVar(&vscodeSetupFlags.installTools, "install-tools", false, "Install VSCode Go extension tools after setup")
 
 	vscodeSetupCmd.SilenceUsage = true
 	vscodeInitCmd.SilenceUsage = true
@@ -544,6 +558,18 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 		fmt.Fprintln(cmd.OutOrStdout(), "   Consider using default --absolute mode for better UX")
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "")
+
+	// Install VSCode tools if requested
+	if VSCodeInitFlags.InstallTools && !VSCodeInitFlags.DryRun {
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintf(cmd.OutOrStdout(), "%sInstalling VSCode Go extension tools...\n", utils.Emoji("🔧 "))
+		fmt.Fprintln(cmd.OutOrStdout())
+
+		if err := installVSCodeTools(cmd, version); err != nil {
+			fmt.Fprintf(cmd.OutOrStderr(), "%sFailed to install tools: %v\n", utils.Emoji("⚠️  "), err)
+			fmt.Fprintln(cmd.OutOrStderr(), "You can install them later with: goenv tools install-vscode <version>")
+		}
+	}
 
 	return nil
 }
@@ -1342,8 +1368,53 @@ func runVSCodeSetup(cmd *cobra.Command, args []string) error {
 			utils.Emoji("⚠️  "))
 	}
 
+	// Step 5: Install VSCode tools if requested
+	if vscodeSetupFlags.installTools && !vscodeSetupFlags.dryRun {
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintf(cmd.OutOrStdout(), "%sStep 5/5: Installing VSCode Go extension tools\n",
+			utils.Emoji("🔧 "))
+
+		ctx := cmdutil.GetContexts(cmd)
+		mgr := ctx.Manager
+		version, _, _, err := mgr.GetCurrentVersionResolved()
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStderr(), "%sFailed to get current Go version: %v\n", utils.Emoji("⚠️  "), err)
+			fmt.Fprintln(cmd.OutOrStderr(), "You can install tools later with: goenv tools install-vscode <version>")
+		} else {
+			if err := installVSCodeTools(cmd, version); err != nil {
+				fmt.Fprintf(cmd.OutOrStderr(), "%sFailed to install tools: %v\n", utils.Emoji("⚠️  "), err)
+				fmt.Fprintln(cmd.OutOrStderr(), "You can install them later with: goenv tools install-vscode <version>")
+			}
+		}
+	}
+
 	fmt.Fprintf(cmd.OutOrStdout(), "\n%sSetup complete! VS Code is ready to use with goenv.\n",
 		utils.Emoji("✅ "))
+
+	return nil
+}
+
+// installVSCodeTools installs all VSCode Go extension tools for the given Go version
+func installVSCodeTools(cmd *cobra.Command, goVersion string) error {
+	ctx := cmdutil.GetContexts(cmd)
+	cfg := ctx.Config
+	mgr := ctx.Manager
+
+	// Validate version is installed
+	if !mgr.IsVersionInstalled(goVersion) {
+		return fmt.Errorf("Go %s is not installed", goVersion)
+	}
+
+	versionPath := cfg.SafeResolvePath(goVersion)
+
+	// Install VSCode tools
+	if err := tools.InstallVSCodeToolsForVersion(goVersion, cfg.Root, versionPath, false); err != nil {
+		return err
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintf(cmd.OutOrStdout(), "%sVSCode tools installed successfully\n", utils.Emoji("✅ "))
+	fmt.Fprintf(cmd.OutOrStdout(), "%sRun 'goenv rehash' to make tools available as shims\n", utils.Emoji("💡 "))
 
 	return nil
 }

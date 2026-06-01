@@ -24,11 +24,11 @@ Common use cases:
   - Reduce manual setup after installing new Go versions
 
 Examples:
-  goenv tools default list              # Show configured tools
-  goenv tools default init              # Create default config file
-  goenv tools default enable            # Enable auto-installation
-  goenv tools default disable           # Disable auto-installation
-  goenv tools default install 1.25.2    # Install tools for specific version`,
+  goenv tools default-tools list              # Show configured tools
+  goenv tools default-tools init              # Create default config file
+  goenv tools default-tools enable            # Enable auto-installation
+  goenv tools default-tools disable           # Disable auto-installation
+  goenv tools default-tools install 1.25.2    # Install tools for specific version`,
 }
 
 var defaultToolsListCmd = &cobra.Command{
@@ -104,7 +104,7 @@ func runDefaultToolsList(cmd *cobra.Command, args []string) error {
 	// Check if config exists
 	if utils.FileNotExists(configPath) {
 		fmt.Fprintln(cmd.OutOrStdout(), "No default tools configuration found.")
-		fmt.Fprintln(cmd.OutOrStdout(), "Run 'goenv tools default init' to create one.")
+		fmt.Fprintln(cmd.OutOrStdout(), "Run 'goenv tools default-tools init' to create one.")
 		return nil
 	}
 
@@ -248,7 +248,7 @@ func runInstallTools(cmd *cobra.Command, args []string) error {
 
 	if len(toolConfig.Tools) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "No tools configured to install.")
-		fmt.Fprintln(cmd.OutOrStdout(), "Run 'goenv tools default init' to create a default configuration.")
+		fmt.Fprintln(cmd.OutOrStdout(), "Run 'goenv tools default-tools init' to create a default configuration.")
 		return nil
 	}
 
@@ -307,7 +307,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 
 	if len(missing) > 0 {
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintf(cmd.OutOrStdout(), "To install missing tools: goenv tools default install %s\n", goVersion)
+		fmt.Fprintf(cmd.OutOrStdout(), "To install missing tools: goenv tools default-tools install %s\n", goVersion)
 	}
 
 	return nil
