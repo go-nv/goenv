@@ -280,7 +280,9 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	if installFlags.skipExisting {
 		// Check if version is already installed
 		if cfg.IsVersionInstalled(goVersion) {
-			// Already installed, skip silently
+			// Already installed, inform user and skip
+			fmt.Printf("⏭️  Version %s is already installed, skipping\n",
+				utils.Green(goVersion))
 			return nil
 		}
 	}
