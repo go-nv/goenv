@@ -384,10 +384,11 @@ func RestoreFromBackup(path string) error {
 	return nil
 }
 
-// IsGoRelatedKey returns true if the key is a Go or gopls setting
+// IsGoRelatedKey returns true if the key is a Go, gopls, or goenv setting
 func IsGoRelatedKey(key string) bool {
 	return strings.HasPrefix(key, "go.") ||
 		strings.HasPrefix(key, "gopls") ||
+		strings.HasPrefix(key, "goenv.") ||
 		key == "gopls"
 }
 
@@ -414,7 +415,7 @@ func ValidateSettingsKeys(keys map[string]any) (warnings []string, err error) {
 	for key := range keys {
 		// Check if key is Go-related
 		if !IsGoRelatedKey(key) {
-			return nil, fmt.Errorf("refusing to modify non-Go setting: %s (only go.* and gopls.* keys are allowed)", key)
+			return nil, fmt.Errorf("refusing to modify non-Go setting: %s (only go.*, gopls.*, and goenv.* keys are allowed)", key)
 		}
 
 		// Check for deprecated keys
@@ -681,8 +682,8 @@ func FixGoExtensionSettings() error {
 	// If settings file doesn't exist, create it with just Go settings
 	if utils.FileNotExists(settingsPath) {
 		settings := map[string]any{
-			"go.goroot":                   "",
-			"go.gopath":                   "",
+			"go.goroot":                     "",
+			"go.gopath":                     "",
 			"go.toolsManagement.autoUpdate": false,
 			"go.alternateTools": map[string]string{
 				"go": "goenv exec go",
@@ -708,8 +709,8 @@ func FixGoExtensionSettings() error {
 
 	// Update settings
 	keysToUpdate := map[string]any{
-		"go.goroot":                   "",
-		"go.gopath":                   "",
+		"go.goroot":                     "",
+		"go.gopath":                     "",
 		"go.toolsManagement.autoUpdate": false,
 		"go.alternateTools": map[string]string{
 			"go": "goenv exec go",
