@@ -24,6 +24,8 @@ coverage.out
 
 // No docs at root
 /*.md
+!/AGENTS.md
+!/README.md
 
 scripts/swap/swap
 
