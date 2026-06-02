@@ -237,27 +237,19 @@ func (s *ShimManager) createWindowsShim(binaryName string) error {
 	shimPath := filepath.Join(s.config.ShimsDir(), binaryName+".bat")
 
 	// Create the batch file shim
+	// Note: Uses a subroutine for file arg detection to avoid goto/label issues
+	// inside parenthesized blocks, which break CMD batch file parsing.
 	shimContent := fmt.Sprintf(`@echo off
 REM goenv shim for %s
 setlocal
 
-if "%%GOENV_DEBUG%%"=="1" (
-  echo on
-)
+if "%%GOENV_DEBUG%%"=="1" echo on
 
 REM Get the script name without path
 for %%%%I in ("%%~f0") do set "program=%%%%~nI"
 
-REM For go commands, detect file arguments (simplified for batch)
-if "%%program:~0,2%%"=="go" (
-  for %%%%a in (%%*) do (
-    if exist "%%%%a" (
-      set "GOENV_FILE_ARG=%%%%a"
-      goto :found_file
-    )
-  )
-  :found_file
-)
+REM For go commands, detect file arguments using safe subroutine call
+if "%%program:~0,2%%"=="go" call :detect_file_arg %%*
 
 if "%%program%%"=="goenv" (
   if "%%1"=="" (
@@ -268,6 +260,17 @@ if "%%program%%"=="goenv" (
 ) else (
   goenv exec "%%program%%" %%*
 )
+
+exit /b %%ERRORLEVEL%%
+
+:detect_file_arg
+if "%%~1"=="" exit /b 0
+if exist "%%~1" (
+  set "GOENV_FILE_ARG=%%~1"
+  exit /b 0
+)
+shift
+goto :detect_file_arg
 `, binaryName)
 
 	if err := utils.WriteFileWithContext(shimPath, []byte(shimContent), 0666, "write shim file"); err != nil {
