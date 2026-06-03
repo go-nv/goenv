@@ -428,7 +428,17 @@ func prependToPath(env []string, dir string) []string {
 	if idx, actualKey := findEnvVar(env, "PATH"); idx != -1 {
 		// Found PATH, extract current value and prepend new directory
 		currentPath := env[idx][len(actualKey)+1:] // +1 for the "=" sign
-		newPath := dir + string(os.PathListSeparator) + currentPath
+		
+		// Detect separator from existing PATH to handle cross-platform scenarios
+		// (e.g., testing Unix-style paths on Windows)
+		sep := string(os.PathListSeparator) // default to OS separator
+		if strings.Contains(currentPath, ";") {
+			sep = ";"
+		} else if strings.Contains(currentPath, ":") {
+			sep = ":"
+		}
+		
+		newPath := dir + sep + currentPath
 		// Preserve original key casing (e.g., "Path" on Windows, "PATH" on Unix)
 		env[idx] = actualKey + "=" + newPath
 		return env
