@@ -11,7 +11,7 @@ import (
 )
 
 var installVSCodeCmd = &cobra.Command{
-	Use:   "install-vscode <version>",
+	Use:   "install-vscode [version]",
 	Short: "Install VSCode Go extension tools for a Go version",
 	Long: `Installs all tools required by the VSCode Go extension for a specific Go version.
 
@@ -32,15 +32,15 @@ These tools provide the full IntelliSense, debugging, and code editing
 capabilities of the VSCode Go extension.
 
 Examples:
+  # Install VSCode tools for current version
+  goenv tools install-vscode
+
   # Install VSCode tools for specific version
   goenv tools install-vscode 1.25.2
 
-  # Install for current version
-  goenv tools install-vscode $(goenv version-name)
-
   # Show what would be installed
-  goenv tools install-vscode 1.25.2 --dry-run`,
-	Args: cobra.ExactArgs(1),
+  goenv tools install-vscode --dry-run`,
+	Args: cobra.RangeArgs(0, 1),
 	RunE: runInstallVSCode,
 }
 
@@ -58,7 +58,19 @@ func runInstallVSCode(cmd *cobra.Command, args []string) error {
 	ctx := cmdutil.GetContexts(cmd)
 	cfg := ctx.Config
 	mgr := ctx.Manager
-	goVersion := args[0]
+
+	// Get version from args or use current version
+	var goVersion string
+	if len(args) > 0 {
+		goVersion = args[0]
+	} else {
+		// Use GetCurrentVersionResolved to handle partial versions (e.g., "1.25" → "1.25.10")
+		var err error
+		goVersion, _, _, err = mgr.GetCurrentVersionResolved()
+		if err != nil {
+			return fmt.Errorf("no Go version specified and no current version set. Use 'goenv global <version>' or specify a version")
+		}
+	}
 
 	// Validate version is installed
 	if !mgr.IsVersionInstalled(goVersion) {

@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -199,6 +200,7 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 	// Track results
 	installed := []string{}
 	failed := []string{}
+	var firstError error
 
 	for _, tool := range config.Tools {
 		if verbose {
@@ -226,14 +228,37 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 			cmd.Env = append(cmd.Env, utils.EnvVarGomodcache+"="+sharedGomodcache)
 		}
 
-		cmd.Stdout = nil // Suppress output unless there's an error
-		cmd.Stderr = nil
+		// Capture stderr for error reporting
+		var stderr bytes.Buffer
+		if verbose {
+			// In verbose mode, show all output
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		} else {
+			// In non-verbose mode, capture stderr for error reporting
+			cmd.Stdout = nil
+			cmd.Stderr = &stderr
+		}
 
 		if err := cmd.Run(); err != nil {
 			if verbose {
 				fmt.Printf(" %sFAILED\n", utils.Emoji("❌ "))
+			} else {
+				// Show error details in non-verbose mode
+				fmt.Printf("  %s %s: %v\n", utils.Emoji("❌"), tool.Name, err)
+				if stderr.Len() > 0 {
+					fmt.Printf("    %s\n", strings.TrimSpace(stderr.String()))
+				}
 			}
 			failed = append(failed, tool.Name)
+			// Capture first error for context
+			if firstError == nil {
+				if stderr.Len() > 0 {
+					firstError = fmt.Errorf("%s failed: %w\n%s", tool.Name, err, strings.TrimSpace(stderr.String()))
+				} else {
+					firstError = fmt.Errorf("%s failed: %w", tool.Name, err)
+				}
+			}
 		} else {
 			if verbose {
 				fmt.Printf(" %s\n", utils.Emoji("✅"))
@@ -247,6 +272,9 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 	}
 
 	if len(failed) > 0 {
+		if firstError != nil {
+			return fmt.Errorf("failed to install %d tool(s): %s\n\nFirst error: %w", len(failed), strings.Join(failed, ", "), firstError)
+		}
 		return fmt.Errorf("failed to install %d tool(s): %s", len(failed), strings.Join(failed, ", "))
 	}
 
