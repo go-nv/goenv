@@ -334,11 +334,11 @@ func TestExecWithShims(t *testing.T) {
 // TestFindEnvVar tests the case-insensitive environment variable finder
 func TestFindEnvVar(t *testing.T) {
 	tests := []struct {
-		name         string
-		env          []string
-		key          string
-		expectedIdx  int
-		expectedKey  string
+		name          string
+		env           []string
+		key           string
+		expectedIdx   int
+		expectedKey   string
 		onlyOnWindows bool
 	}{
 		{
@@ -564,7 +564,7 @@ func TestWindowsPathPreservation(t *testing.T) {
 			require.NotEmpty(t, pathValue, "PATH should be present in result")
 
 			// Verify the new directory was prepended
-			assert.True(t, strings.HasPrefix(pathValue, tt.dir+";"), 
+			assert.True(t, strings.HasPrefix(pathValue, tt.dir+";"),
 				"PATH should start with new directory: got %s", pathValue)
 
 			// Verify the original path component is still present (regression test for #557)

@@ -320,6 +320,7 @@ Before submitting a PR:
 **For developers who want to test against Windows/other platforms locally**, you can use [nektos/act](https://github.com/nektos/act) to run GitHub Actions workflows on your machine:
 
 **Installation**:
+
 ```bash
 # macOS
 brew install act
@@ -332,6 +333,7 @@ choco install act-cli
 ```
 
 **Usage**:
+
 ```bash
 # Run all CI tests (includes Windows)
 act
@@ -346,12 +348,14 @@ act --platform ubuntu-latest=catthehacker/ubuntu:act-latest
 act --dryrun
 ```
 
-**Note**: 
+**Note**:
+
 - Windows containers require Docker Desktop with Windows containers enabled
 - For Windows-specific tests, you may need larger runners: `act -P windows-latest=-self-hosted`
 - CI will always run full cross-platform tests automatically when you push
 
 **When to use local cross-platform testing**:
+
 - ✅ Testing platform-specific code (Windows batch files, Unix shell scripts, path handling)
 - ✅ Verifying OS-specific features (environment variables, file permissions, executables)
 - ✅ Testing changes to shims, install scripts, or platform detection
