@@ -433,11 +433,20 @@ func prependToPath(env []string, dir string) []string {
 		// (e.g., testing Unix-style paths on Windows)
 		sep := string(os.PathListSeparator) // default to OS separator
 		if strings.Contains(currentPath, ";") {
+			// Semicolon found - Windows-style separator
 			sep = ";"
-		} else if strings.Count(currentPath, ":") > 1 {
-			// Multiple colons suggest it's used as a path separator, not just drive letters
-			// (e.g., "/usr/bin:/usr/local/bin" vs "C:\Windows\System32")
-			sep = ":"
+		} else {
+			// Check for colons, but exclude Windows drive letter colons (e.g., "C:")
+			colonCount := strings.Count(currentPath, ":")
+			if len(currentPath) >= 2 && currentPath[1] == ':' {
+				// Has a drive letter at the start, subtract it from the count
+				colonCount--
+			}
+			if colonCount > 0 {
+				// Has colons that are path separators (Unix-style)
+				sep = ":"
+			}
+			// Otherwise, use OS default (already set)
 		}
 
 		newPath := dir + sep + currentPath
