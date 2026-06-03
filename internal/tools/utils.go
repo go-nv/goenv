@@ -11,7 +11,7 @@ var commonTools = map[string]string{
 	"gomodifytags":  "github.com/fatih/gomodifytags",
 	"vscgo":         "github.com/golang/vscode-go/vscgo",
 	"goplay":        "github.com/haya14busa/goplay/cmd/goplay",
-	"gotests":       "github.com/cweill/gotests",
+	"gotests":       "github.com/cweill/gotests/gotests",
 	"gotestsum":     "gotest.tools/gotestsum",
 	"gopls":         "golang.org/x/tools/gopls",
 	"goimports":     "golang.org/x/tools/cmd/goimports",
@@ -126,11 +126,16 @@ func BuildVSCodeToolsConfig() *Config {
 	}
 
 	for _, toolName := range VSCodeTools {
-		pkg := NormalizePackagePath(toolName)
+		// Get package path without version (commonTools contains base paths only)
+		pkg := toolName
+		if fullPath, exists := commonTools[toolName]; exists {
+			pkg = fullPath
+		}
+
 		toolConfig.Tools = append(toolConfig.Tools, Tool{
 			Name:    toolName,
-			Package: pkg,
-			Version: "latest",
+			Package: pkg, // Base package path without version
+			Version: "",  // Empty - InstallTools will add @latest
 			Binary:  toolName,
 		})
 	}
