@@ -434,7 +434,9 @@ func prependToPath(env []string, dir string) []string {
 		sep := string(os.PathListSeparator) // default to OS separator
 		if strings.Contains(currentPath, ";") {
 			sep = ";"
-		} else if strings.Contains(currentPath, ":") {
+		} else if strings.Count(currentPath, ":") > 1 {
+			// Multiple colons suggest it's used as a path separator, not just drive letters
+			// (e.g., "/usr/bin:/usr/local/bin" vs "C:\Windows\System32")
 			sep = ":"
 		}
 
