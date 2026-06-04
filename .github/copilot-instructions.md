@@ -315,6 +315,53 @@ Before submitting a PR:
 4. ✅ No race conditions: `go test -race ./...` (done by `make test`)
 5. ✅ Windows compatibility validated (for shim/path/shell changes)
 
+### Local Cross-Platform Testing (Optional)
+
+**For developers who want to test against Windows/other platforms locally**, you can use [nektos/act](https://github.com/nektos/act) to run GitHub Actions workflows on your machine:
+
+**Installation**:
+
+```bash
+# macOS
+brew install act
+
+# Linux
+curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+
+# Windows
+choco install act-cli
+```
+
+**Usage**:
+
+```bash
+# Run all CI tests (includes Windows)
+act
+
+# Run specific job (e.g., Windows tests only)
+act -j test-windows
+
+# Run with specific platform
+act --platform ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Dry run to see what would execute
+act --dryrun
+```
+
+**Note**:
+
+- Windows containers require Docker Desktop with Windows containers enabled
+- For Windows-specific tests, you may need larger runners: `act -P windows-latest=-self-hosted`
+- CI will always run full cross-platform tests automatically when you push
+
+**When to use local cross-platform testing**:
+
+- ✅ Testing platform-specific code (Windows batch files, Unix shell scripts, path handling)
+- ✅ Verifying OS-specific features (environment variables, file permissions, executables)
+- ✅ Testing changes to shims, install scripts, or platform detection
+- ✅ Debugging cross-platform CI failures locally
+- ❌ Not needed for most changes (CI handles it automatically)
+
 ### Common Testing Commands
 
 ```bash

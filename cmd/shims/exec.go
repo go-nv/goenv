@@ -374,16 +374,44 @@ func runRehashSilent(cfg *config.Config, env *utils.GoenvEnvironment) error {
 	return shimMgr.Rehash()
 }
 
-// setEnvVar sets or updates an environment variable
-func setEnvVar(env []string, key, value string) []string {
-	prefix := key + "="
+// findEnvVar finds an environment variable in the env slice using case-insensitive matching on Windows.
+// Returns the index and the actual key name (with original casing) if found, or -1 and empty string if not found.
+// On Unix systems, matching is case-sensitive.
+func findEnvVar(env []string, key string) (int, string) {
 	for i, envVar := range env {
-		if strings.HasPrefix(envVar, prefix) {
-			env[i] = prefix + value
-			return env
+		// Find the equals sign to separate key from value
+		eqIdx := strings.Index(envVar, "=")
+		if eqIdx == -1 {
+			continue
+		}
+		actualKey := envVar[:eqIdx]
+
+		// On Windows, environment variables are case-insensitive
+		if utils.IsWindows() {
+			if strings.EqualFold(actualKey, key) {
+				return i, actualKey
+			}
+		} else {
+			// On Unix, case-sensitive match
+			if actualKey == key {
+				return i, actualKey
+			}
 		}
 	}
-	return append(env, prefix+value)
+	return -1, ""
+}
+
+// setEnvVar sets or updates an environment variable.
+// On Windows, this handles case-insensitive environment variable names to prevent
+// creating duplicate entries (e.g., both "Path=" and "PATH=").
+func setEnvVar(env []string, key, value string) []string {
+	if idx, actualKey := findEnvVar(env, key); idx != -1 {
+		// Update existing variable, preserving original key casing
+		env[idx] = actualKey + "=" + value
+		return env
+	}
+	// Variable not found, add it with the requested key
+	return append(env, key+"="+value)
 }
 
 // buildCacheSuffix constructs a cache directory suffix that includes ABI variants.
@@ -392,17 +420,40 @@ func buildCacheSuffix(goBinaryPath, goos, goarch string, env []string) string {
 	return cache.BuildCacheSuffix(goBinaryPath, goos, goarch, env)
 }
 
-// prependToPath prepends a directory to the PATH environment variable
+// prependToPath prepends a directory to the PATH environment variable.
+// On Windows, this handles case-insensitive PATH matching to prevent creating duplicate
+// PATH entries (e.g., both "Path=" and "PATH="), which would cause the original system
+// PATH to be lost.
 func prependToPath(env []string, dir string) []string {
-	const pathPrefix = "PATH="
-	for i, envVar := range env {
-		if strings.HasPrefix(envVar, pathPrefix) {
-			currentPath := envVar[len(pathPrefix):]
-			newPath := dir + string(os.PathListSeparator) + currentPath
-			env[i] = pathPrefix + newPath
-			return env
+	if idx, actualKey := findEnvVar(env, "PATH"); idx != -1 {
+		// Found PATH, extract current value and prepend new directory
+		currentPath := env[idx][len(actualKey)+1:] // +1 for the "=" sign
+
+		// Detect separator from existing PATH to handle cross-platform scenarios
+		// (e.g., testing Unix-style paths on Windows)
+		sep := string(os.PathListSeparator) // default to OS separator
+		if strings.Contains(currentPath, ";") {
+			// Semicolon found - Windows-style separator
+			sep = ";"
+		} else {
+			// Check for colons, but exclude Windows drive letter colons (e.g., "C:")
+			colonCount := strings.Count(currentPath, ":")
+			if len(currentPath) >= 2 && currentPath[1] == ':' {
+				// Has a drive letter at the start, subtract it from the count
+				colonCount--
+			}
+			if colonCount > 0 {
+				// Has colons that are path separators (Unix-style)
+				sep = ":"
+			}
+			// Otherwise, use OS default (already set)
 		}
+
+		newPath := dir + sep + currentPath
+		// Preserve original key casing (e.g., "Path" on Windows, "PATH" on Unix)
+		env[idx] = actualKey + "=" + newPath
+		return env
 	}
 	// PATH not found, add it
-	return append(env, pathPrefix+dir)
+	return append(env, "PATH="+dir)
 }

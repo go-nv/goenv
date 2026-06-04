@@ -330,3 +330,246 @@ func TestExecWithShims(t *testing.T) {
 	got := strings.TrimSpace(output.String())
 	assert.Contains(t, got, "go1.21.5", "Expected output to contain version info %v", got)
 }
+
+// TestFindEnvVar tests the case-insensitive environment variable finder
+func TestFindEnvVar(t *testing.T) {
+	tests := []struct {
+		name          string
+		env           []string
+		key           string
+		expectedIdx   int
+		expectedKey   string
+		onlyOnWindows bool
+	}{
+		{
+			name:        "exact match - PATH",
+			env:         []string{"HOME=/home/user", "PATH=/usr/bin:/bin", "USER=testuser"},
+			key:         "PATH",
+			expectedIdx: 1,
+			expectedKey: "PATH",
+		},
+		{
+			name:        "exact match - HOME",
+			env:         []string{"HOME=/home/user", "PATH=/usr/bin", "USER=testuser"},
+			key:         "HOME",
+			expectedIdx: 0,
+			expectedKey: "HOME",
+		},
+		{
+			name:        "not found",
+			env:         []string{"HOME=/home/user", "USER=testuser"},
+			key:         "PATH",
+			expectedIdx: -1,
+			expectedKey: "",
+		},
+		{
+			name:          "case-insensitive match - Path (Windows only)",
+			env:           []string{"Path=C:\\Windows\\System32", "HOME=/home/user"},
+			key:           "PATH",
+			expectedIdx:   0,
+			expectedKey:   "Path",
+			onlyOnWindows: true,
+		},
+		{
+			name:          "case-insensitive match - path (Windows only)",
+			env:           []string{"path=C:\\Windows\\System32", "HOME=/home/user"},
+			key:           "PATH",
+			expectedIdx:   0,
+			expectedKey:   "path",
+			onlyOnWindows: true,
+		},
+		{
+			name:          "case-insensitive match - PaTh (Windows only)",
+			env:           []string{"HOME=/home/user", "PaTh=C:\\Windows\\System32"},
+			key:           "PATH",
+			expectedIdx:   1,
+			expectedKey:   "PaTh",
+			onlyOnWindows: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.onlyOnWindows && !utils.IsWindows() {
+				t.Skip("Windows-only test")
+			}
+
+			idx, key := findEnvVar(tt.env, tt.key)
+			assert.Equal(t, tt.expectedIdx, idx, "Index mismatch")
+			assert.Equal(t, tt.expectedKey, key, "Key mismatch")
+		})
+	}
+}
+
+// TestSetEnvVar tests setting environment variables with case-insensitive handling on Windows
+func TestSetEnvVar(t *testing.T) {
+	tests := []struct {
+		name          string
+		env           []string
+		key           string
+		value         string
+		expected      []string
+		onlyOnWindows bool
+	}{
+		{
+			name:     "add new variable",
+			env:      []string{"HOME=/home/user", "USER=testuser"},
+			key:      "PATH",
+			value:    "/usr/bin:/bin",
+			expected: []string{"HOME=/home/user", "USER=testuser", "PATH=/usr/bin:/bin"},
+		},
+		{
+			name:     "update existing variable - exact match",
+			env:      []string{"HOME=/home/user", "PATH=/usr/bin", "USER=testuser"},
+			key:      "PATH",
+			value:    "/new/path:/usr/bin",
+			expected: []string{"HOME=/home/user", "PATH=/new/path:/usr/bin", "USER=testuser"},
+		},
+		{
+			name:          "update existing variable - case mismatch on Windows",
+			env:           []string{"Path=C:\\Windows\\System32", "HOME=/home/user"},
+			key:           "PATH",
+			value:         "C:\\goenv\\bin;C:\\Windows\\System32",
+			expected:      []string{"Path=C:\\goenv\\bin;C:\\Windows\\System32", "HOME=/home/user"},
+			onlyOnWindows: true,
+		},
+		{
+			name:          "update existing variable - mixed case (Windows)",
+			env:           []string{"HOME=/home/user", "PaTh=C:\\Windows\\System32"},
+			key:           "PATH",
+			value:         "C:\\goenv\\bin;C:\\Windows\\System32",
+			expected:      []string{"HOME=/home/user", "PaTh=C:\\goenv\\bin;C:\\Windows\\System32"},
+			onlyOnWindows: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.onlyOnWindows && !utils.IsWindows() {
+				t.Skip("Windows-only test")
+			}
+
+			result := setEnvVar(tt.env, tt.key, tt.value)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestPrependToPath tests prepending directories to PATH with case-insensitive handling on Windows
+func TestPrependToPath(t *testing.T) {
+	tests := []struct {
+		name          string
+		env           []string
+		dir           string
+		expected      []string
+		onlyOnWindows bool
+	}{
+		{
+			name:     "prepend to existing PATH - Unix",
+			env:      []string{"HOME=/home/user", "PATH=/usr/bin:/bin", "USER=testuser"},
+			dir:      "/opt/goenv/bin",
+			expected: []string{"HOME=/home/user", "PATH=/opt/goenv/bin:/usr/bin:/bin", "USER=testuser"},
+		},
+		{
+			name:     "add PATH when missing",
+			env:      []string{"HOME=/home/user", "USER=testuser"},
+			dir:      "/opt/goenv/bin",
+			expected: []string{"HOME=/home/user", "USER=testuser", "PATH=/opt/goenv/bin"},
+		},
+		{
+			name:          "prepend to existing Path - Windows (case mismatch)",
+			env:           []string{"Path=C:\\Windows\\System32;C:\\Windows", "HOME=C:\\Users\\test"},
+			dir:           "C:\\goenv\\bin",
+			expected:      []string{"Path=C:\\goenv\\bin;C:\\Windows\\System32;C:\\Windows", "HOME=C:\\Users\\test"},
+			onlyOnWindows: true,
+		},
+		{
+			name:          "prepend to existing path - Windows (lowercase)",
+			env:           []string{"HOME=C:\\Users\\test", "path=C:\\Windows\\System32"},
+			dir:           "C:\\goenv\\bin",
+			expected:      []string{"HOME=C:\\Users\\test", "path=C:\\goenv\\bin;C:\\Windows\\System32"},
+			onlyOnWindows: true,
+		},
+		{
+			name:          "prepend to existing PaTh - Windows (mixed case)",
+			env:           []string{"PaTh=C:\\Windows\\System32", "USER=testuser"},
+			dir:           "C:\\goenv\\bin",
+			expected:      []string{"PaTh=C:\\goenv\\bin;C:\\Windows\\System32", "USER=testuser"},
+			onlyOnWindows: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.onlyOnWindows && !utils.IsWindows() {
+				t.Skip("Windows-only test")
+			}
+
+			result := prependToPath(tt.env, tt.dir)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestWindowsPathPreservation is a regression test for issue #557
+// It verifies that the original system PATH is preserved on Windows when goenv exec
+// prepends its own paths, even when PATH has different casing (Path, path, PATH, etc.)
+func TestWindowsPathPreservation(t *testing.T) {
+	if !utils.IsWindows() {
+		t.Skip("Windows-only test")
+	}
+
+	tests := []struct {
+		name     string
+		env      []string
+		dir      string
+		checkFor string // a path component that should still be present after prepending
+	}{
+		{
+			name:     "Path with C:\\TDM-GCC-64\\bin (issue #557 scenario)",
+			env:      []string{"Path=C:\\Windows\\System32;C:\\TDM-GCC-64\\bin;C:\\Windows"},
+			dir:      "C:\\Users\\test\\.goenv\\versions\\1.24.0\\bin",
+			checkFor: "C:\\TDM-GCC-64\\bin",
+		},
+		{
+			name:     "PATH with system paths",
+			env:      []string{"PATH=C:\\Windows\\System32;C:\\Program Files\\Git\\cmd"},
+			dir:      "C:\\goenv\\bin",
+			checkFor: "C:\\Program Files\\Git\\cmd",
+		},
+		{
+			name:     "path (lowercase) with MinGW",
+			env:      []string{"path=C:\\msys64\\mingw64\\bin;C:\\Windows\\System32"},
+			dir:      "C:\\goenv\\bin",
+			checkFor: "C:\\msys64\\mingw64\\bin",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := prependToPath(tt.env, tt.dir)
+
+			// Find the PATH variable in the result (case-insensitive)
+			var pathValue string
+			for _, envVar := range result {
+				if idx := strings.Index(envVar, "="); idx != -1 {
+					key := envVar[:idx]
+					if strings.EqualFold(key, "PATH") {
+						pathValue = envVar[idx+1:]
+						break
+					}
+				}
+			}
+
+			require.NotEmpty(t, pathValue, "PATH should be present in result")
+
+			// Verify the new directory was prepended
+			assert.True(t, strings.HasPrefix(pathValue, tt.dir+";"),
+				"PATH should start with new directory: got %s", pathValue)
+
+			// Verify the original path component is still present (regression test for #557)
+			assert.Contains(t, pathValue, tt.checkFor,
+				"Original path component %s should be preserved in PATH: got %s", tt.checkFor, pathValue)
+		})
+	}
+}
