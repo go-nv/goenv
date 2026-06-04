@@ -141,7 +141,7 @@ exec $SHELL
 ## Support
 
 - **v3 Issues**: [GitHub Issues](https://github.com/go-nv/goenv/issues)
-- **v2 Support**: Maintained until April 2028 or End of Support
+- **v2 Support**: Maintained until December 2028 or End of Support
 - **Questions**: [GitHub Discussions](https://github.com/go-nv/goenv/discussions)
 
 ## Breaking Changes
