@@ -22,12 +22,25 @@ APP_VERSION_FILE="APP_VERSION"
 LATEST_DRAFT_VERSION=$(gh release list -L 20 | awk -F '\t' '{if ($2 == "Draft" && match($3, "^[0-9]+\\.[0-9]+\\.[0-9]+")) {print $3; exit}}')
 LATEST_VERSION=$(gh release view --json tagName -q .tagName)
 
+if [[ -z $LATEST_DRAFT_VERSION ]]; then
+    echo "no draft release found, nothing to do"
+    exit 0
+fi
+
 if [[ $LATEST_DRAFT_VERSION == $LATEST_VERSION ]]; then
     echo "latest draft version ($LATEST_DRAFT_VERSION) matches latest version ($LATEST_VERSION)"
     exit 0
 elif [[ $LATEST_DRAFT_VERSION == $(cat $APP_VERSION_FILE) ]]; then
     echo "latest draft version ($LATEST_DRAFT_VERSION) matches current version in $APP_VERSION_FILE"
     exit 0
+fi
+
+# Route to the correct base branch:
+#   3.x releases live on `main`; 2.x releases live on `master`
+if [[ "$LATEST_DRAFT_VERSION" == 3.* ]]; then
+    TARGET_BRANCH="main"
+else
+    TARGET_BRANCH="master"
 fi
 
 if [[ -n $GITHUB_ACTOR ]]; then
@@ -42,13 +55,13 @@ BRANCH_NAME="$BRANCH_NAME_PREFIX-$LATEST_DRAFT_VERSION"
 EXISTS=$(git branch -r -l 'origin*' | sed -E -e 's/^[^\/]+\///g' -e 's/HEAD.+//' | grep "$BRANCH_NAME" || echo "false")
 
 if [[ -n $EXISTS ]] && [[ $EXISTS != "false" ]]; then
-    echo "A PR already exists on branch $BRANCH_NAME for App Version update: $LATET_DRAFT_VERSION"
+    echo "A PR already exists on branch $BRANCH_NAME for App Version update: $LATEST_DRAFT_VERSION"
     exit 0
 fi
 
-echo "checking out new Git branch $BRANCH_NAME..."
+echo "checking out new Git branch $BRANCH_NAME from $TARGET_BRANCH..."
 
-git switch -c $BRANCH_NAME master
+git switch -c $BRANCH_NAME $TARGET_BRANCH
 
 printf " done\n"
 
@@ -70,7 +83,7 @@ git push -u origin $BRANCH_NAME
 
 echo "Creating Pull Request..."
 
-printf "This updates the App Version to $LATEST_DRAFT_VERSION" | gh pr create -R go-nv/goenv -B master \
+printf "This updates the App Version to $LATEST_DRAFT_VERSION" | gh pr create -R go-nv/goenv -B $TARGET_BRANCH \
     -t "$COMMIT_MSG" \
     -F -
 
