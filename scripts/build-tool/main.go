@@ -357,6 +357,13 @@ Examples:
 
 // Helper functions
 func getVersion() string {
+	// Prefer an exact git tag on HEAD — matches goreleaser's {{.Version}} behavior
+	// so `make build` on a tagged commit always reports the correct release version.
+	if output, err := utils.RunCommandOutput("git", "describe", "--tags", "--exact-match", "HEAD"); err == nil {
+		if v := strings.TrimSpace(strings.TrimPrefix(output, "v")); v != "" {
+			return v
+		}
+	}
 	if content, err := os.ReadFile("APP_VERSION"); err == nil {
 		return strings.TrimSpace(string(content))
 	}
