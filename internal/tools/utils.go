@@ -15,7 +15,7 @@ var commonTools = map[string]string{
 	"gotestsum":     "gotest.tools/gotestsum",
 	"gopls":         "golang.org/x/tools/gopls",
 	"goimports":     "golang.org/x/tools/cmd/goimports",
-	"golangci-lint": "github.com/golangci/golangci-lint/cmd/golangci-lint",
+	"golangci-lint": "github.com/golangci/golangci-lint/v2/cmd/golangci-lint",
 	"staticcheck":   "honnef.co/go/tools/cmd/staticcheck",
 	"dlv":           "github.com/go-delve/delve/cmd/dlv",
 	"gofumpt":       "mvdan.cc/gofumpt",

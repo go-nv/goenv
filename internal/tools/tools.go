@@ -90,7 +90,7 @@ func DefaultConfig() *Config {
 			},
 			{
 				Name:           "golangci-lint",
-				Package:        "github.com/golangci/golangci-lint/cmd/golangci-lint",
+				Package:        "github.com/golangci/golangci-lint/v2/cmd/golangci-lint",
 				Version:        "@latest",
 				Binary:         "golangci-lint",
 				UpdateStrategy: "auto", // Use stable versions
