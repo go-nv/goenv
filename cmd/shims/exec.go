@@ -63,9 +63,13 @@ func runExec(cmd *cobra.Command, args []string) error {
 		args = args[1:]
 	}
 
-	// Recursion guard: detect if we're being called from a shim that we spawned
+	// Recursion guard: detect if we're being called from a shim that we spawned.
+	// We only treat this as recursion if the value equals our parent PID, indicating
+	// we were spawned by another goenv exec (shim → exec → shim → exec).
+	// This avoids false positives when running tests under goenv-managed Go.
 	const recursionEnvVar = "_GOENV_EXEC_ACTIVE"
-	if os.Getenv(recursionEnvVar) != "" {
+	parentPIDStr := fmt.Sprintf("%d", os.Getppid())
+	if os.Getenv(recursionEnvVar) == parentPIDStr {
 		return fmt.Errorf("goenv: infinite recursion detected — shim is calling goenv exec again. Run 'goenv rehash' to regenerate shims")
 	}
 
@@ -312,8 +316,9 @@ func runExec(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute with the modified environment
-	// Set recursion guard so shims don't re-enter goenv exec
-	execEnv = setEnvVar(execEnv, recursionEnvVar, "1")
+	// Set recursion guard so shims don't re-enter goenv exec.
+	// Use our PID as the value so the child can detect if it's being called recursively.
+	execEnv = setEnvVar(execEnv, recursionEnvVar, fmt.Sprintf("%d", os.Getpid()))
 	execCmd := exec.Command(commandPath, commandArgs...)
 	execCmd.Env = execEnv
 	execCmd.Stdin = os.Stdin

@@ -108,6 +108,10 @@ func TestExecCommand(t *testing.T) {
 			t.Setenv(utils.GoenvEnvVarVersion.String(), "")
 			os.Unsetenv("GOENV_VERSION")
 
+			// Clear _GOENV_EXEC_ACTIVE to avoid false recursion detection
+			// This can be set when tests are run via goenv-managed Go (e.g., during package builds)
+			os.Unsetenv("_GOENV_EXEC_ACTIVE")
+
 			// Setup test versions
 			for _, version := range tt.setupVersions {
 				cmdtest.CreateTestVersion(t, testRoot, version)
