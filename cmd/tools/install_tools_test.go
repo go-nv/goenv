@@ -151,7 +151,7 @@ func TestExtractToolNames(t *testing.T) {
 		},
 		{
 			name:     "package without version",
-			packages: []string{"github.com/golangci/golangci-lint/cmd/golangci-lint"},
+			packages: []string{"github.com/golangci/golangci-lint/v2/cmd/golangci-lint"},
 			expected: []string{"golangci-lint"},
 		},
 	}
@@ -233,7 +233,7 @@ func TestExtractToolName_ComplexPaths(t *testing.T) {
 			expected:    "gopls",
 		},
 		{
-			packagePath: "github.com/golangci/golangci-lint/cmd/golangci-lint@latest",
+			packagePath: "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest",
 			expected:    "golangci-lint",
 		},
 		{
