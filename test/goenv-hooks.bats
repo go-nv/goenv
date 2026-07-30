@@ -25,7 +25,7 @@ OUT
 
   create_hook exec "hello.bash"
   create_hook exec "ahoy.bash"
-  # NOTE: This command is expecte to be ignore since it's not ending with '.bash'
+  # NOTE: This command is expected to be ignore since it's not ending with '.bash'
   create_hook exec "invalid.sh"
 
   # NOTE: This command is expected to be ignored since it's for a different command
