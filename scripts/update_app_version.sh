@@ -10,7 +10,7 @@ APP_VERSION_FILE="APP_VERSION"
 # This script is used to update the version of the app.
 
 # Get the latest draft version from the GitHub Releases
-# and take into accoutn that the most recent version is the latest version,
+# and take into account that the most recent version is the latest version,
 # while the second most recent version is the second entry.
 # ❯ gh release list -L 5
 # TITLE   TYPE    TAG NAME  PUBLISHED
