@@ -159,7 +159,7 @@ definition. (All bundled definitions include checksums.)
 go-build will first attempt to download package files from a mirror hosted on
 GitHub Pages. If a package is not available on the mirror, if the mirror
 is down, or if the download is corrupt, go-build will fall back to the
-official URL specified in the defintion file.
+official URL specified in the definition file.
 
 You can point go-build to another mirror by specifying the
 `GO_BUILD_MIRROR_URL` environment variable--useful if you'd like to run your
