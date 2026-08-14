@@ -290,7 +290,10 @@ func VerifyTools(config *Config, goVersion string, goenvRoot string) (map[string
 	}
 
 	versionPath := filepath.Join(goenvRoot, "versions", goVersion)
-	gopathBin := filepath.Join(versionPath, "gopath", "bin")
+	searchDirs := []string{
+		filepath.Join(versionPath, "bin"),           // Current default-tools install path
+		filepath.Join(versionPath, "gopath", "bin"), // Legacy/compat fallback path
+	}
 
 	for _, tool := range config.Tools {
 		binaryName := tool.Binary
@@ -300,11 +303,18 @@ func VerifyTools(config *Config, goVersion string, goenvRoot string) (map[string
 			binaryName = parts[len(parts)-1]
 		}
 
-		binaryBasePath := filepath.Join(gopathBin, binaryName)
+		installed := false
+		for _, dir := range searchDirs {
+			binaryBasePath := filepath.Join(dir, binaryName)
 
-		// Check if executable exists (handles .exe and .bat on Windows)
-		_, err := pathutil.FindExecutable(binaryBasePath)
-		results[tool.Name] = (err == nil)
+			// Check if executable exists (handles .exe and .bat on Windows)
+			if _, err := pathutil.FindExecutable(binaryBasePath); err == nil {
+				installed = true
+				break
+			}
+		}
+
+		results[tool.Name] = installed
 	}
 
 	return results, nil

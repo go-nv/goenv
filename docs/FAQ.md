@@ -507,7 +507,7 @@ goenv use 1.24.0
 ### How do I install common tools?
 
 ```bash
-goenv default-tools
+goenv tools default-tools install $(goenv current)
 ```
 
 This installs gopls, staticcheck, golangci-lint, and other common tools.
@@ -895,14 +895,34 @@ Yes!
 ```dockerfile
 FROM golang:1.25-alpine
 
-RUN apk add --no-cache curl bash
-RUN curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
+RUN apk add --no-cache curl bash && \
+  curl -sfL https://raw.githubusercontent.com/go-nv/goenv/master/install.sh | bash
 
 ENV GOENV_ROOT="/root/.goenv"
 ENV PATH="$GOENV_ROOT/bin:$PATH"
 ENV GOENV_OFFLINE=1
+ENV GOENV_ASSUME_YES=1
 
-RUN goenv install 1.25.2 && goenv use 1.25.2 --global
+RUN goenv tools default-tools disable && \
+  goenv install 1.25.2 && \
+  goenv use 1.25.2 --global && \
+  goenv cache clean all --force
+```
+
+Important: keep install + cleanup in the same `RUN` layer; cleanup in a later layer does not reduce final image size.
+
+Current behavior note: default tools installed by `goenv tools default-tools install` land in `$GOENV_ROOT/versions/<version>/bin`.
+
+If you want to keep tool updates out of the image build layer, use this pattern:
+
+- Disable default tools during image build.
+- Install Go versions in the image.
+- Install/update tools at container runtime (writable container layer or mounted volume).
+
+Example runtime command:
+
+```bash
+goenv tools default-tools install "$(goenv current)"
 ```
 
 [Docker Configuration](./PLATFORM_SUPPORT.md#docker-configuration)

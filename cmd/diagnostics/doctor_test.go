@@ -422,6 +422,81 @@ func TestDoctorHelp(t *testing.T) {
 	}
 }
 
+func TestCheckCacheSizeGuidance_SharedModCacheWarning(t *testing.T) {
+	originalBuildThreshold := buildCacheWarningThresholdBytes
+	originalSharedThreshold := sharedModCacheWarningThresholdBytes
+	buildCacheWarningThresholdBytes = 200
+	sharedModCacheWarningThresholdBytes = 100
+	t.Cleanup(func() {
+		buildCacheWarningThresholdBytes = originalBuildThreshold
+		sharedModCacheWarningThresholdBytes = originalSharedThreshold
+	})
+
+	root := t.TempDir()
+	cfg := &config.Config{Root: root}
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "versions"), 0o755))
+
+	sharedModDir := filepath.Join(root, "shared", "go-mod")
+	require.NoError(t, os.MkdirAll(sharedModDir, 0o755))
+	testutil.WriteTestFile(t, filepath.Join(sharedModDir, "large-mod-cache.bin"), bytes.Repeat([]byte("m"), 150), 0o644)
+
+	result := checkCacheSizeGuidance(cfg)
+
+	assert.Equal(t, "cache-size-guidance", result.id)
+	assert.Equal(t, StatusWarning, result.status)
+	assert.Contains(t, result.message, "shared module cache")
+	assert.Contains(t, result.advice, "goenv cache clean mod --force")
+}
+
+func TestCheckCacheSizeGuidance_BuildCacheWarning(t *testing.T) {
+	originalBuildThreshold := buildCacheWarningThresholdBytes
+	originalSharedThreshold := sharedModCacheWarningThresholdBytes
+	buildCacheWarningThresholdBytes = 100
+	sharedModCacheWarningThresholdBytes = 200
+	t.Cleanup(func() {
+		buildCacheWarningThresholdBytes = originalBuildThreshold
+		sharedModCacheWarningThresholdBytes = originalSharedThreshold
+	})
+
+	root := t.TempDir()
+	cfg := &config.Config{Root: root}
+
+	buildDir := filepath.Join(root, "versions", "1.25.2", "pkg", "go-build-darwin-arm64")
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	testutil.WriteTestFile(t, filepath.Join(buildDir, "large-build-cache.bin"), bytes.Repeat([]byte("b"), 150), 0o644)
+
+	result := checkCacheSizeGuidance(cfg)
+
+	assert.Equal(t, "cache-size-guidance", result.id)
+	assert.Equal(t, StatusWarning, result.status)
+	assert.Contains(t, result.message, "build cache")
+	assert.Contains(t, result.advice, "goenv cache clean build --force")
+}
+
+func TestCheckCacheSizeGuidance_OKWhenBelowThreshold(t *testing.T) {
+	originalBuildThreshold := buildCacheWarningThresholdBytes
+	originalSharedThreshold := sharedModCacheWarningThresholdBytes
+	buildCacheWarningThresholdBytes = 1024
+	sharedModCacheWarningThresholdBytes = 1024
+	t.Cleanup(func() {
+		buildCacheWarningThresholdBytes = originalBuildThreshold
+		sharedModCacheWarningThresholdBytes = originalSharedThreshold
+	})
+
+	root := t.TempDir()
+	cfg := &config.Config{Root: root}
+
+	buildDir := filepath.Join(root, "versions", "1.25.2", "pkg", "go-build-darwin-arm64")
+	require.NoError(t, os.MkdirAll(buildDir, 0o755))
+	testutil.WriteTestFile(t, filepath.Join(buildDir, "small.a"), []byte("small"), 0o644)
+
+	result := checkCacheSizeGuidance(cfg)
+
+	assert.Equal(t, "cache-size-guidance", result.id)
+	assert.Equal(t, StatusOK, result.status)
+	assert.Contains(t, result.message, "within suggested thresholds")
+}
+
 func TestDoctorCommand_ShellDetection(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()

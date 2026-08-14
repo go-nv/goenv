@@ -113,7 +113,7 @@ Change line format:
   - `goenv tools sync-tools <from> <to>` - Copy tools from one Go version to another
   - `goenv tools outdated` - Check which tools need updating across versions
   - `goenv tools status` - View tool consistency and identify gaps across versions
-  - `goenv tools default` - Manage automatic tool installation for new Go versions
+  - `goenv tools default-tools` - Manage automatic tool installation for new Go versions
   - Dry-run mode (`--dry-run`) for previewing operations
   - Verbose mode (`--verbose`) for detailed installation output
   - Tool categorization: Consistent (all versions), Partial (some versions), Version-Specific (one version)

@@ -189,8 +189,8 @@ goenv tools update --all
 goenv tools sync-tools 1.21.0 1.23.0
 
 # Manage default tools (auto-installed with new Go versions)
-goenv tools default list
-goenv tools default init
+goenv tools default-tools list
+goenv tools default-tools init
 ```
 
 ## Cache Management
