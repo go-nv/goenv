@@ -252,14 +252,14 @@ func TestVerifyTools(t *testing.T) {
 
 	// Setup version structure
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
-	gopathBin := filepath.Join(versionPath, "gopath", "bin")
+	versionBin := filepath.Join(versionPath, "bin")
 
-	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
-	require.NoError(t, err, "Failed to create gopath bin directory")
+	err = utils.EnsureDirWithContext(versionBin, "create test directory")
+	require.NoError(t, err, "Failed to create version bin directory")
 
 	// Create some tool binaries
-	tool1Binary := filepath.Join(gopathBin, "gopls")
-	tool2Binary := filepath.Join(gopathBin, "dlv")
+	tool1Binary := filepath.Join(versionBin, "gopls")
+	tool2Binary := filepath.Join(versionBin, "dlv")
 	if utils.IsWindows() {
 		tool1Binary += ".exe"
 		tool2Binary += ".exe"
@@ -301,6 +301,41 @@ func TestVerifyTools(t *testing.T) {
 	}
 }
 
+func TestVerifyTools_LegacyGopathBinFallback(t *testing.T) {
+	var err error
+	tmpDir := t.TempDir()
+	goVersion := "1.21.0"
+
+	// Setup legacy gopath/bin structure under the version directory.
+	versionPath := filepath.Join(tmpDir, "versions", goVersion)
+	gopathBin := filepath.Join(versionPath, "gopath", "bin")
+
+	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
+	require.NoError(t, err, "Failed to create gopath bin directory")
+
+	toolBinary := filepath.Join(gopathBin, "gopls")
+	if utils.IsWindows() {
+		toolBinary += ".exe"
+	}
+
+	testutil.WriteTestFile(t, toolBinary, []byte("mock binary"), utils.PermFileExecutable, "Failed to create tool binary")
+
+	config := &Config{
+		Tools: []Tool{
+			{
+				Name:    "gopls",
+				Package: "golang.org/x/tools/gopls",
+				Binary:  "gopls",
+			},
+		},
+	}
+
+	results, err := VerifyTools(config, goVersion, tmpDir)
+	require.NoError(t, err, "VerifyTools failed")
+
+	assert.True(t, results["gopls"], "Expected gopls to be found via legacy gopath/bin fallback")
+}
+
 func TestVerifyTools_NoBinaryName(t *testing.T) {
 	var err error
 	tmpDir := t.TempDir()
@@ -308,13 +343,13 @@ func TestVerifyTools_NoBinaryName(t *testing.T) {
 
 	// Setup version structure
 	versionPath := filepath.Join(tmpDir, "versions", goVersion)
-	gopathBin := filepath.Join(versionPath, "gopath", "bin")
+	versionBin := filepath.Join(versionPath, "bin")
 
-	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
-	require.NoError(t, err, "Failed to create gopath bin directory")
+	err = utils.EnsureDirWithContext(versionBin, "create test directory")
+	require.NoError(t, err, "Failed to create version bin directory")
 
 	// Create tool binary with name extracted from package path
-	toolBinary := filepath.Join(gopathBin, "staticcheck")
+	toolBinary := filepath.Join(versionBin, "staticcheck")
 	if utils.IsWindows() {
 		toolBinary += ".exe"
 	}

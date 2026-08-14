@@ -48,7 +48,7 @@ goenv is fully supported on the following platforms:
 | `goenv tools install` | ✅ | ✅ | ✅ | Full support |
 | `goenv tools list` | ✅ | ✅ | ✅ | Full support |
 | `goenv sync-tools` | ✅ | ✅ | ✅ | Full support |
-| `goenv default-tools` | ✅ | ✅ | ✅ | Full support |
+| `goenv tools default-tools` | ✅ | ✅ | ✅ | Full support |
 | **Caching** | | | | |
 | Smart caching | ✅ | ✅ | ✅ | Full support |
 | Cache cleaning | ✅ | ✅ | ✅ | Full support |

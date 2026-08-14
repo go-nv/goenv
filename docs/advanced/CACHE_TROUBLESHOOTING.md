@@ -81,7 +81,7 @@ goenv uses multiple cache layers for different purposes:
 
 **When used:**
 - `goenv tools install`
-- `goenv default-tools`
+- `goenv tools default-tools`
 
 ## Common Issues
 
@@ -467,7 +467,7 @@ while read version; do
 done < ~/intel-versions.txt
 
 # Reinstall tools (will compile for ARM64)
-goenv default-tools
+goenv tools default-tools install $(goenv current)
 
 # Or sync from old setup
 goenv sync-tools $(cat ~/intel-tools.txt)

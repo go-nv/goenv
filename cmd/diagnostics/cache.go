@@ -21,6 +21,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	buildCacheWarningThresholdBytes     int64 = 1 * 1024 * 1024 * 1024 // 1GB
+	sharedModCacheWarningThresholdBytes int64 = 2 * 1024 * 1024 * 1024 // 2GB
+)
+
+func sharedModCacheSize(status *cache.CacheStatus) int64 {
+	var total int64
+	for _, c := range status.ModCaches {
+		if c.GoVersion == "shared" {
+			total += c.SizeBytes
+		}
+	}
+	return total
+}
+
+func totalBuildCacheSize(status *cache.CacheStatus) int64 {
+	var total int64
+	for _, c := range status.BuildCaches {
+		total += c.SizeBytes
+	}
+	return total
+}
+
 // completeCacheCleanTypes provides shell completion for cache clean command
 func completeCacheCleanTypes(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) > 0 {
@@ -439,8 +462,20 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	sharedModSize := sharedModCacheSize(status)
+	if sharedModSize >= sharedModCacheWarningThresholdBytes {
+		fmt.Fprintf(out, "\n%s Tip: Shared module cache is %s. Run 'goenv cache clean mod --force' to reclaim space.\n",
+			utils.Emoji("💡"), cache.FormatBytes(sharedModSize))
+	}
+
+	buildCacheSize := totalBuildCacheSize(status)
+	if buildCacheSize >= buildCacheWarningThresholdBytes {
+		fmt.Fprintf(out, "%s Tip: Build caches total %s. Run 'goenv cache clean build --force' to reclaim space.\n",
+			utils.Emoji("💡"), cache.FormatBytes(buildCacheSize))
+	}
+
 	if status.TotalSize > 5*1024*1024*1024 { // > 5GB
-		fmt.Fprintf(out, "\n%s Tip: Run 'goenv cache clean' to free up disk space.\n",
+		fmt.Fprintf(out, "%s Tip: For aggressive cleanup, run 'goenv cache clean all --force'.\n",
 			utils.Emoji("💡"))
 	}
 

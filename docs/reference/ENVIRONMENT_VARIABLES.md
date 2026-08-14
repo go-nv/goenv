@@ -23,3 +23,13 @@ You can configure how `goenv` operates with the following settings:
 | `GOENV_ASSUME_YES`         | `0`              | Auto-confirms all interactive prompts without asking for user input.<br> Set this to `1` to skip confirmation prompts (e.g., for `goenv cache clean`, `goenv cache migrate`). **Recommended for CI/CD pipelines** to prevent hanging on prompts. More user-friendly alternative to `--force` flag.                                   |
 | `NO_COLOR`                 |                  | Disables colored output and emojis (follows [no-color.org](https://no-color.org/) standard).<br> Set this to any non-empty value to disable all colors and emojis in goenv output. Automatically respected by the `--plain` flag. Useful for CI/CD pipelines, scripts, or text-only environments.                                    |
 | `GOENV_VSCODE_AUTO_SYNC`   | `0`              | Automatically updates VS Code workspace settings when changing Go versions.<br> Set this to `1` to enable auto-sync. When enabled, `goenv use/local/global` will update `.vscode/settings.json` without prompting if the workspace exists. When disabled (default), goenv prompts before updating VS Code settings.                  |
+
+## Default tools behavior
+
+Default tools are enabled by default. If `~/.goenv/default-tools.yaml` does not exist, goenv uses built-in default tool configuration.
+
+Use the command below to disable automatic default tool installation:
+
+```bash
+goenv tools default-tools disable
+```

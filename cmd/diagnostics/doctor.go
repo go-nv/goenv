@@ -242,6 +242,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 9: Cache files
 	results = append(results, checkCacheFiles(cfg))
 
+	// Check 9b: Cache size guidance
+	results = append(results, checkCacheSizeGuidance(cfg))
+
 	// Check 10: Network connectivity (optional)
 	results = append(results, checkNetwork())
 
@@ -2825,6 +2828,60 @@ func checkCacheFiles(cfg *config.Config) checkResult {
 		name:    "Cache files",
 		status:  StatusOK,
 		message: fmt.Sprintf("Found %d cache file(s): %v", len(foundCaches), foundCaches),
+	}
+}
+
+func checkCacheSizeGuidance(cfg *config.Config) checkResult {
+	cacheMgr := cache.NewManager(cfg)
+	status, err := cacheMgr.GetStatus(true)
+	if err != nil {
+		return checkResult{
+			id:      "cache-size-guidance",
+			name:    "Cache size guidance",
+			status:  StatusWarning,
+			message: "Unable to analyze cache sizes",
+			advice:  "Run 'goenv cache status' for detailed cache diagnostics",
+		}
+	}
+
+	sharedModSize := sharedModCacheSize(status)
+	buildSize := totalBuildCacheSize(status)
+
+	if sharedModSize >= sharedModCacheWarningThresholdBytes && buildSize >= buildCacheWarningThresholdBytes {
+		return checkResult{
+			id:      "cache-size-guidance",
+			name:    "Cache size guidance",
+			status:  StatusWarning,
+			message: fmt.Sprintf("Large shared module cache (%s) and build caches (%s) detected", cache.FormatBytes(sharedModSize), cache.FormatBytes(buildSize)),
+			advice:  "Run 'goenv cache clean mod --force' and 'goenv cache clean build --force' to reclaim space",
+		}
+	}
+
+	if sharedModSize >= sharedModCacheWarningThresholdBytes {
+		return checkResult{
+			id:      "cache-size-guidance",
+			name:    "Cache size guidance",
+			status:  StatusWarning,
+			message: fmt.Sprintf("Large shared module cache detected: %s", cache.FormatBytes(sharedModSize)),
+			advice:  "Run 'goenv cache clean mod --force' to reclaim space",
+		}
+	}
+
+	if buildSize >= buildCacheWarningThresholdBytes {
+		return checkResult{
+			id:      "cache-size-guidance",
+			name:    "Cache size guidance",
+			status:  StatusWarning,
+			message: fmt.Sprintf("Large build cache total detected: %s", cache.FormatBytes(buildSize)),
+			advice:  "Run 'goenv cache clean build --force' to reclaim space",
+		}
+	}
+
+	return checkResult{
+		id:      "cache-size-guidance",
+		name:    "Cache size guidance",
+		status:  StatusOK,
+		message: "Cache sizes are within suggested thresholds",
 	}
 }
 

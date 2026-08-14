@@ -78,7 +78,7 @@ These unified commands provide a cleaner, more consistent interface. The legacy 
   - [`goenv explore`](#goenv-explore)
   - [`goenv completions`](#goenv-completions)
   - [`goenv tools`](#goenv-tools)
-  - [`goenv tools default`](#goenv-tools-default)
+  - [`goenv tools default-tools`](#goenv-tools-default-tools)
   - [`goenv tools install`](#goenv-tools-install)
   - [`goenv tools uninstall`](#goenv-tools-uninstall)
   - [`goenv tools list`](#goenv-tools-list)
@@ -1004,7 +1004,7 @@ Manage Go tools on a per-version basis. Ensures tools are properly isolated per 
 - `goenv tools outdated` - Show which tools need updating across all versions
 - `goenv tools status` - View tool consistency across all Go versions
 - `goenv tools sync-tools` - Copy tools from one version to another
-- `goenv tools default` - Manage automatic tool installation
+- `goenv tools default-tools` - Manage automatic tool installation
 
 **Quick Start:**
 
@@ -1045,29 +1045,31 @@ goenv tools sync-tools 1.23.2 1.24.4
 
 See the detailed sections below for each subcommand.
 
-## `goenv tools default`
+## `goenv tools default-tools`
 
 Manages the list of tools automatically installed with each new Go version.
 
 Default tools are specified in `~/.goenv/default-tools.yaml` and are automatically installed after each `goenv install` command completes successfully.
+If the file does not exist, goenv uses built-in defaults with default tools enabled.
+By default, installed tool binaries land in `$GOENV_ROOT/versions/<version>/bin`.
 
 **Subcommands:**
 
 ```shell
 # List configured default tools
-> goenv tools default list
+> goenv tools default-tools list
 
 # Initialize default tools configuration with sensible defaults
-> goenv tools default init
+> goenv tools default-tools init
 
 # Enable automatic tool installation
-> goenv tools default enable
+> goenv tools default-tools enable
 
 # Disable automatic tool installation
-> goenv tools default disable
+> goenv tools default-tools disable
 
 # Install default tools for a specific Go version
-> goenv tools default install 1.25.2
+> goenv tools default-tools install 1.25.2
 ```
 
 **Common use cases:**
@@ -1081,10 +1083,22 @@ Default tools are specified in `~/.goenv/default-tools.yaml` and are automatical
 ```yaml
 enabled: true
 tools:
-  - golang.org/x/tools/gopls@latest
-  - github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-  - honnef.co/go/tools/cmd/staticcheck@latest
-  - github.com/go-delve/delve/cmd/dlv@latest
+  - name: gopls
+    package: golang.org/x/tools/gopls
+    version: "@latest"
+    binary: gopls
+  - name: golangci-lint
+    package: github.com/golangci/golangci-lint/cmd/golangci-lint
+    version: "@latest"
+    binary: golangci-lint
+  - name: staticcheck
+    package: honnef.co/go/tools/cmd/staticcheck
+    version: "@latest"
+    binary: staticcheck
+  - name: delve
+    package: github.com/go-delve/delve/cmd/dlv
+    version: "@latest"
+    binary: dlv
 ```
 
 ## `goenv tools install`

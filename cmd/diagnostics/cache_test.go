@@ -391,6 +391,32 @@ func TestCacheCleanDryRunShowsSummary(t *testing.T) {
 	}
 }
 
+func TestSharedModCacheSize(t *testing.T) {
+	status := &cache.CacheStatus{
+		ModCaches: []cache.CacheInfo{
+			{GoVersion: "shared", SizeBytes: 1024},
+			{GoVersion: "shared", SizeBytes: 2048},
+			{GoVersion: "1.25.2", SizeBytes: 4096},
+		},
+	}
+
+	got := sharedModCacheSize(status)
+	assert.Equal(t, int64(3072), got, "Expected only shared module cache sizes to be summed")
+}
+
+func TestTotalBuildCacheSize(t *testing.T) {
+	status := &cache.CacheStatus{
+		BuildCaches: []cache.CacheInfo{
+			{SizeBytes: 10},
+			{SizeBytes: 20},
+			{SizeBytes: 30},
+		},
+	}
+
+	got := totalBuildCacheSize(status)
+	assert.Equal(t, int64(60), got, "Expected all build cache sizes to be summed")
+}
+
 func TestCacheCleanDryRunEmptyCaches(t *testing.T) {
 	var err error
 	// Create temporary GOENV_ROOT with no caches
