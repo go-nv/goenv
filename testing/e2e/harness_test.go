@@ -109,6 +109,10 @@ type env struct {
 	Root string // GOENV_ROOT
 	Dir  string // working directory for commands
 	Home string // isolated HOME/USERPROFILE
+	// allowNetwork opts out of GOENV_OFFLINE for tests that must reach the
+	// network. Off by default so the suite is hermetic in fact, not just in
+	// its documentation.
+	allowNetwork bool
 	// Extra environment variables layered on top of the isolated defaults.
 	Extra map[string]string
 }
@@ -151,6 +155,45 @@ func newEnv(t *testing.T) *env {
 func (e *env) Set(key, value string) *env {
 	e.Extra[key] = value
 	return e
+}
+
+// AllowNetwork lets a test reach the network, disabling GOENV_OFFLINE.
+func (e *env) AllowNetwork() *env {
+	e.allowNetwork = true
+	return e
+}
+
+// sandboxPath returns the host PATH with any goenv directories removed.
+//
+// Generated shims dispatch through a bare "goenv exec", resolved via PATH. On a
+// developer machine PATH contains ~/.goenv/shims and ~/.goenv/bin, so a shim
+// executed by a test would run the host's installed goenv against the host's
+// configuration instead of the binary under test — passing or failing for
+// reasons that have nothing to do with the change being tested.
+func sandboxPath() string {
+	hostPath := os.Getenv("PATH")
+	if hostPath == "" {
+		return ""
+	}
+
+	home, err := os.UserHomeDir()
+	var goenvRoot string
+	if err == nil {
+		goenvRoot = filepath.Join(home, ".goenv")
+	}
+	if env := os.Getenv("GOENV_ROOT"); env != "" {
+		goenvRoot = env
+	}
+
+	kept := make([]string, 0, 16)
+	for _, dir := range filepath.SplitList(hostPath) {
+		if goenvRoot != "" && strings.HasPrefix(filepath.Clean(dir), filepath.Clean(goenvRoot)) {
+			continue
+		}
+		kept = append(kept, dir)
+	}
+
+	return strings.Join(kept, string(filepath.ListSeparator))
 }
 
 // result is the outcome of running a goenv command.
@@ -226,22 +269,49 @@ func (e *env) runWithTimeout(timeout time.Duration, args ...string) result {
 // environment for a process to run, plus only the GOENV_* variables this test
 // asked for. HOME is redirected into the test's sandbox.
 func (e *env) environ() []string {
-	// Deliberately excludes HOME and USERPROFILE; those are set below.
-	passthrough := []string{"PATH", "TMPDIR", "TEMP", "TMP",
-		"SystemRoot", "COMSPEC", "PATHEXT", "LOCALAPPDATA", "APPDATA"}
+	// Deliberately excludes HOME, USERPROFILE and PATH; those are set below.
+	// LOCALAPPDATA/APPDATA are also redirected into the sandbox on Windows,
+	// since anything writing under %APPDATA% would otherwise escape it.
+	passthrough := []string{"TMPDIR", "TEMP", "TMP",
+		"SystemRoot", "COMSPEC", "PATHEXT", "SystemDrive", "windir",
+		"ProgramData", "ProgramFiles", "ProgramFiles(x86)",
+		"USERNAME", "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE"}
 
-	out := make([]string, 0, len(passthrough)+len(e.Extra)+6)
+	out := make([]string, 0, len(passthrough)+len(e.Extra)+12)
 	for _, key := range passthrough {
 		if value, ok := os.LookupEnv(key); ok {
 			out = append(out, key+"="+value)
 		}
 	}
 
+	// PATH is handled separately: goenv directories are stripped from it.
+	out = append(out, "PATH="+sandboxPath())
+
 	out = append(out, "GOENV_ROOT="+e.Root)
 	out = append(out, "HOME="+e.Home)
 	out = append(out, "USERPROFILE="+e.Home)
+	out = append(out, "LOCALAPPDATA="+filepath.Join(e.Home, "AppData", "Local"))
+	out = append(out, "APPDATA="+filepath.Join(e.Home, "AppData", "Roaming"))
 	// Keep output deterministic and parseable.
 	out = append(out, "NO_COLOR=1")
+
+	// Keep Go's own caches inside the sandbox. Without these, a test that shells
+	// out to a toolchain writes into the developer's real ~/go and ~/Library/Caches.
+	out = append(out, "GOPATH="+filepath.Join(e.Home, "go"))
+	out = append(out, "GOCACHE="+filepath.Join(e.Home, "go-build"))
+	out = append(out, "GOMODCACHE="+filepath.Join(e.Home, "go", "pkg", "mod"))
+	// XDG paths, so anything following the spec also stays inside the sandbox.
+	out = append(out, "XDG_CACHE_HOME="+filepath.Join(e.Home, ".cache"))
+	out = append(out, "XDG_CONFIG_HOME="+filepath.Join(e.Home, ".config"))
+	out = append(out, "XDG_DATA_HOME="+filepath.Join(e.Home, ".local", "share"))
+
+	// Offline by default. Several commands (install, and anything that resolves
+	// a version spec) otherwise reach api/golang.org, which makes the suite
+	// slow, flaky, and dependent on the network despite being advertised as
+	// hermetic. Tests that genuinely need the network opt in via networkEnv.
+	if !e.allowNetwork {
+		out = append(out, "GOENV_OFFLINE=1")
+	}
 
 	for key, value := range e.Extra {
 		out = append(out, key+"="+value)

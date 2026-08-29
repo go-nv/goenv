@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -54,37 +54,23 @@ func truncate(s string, max int) string {
 	if len(s) <= max {
 		return s
 	}
-	return s[:max] + "\n... (truncated, " + itoa(len(s)-max) + " more bytes)"
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var digits []byte
-	for n > 0 {
-		digits = append([]byte{byte('0' + n%10)}, digits...)
-		n /= 10
-	}
-	return string(digits)
-}
-
-// mentionsRecursionRisk reports whether doctor output warns about a goenv shim
-// that would cause recursion. Matching on intent rather than an exact string
-// keeps the test from breaking on wording changes.
-func mentionsRecursionRisk(output string) bool {
-	lower := strings.ToLower(output)
-	for _, phrase := range []string{"recursion", "recursive", "shadow", "infinite loop", "remove"} {
-		if strings.Contains(lower, phrase) {
-			return true
-		}
-	}
-	return false
+	return s[:max] + "\n... (truncated, " + strconv.Itoa(len(s)-max) + " more bytes)"
 }
 
 // gotoInsideParensPattern finds a "goto :label" that sits inside a
 // parenthesized if block, which breaks the CMD parser (issue #555).
-var gotoInsideParensPattern = regexp.MustCompile(`(?is)\bif\b[^\r\n]*\(\s*[^)]*goto\s*:`)
+//
+// The `(?s)` flag matters: the construct this exists to catch spans multiple
+// lines —
+//
+//	if "%x%"=="y" (
+//	  goto :label
+//	)
+//
+// so the character class between the paren and the goto must be able to cross
+// newlines. An earlier version used [^\r\n]*, which could only ever match a
+// single-line form that issue #555 was not about — a guard that could not fire.
+var gotoInsideParensPattern = regexp.MustCompile(`(?is)\bif\b[^(\r\n]*\([^)]*\bgoto\s*:`)
 
 // assertNoGotoInsideParens fails when a generated Windows shim contains the
 // batch construct that issue #555 was filed for.

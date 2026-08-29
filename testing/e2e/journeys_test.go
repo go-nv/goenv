@@ -210,25 +210,59 @@ func TestDoctor_DetectsGoenvShim(t *testing.T) {
 	e.run("global", "1.23.6")
 	e.run("rehash")
 
-	// Plant the offending shim, mimicking a leftover v2 install.
+	// Plant the offending shim, mimicking a leftover install. It carries the
+	// marker that generated shims carry, since that is what goenv identifies.
 	shimPath := e.path("shims", exeName("goenv"))
 	if err := os.MkdirAll(filepath.Dir(shimPath), 0o755); err != nil {
 		t.Fatalf("failed to create shims dir: %v", err)
 	}
-	if err := os.WriteFile(shimPath, []byte("#!/usr/bin/env bash\nexec goenv exec \"$@\"\n"), 0o755); err != nil {
+	shim := "#!/usr/bin/env bash\n# goenv-shim v1\nexec goenv exec \"$@\"\n"
+	if err := os.WriteFile(shimPath, []byte(shim), 0o755); err != nil {
 		t.Fatalf("failed to plant goenv shim: %v", err)
 	}
 
 	res := e.run("doctor")
 	output := res.Output()
 
-	// doctor exits non-zero when it finds problems, which is expected here.
-	if !strings.Contains(strings.ToLower(output), "goenv") ||
-		!strings.Contains(strings.ToLower(output), "shim") {
-		t.Fatalf("doctor output does not mention the goenv shim:\n%s", output)
+	// Assert on this check's own identity and remediation, not on loose English.
+	// An earlier version of this test matched any of "recursion"/"remove"/etc.
+	// anywhere in doctor's output — words that appear in unrelated advice — so
+	// it passed even when the check itself never fired.
+	requireContains(t, output, "Recursive goenv shim",
+		"doctor must run a check named for the recursive goenv shim (issue #542)")
+	requireContains(t, output, shimPath,
+		"doctor must name the offending file so the user can act on it")
+	requireContains(t, output, "goenv doctor --fix",
+		"doctor must offer the remediation for the shim it found")
+}
+
+// TestDoctor_FixRemovesGoenvShim closes the loop: detection is only useful if
+// the advertised --fix actually removes the file.
+func TestDoctor_FixRemovesGoenvShim(t *testing.T) {
+	e := newEnv(t)
+	e.fakeVersion("1.23.6")
+	e.run("global", "1.23.6")
+	e.run("rehash")
+
+	shimPath := e.path("shims", exeName("goenv"))
+	if err := os.MkdirAll(filepath.Dir(shimPath), 0o755); err != nil {
+		t.Fatalf("failed to create shims dir: %v", err)
 	}
-	if !mentionsRecursionRisk(output) {
-		t.Fatalf("doctor did not flag the recursion-causing goenv shim (issue #542):\n%s", output)
+	// Must carry the marker a real generated shim carries, otherwise goenv is
+	// right to leave it alone.
+	shim := "#!/usr/bin/env bash\n# goenv-shim v1\nexec goenv exec \"$@\"\n"
+	if err := os.WriteFile(shimPath, []byte(shim), 0o755); err != nil {
+		t.Fatalf("failed to plant goenv shim: %v", err)
+	}
+
+	res := e.run("doctor", "--fix")
+	if res.TimedOut {
+		t.Fatal("goenv doctor --fix timed out")
+	}
+
+	if fileExists(shimPath) {
+		t.Fatalf("doctor --fix did not remove the recursive goenv shim (issue #542)\n"+
+			"--- output ---\n%s", res.Output())
 	}
 }
 
@@ -428,7 +462,7 @@ func TestInstallAndUse_RealVersion(t *testing.T) {
 
 	const version = "1.23.6"
 
-	e := newEnv(t)
+	e := newEnv(t).AllowNetwork()
 
 	res := e.runWithTimeout(10*time.Minute, "install", version)
 	if !res.Succeeded() {

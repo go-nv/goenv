@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - main
     tags:
       - "*"
   pull_request:
@@ -10,6 +11,25 @@ on:
       - "*"
   merge_group:
 jobs:
+  workflow-lint:
+    name: Lint workflow files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # A workflow file has no compiler. A malformed one does not fail — it
+      # simply never runs, so the coverage it was added to provide silently
+      # does not exist. actionlint turns that into a visible error.
+      #
+      # The shellcheck integration is disabled: it reports pre-existing
+      # info-level findings in unrelated workflows, which would make this job
+      # red on arrival and therefore ignored. Shell scripts are linted directly
+      # in the install-scripts workflow instead.
+      - name: actionlint
+        uses: docker://rhysd/actionlint:latest
+        with:
+          args: -color -shellcheck=
+
   build:
     strategy:
       matrix:

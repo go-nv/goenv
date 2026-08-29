@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/shims"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,12 +24,66 @@ set -e
 exec "/opt/homebrew/Cellar/goenv/2.2.38_1/libexec/goenv" "$@"
 `
 	v3GoenvShim = `#!/usr/bin/env bash
+# goenv-shim v1
 # goenv shim for goenv
 set -e
 program="${0##*/}"
 exec goenv exec "$program" "$@"
 `
 )
+
+// TestFindGoenvShims_IgnoresTheGoenvBinary is a regression test for a
+// self-deletion bug introduced while fixing issue #542.
+//
+// Detection originally matched the substring "goenv exec" against a candidate
+// file's raw bytes. The compiled goenv binary embeds the shim templates, so it
+// contains that sequence too — meaning a goenv binary placed in the shims
+// directory (which packagers and users do) was classified as a stale shim and
+// deleted on the next invocation.
+//
+// Detection gates a destructive operation, so it must positively identify a
+// shim rather than merely fail to rule one out.
+func TestFindGoenvShims_IgnoresTheGoenvBinary(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shim file naming differs on Windows; covered by the name-list test")
+	}
+
+	dir := t.TempDir()
+
+	// Stand in for the real binary: ELF-ish header, NUL bytes, and the shim
+	// template text that the real binary genuinely embeds.
+	fakeBinary := append([]byte{0x7f, 'E', 'L', 'F', 0x00, 0x00, 0x00},
+		[]byte("exec goenv exec \"$program\" \"$@\"\n# goenv shim for %s\x00")...)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "goenv"), fakeBinary, 0o755))
+
+	assert.Empty(t, FindGoenvShims(dir),
+		"a compiled goenv binary must never be classified as a stale shim")
+}
+
+// TestFindGoenvShims_IgnoresUnrelatedScripts ensures a user's own script in the
+// shims directory is left alone.
+func TestFindGoenvShims_IgnoresUnrelatedScripts(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shim file naming differs on Windows; covered by the name-list test")
+	}
+
+	dir := t.TempDir()
+	writeShim(t, dir, "goenv", "#!/usr/bin/env bash\n# my own wrapper\nexec goenv \"$@\"\n")
+
+	assert.Empty(t, FindGoenvShims(dir),
+		"a hand-written wrapper without a goenv shim marker must not be deleted")
+}
+
+// TestGeneratedShimsCarryTheMarker pins the contract between the shim generator
+// and this package: if internal/shims stops emitting the marker, stale-shim
+// detection silently stops working. The constants are asserted here so the two
+// packages cannot drift apart unnoticed.
+func TestGeneratedShimsCarryTheMarker(t *testing.T) {
+	assert.True(t, v3ShimPattern.MatchString("#!/usr/bin/env bash\n"+shims.UnixShimMarker+"\n"),
+		"the Unix shim marker emitted by internal/shims must be recognised")
+	assert.True(t, v3ShimPattern.MatchString("@echo off\r\n"+shims.WindowsShimMarker+"\r\n"),
+		"the Windows shim marker emitted by internal/shims must be recognised")
+}
 
 // TestFindGoenvShims_DetectsV3FormatShim covers the gap that left issue #542
 // reproducible: RemoveStaleV2Shim only matched the v2 "libexec/goenv"

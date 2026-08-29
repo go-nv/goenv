@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -64,13 +65,22 @@ var RootCmd = &cobra.Command{
 		// Store updated context back to command
 		cmd.SetContext(ctx)
 
-		// Remove any goenv shim shadowing this binary. rehash never creates one
-		// on purpose, and because the shims directory is at the front of PATH a
-		// leftover goenv shim makes every shim invocation recurse until the
-		// process table fills up (issues #542, #572). Covers both v2 leftovers
-		// and v3-format shims.
-		if _, err := migration.RemoveGoenvShims(cfg.ShimsDir()); err != nil {
+		// Remove the stale goenv shim left over from v2 installations. Its baked-in
+		// Cellar path no longer exists, so it is unambiguously broken and safe to
+		// delete unattended.
+		//
+		// Deliberately narrow. Broader detection (v3-format goenv shims) lives in
+		// 'goenv doctor', behind an explicit --fix, for two reasons: a destructive
+		// action on the path shared by every command — including read-only ones
+		// like 'goenv versions' — should be the user's choice, and auto-removing
+		// here would make the doctor check unreachable, since PersistentPreRun
+		// runs before every subcommand's RunE.
+		if removed, err := migration.RemoveStaleV2Shim(cfg.ShimsDir()); err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %v\n", err)
+		} else if removed {
+			fmt.Fprintf(cmd.ErrOrStderr(),
+				"goenv: removed stale v2 shim %s (it shadowed goenv and made every shim recurse)\n",
+				filepath.Join(cfg.ShimsDir(), "goenv"))
 		}
 
 		// Propagate output options

@@ -593,7 +593,7 @@ func renderCompletion(shell shellutil.ShellType) string {
 // the given shell, or "" when the shell has none.
 func embeddedCompletion(shell shellutil.ShellType) string {
 	switch shell {
-	case shellutil.ShellTypeBash, shellutil.ShellTypeKsh:
+	case shellutil.ShellTypeBash:
 		return completions.Bash
 	case shellutil.ShellTypeZsh:
 		return completions.ZshInit
@@ -602,6 +602,9 @@ func embeddedCompletion(shell shellutil.ShellType) string {
 	case shellutil.ShellTypePowerShell:
 		return completions.PowerShell
 	default:
+		// ksh in particular is deliberately absent. The bash script uses
+		// complete/compgen/COMPREPLY, which ksh does not implement, so emitting
+		// it would turn "no completions" into an error on every shell start.
 		return ""
 	}
 }
