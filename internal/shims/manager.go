@@ -175,6 +175,28 @@ func (s *ShimManager) clearShims() error {
 	return nil
 }
 
+// Shim markers. Every shim goenv generates carries one of these on its own
+// line, so a shim can be positively identified rather than guessed at from its
+// contents.
+//
+// This matters because identifying a shim gates a destructive operation:
+// leftover "goenv" shims are deleted automatically. Detecting them by looking
+// for a substring like "goenv exec" would also match the compiled goenv binary,
+// which embeds these very templates — and goenv would delete itself.
+//
+// internal/migration matches these markers. Changing them is a breaking change
+// for shims already on disk: bump the version suffix and keep matching the old
+// one rather than editing in place.
+const (
+	UnixShimMarker    = "# goenv-shim v1"
+	WindowsShimMarker = "REM goenv-shim v1"
+)
+
+// WindowsShimExtension is the extension createWindowsShim writes. Anything that
+// needs to find a generated shim by name must use this rather than hardcoding
+// ".bat", so the generator and its consumers cannot disagree about the name.
+const WindowsShimExtension = ".bat"
+
 // createShim creates a shim file for the specified binary
 func (s *ShimManager) createShim(binaryName string) error {
 	if utils.IsWindows() {
@@ -189,6 +211,7 @@ func (s *ShimManager) createUnixShim(binaryName string) error {
 
 	// Create the shim script
 	shimContent := fmt.Sprintf(`#!/usr/bin/env bash
+%s
 # goenv shim for %s
 set -e
 [ -n "$GOENV_DEBUG" ] && set -x
@@ -223,23 +246,20 @@ if [ "$program" = "goenv" ]; then
 else
   exec goenv exec "$program" "$@"
 fi
-`, binaryName)
+`, UnixShimMarker, binaryName)
 
-	if err := utils.WriteFileWithContext(shimPath, []byte(shimContent), utils.PermFileExecutable, "write shim file"); err != nil {
-		return err
-	}
-
-	return nil
+	return utils.WriteFileWithContext(shimPath, []byte(shimContent), utils.PermFileExecutable, "write shim file")
 }
 
 // createWindowsShim creates a Windows batch file shim
 func (s *ShimManager) createWindowsShim(binaryName string) error {
-	shimPath := filepath.Join(s.config.ShimsDir(), binaryName+".bat")
+	shimPath := filepath.Join(s.config.ShimsDir(), binaryName+WindowsShimExtension)
 
 	// Create the batch file shim
 	// Note: Uses a subroutine for file arg detection to avoid goto/label issues
 	// inside parenthesized blocks, which break CMD batch file parsing.
 	shimContent := fmt.Sprintf(`@echo off
+%s
 REM goenv shim for %s
 setlocal
 
@@ -271,7 +291,7 @@ if exist "%%~1" (
 )
 shift
 goto :detect_file_arg
-`, binaryName)
+`, WindowsShimMarker, binaryName)
 
 	if err := utils.WriteFileWithContext(shimPath, []byte(shimContent), 0666, "write shim file"); err != nil {
 		return err

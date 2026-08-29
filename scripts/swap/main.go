@@ -47,9 +47,20 @@ func init() {
 	// Find repo root (go up from scripts/swap to repo root)
 	repoRoot := filepath.Dir(filepath.Dir(scriptDir)) // Go up 2 levels
 
-	goBinary = filepath.Join(repoRoot, "goenv")
+	// "make build" writes to <repo>/bin/goenv. Fall back to the repository
+	// root for binaries built before that change (and for a bare "go build").
+	goBinary = filepath.Join(repoRoot, "bin", "goenv")
 	if platform.IsWindows() {
 		goBinary += ".exe"
+	}
+	if _, err := os.Stat(goBinary); err != nil {
+		legacy := filepath.Join(repoRoot, "goenv")
+		if platform.IsWindows() {
+			legacy += ".exe"
+		}
+		if _, err := os.Stat(legacy); err == nil {
+			goBinary = legacy
+		}
 	}
 
 	homeDir, _ := os.UserHomeDir()

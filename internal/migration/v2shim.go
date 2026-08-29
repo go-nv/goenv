@@ -12,6 +12,20 @@ import (
 // path component (followed by quote, space, or directory separator, but not a hyphen or letter).
 var V2ShimPattern = regexp.MustCompile(`libexec[\\/]goenv(["'\s/\\]|$)`)
 
+// v3ShimPattern matches the marker line that goenv writes into every shim it
+// generates (see internal/shims.ShimMarker). A shim named "goenv" containing
+// this is just as recursive as a v2 leftover, so it must be recognised too.
+//
+// This deliberately does NOT match on "goenv exec". The compiled goenv binary
+// embeds the shim templates and therefore contains that byte sequence itself,
+// so a substring test would classify the goenv binary as a shim and delete it.
+// Detection for a destructive operation must positively identify the target,
+// never merely fail to rule it out.
+//
+// The optional \r keeps this working against shims stored with CRLF endings,
+// which is the normal state of a checked-out or edited file on Windows.
+var v3ShimPattern = regexp.MustCompile(`(?m)^(#|REM) goenv-shim v1\r?$`)
+
 // RemoveStaleV2Shim removes the stale goenv shim left over from v2 installations.
 // v2's goenv-rehash bakes the Homebrew Cellar path into shims at creation time
 // (e.g. exec "/opt/homebrew/Cellar/goenv/2.2.38_1/libexec/goenv" on macOS/Linux

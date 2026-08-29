@@ -319,7 +319,16 @@ func runInstall(cmd *cobra.Command, args []string) error {
 				fmt.Fprintln(cmd.OutOrStdout(), "Debug: Auto-rehashing after installation")
 			}
 			shimMgr := shims.NewShimManager(cfg, env)
-			_ = shimMgr.Rehash() // Don't fail the install if rehash fails
+			// A rehash failure must not fail the install — the toolchain really is
+			// installed. But it cannot be silent either: without shims the newly
+			// installed 'go' is not runnable, and the user would see a successful
+			// install followed by "command not found" with nothing to connect them.
+			if rehashErr := shimMgr.Rehash(); rehashErr != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "%sGo %s was installed, but generating shims failed: %v\n",
+					utils.Emoji("⚠️  "), goVersion, rehashErr)
+				fmt.Fprintf(cmd.ErrOrStderr(), "   The 'go' command may not be available until this is resolved.\n")
+				fmt.Fprintf(cmd.ErrOrStderr(), "   Run 'goenv rehash' to retry, or 'goenv doctor' to diagnose.\n")
+			}
 		} else if cfg.Debug {
 			fmt.Fprintln(cmd.OutOrStdout(), "Debug: Skipping auto-rehash (disabled via flag or environment)")
 		}

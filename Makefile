@@ -13,6 +13,7 @@ export PREFIX ?= /usr/local
 # Build targets
 .PHONY: build clean test install uninstall dev-deps all cross-build generate-embedded test-windows release snapshot
 .PHONY: test-verbose test-report test-watch test-coverage test-quick check-gotestsum
+.PHONY: test-e2e test-e2e-network test-install-scripts
 .DEFAULT=build
 
 # Default target
@@ -32,6 +33,19 @@ bs: build-swap
 
 test:
 	unset GOENV_DEBUG && go run scripts/build-tool/main.go -task=test
+
+# End-to-end tests: runs a real goenv binary against an isolated GOENV_ROOT.
+# Hermetic and offline; safe to run anywhere.
+test-e2e:
+	unset GOENV_DEBUG && go test -tags e2e -v -timeout 20m ./testing/e2e/...
+
+# E2E including the tests that download a real Go toolchain (slow, needs network).
+test-e2e-network:
+	unset GOENV_DEBUG && GOENV_E2E_NETWORK=1 go test -tags e2e -v -timeout 30m ./testing/e2e/...
+
+# Regression tests for install.sh release selection (offline, fixture-driven).
+test-install-scripts:
+	bash testing/install/release_selection_test.sh
 
 # Enhanced test targets using gotestsum (install with: go install gotest.tools/gotestsum@latest)
 check-gotestsum:

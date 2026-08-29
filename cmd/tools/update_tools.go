@@ -312,8 +312,19 @@ func displayUpdateResults(cmd *cobra.Command, result *toolupdater.UpdateResult, 
 	}
 
 	if len(result.Updated) == 0 && len(result.Failed) == 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s All tools are up to date!\n",
-			utils.EmojiOr("✅ ", ""))
+		// Skipped tools were never checked for updates (they are pinned, or their
+		// strategy excluded them), so claiming everything is up to date would be
+		// telling the user something that was not verified.
+		if len(result.Skipped) > 0 {
+			fmt.Fprintf(cmd.OutOrStdout(), "%sNo tools updated (%d skipped)\n",
+				utils.EmojiOr("✅ ", ""), len(result.Skipped))
+			if !updateToolsFlags.verbose {
+				fmt.Fprintln(cmd.OutOrStdout(), "Run with --verbose to see why tools were skipped.")
+			}
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "%sAll tools are up to date!\n",
+				utils.EmojiOr("✅ ", ""))
+		}
 	}
 
 	return nil

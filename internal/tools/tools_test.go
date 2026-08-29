@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/stretchr/testify/assert"
@@ -299,6 +300,128 @@ func TestVerifyTools(t *testing.T) {
 	if results["missing-tool"] {
 		t.Error("Expected missing-tool to not be found")
 	}
+}
+
+// TestVerifyTools_FindsToolsWhereInstallToolsWritesThem is a regression test for
+// the false "not installed" reports described in issue #581.
+//
+// Both InstallTools call sites pass Config.SafeResolvePath(version) as the
+// GOPATH, which resolves to the version directory itself once the version is
+// installed, so "go install" writes binaries to versions/<version>/bin.
+// VerifyTools used to look only in versions/<version>/gopath/bin and therefore
+// reported successfully-installed tools as missing.
+func TestVerifyTools_FindsToolsWhereInstallToolsWritesThem(t *testing.T) {
+	tmpDir := t.TempDir()
+	goVersion := "1.21.0"
+
+	// GOPATH=versions/<version> means "go install" lands in versions/<version>/bin.
+	installedBin := filepath.Join(tmpDir, "versions", goVersion, "bin")
+	require.NoError(t, utils.EnsureDirWithContext(installedBin, "create test directory"))
+
+	goplsBinary := filepath.Join(installedBin, "gopls")
+	if utils.IsWindows() {
+		goplsBinary += ".exe"
+	}
+	testutil.WriteTestFile(t, goplsBinary, []byte("mock binary"), utils.PermFileExecutable, "Failed to create gopls binary")
+
+	config := &Config{
+		Tools: []Tool{
+			{Name: "gopls", Package: "golang.org/x/tools/gopls", Binary: "gopls"},
+			{Name: "missing-tool", Package: "example.com/missing", Binary: "missing"},
+		},
+	}
+
+	results, err := VerifyTools(config, goVersion, tmpDir)
+	require.NoError(t, err, "VerifyTools failed")
+
+	assert.True(t, results["gopls"],
+		"gopls installed at %s should be reported as installed", installedBin)
+	assert.False(t, results["missing-tool"], "missing-tool should not be found")
+}
+
+// TestToolBinDirs_CoversInstallToolsTarget asserts that the directory
+// InstallTools actually writes to is one of the directories VerifyTools
+// searches, so the two cannot silently drift apart again.
+func TestToolBinDirs_CoversInstallToolsTarget(t *testing.T) {
+	tmpDir := t.TempDir()
+	goVersion := "1.21.0"
+
+	cfg := &config.Config{Root: tmpDir}
+	require.NoError(t, utils.EnsureDirWithContext(cfg.VersionDir(goVersion), "create version dir"))
+
+	// This is the argument both InstallTools call sites pass as hostGopath.
+	hostGopath := cfg.SafeResolvePath(goVersion)
+	installTarget := filepath.Join(hostGopath, "bin")
+
+	assert.Contains(t, ToolBinDirs(tmpDir, goVersion), installTarget,
+		"ToolBinDirs must include the directory InstallTools writes to")
+}
+
+// isolateHome points the user's home directory at a temporary location for the
+// duration of a test.
+//
+// ToolBinDirs includes the legacy "$HOME/go/<version>/bin" location, so without
+// this a developer who happens to have a tool installed there gets a different
+// result from CI — and the test passes or fails for reasons unrelated to the
+// code under test.
+func isolateHome(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)        // Unix
+	t.Setenv("USERPROFILE", home) // Windows
+}
+
+// TestToolBinDirs_AreVersionScoped guards against a false positive: reporting a
+// tool as installed for version A because it exists for version B.
+//
+// Verification exists to tell the user whether a specific version has its
+// tools. A shared, host-wide directory in the search list silently defeats
+// that, and a silent false positive costs more than the false negative it
+// replaced — the user debugs the wrong thing.
+func TestToolBinDirs_AreVersionScoped(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	dirsA := ToolBinDirs(tmpDir, "1.21.0")
+	dirsB := ToolBinDirs(tmpDir, "1.24.0")
+
+	for _, a := range dirsA {
+		assert.NotContains(t, dirsB, a,
+			"directory %q is searched for both 1.21.0 and 1.24.0, so a tool installed "+
+				"for one version would be reported as installed for the other", a)
+	}
+}
+
+// TestVerifyTools_DoesNotLeakAcrossVersions is the behavioural counterpart:
+// installing a tool for one version must not mark it installed for another.
+func TestVerifyTools_DoesNotLeakAcrossVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// ToolBinDirs consults $HOME/go/<version>/bin, so the developer's real home
+	// directory would otherwise decide the result of this test.
+	isolateHome(t)
+
+	installedFor := "1.24.0"
+	queriedFor := "1.21.0"
+
+	binDir := filepath.Join(tmpDir, "versions", installedFor, "bin")
+	require.NoError(t, utils.EnsureDirWithContext(binDir, "create test directory"))
+
+	goplsBinary := filepath.Join(binDir, "gopls")
+	if utils.IsWindows() {
+		goplsBinary += ".exe"
+	}
+	testutil.WriteTestFile(t, goplsBinary, []byte("mock binary"), utils.PermFileExecutable, "Failed to create gopls binary")
+
+	config := &Config{
+		Tools: []Tool{{Name: "gopls", Package: "golang.org/x/tools/gopls", Binary: "gopls"}},
+	}
+
+	results, err := VerifyTools(config, queriedFor, tmpDir)
+	require.NoError(t, err)
+
+	assert.False(t, results["gopls"],
+		"a tool installed only for %s must not be reported as installed for %s",
+		installedFor, queriedFor)
 }
 
 func TestVerifyTools_NoBinaryName(t *testing.T) {

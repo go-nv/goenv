@@ -1,14 +1,20 @@
 package meta
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -284,7 +290,7 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 		return fmt.Errorf("%s", errMsg)
 	}
 
-	// Download new binary
+	// Download new release archive
 	fmt.Fprintf(cmd.OutOrStdout(), "%sDownloading goenv %s...\n", utils.Emoji("⬇️  "), latestVersion)
 	tmpFile, err := downloadBinary(downloadURL)
 	if err != nil {
@@ -292,19 +298,48 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	}
 	defer os.Remove(tmpFile)
 
-	// Verify checksum if available
+	// Verify the checksum of the downloaded archive before unpacking anything.
+	// goreleaser publishes "goenv_<version>_checksums.txt"; the previously used
+	// "SHA256SUMS" name has never existed, so verification always fell through
+	// to the "proceeding anyway" warning.
 	fmt.Fprintf(cmd.OutOrStdout(), "%sVerifying checksum...\n", utils.Emoji("🔐 "))
-	checksumURL := fmt.Sprintf("https://github.com/go-nv/goenv/releases/download/%s/SHA256SUMS", latestVersion)
-	if err := verifyChecksum(tmpFile, checksumURL, filepath.Base(downloadURL)); err != nil {
-		if cfg.Debug {
-			fmt.Fprintf(cmd.OutOrStdout(), "Debug: Checksum verification: %v\n", err)
-		}
-		// Warn but don't block (for older releases without checksums)
-		fmt.Fprintf(cmd.OutOrStdout(), "%sWarning: Could not verify checksum (proceeding anyway)\n", utils.Emoji("⚠️  "))
-		fmt.Fprintln(cmd.OutOrStdout(), "   This may indicate the release doesn't have checksums published")
-	} else {
+	checksumURL := fmt.Sprintf("https://github.com/go-nv/goenv/releases/download/%s/goenv_%s_checksums.txt",
+		latestVersion, strings.TrimPrefix(latestVersion, "v"))
+
+	switch err := verifyChecksum(tmpFile, checksumURL, filepath.Base(downloadURL)); {
+	case err == nil:
 		fmt.Fprintf(cmd.OutOrStdout(), "%sChecksum verified\n", utils.Emoji("✅ "))
+
+	case stderrors.Is(err, errChecksumsUnpublished):
+		// Releases predating goreleaser checksums genuinely have none. This is
+		// the only failure that does not abort: there is nothing to verify
+		// against, as opposed to a check that did not pass.
+		fmt.Fprintf(cmd.OutOrStderr(), "%sThis release publishes no checksums; the download cannot be verified.\n",
+			utils.Emoji("⚠️  "))
+
+	default:
+		// Anything else means verification was possible and did not succeed:
+		// a mismatch, a missing entry for this artifact, or an unreadable
+		// checksums file. Installing regardless would execute an unverified
+		// binary with the user's privileges, which is the exact outcome this
+		// step exists to prevent.
+		return fmt.Errorf("checksum verification failed: %w\n\n"+
+			"The downloaded archive does not match its published checksum, so it has NOT been installed.\n"+
+			"Retry the update; if it persists, download the release manually from\n"+
+			"https://github.com/go-nv/goenv/releases and verify it yourself", err)
 	}
+
+	// Release assets are archives, not bare binaries — unpack the goenv
+	// executable before it can replace the installed one.
+	//
+	// Staged in the installed binary's own directory so the replacement below
+	// is a same-filesystem rename. Extracting to $TMPDIR would fail with EXDEV
+	// wherever /tmp is a separate mount.
+	newBinary, err := extractGoenvBinary(tmpFile, downloadURL, filepath.Dir(binaryPath))
+	if err != nil {
+		return errors.FailedTo("extract update", err)
+	}
+	defer os.Remove(newBinary)
 
 	// Backup current binary
 	backupPath := binaryPath + ".backup"
@@ -318,7 +353,7 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 
 	// Make executable on Unix (Windows uses file extension for executability)
 	if !utils.IsWindows() {
-		if err := os.Chmod(tmpFile, utils.PermFileExecutable); err != nil {
+		if err := os.Chmod(newBinary, utils.PermFileExecutable); err != nil {
 			return errors.FailedTo("set permissions", err)
 		}
 	}
@@ -328,11 +363,11 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	// 1. Rename the new binary to the target name with .new extension
 	// 2. Create a batch script that waits, renames, and restarts
 	if utils.IsWindows() {
-		return replaceWindowsBinary(cmd, tmpFile, binaryPath, backupPath, currentVersion, latestVersion)
+		return replaceWindowsBinary(cmd, newBinary, binaryPath, backupPath, currentVersion, latestVersion)
 	}
 
 	// On Unix, we can replace the binary directly
-	if err := os.Rename(tmpFile, binaryPath); err != nil {
+	if err := os.Rename(newBinary, binaryPath); err != nil {
 		// Try to restore backup
 		os.Rename(backupPath, binaryPath)
 		return errors.FailedTo("replace binary", err)
@@ -393,8 +428,15 @@ func hasUncommittedChanges(gitRoot string) bool {
 // Helper functions for binary updates
 
 func getLatestRelease() (version string, downloadURL string, err error) {
-	// GitHub API endpoint for latest release
-	apiURL := "https://api.github.com/repos/go-nv/goenv/releases/latest"
+	// List releases rather than using /releases/latest.
+	//
+	// /releases/latest returns the most recently published release across *all*
+	// branches. The v2 maintenance branch publishes documentation-only releases
+	// with no binary assets, so /releases/latest regularly points at a release
+	// this binary cannot update to (issue #582). GitHub returns releases
+	// newest-first, so we take the first one that ships an asset for this
+	// platform.
+	apiURL := "https://api.github.com/repos/go-nv/goenv/releases?per_page=50"
 
 	// Try to load cached ETag
 	cfg := config.Load()
@@ -514,33 +556,57 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 		return "", "", err
 	}
 
-	bodyStr := string(body)
-
-	// Extract version (tag_name)
-	if idx := strings.Index(bodyStr, `"tag_name"`); idx != -1 {
-		start := strings.Index(bodyStr[idx:], `"`) + idx + 1
-		start = strings.Index(bodyStr[start:], `"`) + start + 1
-		end := strings.Index(bodyStr[start:], `"`) + start
-		version = bodyStr[start:end]
-	}
-
-	// Build download URL for current platform
-	if version != "" {
-		osName := platform.OS()
-		arch := platform.Arch()
-		assetName := fmt.Sprintf("goenv_%s_%s_%s", strings.TrimPrefix(version, "v"), osName, arch)
-
-		// Look for this asset in the release
-		if strings.Contains(bodyStr, assetName) {
-			downloadURL = fmt.Sprintf("https://github.com/go-nv/goenv/releases/download/%s/%s", version, assetName)
-		}
-	}
-
+	version, downloadURL = selectRelease(body, platform.OS(), platform.Arch())
 	if version == "" || downloadURL == "" {
-		return "", "", errors.FailedTo("parse release information", fmt.Errorf("incomplete release data"))
+		return "", "", errors.FailedTo("parse release information",
+			fmt.Errorf("no release found with a %s_%s binary", platform.OS(), platform.Arch()))
 	}
 
 	return version, downloadURL, nil
+}
+
+// githubRelease is the subset of the GitHub release payload we need.
+type githubRelease struct {
+	TagName    string `json:"tag_name"`
+	Draft      bool   `json:"draft"`
+	Prerelease bool   `json:"prerelease"`
+	Assets     []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+	} `json:"assets"`
+}
+
+// selectRelease returns the tag and download URL of the newest published
+// release in body that ships a binary for the given os/arch. It returns empty
+// strings when no such release exists.
+func selectRelease(body []byte, osName, arch string) (version string, downloadURL string) {
+	var releases []githubRelease
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return "", ""
+	}
+
+	assetPrefix := fmt.Sprintf("_%s_%s", osName, arch)
+
+	for _, release := range releases {
+		if release.Draft || release.Prerelease || release.TagName == "" {
+			continue
+		}
+
+		want := fmt.Sprintf("goenv_%s%s", strings.TrimPrefix(release.TagName, "v"), assetPrefix)
+		for _, asset := range release.Assets {
+			// Match with or without an archive extension.
+			if asset.Name != want && !strings.HasPrefix(asset.Name, want+".") {
+				continue
+			}
+			if asset.BrowserDownloadURL != "" {
+				return release.TagName, asset.BrowserDownloadURL
+			}
+			return release.TagName, fmt.Sprintf(
+				"https://github.com/go-nv/goenv/releases/download/%s/%s", release.TagName, asset.Name)
+		}
+	}
+
+	return "", ""
 }
 
 func getCurrentVersion() string {
@@ -589,7 +655,124 @@ func downloadBinary(url string) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-// verifyChecksum downloads SHA256SUMS and verifies the binary matches
+// extractGoenvBinary unpacks the goenv executable from a downloaded release
+// archive and returns the path to a temporary file containing it.
+//
+// Release assets are ".tar.gz" (or ".zip" on Windows) archives, so the
+// downloaded file cannot be installed as an executable directly.
+func extractGoenvBinary(archivePath, sourceURL, destDir string) (string, error) {
+	wantNames := []string{"goenv", "goenv.exe"}
+
+	if strings.HasSuffix(sourceURL, ".zip") {
+		return extractFromZip(archivePath, wantNames, destDir)
+	}
+	return extractFromTarGz(archivePath, wantNames, destDir)
+}
+
+func extractFromTarGz(archivePath string, wantNames []string, destDir string) (string, error) {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	gzr, err := gzip.NewReader(file)
+	if err != nil {
+		return "", err
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+		// Match on the base name only; never use the archive's path.
+		if !slices.Contains(wantNames, filepath.Base(header.Name)) {
+			continue
+		}
+		return writeTempBinary(io.LimitReader(tr, maxBinarySize), destDir)
+	}
+
+	return "", fmt.Errorf("no goenv binary found in archive")
+}
+
+func extractFromZip(archivePath string, wantNames []string, destDir string) (string, error) {
+	reader, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	for _, entry := range reader.File {
+		if entry.FileInfo().IsDir() {
+			continue
+		}
+		if !slices.Contains(wantNames, filepath.Base(entry.Name)) {
+			continue
+		}
+
+		rc, err := entry.Open()
+		if err != nil {
+			return "", err
+		}
+		path, err := writeTempBinary(io.LimitReader(rc, maxBinarySize), destDir)
+		rc.Close()
+		return path, err
+	}
+
+	return "", fmt.Errorf("no goenv binary found in archive")
+}
+
+// maxBinarySize caps how much data is unpacked from a release archive,
+// bounding decompression-bomb exposure.
+const maxBinarySize = 256 << 20 // 256 MiB
+
+// writeTempBinary writes src to a new file in destDir and returns its path.
+//
+// destDir must be the directory the binary will finally live in. The caller
+// installs the result with os.Rename, and rename cannot cross filesystems:
+// writing to $TMPDIR instead fails with EXDEV wherever /tmp is a separate
+// mount, which is the systemd default on many Linux distributions. Staging in
+// the destination directory also keeps the replacement atomic, and gives the
+// new binary its own inode — replacing an executable's contents in place
+// invalidates its code signature and macOS then kills it on exec.
+func writeTempBinary(src io.Reader, destDir string) (string, error) {
+	out, err := os.CreateTemp(destDir, ".goenv-update-bin-*")
+	if err != nil {
+		// A read-only or otherwise unwritable destination is a legitimate
+		// failure to report: the update could not be staged where it must land.
+		return "", fmt.Errorf("cannot stage update in %s: %w", destDir, err)
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, src); err != nil {
+		os.Remove(out.Name())
+		return "", err
+	}
+
+	return out.Name(), nil
+}
+
+// errChecksumsUnpublished means the release does not publish a checksums file
+// at all. Releases predating goreleaser checksums are the only legitimate case,
+// so this is the single failure mode that does not abort the update.
+var errChecksumsUnpublished = fmt.Errorf("release does not publish checksums")
+
+// verifyChecksum downloads the release checksums file and verifies the
+// downloaded artifact matches.
+//
+// Every failure except errChecksumsUnpublished must be treated as fatal by the
+// caller. A verification step that warns and continues is not a security
+// control — it is a log line, and it offers no protection against exactly the
+// tampered or truncated artifact it exists to catch.
 func verifyChecksum(binaryPath, checksumURL, filename string) error {
 	// Download checksum file
 	client := utils.NewHTTPClient(10 * time.Second)
@@ -600,7 +783,7 @@ func verifyChecksum(binaryPath, checksumURL, filename string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("checksums file not found (release may not have published checksums)")
+		return errChecksumsUnpublished
 	}
 
 	if resp.StatusCode != http.StatusOK {

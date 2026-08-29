@@ -67,19 +67,46 @@ func main() {
 func build() {
 	fmt.Println("Building goenv...")
 
-	binaryName := "goenv"
-	if platform.IsWindows() {
-		binaryName += ".exe"
+	outputPath := builtBinaryPath()
+
+	// Build into bin/ rather than the repository root. The documented
+	// git-clone install clones to $GOENV_ROOT and puts $GOENV_ROOT/bin on
+	// PATH, so a binary left in the repository root is never found (#572).
+	if err := utils.EnsureDirWithContext(filepath.Dir(outputPath), "create bin directory"); err != nil {
+		fmt.Printf("Failed to create bin directory: %v\n", err)
+		os.Exit(1)
 	}
 
 	ldflags := fmt.Sprintf("-X main.version=%s -X main.commit=%s -X main.buildTime=%s", version, commitSHA, buildTime)
 
-	if err := utils.RunCommandWithIO("go", []string{"build", "-ldflags", ldflags, "-o", binaryName, "."}, os.Stdout, os.Stderr); err != nil {
+	if err := utils.RunCommandWithIO("go", []string{"build", "-ldflags", ldflags, "-o", outputPath, "."}, os.Stdout, os.Stderr); err != nil {
 		fmt.Printf("Build failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("✓ Built %s successfully\n", binaryName)
+	fmt.Printf("✓ Built %s successfully\n", outputPath)
+}
+
+// builtBinaryPath returns where "make build" writes the goenv binary.
+func builtBinaryPath() string {
+	binaryName := "goenv"
+	if platform.IsWindows() {
+		binaryName += ".exe"
+	}
+	return filepath.Join("bin", binaryName)
+}
+
+// sameFile reports whether two paths refer to the same existing file.
+func sameFile(a, b string) bool {
+	aInfo, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	bInfo, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(aInfo, bInfo)
 }
 
 func test() {
@@ -175,12 +202,17 @@ func install(prefix string) {
 	}
 
 	// Copy binary
-	srcBinary := "goenv"
-	if platform.IsWindows() {
-		srcBinary += ".exe"
-	}
+	srcBinary := builtBinaryPath()
 
 	dstBinary := filepath.Join(binDir, filepath.Base(srcBinary))
+
+	// "make install PREFIX=$PWD" would otherwise copy the binary onto itself
+	// and truncate it, since build() already writes to ./bin.
+	if sameFile(srcBinary, dstBinary) {
+		fmt.Printf("✓ Installed %s\n", dstBinary)
+		return
+	}
+
 	if err := utils.CopyFile(srcBinary, dstBinary); err != nil {
 		fmt.Printf("Failed to copy binary: %v\n", err)
 		os.Exit(1)

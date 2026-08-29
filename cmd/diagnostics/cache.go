@@ -21,6 +21,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// sharedModCacheAdviceThreshold is the size at which "goenv cache status"
+// starts pointing out the shared module cache. Set at 1GB: below that it is
+// not worth the noise, above it the cache is a meaningful share of a container
+// image (issue #578 reported ~2.5GB).
+const sharedModCacheAdviceThreshold = 1 << 30 // 1 GiB
+
 // completeCacheCleanTypes provides shell completion for cache clean command
 func completeCacheCleanTypes(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) > 0 {
@@ -253,7 +259,11 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 		return errors.FailedTo("list installed versions", err)
 	}
 
-	if len(versions) == 0 {
+	// Note: we deliberately do NOT return early when no versions are installed.
+	// The shared module cache lives outside versions/ and survives version
+	// removal, so "No Go versions installed" would hide gigabytes of reclaimable
+	// disk (issue #578). Fall through and let the display report what exists.
+	if len(versions) == 0 && !utils.DirExists(filepath.Join(cfg.Root, "shared", "go-mod")) {
 		if statusJSON {
 			// Output minimal JSON for no versions
 			result := cacheStatusJSON{
@@ -358,8 +368,20 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 	// Human-readable output
 	out := cmd.OutOrStdout()
 
+	// The shared module cache is not attached to any single version, so it is
+	// absent from status.ByVersion and has to be pulled out of ModCaches.
+	// It used to be counted in the total but never displayed, which is how a
+	// multi-gigabyte cache stayed invisible until users went spelunking through
+	// the filesystem (issue #578).
+	sharedModCaches := make([]cache.CacheInfo, 0, 1)
+	for _, c := range status.ModCaches {
+		if c.GoVersion == cache.SharedCacheLabel {
+			sharedModCaches = append(sharedModCaches, c)
+		}
+	}
+
 	// Group by version for display
-	if len(status.ByVersion) == 0 {
+	if len(status.ByVersion) == 0 && len(sharedModCaches) == 0 {
 		fmt.Fprintln(out, "No caches found.")
 		return nil
 	}
@@ -416,6 +438,23 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(out)
 	}
 
+	// Display the shared module cache, which is shared across every installed
+	// version rather than belonging to one.
+	var sharedTotal int64
+	for _, c := range sharedModCaches {
+		sharedTotal += c.SizeBytes
+		fileCount := cache.FormatFileCount(c.Files, c.Files < 0)
+		fmt.Fprintf(out, "%s Shared (all versions) │ (%s)\n",
+			utils.Emoji("🌐"),
+			cache.FormatBytes(c.SizeBytes))
+		fmt.Fprintf(out, "  %s Modules: %s [%s] (%s files)\n",
+			utils.Emoji("📚"),
+			cache.FormatBytes(c.SizeBytes),
+			c.Path,
+			fileCount)
+		fmt.Fprintln(out)
+	}
+
 	// Display totals
 	totalFileCount := cache.FormatFileCount(status.TotalFiles, status.TotalFiles < 0)
 	fmt.Fprintf(out, "%s Total: %s (%s files)\n",
@@ -437,6 +476,20 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(out, "\n%s Tip: Run 'goenv cache migrate' to convert old format caches to architecture-aware format.\n",
 				utils.Emoji("💡"))
 		}
+	}
+
+	// Call out a large shared module cache explicitly. In container and CI
+	// image builds it is frequently the single biggest contributor, and the
+	// v2-era cleanup recipes that only walk versions/<version>/ never touch it
+	// (issue #578).
+	if sharedTotal > sharedModCacheAdviceThreshold {
+		fmt.Fprintf(out, "\n%s The shared module cache is %s.\n",
+			utils.Emoji("💡"),
+			cache.FormatBytes(sharedTotal))
+		fmt.Fprintf(out, "   It is shared by every installed version and is not removed by cleanup\n")
+		fmt.Fprintf(out, "   scripts that only delete files under versions/. To reclaim it:\n")
+		fmt.Fprintf(out, "     goenv cache clean mod\n")
+		fmt.Fprintf(out, "   In a Dockerfile, run it in the same RUN layer as 'goenv install'.\n")
 	}
 
 	if status.TotalSize > 5*1024*1024*1024 { // > 5GB
@@ -478,7 +531,11 @@ func runCacheClean(cmd *cobra.Command, args []string) error {
 		return errors.FailedTo("list installed versions", err)
 	}
 
-	if len(versions) == 0 {
+	// Only bail out when there is genuinely nothing to clean. The shared module
+	// cache lives outside versions/ and survives version removal, so gating
+	// cleanup on installed versions made it impossible to reclaim — while
+	// 'cache status' was telling users to run exactly this command (issue #578).
+	if len(versions) == 0 && !utils.DirExists(filepath.Join(cfg.Root, "shared", "go-mod")) {
 		fmt.Fprintln(cmd.OutOrStdout(), "No Go versions installed.")
 		return nil
 	}

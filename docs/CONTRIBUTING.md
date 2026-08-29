@@ -87,7 +87,7 @@ Press `Ctrl+Shift+B` to run build tasks, or use the Command Palette (`Ctrl+Shift
 **Unix/macOS:**
 
 ```bash
-make build              # Build goenv binary in root directory
+make build              # Build goenv binary into bin/ (bin/goenv, or bin/goenv.exe on Windows)
 ```
 
 **Windows (PowerShell):**
@@ -116,7 +116,7 @@ The enhanced test targets automatically download and use [gotestsum](https://git
 
 ```bash
 make test-quick         # Clean, readable output + failures saved to file
-make test-debug         # Debug mode - only show failures in terminal  
+make test-debug         # Debug mode - only show failures in terminal
 make test-verbose       # Detailed test output
 make test-report        # Generate JUnit XML + HTML coverage + failures summary
 make test-watch         # Watch mode - reruns tests on file changes
@@ -124,6 +124,7 @@ make test-coverage      # Quick coverage summary
 ```
 
 **Test Reports & Output Files:**
+
 - **Failures only**: `.test-results/failures.txt` (easy to parse - check this first!)
 - **Full output**: `.test-results/full-output.log` (complete test run details)
 - **JUnit XML**: `.test-results/junit.xml` (for CI integration)
@@ -131,6 +132,7 @@ make test-coverage      # Quick coverage summary
 - **JSON output**: `.test-results/test-output.json` (machine-readable format)
 
 **Efficient Debugging Workflow:**
+
 1. Run `make test-quick` or `make test-debug`
 2. Check `.test-results/failures.txt` - contains only failures (small file, easy to parse)
 3. If needed, check `.test-results/full-output.log` for full context
@@ -482,14 +484,14 @@ if err != nil {
 
 ### Helper Function Reference
 
-| Category | Location | Key Functions |
-|----------|----------|---------------|
-| **File operations** | `internal/utils/file.go` | FileExists, DirExists, PathExists, IsExecutableFile, StatWithExistence |
-| **Directory creation** | `internal/utils/file.go` | EnsureDir, EnsureDirWithContext, EnsureDirForFile |
-| **JSON** | `internal/utils/json.go` | UnmarshalJSONFile, MarshalJSONFile, MarshalJSONPretty |
-| **Commands** | `internal/utils/command.go` | RunCommand, RunCommandOutput, RunCommandInDir, RunCommandWithIO |
-| **HTTP** | `internal/utils/http.go` | NewHTTPClient, FetchJSON, FetchJSONWithTimeout |
-| **Errors** | `internal/errors/errors.go` | FailedTo, New |
+| Category               | Location                    | Key Functions                                                          |
+| ---------------------- | --------------------------- | ---------------------------------------------------------------------- |
+| **File operations**    | `internal/utils/file.go`    | FileExists, DirExists, PathExists, IsExecutableFile, StatWithExistence |
+| **Directory creation** | `internal/utils/file.go`    | EnsureDir, EnsureDirWithContext, EnsureDirForFile                      |
+| **JSON**               | `internal/utils/json.go`    | UnmarshalJSONFile, MarshalJSONFile, MarshalJSONPretty                  |
+| **Commands**           | `internal/utils/command.go` | RunCommand, RunCommandOutput, RunCommandInDir, RunCommandWithIO        |
+| **HTTP**               | `internal/utils/http.go`    | NewHTTPClient, FetchJSON, FetchJSONWithTimeout                         |
+| **Errors**             | `internal/errors/errors.go` | FailedTo, New                                                          |
 
 ### When NOT to Use Helpers
 
@@ -533,12 +535,14 @@ Good documentation is just as important as good code! We welcome contributions t
 All documentation should follow these quality standards:
 
 ✅ **Structure:**
+
 - Include a table of contents for documents > 100 lines
 - Use clear, hierarchical headings (H1 → H2 → H3)
 - Group related content logically
 - Add "See Also" cross-references at the end
 
 ✅ **Content:**
+
 - Start with a brief purpose statement
 - Include copy-paste working examples
 - Cover common use cases first, advanced topics later
@@ -546,17 +550,20 @@ All documentation should follow these quality standards:
 - Include troubleshooting sections
 
 ✅ **Examples:**
+
 - All code examples must be tested and work
 - Show both success and failure cases
 - Include platform-specific examples when relevant
 - Use realistic, practical examples (not "foo/bar")
 
 ✅ **Cross-Platform:**
+
 - Note platform differences (Linux, macOS, Windows)
 - Include examples for all major platforms
 - Mention any platform limitations
 
 ✅ **Security:**
+
 - Highlight security considerations
 - Show secure patterns first
 - Warn about insecure alternatives
@@ -573,6 +580,7 @@ We have several documentation patterns you can follow:
 **Purpose:** Get users productive in 5 minutes
 
 **Template:**
+
 ```markdown
 # Feature Quick Start
 
@@ -585,12 +593,15 @@ Brief explanation (2-3 sentences).
 ## 5-Minute Setup
 
 ### 1. Step One
+
 ### 2. Step Two
+
 ### 3. Test It
 
 ## Common Use Cases
 
 ### Use Case 1
+
 ### Use Case 2
 
 ## Troubleshooting
@@ -605,6 +616,7 @@ Brief explanation (2-3 sentences).
 **Purpose:** Complete, authoritative reference
 
 **Template:**
+
 ```markdown
 # Feature Reference
 
@@ -617,7 +629,7 @@ Complete reference for [feature].
 ## Reference Tables
 
 | Item | Description | Notes |
-|------|-------------|-------|
+| ---- | ----------- | ----- |
 
 ## Detailed Sections
 
@@ -631,6 +643,7 @@ Complete reference for [feature].
 **Purpose:** Solve specific problems
 
 **Template:**
+
 ```markdown
 # How to [Task]
 
@@ -656,6 +669,7 @@ Complete guide to [task].
 **Purpose:** Explain concepts and design decisions
 
 **Template:**
+
 ```markdown
 # Understanding [Concept]
 
@@ -677,6 +691,7 @@ Use this checklist before submitting documentation PRs:
 **📋 Use the checklist above to ensure high-quality documentation.**
 
 Quick checklist:
+
 - [ ] Table of contents included (for docs > 100 lines)
 - [ ] All code examples tested and work
 - [ ] Cross-references added to related docs
@@ -690,26 +705,31 @@ Quick checklist:
 ### Where to Add Documentation
 
 **Reference Documentation:**
+
 - Commands: `docs/reference/COMMANDS.md`
 - Environment variables: `docs/reference/ENVIRONMENT_VARIABLES.md`
 - Platform support: `docs/reference/PLATFORM_SUPPORT.md`
 
 **User Guides:**
+
 - Getting started: `docs/user-guide/`
 - Installation: `docs/user-guide/INSTALL.md`
 - VS Code: `docs/user-guide/VSCODE_INTEGRATION.md`
 
 **Advanced Topics:**
+
 - Configuration: `docs/advanced/`
 - Caching: `docs/advanced/SMART_CACHING.md`
 - Cross-building: `docs/advanced/CROSS_BUILDING.md`
 
 **Troubleshooting:**
+
 - Cache issues: `docs/advanced/CACHE_TROUBLESHOOTING.md`
 - Platform issues: `docs/reference/PLATFORM_SUPPORT.md`
 - FAQ: `docs/FAQ.md`
 
 **Compliance & Operations:**
+
 - Hooks: `docs/reference/HOOKS_QUICKSTART.md` (quick) or `docs/reference/HOOKS.md` (complete)
 - Compliance: `docs/advanced/COMPLIANCE_USE_CASES.md`
 - CI/CD: `docs/advanced/CI_CD_GUIDE.md`
@@ -719,14 +739,18 @@ Quick checklist:
 When adding new documentation:
 
 1. **Add to main README.md:**
+
    ```markdown
    #### Advanced Topics
+
    - **[Your New Guide](./docs/YOUR_GUIDE.md)** - Brief description ⭐ **NEW**
    ```
 
 2. **Add to docs/README.md:**
+
    ```markdown
    ### Your Category
+
    - **[Your New Guide](YOUR_GUIDE.md)** - Brief description
    ```
 
@@ -739,22 +763,26 @@ When adding new documentation:
 Learn from our best documentation:
 
 **Complete Guides:**
+
 - [Hooks Quick Start](./reference/HOOKS_QUICKSTART.md) - Perfect quick start example
 - [Compliance Use Cases](./advanced/COMPLIANCE_USE_CASES.md) - Comprehensive how-to
 - [Platform Support Matrix](./reference/PLATFORM_SUPPORT.md) - Complete reference
 
 **Well-Structured Commands:**
+
 - [goenv vscode setup](./reference/COMMANDS.md#goenv-vscode-setup) - Clear, complete command documentation
 - [goenv cache clean](./reference/COMMANDS.md#goenv-cache-clean) - Good examples and options
 
 **Security Documentation:**
+
 - [run_command action](./HOOKS.md#run_command) - Security-first approach
 - [Hooks Security Model](./HOOKS.md#security-model) - Complete threat model
 
 ### Common Documentation Patterns
 
 **Platform-specific examples:**
-```markdown
+
+````markdown
 ### macOS / Linux
 
 \```bash
@@ -766,10 +794,11 @@ export GOENV_ROOT="$HOME/.goenv"
 \```powershell
 $env:GOENV_ROOT = "$HOME\.goenv"
 \```
-```
+````
 
 **Troubleshooting format:**
-```markdown
+
+````markdown
 ### Issue: Brief Description
 
 **Symptom:**
@@ -783,32 +812,38 @@ Error message or behavior
 \```bash
 command to fix
 \```
-```
+````
 
 **Example with explanation:**
-```markdown
+
+````markdown
 ### Use Case: Descriptive Title
 
 \```bash
+
 # Step 1: Do this
+
 command --flag
 
 # Step 2: Do that
+
 another command
 \```
 
 **What this does:**
+
 1. First command explanation
 2. Second command explanation
 
 **Why this works:** Brief explanation
-```
+````
 
 ### Testing Documentation
 
 Before submitting:
 
 1. **Test all commands:**
+
    ```bash
    # Copy each command from your doc
    # Run it in a clean environment
@@ -816,12 +851,14 @@ Before submitting:
    ```
 
 2. **Check links:**
+
    ```bash
    # Use a markdown link checker
    markdown-link-check docs/YOUR_GUIDE.md
    ```
 
 3. **Verify cross-references:**
+
    ```bash
    # Ensure all "See Also" links work
    # Check that related docs link back
@@ -836,17 +873,20 @@ Before submitting:
 ### Documentation Style Guide
 
 **Voice and tone:**
+
 - Use active voice: "Run this command" not "This command should be run"
 - Be direct: "Do X" not "You should probably do X"
 - Be helpful: Explain why, not just what
 
 **Formatting:**
+
 - Use **bold** for emphasis and important notes
 - Use `code` for commands, files, and variables
 - Use > blockquotes for tips and warnings
 - Use ✅ ❌ ⚠️ for visual cues (sparingly)
 
 **Terminology:**
+
 - "Go version" not "golang version"
 - "goenv" (lowercase) in text, `goenv` in code
 - "macOS" not "Mac OS" or "OSX"
@@ -854,13 +894,17 @@ Before submitting:
 - Use proper product names: "VS Code" not "vscode"
 
 **Code blocks:**
-```markdown
+
+````markdown
 \```bash
+
 # Always include shebang or language
+
 # Add comments to explain non-obvious parts
+
 goenv install 1.25.2
 \```
-```
+````
 
 ### Getting Help with Documentation
 

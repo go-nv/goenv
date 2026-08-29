@@ -23,6 +23,7 @@ import (
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/migration"
 	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/shellutil"
@@ -108,6 +109,7 @@ const (
 	IssueTypeShimsMissing        IssueType = "shims-missing"
 	IssueTypeShimsEmpty          IssueType = "shims-empty"
 	IssueTypeShimsStale          IssueType = "shims-stale"
+	IssueTypeGoenvShimPresent    IssueType = "goenv-shim-present"
 	IssueTypeCacheStale          IssueType = "cache-stale"
 	IssueTypeCacheArchMismatch   IssueType = "cache-arch-mismatch"
 	IssueTypeOldModCaches        IssueType = "old-mod-caches"
@@ -230,6 +232,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check 5b: Shim content (detect stale/incompatible shims)
 	results = append(results, checkShimContent(cfg))
 
+	// Check 5c: Recursive goenv shim (a "goenv" shim shadows the real binary)
+	results = append(results, checkGoenvShim(cfg))
+
 	// Check 6: Installed versions
 	results = append(results, checkInstalledVersions(cfg, mgr))
 
@@ -238,6 +243,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 8: Conflicting installations
 	results = append(results, checkConflictingGo(cfg))
+
+	// Check 8b: Stale/mismatched GOROOT
+	results = append(results, checkGorootMismatch(cfg, mgr))
 
 	// Check 9: Cache files
 	results = append(results, checkCacheFiles(cfg))
@@ -1708,6 +1716,15 @@ func detectFixableIssues(results []checkResult, cfg *config.Config) []fixableIss
 				fixFunc:     fixRehash,
 			})
 
+		case IssueTypeGoenvShimPresent:
+			issues = append(issues, fixableIssue{
+				id:          "goenv-shim-remove",
+				name:        "Recursive goenv Shim",
+				description: "A goenv shim shadows the goenv binary and causes infinite recursion",
+				tier:        FixTierAuto,
+				fixFunc:     fixGoenvShim,
+			})
+
 		case IssueTypeCacheStale, IssueTypeCacheArchMismatch:
 			issues = append(issues, fixableIssue{
 				id:          "cache-clean",
@@ -1882,6 +1899,18 @@ func fixRehash(cmd *cobra.Command, cfg *config.Config) error {
 	ctx := cmdutil.GetContexts(cmd)
 	shimMgr := shims.NewShimManager(cfg, ctx.Environment)
 	return shimMgr.Rehash()
+}
+
+// fixGoenvShim removes any goenv shim shadowing the real goenv binary.
+func fixGoenvShim(cmd *cobra.Command, cfg *config.Config) error {
+	removed, err := migration.RemoveGoenvShims(cfg.ShimsDir())
+	for _, path := range removed {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Removed %s\n", path)
+	}
+	if err != nil {
+		return errors.FailedTo("remove goenv shim", err)
+	}
+	return nil
 }
 
 func fixCacheClean(cmd *cobra.Command, cfg *config.Config) error {
@@ -2575,6 +2604,38 @@ func checkShimContent(cfg *config.Config) checkResult {
 	}
 }
 
+// checkGoenvShim detects a "goenv" entry inside the shims directory.
+//
+// rehash deliberately never creates one (internal/shims/manager.go), because
+// the shims directory sits at the front of PATH and every shim dispatches
+// through "goenv exec". A goenv shim therefore makes goenv invoke itself
+// forever — the runaway "goenv exec go version" processes reported in #542.
+// Stale v2 installs are the usual source, and "goenv doctor" previously had no
+// check for it at all.
+func checkGoenvShim(cfg *config.Config) checkResult {
+	shimsDir := cfg.ShimsDir()
+
+	found := migration.FindGoenvShims(shimsDir)
+	if len(found) == 0 {
+		return checkResult{
+			id:      "goenv-shim",
+			name:    "Recursive goenv shim",
+			status:  StatusOK,
+			message: "No goenv shim shadowing the goenv binary",
+		}
+	}
+
+	return checkResult{
+		id:     "goenv-shim",
+		name:   "Recursive goenv shim",
+		status: StatusError,
+		message: fmt.Sprintf("Found %s — this shadows the real goenv binary and causes infinite recursion",
+			strings.Join(found, ", ")),
+		advice:    "Run 'goenv doctor --fix', or delete the file(s) manually and run 'goenv rehash'",
+		issueType: IssueTypeGoenvShimPresent,
+	}
+}
+
 func checkInstalledVersions(cfg *config.Config, mgr *manager.Manager) checkResult {
 	versions, err := mgr.ListInstalledVersions()
 
@@ -2783,8 +2844,123 @@ func checkConflictingGo(cfg *config.Config) checkResult {
 	}
 }
 
-func checkCacheFiles(cfg *config.Config) checkResult {
-	// Cache files are stored in GOENV_ROOT, not a separate directory
+// checkGorootMismatch detects a GOROOT environment variable that disagrees
+// with the Go version goenv would actually run.
+//
+// A stale exported GOROOT is one of the hardest goenv failures to diagnose:
+// the Go toolchain reads its standard library from GOROOT, so pairing (say)
+// the 1.23.2 "go" binary with GOROOT pointing at 1.27.0 fails every build with
+// "compile: version go1.27.0 does not match go tool version go1.23.2" and says
+// nothing about goenv. This is the situation behind issue #367, and it also
+// shows up when contributors build goenv itself (#570).
+//
+// The comparison is against the version goenv resolves, NOT against whatever
+// exec.LookPath("go") returns. In a correctly initialised shell PATH resolves
+// "go" to $GOENV_ROOT/shims/go, which belongs to no version — so comparing
+// against the binary path yields nothing to compare and the check would report
+// "consistent" precisely when the user is in the broken state it exists to
+// find.
+func checkGorootMismatch(cfg *config.Config, mgr *manager.Manager) checkResult {
+	const id = "goroot-consistency"
+	const name = "GOROOT consistency"
+
+	goroot := os.Getenv(utils.EnvVarGoroot)
+	if goroot == "" {
+		return checkResult{
+			id:      id,
+			name:    name,
+			status:  StatusOK,
+			message: "GOROOT is not set (goenv manages it per command)",
+		}
+	}
+
+	if !utils.DirExists(goroot) {
+		return checkResult{
+			id:      id,
+			name:    name,
+			status:  StatusError,
+			message: fmt.Sprintf("GOROOT points at a directory that does not exist: %s", goroot),
+			advice:  "Unset it with 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
+		}
+	}
+
+	// GOROOT that is not inside goenv's versions/ tree belongs to a system or
+	// hand-managed Go. That is a deliberate choice and not goenv's business.
+	gorootVersion := versionFromVersionPath(cfg, goroot)
+	if gorootVersion == "" {
+		return checkResult{
+			id:      id,
+			name:    name,
+			status:  StatusOK,
+			message: fmt.Sprintf("GOROOT (%s) is not goenv-managed; leaving it alone", goroot),
+		}
+	}
+
+	// Compare against the version goenv resolves, which is what any shim will
+	// execute.
+	activeVersion, _, source, err := mgr.GetCurrentVersionResolved()
+	if err != nil {
+		return checkResult{
+			id:      id,
+			name:    name,
+			status:  StatusWarning,
+			message: fmt.Sprintf("GOROOT points at Go %s but the active version could not be determined: %v", gorootVersion, err),
+			advice:  "Run 'goenv version' to check the configured version",
+		}
+	}
+
+	if activeVersion == manager.SystemVersion {
+		return checkResult{
+			id:     id,
+			name:   name,
+			status: StatusError,
+			message: fmt.Sprintf("GOROOT points at goenv's Go %s, but the active version is 'system'",
+				gorootVersion),
+			advice: "Run 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
+		}
+	}
+
+	if gorootVersion != activeVersion {
+		return checkResult{
+			id:     id,
+			name:   name,
+			status: StatusError,
+			message: fmt.Sprintf("GOROOT points at Go %s but the active version is %s (set by %s)",
+				gorootVersion, activeVersion, source),
+			advice: "This breaks every build with \"compile: version does not match go tool version\". " +
+				"Run 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
+		}
+	}
+
+	return checkResult{
+		id:      id,
+		name:    name,
+		status:  StatusOK,
+		message: fmt.Sprintf("GOROOT (%s) matches the active Go %s", goroot, activeVersion),
+	}
+}
+
+// versionFromVersionPath returns the goenv version a path belongs to, or "" if
+// the path is not inside $GOENV_ROOT/versions/<version>.
+func versionFromVersionPath(cfg *config.Config, path string) string {
+	versionsDir := cfg.VersionsDir()
+
+	rel, err := filepath.Rel(versionsDir, path)
+	if err != nil {
+		return ""
+	}
+	if rel == "." || strings.HasPrefix(rel, "..") {
+		return ""
+	}
+
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return ""
+	}
+	return parts[0]
+}
+
+func checkCacheFiles(cfg *config.Config) checkResult { // Cache files are stored in GOENV_ROOT, not a separate directory
 	// Check for releases-cache.json and versions-cache.json
 	releasesCache := filepath.Join(cfg.Root, "releases-cache.json")
 	versionsCache := filepath.Join(cfg.Root, "versions-cache.json")
