@@ -6,6 +6,10 @@ name: E2E
 # Unit tests did not catch several shipped regressions (issues #438, #542, #572,
 # #581, #593) because those bugs only appear when the binary runs against a real
 # filesystem, PATH and shell. This workflow is that missing outer ring.
+#
+# Tests always run with -v. These failures are usually diagnosed by someone who
+# cannot reproduce the runner's OS locally, so the harness logs every command it
+# executes with both output streams, and dumps the sandbox tree on failure.
 
 on:
     push:
@@ -47,6 +51,14 @@ jobs:
               with:
                   go-version: "stable"
 
+            - name: Environment
+              shell: bash
+              run: |
+                  echo "runner os : ${RUNNER_OS}"
+                  echo "go        : $(go version)"
+                  echo "shell     : ${SHELL:-unknown}"
+                  go env GOOS GOARCH GOROOT
+
             - name: Run E2E tests
               shell: bash
               env:
@@ -54,7 +66,34 @@ jobs:
                   # leak into the harness.
                   GOENV_DEBUG: ""
                   GOENV_VERSION: ""
-              run: go test -tags e2e -v -timeout 20m ./testing/e2e/...
+              run: |
+                  set -o pipefail
+                  mkdir -p .test-results
+                  go test -tags e2e -v -timeout 20m ./testing/e2e/... 2>&1 \
+                    | tee ".test-results/e2e-${{ matrix.os }}.log"
+
+            - name: Summarise failures
+              if: failure()
+              shell: bash
+              run: |
+                  log=".test-results/e2e-${{ matrix.os }}.log"
+                  [ -f "$log" ] || exit 0
+                  {
+                    echo "### E2E failures on ${{ matrix.os }}"
+                    echo
+                    echo '```'
+                    grep -E -- '--- FAIL|_test\.go:[0-9]+:' "$log" | head -80
+                    echo '```'
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Upload E2E log
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: e2e-log-${{ matrix.os }}
+                  path: .test-results/
+                  retention-days: 7
+                  if-no-files-found: ignore
 
     e2e-network:
         name: E2E with real toolchain download (${{ matrix.os }})
@@ -79,4 +118,17 @@ jobs:
                   GOENV_E2E_NETWORK: "1"
                   GOENV_DEBUG: ""
                   GOENV_VERSION: ""
-              run: go test -tags e2e -v -timeout 30m ./testing/e2e/...
+              run: |
+                  set -o pipefail
+                  mkdir -p .test-results
+                  go test -tags e2e -v -timeout 30m ./testing/e2e/... 2>&1 \
+                    | tee ".test-results/e2e-network-${{ matrix.os }}.log"
+
+            - name: Upload E2E network log
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: e2e-network-log-${{ matrix.os }}
+                  path: .test-results/
+                  retention-days: 7
+                  if-no-files-found: ignore

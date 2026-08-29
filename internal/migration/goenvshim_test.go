@@ -85,6 +85,44 @@ func TestGeneratedShimsCarryTheMarker(t *testing.T) {
 		"the Windows shim marker emitted by internal/shims must be recognised")
 }
 
+// TestGoenvShimNamesFor_Windows exercises the Windows naming rules from any
+// runner. The generated shim is ".bat"; the rest cover leftovers.
+func TestGoenvShimNamesFor_Windows(t *testing.T) {
+	names := goenvShimNamesFor("windows")
+
+	assert.Contains(t, names, "goenv.bat", "rehash generates .bat shims on Windows")
+	assert.Contains(t, names, "goenv", "a extension-less leftover must still be considered")
+
+	// The generated-shim name must match what the shim generator actually
+	// writes, otherwise a recursive shim is created under one name and looked
+	// for under another.
+	assert.Equal(t, "goenv"+shims.WindowsShimExtension, "goenv.bat",
+		"shim extension must match internal/shims.createWindowsShim")
+}
+
+// TestGoenvShimNamesFor_Unix keeps the Unix list minimal: anything broader
+// risks deleting a user's own file.
+func TestGoenvShimNamesFor_Unix(t *testing.T) {
+	for _, goos := range []string{"linux", "darwin", "freebsd"} {
+		assert.Equal(t, []string{"goenv"}, goenvShimNamesFor(goos),
+			"%s should only consider an extension-less goenv shim", goos)
+	}
+}
+
+// TestFindGoenvShims_IgnoresBinaryNamedGoenvExe covers the Windows case of the
+// self-deletion bug: on Windows "goenv.exe" is a candidate name, and it is
+// exactly what the real binary is called.
+func TestFindGoenvShims_IgnoresBinaryNamedGoenvExe(t *testing.T) {
+	dir := t.TempDir()
+
+	fakeBinary := append([]byte{'M', 'Z', 0x90, 0x00, 0x00},
+		[]byte("exec goenv exec \"$program\" \"$@\"\x00")...)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "goenv.exe"), fakeBinary, 0o755))
+
+	assert.Empty(t, FindGoenvShims(dir),
+		"a compiled goenv.exe must never be classified as a stale shim")
+}
+
 // TestFindGoenvShims_DetectsV3FormatShim covers the gap that left issue #542
 // reproducible: RemoveStaleV2Shim only matched the v2 "libexec/goenv"
 // fingerprint, so a v3-format goenv shim kept recursing forever.

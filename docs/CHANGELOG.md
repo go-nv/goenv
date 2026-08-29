@@ -51,7 +51,7 @@ Change line format:
 * <Change title/PR title/content> ; Ref: <pr link>
 ```
 
-## Unreleased (master)
+## Unreleased (main / v3)
 
 ### Added
 

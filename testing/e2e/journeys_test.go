@@ -191,6 +191,7 @@ func TestRehash_DoesNotCreateGoenvShim(t *testing.T) {
 
 	for _, name := range []string{"goenv", exeName("goenv"), "goenv.exe"} {
 		if fileExists(e.path("shims", name)) {
+			e.Diagnose()
 			t.Fatalf("rehash created a %q shim; it shadows the real binary and causes "+
 				"infinite recursion (issue #542)", name)
 		}
@@ -198,6 +199,7 @@ func TestRehash_DoesNotCreateGoenvShim(t *testing.T) {
 
 	// Sanity check that rehash did its actual job.
 	if !fileExists(e.path("shims", exeName("go"))) {
+		e.Diagnose()
 		t.Fatal("rehash did not create the expected 'go' shim")
 	}
 }
@@ -318,9 +320,11 @@ func TestRehash_GeneratesPlatformAppropriateShims(t *testing.T) {
 	shimPath := e.path("shims", exeName("go"))
 	content, err := os.ReadFile(shimPath)
 	if err != nil {
+		e.Diagnose()
 		t.Fatalf("failed to read generated shim %s: %v", shimPath, err)
 	}
 	shim := string(content)
+	t.Logf("--- generated shim (%s) ---\n%s", shimPath, shim)
 
 	requireContains(t, shim, "goenv exec", "every shim must delegate to goenv exec")
 

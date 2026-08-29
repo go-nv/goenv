@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/pathutil"
-	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -293,22 +292,23 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 // itself once the version is installed — so "go install" writes to
 // versions/<version>/bin, not versions/<version>/gopath/bin.
 //
-// The other entries cover installs performed by older goenv versions and by
-// the shims, which set GOPATH to $HOME/go/<version> at runtime.
+// Every entry is scoped to goVersion. The host-wide GOPATH
+// (hosts/<os>-<arch>/gopath/bin) is deliberately excluded: it is shared by all
+// versions, so including it would report a tool built against Go 1.24 as
+// installed for 1.21. A false negative is a visible annoyance; a false positive
+// is silent and sends the user to debug the wrong thing.
 func ToolBinDirs(goenvRoot, goVersion string) []string {
 	versionPath := filepath.Join(goenvRoot, "versions", goVersion)
 
 	dirs := []string{
 		// Where InstallTools writes today (GOPATH=versions/<version>).
 		filepath.Join(versionPath, "bin"),
-		// Where InstallTools writes when the version directory is absent
-		// (GOPATH=hosts/<os>-<arch>/gopath) and where host-wide tools live.
-		filepath.Join(goenvRoot, "hosts", platform.OS()+"-"+platform.Arch(), "gopath", "bin"),
-		// v3 version-scoped GOPATH.
+		// v3 version-scoped GOPATH, used by older goenv versions.
 		filepath.Join(versionPath, "gopath", "bin"),
 	}
 
-	// Legacy "$HOME/go/<version>/bin" used by the shims at runtime.
+	// Legacy "$HOME/go/<version>/bin" used by the shims at runtime. Still
+	// version-scoped, so it cannot leak across versions.
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
 		dirs = append(dirs, filepath.Join(home, "go", goVersion, "bin"))
 	}

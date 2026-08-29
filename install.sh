@@ -68,7 +68,9 @@ detect_platform() {
 # Fetch a URL to stdout using whichever downloader is available
 fetch_url() {
     if command -v curl >/dev/null 2>&1; then
-        curl -sL "$1"
+        # -f makes curl exit non-zero on 4xx/5xx instead of printing the error
+        # body to stdout, where it would be parsed as if it were release data.
+        curl -fsSL "$1"
     elif command -v wget >/dev/null 2>&1; then
         wget -qO- "$1"
     else
@@ -87,37 +89,83 @@ get_latest_version() {
     echo -e "${YELLOW}Fetching latest release...${NC}"
 
     local releases
-    releases=$(fetch_url "${GITHUB_API}/repos/${GITHUB_REPO}/releases?per_page=50")
+    if ! releases=$(fetch_url "${GITHUB_API}/repos/${GITHUB_REPO}/releases?per_page=50"); then
+        echo -e "${RED}Could not reach the GitHub releases API.${NC}" >&2
+        echo -e "${RED}Check your network connection, or set GOENV_GITHUB_API to a reachable mirror.${NC}" >&2
+        exit 1
+    fi
 
-    # Collapse the response so each release occupies exactly one line. Every
-    # line then holds that release's tag, its draft/prerelease flags and its
-    # asset names together, which is enough to pick a release without needing
-    # jq (which is not guaranteed to be installed).
+    if [ -z "$releases" ]; then
+        echo -e "${RED}The GitHub releases API returned an empty response.${NC}" >&2
+        exit 1
+    fi
+
+    # A rate-limit or error payload is a JSON object with a "message" field,
+    # not the expected array. Diagnosing it here avoids reporting "no release
+    # found for your platform", which sends people looking in the wrong place.
+    case "$releases" in
+        \[*) ;;
+        *)
+            local api_message
+            api_message=$(printf '%s' "$releases" | tr -d '\n' |
+                sed -n 's/.*"message" *: *"\([^"]*\)".*/\1/p')
+            echo -e "${RED}The GitHub releases API returned an error.${NC}" >&2
+            [ -n "$api_message" ] && echo -e "${RED}  ${api_message}${NC}" >&2
+            echo -e "${RED}If this is a rate limit, retry later or install from a downloaded archive.${NC}" >&2
+            exit 1
+            ;;
+    esac
+
+    # Collapse the response so each release occupies exactly one line, so the
+    # fields of one release can be examined without pulling in a JSON parser
+    # (jq is not guaranteed to be installed, least of all on Alpine).
+    #
+    # The assets key is canonicalised first so the split below works against
+    # both compact and pretty-printed responses.
     local records
-    records=$(printf '%s' "$releases" | tr -d '\n' | awk '{gsub(/"tag_name"/, "\n\"tag_name\""); print}')
+    records=$(printf '%s' "$releases" | tr -d '\n' | awk '{
+        gsub(/"assets"[ \t]*:[ \t]*\[/, "\"assets\":[");
+        gsub(/"tag_name"/, "\n\"tag_name\"");
+        print
+    }')
 
     # GitHub returns releases newest-first. Take the first stable release that
     # publishes the archive for this OS/arch.
-    local record tag version
+    local record meta tag version
     while IFS= read -r record; do
         case "$record" in
             '"tag_name"'*) ;;
             *) continue ;;
         esac
 
-        case "$record" in
+        # Split the record at the assets array. Everything before it is release
+        # metadata, which is where the draft/prerelease flags live.
+        meta="${record%%\"assets\":\[*}"
+
+        case "$meta" in
             *'"draft":true'* | *'"draft": true'*) continue ;;
         esac
-        case "$record" in
+        case "$meta" in
             *'"prerelease":true'* | *'"prerelease": true'*) continue ;;
         esac
 
-        tag=$(printf '%s' "$record" | sed -E 's/^"tag_name" *: *"([^"]+)".*/\1/')
+        tag=$(printf '%s' "$meta" | sed -E 's/^"tag_name" *: *"([^"]+)".*/\1/')
         [ -n "$tag" ] || continue
 
         version="${tag#v}"
+
+        # Require the archive to appear as an asset's "name" field, i.e. in JSON
+        # key/value syntax. Matching the bare filename would also match release
+        # notes, which routinely quote download filenames — and selecting a
+        # release from its prose produces a 404 on download, the exact failure
+        # issue #582 was filed for.
+        #
+        # The assets array is not delimited by hand here: asset objects contain
+        # nested "]" characters, so cutting at the first one silently drops most
+        # of the assets.
         case "$record" in
-            *"\"goenv_${version}_${OS}_${ARCH}.tar.gz\""*)
+            *"\"name\":\"goenv_${version}_${OS}_${ARCH}.tar.gz\""* | \
+            *"\"name\": \"goenv_${version}_${OS}_${ARCH}.tar.gz\""*)
                 LATEST_VERSION="$tag"
                 break
                 ;;
@@ -128,6 +176,7 @@ EOF
 
     if [ -z "$LATEST_VERSION" ]; then
         echo -e "${RED}No release found containing a ${OS}_${ARCH} binary (goenv_<version>_${OS}_${ARCH}.tar.gz)${NC}" >&2
+        echo -e "${RED}See https://github.com/${GITHUB_REPO}/releases for available downloads.${NC}" >&2
         exit 1
     fi
 

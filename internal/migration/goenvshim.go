@@ -6,13 +6,29 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"github.com/go-nv/goenv/internal/shims"
 )
 
 // goenvShimNames are the file names a goenv shim can have inside the shims
-// directory. Windows shims are generated as ".bat" files.
+// directory, for the current platform.
 func goenvShimNames() []string {
-	if runtime.GOOS == "windows" {
-		return []string{"goenv.bat", "goenv.cmd", "goenv.exe", "goenv"}
+	return goenvShimNamesFor(runtime.GOOS)
+}
+
+// goenvShimNamesFor returns the candidate shim names for a given GOOS.
+//
+// Taking the OS as a parameter rather than reading runtime.GOOS directly means
+// the Windows naming rules are exercised on every CI runner, not only the
+// Windows one — platform-specific logic that can only be tested on that
+// platform is logic that effectively is not tested.
+func goenvShimNamesFor(goos string) []string {
+	if goos == "windows" {
+		// rehash generates the shims.WindowsShimExtension form; the others cover
+		// shims left by other tools or earlier versions. "goenv.exe" is included
+		// so a stale copy is detected, but content checks still have to confirm
+		// it is a script — see FindGoenvShims.
+		return []string{"goenv" + shims.WindowsShimExtension, "goenv.cmd", "goenv.exe", "goenv"}
 	}
 	return []string{"goenv"}
 }

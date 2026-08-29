@@ -192,6 +192,11 @@ const (
 	WindowsShimMarker = "REM goenv-shim v1"
 )
 
+// WindowsShimExtension is the extension createWindowsShim writes. Anything that
+// needs to find a generated shim by name must use this rather than hardcoding
+// ".bat", so the generator and its consumers cannot disagree about the name.
+const WindowsShimExtension = ".bat"
+
 // createShim creates a shim file for the specified binary
 func (s *ShimManager) createShim(binaryName string) error {
 	if utils.IsWindows() {
@@ -248,7 +253,7 @@ fi
 
 // createWindowsShim creates a Windows batch file shim
 func (s *ShimManager) createWindowsShim(binaryName string) error {
-	shimPath := filepath.Join(s.config.ShimsDir(), binaryName+".bat")
+	shimPath := filepath.Join(s.config.ShimsDir(), binaryName+WindowsShimExtension)
 
 	// Create the batch file shim
 	// Note: Uses a subroutine for file arg detection to avoid goto/label issues

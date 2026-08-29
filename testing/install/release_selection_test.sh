@@ -136,6 +136,89 @@ fi
 rm -rf "$probe_root"
 
 echo
+echo "== release notes must never be parsed as release metadata =="
+# The 2.2.42 fixture publishes no usable binary but its body quotes
+# goenv_2.2.42_linux_amd64.tar.gz. Selecting it would produce a 404 on download
+# — the exact failure issue #582 was filed for.
+got="$(select_version linux amd64)"
+if [ "$got" = "2.2.42" ]; then
+    fail "selected 2.2.42 by matching a filename quoted in its release notes"
+else
+    pass "asset names in prose do not select a release (got '${got}')"
+fi
+
+echo
+echo "== API errors must be diagnosed, not reported as 'no binary for your platform' =="
+
+# run_installer_against <served-file-content> <http-ish scenario name>
+# Serves a payload that is not a release array and captures the error output.
+check_api_error() {
+    local label="$1" payload="$2" expect="$3"
+    local dir output
+    dir="$(mktemp -d)"
+    mkdir -p "${dir}/repos/go-nv/goenv"
+    printf '%s' "$payload" > "${dir}/repos/go-nv/goenv/releases"
+
+    local python_bin port=""
+    python_bin="$(command -v python3 || command -v python)"
+    "$python_bin" -u -m http.server 0 --bind 127.0.0.1 --directory "$dir" \
+        >"${dir}/server.log" 2>&1 &
+    local pid=$!
+
+    for _ in $(seq 1 50); do
+        port="$(sed -nE 's/.*port ([0-9]+).*/\1/p' "${dir}/server.log" | head -1)"
+        [ -n "$port" ] && break
+        sleep 0.1
+    done
+
+    output=$(
+        (
+            # shellcheck disable=SC1091
+            GOENV_GITHUB_API="http://127.0.0.1:${port}" source "${REPO_ROOT}/install.sh"
+            OS=linux
+            ARCH=amd64
+            LATEST_VERSION=""
+            get_latest_version
+        ) 2>&1
+    ) || true
+
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    rm -rf "$dir"
+
+    if printf '%s' "$output" | grep -q "$expect"; then
+        pass "${label}: reported as an API problem"
+    else
+        fail "${label}: expected output matching '${expect}', got: ${output}"
+    fi
+}
+
+check_api_error "rate limit (403 body)" \
+    '{"message":"API rate limit exceeded for 1.2.3.4.","documentation_url":"https://docs.github.com/"}' \
+    "rate limit"
+
+check_api_error "empty response" \
+    '' \
+    "empty response"
+
+echo
+echo "== the fixture must match the shape the real API returns =="
+# The fixture is only useful if it exercises the same parsing path as a real
+# response. An earlier fixture used compact "assets":[{...}] with no nested
+# structure, so the parser passed here while failing against the live API, whose
+# asset objects are pretty-printed and contain nested "]" characters.
+if grep -q '"assets": \[' "$FIXTURE" && grep -q '"name": "goenv_' "$FIXTURE"; then
+    pass "fixture uses the pretty-printed key spacing GitHub actually returns"
+else
+    fail "fixture does not match real API formatting; parser bugs will not be caught"
+fi
+if grep -q '"uploader"' "$FIXTURE"; then
+    pass "fixture includes nested asset objects"
+else
+    fail "fixture asset objects lack nesting; the real API nests an uploader object containing ']' characters, which is what broke naive array delimiting"
+fi
+
+echo
 if [ "$FAILURES" -ne 0 ]; then
     echo "${FAILURES} test(s) failed" >&2
     exit 1

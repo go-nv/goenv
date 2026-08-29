@@ -21,10 +21,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -47,9 +49,46 @@ func TestMain(m *testing.M) {
 	}
 	goenvBinary = binary
 
+	printSuiteDiagnostics()
+
 	code := m.Run()
 	cleanup()
 	os.Exit(code)
+}
+
+// printSuiteDiagnostics records the environment the suite is running in.
+//
+// When this suite fails on a runner the author cannot reproduce — Windows in
+// particular — the first questions are always "which OS, which shell, what was
+// on PATH". Printing it once up front means the answer is already in the log
+// instead of requiring another CI round-trip to find out.
+func printSuiteDiagnostics() {
+	fmt.Printf("=== goenv e2e suite ===\n")
+	fmt.Printf("GOOS/GOARCH  : %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("Go version   : %s\n", runtime.Version())
+	fmt.Printf("binary       : %s\n", goenvBinary)
+
+	if info, err := os.Stat(goenvBinary); err == nil {
+		fmt.Printf("binary size  : %d bytes, mode %s\n", info.Size(), info.Mode())
+	}
+
+	// The sandbox strips goenv directories from PATH; show what survived so a
+	// "command not found" in a shim test is immediately explainable.
+	fmt.Printf("sandbox PATH :\n")
+	for _, dir := range filepath.SplitList(sandboxPath()) {
+		fmt.Printf("  %s\n", dir)
+	}
+
+	for _, name := range []string{"bash", "zsh", "pwsh", "cmd"} {
+		if path, err := exec.LookPath(name); err == nil {
+			fmt.Printf("shell %-5s  : %s\n", name, path)
+		} else {
+			fmt.Printf("shell %-5s  : (not found)\n", name)
+		}
+	}
+
+	fmt.Printf("network tests: %v\n", os.Getenv("GOENV_E2E_NETWORK") == "1")
+	fmt.Printf("=======================\n")
 }
 
 // buildGoenv compiles the goenv binary from the repository root.
@@ -204,6 +243,10 @@ type result struct {
 	ExitCode int
 	Err      error
 	TimedOut bool
+	// Args and Duration exist for diagnostics: a CI log needs to show what was
+	// run and how long it took, not just what came back.
+	Args     []string
+	Duration time.Duration
 }
 
 // Output returns stdout and stderr joined, which is what most assertions want
@@ -237,18 +280,23 @@ func (e *env) runWithTimeout(timeout time.Duration, args ...string) result {
 	cmd.Stdout = multiWriter(&stdout, &combined)
 	cmd.Stderr = multiWriter(&stderr, &combined)
 
+	started := time.Now()
 	err := cmd.Run()
+	elapsed := time.Since(started)
 
 	res := result{
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
 		Combined: combined.String(),
 		Err:      err,
+		Args:     args,
+		Duration: elapsed,
 	}
 
 	if ctx.Err() == context.DeadlineExceeded {
 		res.TimedOut = true
 		res.ExitCode = -1
+		e.logResult(res)
 		return res
 	}
 
@@ -262,7 +310,104 @@ func (e *env) runWithTimeout(timeout time.Duration, args ...string) result {
 		res.ExitCode = -1
 	}
 
+	e.logResult(res)
 	return res
+}
+
+// logResult records every command under -v.
+//
+// These tests are frequently diagnosed from a CI log on an operating system the
+// author cannot reproduce locally — Windows above all. A failure that only says
+// "expected X, got Y" forces a blind guess-and-push cycle, so the full
+// invocation, timing, exit status and both streams are recorded for every
+// command, not only failing ones. The preceding commands are usually what
+// explain the failure.
+func (e *env) logResult(res result) {
+	e.t.Helper()
+
+	if !testing.Verbose() {
+		return
+	}
+
+	e.t.Logf("$ goenv %s  (exit=%d, %s)", strings.Join(res.Args, " "), res.ExitCode, res.Duration.Round(time.Millisecond))
+	if res.TimedOut {
+		e.t.Logf("  !! TIMED OUT")
+	}
+	if out := strings.TrimRight(res.Stdout, "\n"); out != "" {
+		e.t.Logf("  stdout | %s", strings.ReplaceAll(out, "\n", "\n  stdout | "))
+	}
+	if errOut := strings.TrimRight(res.Stderr, "\n"); errOut != "" {
+		e.t.Logf("  stderr | %s", strings.ReplaceAll(errOut, "\n", "\n  stderr | "))
+	}
+}
+
+// Diagnose dumps the state of the sandbox. Call it from a failure path to make
+// a CI log actionable without a local reproduction.
+func (e *env) Diagnose() {
+	e.t.Helper()
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n===== e2e sandbox diagnostics =====\n")
+	fmt.Fprintf(&b, "GOOS/GOARCH : %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(&b, "binary      : %s\n", goenvBinary)
+	fmt.Fprintf(&b, "GOENV_ROOT  : %s\n", e.Root)
+	fmt.Fprintf(&b, "workdir     : %s\n", e.Dir)
+	fmt.Fprintf(&b, "HOME        : %s\n", e.Home)
+
+	if len(e.Extra) > 0 {
+		fmt.Fprintf(&b, "extra env   :\n")
+		keys := make([]string, 0, len(e.Extra))
+		for k := range e.Extra {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Fprintf(&b, "  %s=%s\n", k, e.Extra[k])
+		}
+	}
+
+	fmt.Fprintf(&b, "--- tree of GOENV_ROOT ---\n")
+	writeTree(&b, e.Root)
+	fmt.Fprintf(&b, "--- tree of workdir ---\n")
+	writeTree(&b, e.Dir)
+	fmt.Fprintf(&b, "==================================")
+
+	e.t.Log(b.String())
+}
+
+// writeTree lists a directory tree with sizes and modes, which is what
+// identifies a missing shim, a wrong extension, or a non-executable file.
+func writeTree(w io.Writer, root string) {
+	entries := 0
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			fmt.Fprintf(w, "  !! %s: %v\n", path, err)
+			return nil
+		}
+		entries++
+		if entries > 200 {
+			return filepath.SkipAll
+		}
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			rel = path
+		}
+		if rel == "." {
+			return nil
+		}
+		if info.IsDir() {
+			fmt.Fprintf(w, "  %s%c\n", rel, filepath.Separator)
+			return nil
+		}
+		fmt.Fprintf(w, "  %-52s %7d  %s\n", rel, info.Size(), info.Mode())
+		return nil
+	})
+	if err != nil {
+		fmt.Fprintf(w, "  !! walk failed: %v\n", err)
+	}
+	if entries == 0 {
+		fmt.Fprintf(w, "  (empty or missing)\n")
+	}
 }
 
 // environ builds a deliberately minimal environment: enough of the host

@@ -4,14 +4,28 @@
     "name": "v2 maintenance notes",
     "draft": false,
     "prerelease": false,
-    "assets": []
+    "assets": [],
+    "body": "Documentation-only release for the v2 maintenance branch. No binaries are published here."
   },
   {
     "tag_name": "2.2.42",
     "name": "v2 maintenance notes",
     "draft": false,
     "prerelease": false,
-    "assets": [{ "name": "Source code (zip)" }]
+    "assets": [
+      {
+        "name": "Source code (zip)",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      }
+    ],
+    "body": "To install manually, download goenv_2.2.42_linux_amd64.tar.gz or goenv_2.2.42_darwin_arm64.tar.gz from the releases page. This body also contains the literal string \"tag_name\" and the words draft and prerelease, to prove prose is never parsed as release metadata."
   },
   {
     "tag_name": "3.2.0-rc1",
@@ -19,12 +33,72 @@
     "draft": false,
     "prerelease": true,
     "assets": [
-      { "name": "goenv_3.2.0-rc1_linux_amd64.tar.gz" },
-      { "name": "goenv_3.2.0-rc1_linux_arm64.tar.gz" },
-      { "name": "goenv_3.2.0-rc1_darwin_amd64.tar.gz" },
-      { "name": "goenv_3.2.0-rc1_darwin_arm64.tar.gz" },
-      { "name": "goenv_3.2.0-rc1_windows_amd64.zip" },
-      { "name": "goenv_3.2.0-rc1_windows_arm64.zip" }
+      {
+        "name": "goenv_3.2.0-rc1_linux_amd64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.2.0-rc1_linux_arm64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.2.0-rc1_darwin_amd64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.2.0-rc1_darwin_arm64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.2.0-rc1_windows_amd64.zip",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.2.0-rc1_windows_arm64.zip",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      }
     ]
   },
   {
@@ -33,12 +107,72 @@
     "draft": false,
     "prerelease": false,
     "assets": [
-      { "name": "goenv_3.1.4_linux_amd64.tar.gz" },
-      { "name": "goenv_3.1.4_linux_arm64.tar.gz" },
-      { "name": "goenv_3.1.4_darwin_amd64.tar.gz" },
-      { "name": "goenv_3.1.4_darwin_arm64.tar.gz" },
-      { "name": "goenv_3.1.4_windows_amd64.zip" },
-      { "name": "goenv_3.1.4_windows_arm64.zip" }
+      {
+        "name": "goenv_3.1.4_linux_amd64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.1.4_linux_arm64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.1.4_darwin_amd64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.1.4_darwin_arm64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.1.4_windows_amd64.zip",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.1.4_windows_arm64.zip",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      }
     ]
   },
   {
@@ -47,9 +181,39 @@
     "draft": false,
     "prerelease": false,
     "assets": [
-      { "name": "goenv_3.1.3_linux_amd64.tar.gz" },
-      { "name": "goenv_3.1.3_darwin_arm64.tar.gz" },
-      { "name": "goenv_3.1.3_windows_amd64.zip" }
+      {
+        "name": "goenv_3.1.3_linux_amd64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.1.3_darwin_arm64.tar.gz",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      },
+      {
+        "name": "goenv_3.1.3_windows_amd64.zip",
+        "url": "https://api.github.com/repos/go-nv/goenv/releases/assets/1",
+        "uploader": {
+          "login": "goenv-bot",
+          "starred_url": "https://api.github.com/users/goenv-bot/starred{/owner}{/repo}",
+          "events_url": "https://api.github.com/users/goenv-bot/events{/privacy}"
+        },
+        "content_type": "application/gzip",
+        "state": "uploaded"
+      }
     ]
   }
 ]
