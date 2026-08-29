@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -304,15 +305,28 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	fmt.Fprintf(cmd.OutOrStdout(), "%sVerifying checksum...\n", utils.Emoji("🔐 "))
 	checksumURL := fmt.Sprintf("https://github.com/go-nv/goenv/releases/download/%s/goenv_%s_checksums.txt",
 		latestVersion, strings.TrimPrefix(latestVersion, "v"))
-	if err := verifyChecksum(tmpFile, checksumURL, filepath.Base(downloadURL)); err != nil {
-		if cfg.Debug {
-			fmt.Fprintf(cmd.OutOrStdout(), "Debug: Checksum verification: %v\n", err)
-		}
-		// Warn but don't block (for older releases without checksums)
-		fmt.Fprintf(cmd.OutOrStdout(), "%sWarning: Could not verify checksum (proceeding anyway)\n", utils.Emoji("⚠️  "))
-		fmt.Fprintln(cmd.OutOrStdout(), "   This may indicate the release doesn't have checksums published")
-	} else {
+
+	switch err := verifyChecksum(tmpFile, checksumURL, filepath.Base(downloadURL)); {
+	case err == nil:
 		fmt.Fprintf(cmd.OutOrStdout(), "%sChecksum verified\n", utils.Emoji("✅ "))
+
+	case stderrors.Is(err, errChecksumsUnpublished):
+		// Releases predating goreleaser checksums genuinely have none. This is
+		// the only failure that does not abort: there is nothing to verify
+		// against, as opposed to a check that did not pass.
+		fmt.Fprintf(cmd.OutOrStderr(), "%sThis release publishes no checksums; the download cannot be verified.\n",
+			utils.Emoji("⚠️  "))
+
+	default:
+		// Anything else means verification was possible and did not succeed:
+		// a mismatch, a missing entry for this artifact, or an unreadable
+		// checksums file. Installing regardless would execute an unverified
+		// binary with the user's privileges, which is the exact outcome this
+		// step exists to prevent.
+		return fmt.Errorf("checksum verification failed: %w\n\n"+
+			"The downloaded archive does not match its published checksum, so it has NOT been installed.\n"+
+			"Retry the update; if it persists, download the release manually from\n"+
+			"https://github.com/go-nv/goenv/releases and verify it yourself", err)
 	}
 
 	// Release assets are archives, not bare binaries — unpack the goenv
@@ -732,8 +746,18 @@ func writeTempBinary(src io.Reader) (string, error) {
 	return out.Name(), nil
 }
 
+// errChecksumsUnpublished means the release does not publish a checksums file
+// at all. Releases predating goreleaser checksums are the only legitimate case,
+// so this is the single failure mode that does not abort the update.
+var errChecksumsUnpublished = fmt.Errorf("release does not publish checksums")
+
 // verifyChecksum downloads the release checksums file and verifies the
 // downloaded artifact matches.
+//
+// Every failure except errChecksumsUnpublished must be treated as fatal by the
+// caller. A verification step that warns and continues is not a security
+// control — it is a log line, and it offers no protection against exactly the
+// tampered or truncated artifact it exists to catch.
 func verifyChecksum(binaryPath, checksumURL, filename string) error {
 	// Download checksum file
 	client := utils.NewHTTPClient(10 * time.Second)
@@ -744,7 +768,7 @@ func verifyChecksum(binaryPath, checksumURL, filename string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("checksums file not found (release may not have published checksums)")
+		return errChecksumsUnpublished
 	}
 
 	if resp.StatusCode != http.StatusOK {

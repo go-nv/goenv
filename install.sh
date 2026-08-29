@@ -19,10 +19,6 @@ INSTALL_DIR="$GOENV_ROOT/bin"
 # hermetic release-selection tests in CI.
 GITHUB_API="${GOENV_GITHUB_API:-https://api.github.com}"
 
-# HTTP status of the last fetch_url call. Declared here so it is always defined,
-# including when this script is sourced by a caller running under `set -u`.
-FETCH_HTTP_STATUS=""
-
 # Detect OS and architecture
 detect_platform() {
     # Declared separately so a failing command is not masked by 'local'
@@ -69,42 +65,48 @@ detect_platform() {
     echo -e "${GREEN}Detected platform: ${OS}_${ARCH}${NC}"
 }
 
-# Fetch a URL, printing the body to stdout and setting FETCH_HTTP_STATUS.
+# Fetch a URL. Prints the HTTP status on the first line, then the body.
+#
+# The status is returned through stdout rather than a global, because callers
+# invoke this via command substitution — which runs the function in a subshell,
+# so any variable it assigns is discarded when that subshell exits.
 #
 # Deliberately does NOT use curl -f. The GitHub API returns a JSON body
 # explaining *why* a request failed (rate limit, bad token), and -f throws that
-# body away — leaving only "exit code 22" to diagnose from. The body is kept and
-# the status code is captured separately so the caller can say what happened.
+# body away — leaving only "exit code 22" to diagnose from.
 #
 # Sends an Authorization header when a token is available. Unauthenticated
 # GitHub API access is limited to 60 requests/hour per IP, which CI runners
 # routinely exhaust because their addresses are shared.
 fetch_url() {
     local url="$1"
-    FETCH_HTTP_STATUS=""
-
     local token="${GOENV_GITHUB_TOKEN:-${GITHUB_TOKEN:-${GH_TOKEN:-}}}"
 
     if command -v curl >/dev/null 2>&1; then
-        local response
+        local response status body
+        # The token is passed as a header argument only; it is never echoed.
         if [ -n "$token" ]; then
-            # The token is passed via a header argument only; it is never echoed.
             response=$(curl -sSL -H "Authorization: Bearer ${token}" \
                 --write-out '\n%{http_code}' "$url" 2>/dev/null) || return 1
         else
             response=$(curl -sSL --write-out '\n%{http_code}' "$url" 2>/dev/null) || return 1
         fi
-        FETCH_HTTP_STATUS="${response##*$'\n'}"
-        printf '%s' "${response%$'\n'*}"
+        status="${response##*$'\n'}"
+        body="${response%$'\n'*}"
+        printf '%s\n%s' "$status" "$body"
         return 0
     fi
 
     if command -v wget >/dev/null 2>&1; then
+        local body
+        # wget does not expose the status as simply; "000" means "unknown", and
+        # the caller falls back to inspecting the body.
         if [ -n "$token" ]; then
-            wget -qO- --header="Authorization: Bearer ${token}" "$url" || return 1
+            body=$(wget -qO- --header="Authorization: Bearer ${token}" "$url") || return 1
         else
-            wget -qO- "$url" || return 1
+            body=$(wget -qO- "$url") || return 1
         fi
+        printf '000\n%s' "$body"
         return 0
     fi
 
@@ -130,22 +132,34 @@ rate_limit_advice() {
 get_latest_version() {
     echo -e "${YELLOW}Fetching latest release...${NC}"
 
-    local releases
-    if ! releases=$(fetch_url "${GITHUB_API}/repos/${GITHUB_REPO}/releases?per_page=50"); then
+    local response releases status
+    if ! response=$(fetch_url "${GITHUB_API}/repos/${GITHUB_REPO}/releases?per_page=50"); then
         echo -e "${RED}Could not reach the GitHub releases API.${NC}" >&2
         echo -e "${RED}Check your network connection, or set GOENV_GITHUB_API to a reachable mirror.${NC}" >&2
         exit 1
     fi
 
-    case "${FETCH_HTTP_STATUS}" in
-        ""|2*) ;;
+    # fetch_url returns "status\nbody"; a global would not survive the command
+    # substitution above. When the body is empty the separator newline is the
+    # last character and command substitution strips it, leaving just the
+    # status — so the no-newline case has to be handled explicitly rather than
+    # letting "${response#*\n}" fall through and return the status as the body.
+    status="${response%%$'\n'*}"
+    if [ "$status" = "$response" ]; then
+        releases=""
+    else
+        releases="${response#*$'\n'}"
+    fi
+
+    case "${status}" in
+        ""|000|2*) ;;
         403|429)
-            echo -e "${RED}The GitHub releases API refused the request (HTTP ${FETCH_HTTP_STATUS}).${NC}" >&2
+            echo -e "${RED}The GitHub releases API refused the request (HTTP ${status}).${NC}" >&2
             rate_limit_advice
             exit 1
             ;;
         *)
-            echo -e "${RED}The GitHub releases API returned HTTP ${FETCH_HTTP_STATUS}.${NC}" >&2
+            echo -e "${RED}The GitHub releases API returned HTTP ${status}.${NC}" >&2
             echo -e "${RED}See https://github.com/${GITHUB_REPO}/releases to download manually.${NC}" >&2
             exit 1
             ;;

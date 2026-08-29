@@ -205,8 +205,12 @@ echo
 echo "== a real HTTP 403 must be reported as a rate limit, not a network failure =="
 # This is what actually broke CI on macos-latest: runner IPs are shared, so the
 # 60-requests/hour unauthenticated limit is reached and the API answers 403.
-# The status code has to drive the message; an earlier version used `curl -f`,
-# which discarded the response body and could only report "could not reach".
+#
+# The response body here deliberately does NOT contain the words "rate limit".
+# An earlier version of this test used a realistic body that did, so it passed
+# via the body-inspection branch while the status-code branch was dead code —
+# fetch_url was setting a global from inside a command substitution, where the
+# assignment is discarded with the subshell. Only the status can satisfy this.
 status_dir="$(mktemp -d)"
 cat > "${status_dir}/server.py" <<'PYEOF'
 import http.server
@@ -214,7 +218,9 @@ import http.server
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        body = b'{"message":"API rate limit exceeded for 1.2.3.4."}'
+        # Intentionally opaque: nothing here hints at a rate limit, so the
+        # diagnosis has to come from the 403 status code.
+        body = b'{"documentation_url":"https://docs.github.com/"}'
         self.send_response(403)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))

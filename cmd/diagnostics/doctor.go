@@ -245,7 +245,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	results = append(results, checkConflictingGo(cfg))
 
 	// Check 8b: Stale/mismatched GOROOT
-	results = append(results, checkGorootMismatch(cfg))
+	results = append(results, checkGorootMismatch(cfg, mgr))
 
 	// Check 9: Cache files
 	results = append(results, checkCacheFiles(cfg))
@@ -2845,7 +2845,7 @@ func checkConflictingGo(cfg *config.Config) checkResult {
 }
 
 // checkGorootMismatch detects a GOROOT environment variable that disagrees
-// with the "go" binary PATH actually resolves to.
+// with the Go version goenv would actually run.
 //
 // A stale exported GOROOT is one of the hardest goenv failures to diagnose:
 // the Go toolchain reads its standard library from GOROOT, so pairing (say)
@@ -2853,7 +2853,14 @@ func checkConflictingGo(cfg *config.Config) checkResult {
 // "compile: version go1.27.0 does not match go tool version go1.23.2" and says
 // nothing about goenv. This is the situation behind issue #367, and it also
 // shows up when contributors build goenv itself (#570).
-func checkGorootMismatch(cfg *config.Config) checkResult {
+//
+// The comparison is against the version goenv resolves, NOT against whatever
+// exec.LookPath("go") returns. In a correctly initialised shell PATH resolves
+// "go" to $GOENV_ROOT/shims/go, which belongs to no version — so comparing
+// against the binary path yields nothing to compare and the check would report
+// "consistent" precisely when the user is in the broken state it exists to
+// find.
+func checkGorootMismatch(cfg *config.Config, mgr *manager.Manager) checkResult {
 	const id = "goroot-consistency"
 	const name = "GOROOT consistency"
 
@@ -2877,37 +2884,59 @@ func checkGorootMismatch(cfg *config.Config) checkResult {
 		}
 	}
 
-	goBinary, err := exec.LookPath("go")
+	// GOROOT that is not inside goenv's versions/ tree belongs to a system or
+	// hand-managed Go. That is a deliberate choice and not goenv's business.
+	gorootVersion := versionFromVersionPath(cfg, goroot)
+	if gorootVersion == "" {
+		return checkResult{
+			id:      id,
+			name:    name,
+			status:  StatusOK,
+			message: fmt.Sprintf("GOROOT (%s) is not goenv-managed; leaving it alone", goroot),
+		}
+	}
+
+	// Compare against the version goenv resolves, which is what any shim will
+	// execute.
+	activeVersion, _, source, err := mgr.GetCurrentVersionResolved()
 	if err != nil {
 		return checkResult{
 			id:      id,
 			name:    name,
-			status:  StatusOK,
-			message: fmt.Sprintf("GOROOT is set to %s (no 'go' on PATH to compare against)", goroot),
+			status:  StatusWarning,
+			message: fmt.Sprintf("GOROOT points at Go %s but the active version could not be determined: %v", gorootVersion, err),
+			advice:  "Run 'goenv version' to check the configured version",
 		}
 	}
 
-	// Only compare when the resolved binary is one goenv manages. A system Go
-	// with a deliberately set GOROOT is not goenv's business.
-	gorootVersion := versionFromVersionPath(cfg, goroot)
-	binaryVersion := versionFromVersionPath(cfg, goBinary)
-	if gorootVersion == "" || binaryVersion == "" || gorootVersion == binaryVersion {
+	if activeVersion == manager.SystemVersion {
 		return checkResult{
-			id:      id,
-			name:    name,
-			status:  StatusOK,
-			message: fmt.Sprintf("GOROOT (%s) is consistent with the active Go", goroot),
+			id:     id,
+			name:   name,
+			status: StatusError,
+			message: fmt.Sprintf("GOROOT points at goenv's Go %s, but the active version is 'system'",
+				gorootVersion),
+			advice: "Run 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
+		}
+	}
+
+	if gorootVersion != activeVersion {
+		return checkResult{
+			id:     id,
+			name:   name,
+			status: StatusError,
+			message: fmt.Sprintf("GOROOT points at Go %s but the active version is %s (set by %s)",
+				gorootVersion, activeVersion, source),
+			advice: "This breaks every build with \"compile: version does not match go tool version\". " +
+				"Run 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
 		}
 	}
 
 	return checkResult{
-		id:     id,
-		name:   name,
-		status: StatusError,
-		message: fmt.Sprintf("GOROOT points at Go %s but 'go' resolves to Go %s (%s)",
-			gorootVersion, binaryVersion, goBinary),
-		advice: "Run 'unset GOROOT' and start a new shell. A stale GOROOT makes every build fail with " +
-			"\"compile: version ... does not match go tool version ...\"",
+		id:      id,
+		name:    name,
+		status:  StatusOK,
+		message: fmt.Sprintf("GOROOT (%s) matches the active Go %s", goroot, activeVersion),
 	}
 }
 
