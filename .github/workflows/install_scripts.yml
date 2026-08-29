@@ -96,6 +96,10 @@ jobs:
         shell: bash
         env:
           GOENV_ROOT: ${{ runner.temp }}/goenv-e2e
+          # Unauthenticated GitHub API access is capped at 60 requests/hour per
+          # IP. Runner IPs are shared, so macOS runners in particular hit the
+          # limit and the job fails for reasons unrelated to the change.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash ./install.sh
 
       - name: Run install.ps1
@@ -103,6 +107,7 @@ jobs:
         shell: pwsh
         env:
           GOENV_ROOT: ${{ runner.temp }}/goenv-e2e
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./install.ps1
 
       - name: Verify the installed binary runs and is v3

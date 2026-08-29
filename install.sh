@@ -19,6 +19,10 @@ INSTALL_DIR="$GOENV_ROOT/bin"
 # hermetic release-selection tests in CI.
 GITHUB_API="${GOENV_GITHUB_API:-https://api.github.com}"
 
+# HTTP status of the last fetch_url call. Declared here so it is always defined,
+# including when this script is sourced by a caller running under `set -u`.
+FETCH_HTTP_STATUS=""
+
 # Detect OS and architecture
 detect_platform() {
     # Declared separately so a failing command is not masked by 'local'
@@ -65,18 +69,56 @@ detect_platform() {
     echo -e "${GREEN}Detected platform: ${OS}_${ARCH}${NC}"
 }
 
-# Fetch a URL to stdout using whichever downloader is available
+# Fetch a URL, printing the body to stdout and setting FETCH_HTTP_STATUS.
+#
+# Deliberately does NOT use curl -f. The GitHub API returns a JSON body
+# explaining *why* a request failed (rate limit, bad token), and -f throws that
+# body away — leaving only "exit code 22" to diagnose from. The body is kept and
+# the status code is captured separately so the caller can say what happened.
+#
+# Sends an Authorization header when a token is available. Unauthenticated
+# GitHub API access is limited to 60 requests/hour per IP, which CI runners
+# routinely exhaust because their addresses are shared.
 fetch_url() {
+    local url="$1"
+    FETCH_HTTP_STATUS=""
+
+    local token="${GOENV_GITHUB_TOKEN:-${GITHUB_TOKEN:-${GH_TOKEN:-}}}"
+
     if command -v curl >/dev/null 2>&1; then
-        # -f makes curl exit non-zero on 4xx/5xx instead of printing the error
-        # body to stdout, where it would be parsed as if it were release data.
-        curl -fsSL "$1"
-    elif command -v wget >/dev/null 2>&1; then
-        wget -qO- "$1"
-    else
-        echo -e "${RED}Error: Neither curl nor wget found. Please install one of them.${NC}" >&2
-        exit 1
+        local response
+        if [ -n "$token" ]; then
+            # The token is passed via a header argument only; it is never echoed.
+            response=$(curl -sSL -H "Authorization: Bearer ${token}" \
+                --write-out '\n%{http_code}' "$url" 2>/dev/null) || return 1
+        else
+            response=$(curl -sSL --write-out '\n%{http_code}' "$url" 2>/dev/null) || return 1
+        fi
+        FETCH_HTTP_STATUS="${response##*$'\n'}"
+        printf '%s' "${response%$'\n'*}"
+        return 0
     fi
+
+    if command -v wget >/dev/null 2>&1; then
+        if [ -n "$token" ]; then
+            wget -qO- --header="Authorization: Bearer ${token}" "$url" || return 1
+        else
+            wget -qO- "$url" || return 1
+        fi
+        return 0
+    fi
+
+    echo -e "${RED}Error: Neither curl nor wget found. Please install one of them.${NC}" >&2
+    exit 1
+}
+
+# rate_limit_advice prints guidance for an HTTP 403/429 from the GitHub API.
+rate_limit_advice() {
+    echo -e "${RED}This is usually the GitHub API rate limit (60 requests/hour for unauthenticated${NC}" >&2
+    echo -e "${RED}callers, counted per IP address — shared CI runners hit it routinely).${NC}" >&2
+    echo -e "${RED}Set GITHUB_TOKEN (or GOENV_GITHUB_TOKEN) to raise the limit:${NC}" >&2
+    echo -e "${RED}  GITHUB_TOKEN=\$YOUR_TOKEN curl -sfL .../install.sh | bash${NC}" >&2
+    echo -e "${RED}In GitHub Actions: env: { GITHUB_TOKEN: \\\${{ secrets.GITHUB_TOKEN }} }${NC}" >&2
 }
 
 # Get the newest release that actually ships a binary for this platform.
@@ -95,6 +137,20 @@ get_latest_version() {
         exit 1
     fi
 
+    case "${FETCH_HTTP_STATUS}" in
+        ""|2*) ;;
+        403|429)
+            echo -e "${RED}The GitHub releases API refused the request (HTTP ${FETCH_HTTP_STATUS}).${NC}" >&2
+            rate_limit_advice
+            exit 1
+            ;;
+        *)
+            echo -e "${RED}The GitHub releases API returned HTTP ${FETCH_HTTP_STATUS}.${NC}" >&2
+            echo -e "${RED}See https://github.com/${GITHUB_REPO}/releases to download manually.${NC}" >&2
+            exit 1
+            ;;
+    esac
+
     if [ -z "$releases" ]; then
         echo -e "${RED}The GitHub releases API returned an empty response.${NC}" >&2
         exit 1
@@ -111,7 +167,10 @@ get_latest_version() {
                 sed -n 's/.*"message" *: *"\([^"]*\)".*/\1/p')
             echo -e "${RED}The GitHub releases API returned an error.${NC}" >&2
             [ -n "$api_message" ] && echo -e "${RED}  ${api_message}${NC}" >&2
-            echo -e "${RED}If this is a rate limit, retry later or install from a downloaded archive.${NC}" >&2
+            case "$api_message" in
+                *[Rr]ate*limit*) rate_limit_advice ;;
+                *) echo -e "${RED}See https://github.com/${GITHUB_REPO}/releases to download manually.${NC}" >&2 ;;
+            esac
             exit 1
             ;;
     esac
@@ -184,6 +243,12 @@ EOF
 }
 
 # Download and install binary
+#
+# The archive is fetched from github.com (not api.github.com), which serves
+# public release assets without authentication and is not subject to the API's
+# 60/hour limit. No token is sent here on purpose: this URL redirects to a
+# separate CDN host, and curl -L would forward an Authorization header across
+# that redirect, handing the token to a different origin.
 install_binary() {
     local version="${LATEST_VERSION#v}"  # Remove 'v' prefix if present
     local archive_name="goenv_${version}_${OS}_${ARCH}.tar.gz"

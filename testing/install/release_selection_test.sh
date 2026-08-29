@@ -202,6 +202,73 @@ check_api_error "empty response" \
     "empty response"
 
 echo
+echo "== a real HTTP 403 must be reported as a rate limit, not a network failure =="
+# This is what actually broke CI on macos-latest: runner IPs are shared, so the
+# 60-requests/hour unauthenticated limit is reached and the API answers 403.
+# The status code has to drive the message; an earlier version used `curl -f`,
+# which discarded the response body and could only report "could not reach".
+status_dir="$(mktemp -d)"
+cat > "${status_dir}/server.py" <<'PYEOF'
+import http.server
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = b'{"message":"API rate limit exceeded for 1.2.3.4."}'
+        self.send_response(403)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+print("port %d" % server.server_address[1], flush=True)
+server.serve_forever()
+PYEOF
+
+python_bin="$(command -v python3 || command -v python)"
+"$python_bin" -u "${status_dir}/server.py" >"${status_dir}/log" 2>&1 &
+status_pid=$!
+
+status_port=""
+for _ in $(seq 1 50); do
+    status_port="$(sed -nE 's/.*port ([0-9]+).*/\1/p' "${status_dir}/log" | head -1)"
+    [ -n "$status_port" ] && break
+    sleep 0.1
+done
+
+status_output=$(
+    (
+        # shellcheck disable=SC1091
+        GOENV_GITHUB_API="http://127.0.0.1:${status_port}" source "${REPO_ROOT}/install.sh"
+        OS=linux
+        ARCH=amd64
+        LATEST_VERSION=""
+        get_latest_version
+    ) 2>&1
+) || true
+
+kill "$status_pid" 2>/dev/null || true
+wait "$status_pid" 2>/dev/null || true
+rm -rf "$status_dir"
+
+if printf '%s' "$status_output" | grep -qi "rate limit"; then
+    pass "HTTP 403 is diagnosed as a rate limit"
+else
+    fail "HTTP 403 should mention the rate limit, got: ${status_output}"
+fi
+
+if printf '%s' "$status_output" | grep -q "GITHUB_TOKEN"; then
+    pass "HTTP 403 advises setting a token"
+else
+    fail "HTTP 403 should suggest GITHUB_TOKEN, got: ${status_output}"
+fi
+
+echo
 echo "== the fixture must match the shape the real API returns =="
 # The fixture is only useful if it exercises the same parsing path as a real
 # response. An earlier fixture used compact "assets":[{...}] with no nested
