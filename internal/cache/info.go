@@ -61,13 +61,22 @@ type CacheInfo struct {
 	CGOInfo   *CGOToolchainInfo // CGO compiler info (build caches only)
 }
 
+// SharedCacheLabel is the value placed in CacheInfo.GoVersion for the module
+// cache that is shared across all installed Go versions.
+//
+// The shared cache belongs to no single version, so it is deliberately absent
+// from CacheStatus.ByVersion. Anything that renders cache information must
+// handle it separately or it will be silently omitted while still being
+// counted in totals (issue #578).
+const SharedCacheLabel = "shared"
+
 // CacheStatus contains aggregate cache statistics for all Go versions.
 type CacheStatus struct {
 	BuildCaches []CacheInfo               // All build caches
 	ModCaches   []CacheInfo               // All module caches
 	TotalSize   int64                     // Total size of all caches
 	TotalFiles  int                       // Total number of files (-1 if any cache timed out)
-	ByVersion   map[string]*VersionCaches // Caches grouped by Go version
+	ByVersion   map[string]*VersionCaches // Caches grouped by Go version (excludes the shared cache)
 }
 
 // VersionCaches groups cache information by Go version.
@@ -191,17 +200,46 @@ func GetCacheStatus(goenvRoot string, fast bool) (*CacheStatus, error) {
 	}
 
 	versionsDir := filepath.Join(goenvRoot, "versions")
-	if !utils.DirExists(versionsDir) {
-		// No versions directory - return empty status
-		return status, nil
+
+	// Walk through all version directories.
+	//
+	// A missing versions/ directory is not a reason to stop: the shared module
+	// cache lives outside versions/ and outlives every version, so returning
+	// here would report zero bytes while gigabytes sit on disk (issue #578).
+	if utils.DirExists(versionsDir) {
+		entries, err := os.ReadDir(versionsDir)
+		if err != nil {
+			return nil, errors.FailedTo("read versions directory", err)
+		}
+
+		if err := collectVersionCaches(status, versionsDir, entries, fast); err != nil {
+			return nil, err
+		}
 	}
 
-	// Walk through all version directories
-	entries, err := os.ReadDir(versionsDir)
-	if err != nil {
-		return nil, errors.FailedTo("read versions directory", err)
+	// Check for shared module cache (v3+). Deliberately outside the versions
+	// walk above — see the comment there.
+	sharedModCachePath := filepath.Join(goenvRoot, "shared", "go-mod")
+	if utils.DirExists(sharedModCachePath) {
+		cacheInfo, err := GetCacheInfo(sharedModCachePath, CacheKindMod, fast)
+		if err == nil {
+			cacheInfo.GoVersion = SharedCacheLabel // Mark as shared across versions
+			status.ModCaches = append(status.ModCaches, *cacheInfo)
+			status.TotalSize += cacheInfo.SizeBytes
+			if status.TotalFiles >= 0 && cacheInfo.Files >= 0 {
+				status.TotalFiles += cacheInfo.Files
+			} else {
+				status.TotalFiles = -1 // Mark as approximate
+			}
+		}
 	}
 
+	return status, nil
+}
+
+// collectVersionCaches walks each installed version and records its build and
+// module caches into status.
+func collectVersionCaches(status *CacheStatus, versionsDir string, entries []os.DirEntry, fast bool) error {
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -295,23 +333,7 @@ func GetCacheStatus(goenvRoot string, fast bool) (*CacheStatus, error) {
 		}
 	}
 
-	// Check for shared module cache (v3+)
-	sharedModCachePath := filepath.Join(goenvRoot, "shared", "go-mod")
-	if utils.DirExists(sharedModCachePath) {
-		cacheInfo, err := GetCacheInfo(sharedModCachePath, CacheKindMod, fast)
-		if err == nil {
-			cacheInfo.GoVersion = "shared" // Mark as shared across versions
-			status.ModCaches = append(status.ModCaches, *cacheInfo)
-			status.TotalSize += cacheInfo.SizeBytes
-			if status.TotalFiles >= 0 && cacheInfo.Files >= 0 {
-				status.TotalFiles += cacheInfo.Files
-			} else {
-				status.TotalFiles = -1 // Mark as approximate
-			}
-		}
-	}
-
-	return status, nil
+	return nil
 }
 
 // GetVersionCaches returns all caches for a specific Go version.

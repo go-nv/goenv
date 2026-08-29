@@ -368,6 +368,54 @@ func TestCoreCommands_Smoke(t *testing.T) {
 	}
 }
 
+// --- Issue #578: the shared module cache must be visible and reclaimable ----
+
+// TestSharedCache_IsVisibleAndReclaimable guards issue #578, where a
+// devcontainer image grew by ~2.5GB and the reporter had to dig through the
+// filesystem with docker history to find the cause.
+//
+// Two separate defects made that necessary: "cache status" never displayed the
+// shared module cache (it was counted in the total but not listed), and
+// "cache clean" refused to do anything when no versions were installed — even
+// though the shared cache lives outside versions/ and survives them.
+func TestSharedCache_IsVisibleAndReclaimable(t *testing.T) {
+	e := newEnv(t)
+
+	// A shared cache with no installed versions: exactly the state a container
+	// image lands in after the versions are pruned but the cache is not.
+	blob := e.path("shared", "go-mod", "cache", "download", "blob.bin")
+	if err := os.MkdirAll(filepath.Dir(blob), 0o755); err != nil {
+		t.Fatalf("failed to create shared cache dir: %v", err)
+	}
+	// 2 MiB is enough to assert on without slowing the suite down.
+	if err := os.WriteFile(blob, make([]byte, 2<<20), 0o644); err != nil {
+		t.Fatalf("failed to write cache blob: %v", err)
+	}
+
+	status := e.run("cache", "status")
+	if !status.Succeeded() {
+		t.Fatalf("goenv cache status failed (exit %d):\n%s", status.ExitCode, status.Output())
+	}
+
+	requireNotContains(t, status.Output(), "No caches found",
+		"cache status hid a populated shared module cache (issue #578)")
+	requireNotContains(t, status.Output(), "No Go versions installed",
+		"cache status must report the shared cache even with no versions installed (issue #578)")
+	requireContains(t, status.Output(), "Shared",
+		"cache status must list the shared module cache as its own entry (issue #578)")
+
+	// The advice cache status prints must actually work.
+	clean := e.run("cache", "clean", "mod", "--force")
+	if !clean.Succeeded() {
+		t.Fatalf("goenv cache clean mod failed (exit %d):\n%s", clean.ExitCode, clean.Output())
+	}
+
+	if fileExists(blob) {
+		t.Fatalf("goenv cache clean mod did not reclaim the shared module cache (issue #578)\n"+
+			"--- output ---\n%s", clean.Output())
+	}
+}
+
 // --- Network-gated: the full install journey --------------------------------
 
 // TestInstallAndUse_RealVersion is the complete user journey: install a real Go

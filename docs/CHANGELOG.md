@@ -74,7 +74,7 @@ Change line format:
   - 3 new diagnostic checks (shell environment, profile sourcing, duplicate installations)
   - Detects "undo sourcing" scenarios (major pain point)
 - **🌍 Environment Detection** - Automatic detection of containers (Docker, Podman, Kubernetes, LXC, BuildKit), WSL (versions 1/2), and filesystem types (NFS, SMB, FUSE, bind mounts) with actionable warnings
-- **🖥️  Platform-Specific Enhancements** - macOS deployment target validation, Windows MSVC/MinGW detection, Windows ARM64/ARM64EC support, Linux kernel version checks, and glibc compatibility suggestions
+- **🖥️ Platform-Specific Enhancements** - macOS deployment target validation, Windows MSVC/MinGW detection, Windows ARM64/ARM64EC support, Linux kernel version checks, and glibc compatibility suggestions
 - **⚡ Smart Caching System** - 10-50x faster version listing with intelligent cache validation, HTTP ETag support, and automatic freshness checking
 - **🔄 Cache Management Commands**:
   - `goenv cache status` - Show cache sizes and locations with auto-detection for large caches (suggests `--fast` for 5-10x faster scanning when >5000 files detected)
@@ -147,14 +147,31 @@ Change line format:
 - **📦 Install Command** - Enhanced with completion, caching, and configurable auto-rehash behavior
 - go.mod version discovery is now always enabled (no longer requires `GOENV_GOMOD_VERSION_ENABLE=1`)
 - Smart version precedence: `.go-version` takes precedence when it satisfies or exceeds `go.mod` toolchain requirements
+- **⚠️ `goenv latest` no longer changes the active version** ([#438]) - In 3.1.x, `goenv latest` was rewritten to `goenv local latest` and wrote a `.go-version` file as a side effect. It now only prints, matching `pyenv latest`. Scripts that relied on the old side effect must call `goenv local <version>` (or `goenv use <version>`) explicitly. Bare version shorthand (`goenv 1.23.6`) is unchanged.
+- **🩺 `goenv doctor` checks for a `goenv` shim** - A `goenv` file inside the shims directory shadows the real binary and causes infinite recursion; doctor now detects it and `--fix` removes it.
+- **📊 `goenv cache status` lists the shared module cache separately** - It is reported as its own `Shared (all versions)` entry, with guidance when it exceeds 1GB. Totals now reconcile with the listed entries.
 
 ### Fixed
 
+- **Infinite loop on auto-install** ([#572], [#542]) - `goenv` with `GOENV_AUTO_INSTALL=1` in a directory containing `go.mod` spawned `goenv exec` forever. The auto-install and interactive-setup paths invoked the `install` subcommand via cobra's `Execute()`, which always dispatches from the **root** command, so the root command re-entered its own auto-install branch. Subcommands are now invoked directly.
+- **📂 `goenv latest` silently created a `.go-version` file** ([#438]) - `latest` was captured by the version-shorthand rewrite and became `goenv local latest`, writing a version file into the current directory. `goenv latest` is now a real command that only prints; the shorthand no longer shadows registered command names. Use `goenv latest [prefix]` for installed versions and `goenv latest --known` for downloadable ones.
+- **🧩 `goenv init -` emitted no shell completions** ([#593]) - Completions were only emitted when an `<install-root>/completions/` directory existed on disk, which is never the case for Homebrew installs, so `eval "$(goenv init -)"` produced no completions at all. The completion script embedded in the binary is now inlined as a fallback. The zsh variant registers via the `compctl` builtin so it works regardless of whether `compinit` has run.
+- **💽 Shared module cache was invisible and unreclaimable** ([#578], [#581]) - `goenv cache status` counted `$GOENV_ROOT/shared/go-mod` in its total but never listed it, and reported `No Go versions installed` when no versions were present — hiding multi-gigabyte caches in container images. `goenv cache clean` had the same precondition and freed nothing in that state. Both now handle the shared cache, which lives outside `versions/` and outlives every installed version.
+- **🔍 `goenv tools default-tools verify` reported installed tools as missing** ([#581]) - `VerifyTools` looked only in `versions/<version>/gopath/bin`, but `InstallTools` sets `GOPATH` to the version directory, so `go install` writes to `versions/<version>/bin`. Verification now searches every location tools can land in.
+- **🪟 Install scripts and `goenv update` selected releases without binaries** ([#582]) - All three used GitHub's `/releases/latest`, which returns the newest release across _all_ branches; the v2 maintenance branch publishes documentation-only releases with no assets, so installs failed on the archive download. Selection now picks the newest non-draft, non-prerelease release that actually publishes an archive for the target platform.
 - **🔧 Cache Isolation** - Fixed cache migration to use runtime platform detection (`runtime.GOOS/GOARCH`) instead of cross-compilation environment variables, preventing "exec format error" when switching architectures
 - **🔧 Cache ABI Parsing** - Enhanced cache name parser to handle ARM variant formats (both "v6" and "6"), CGO toolchain hashes, and GOEXPERIMENT flags for accurate cache matching
 - **🔧 Atomic Cache Writes** - Fixed build.info atomic writer to properly use file locking mechanism, ensuring cache consistency under concurrent operations
 - **🔧 Doctor Network Check** - Replaced ICMP ping (blocked in CI/containers) with HTTPS HEAD request to go.dev for reliable network connectivity testing
 - **🔧 Windows PATH Filtering** - Fixed shim PATH detection to use normalized absolute path comparison instead of substring matching, preventing false exclusions of directories like `goenv_shims_backup`
+
+[#438]: https://github.com/go-nv/goenv/issues/438
+[#542]: https://github.com/go-nv/goenv/issues/542
+[#572]: https://github.com/go-nv/goenv/issues/572
+[#578]: https://github.com/go-nv/goenv/issues/578
+[#581]: https://github.com/go-nv/goenv/issues/581
+[#582]: https://github.com/go-nv/goenv/issues/582
+[#593]: https://github.com/go-nv/goenv/issues/593
 
 ### Documentation
 
@@ -166,7 +183,7 @@ Change line format:
 - **🔒 Security Recommendations** - Added strong recommendation for `strict_dns: true` in CI/CD environments to prevent DNS rebinding attacks (`docs/HOOKS.md`)
 - **📊 Testing Roadmap** - Created comprehensive testing roadmap identifying 9 major test gaps with priorities and specific test examples (`docs/TESTING_ROADMAP.md`)
 - **📋 Documentation Review Summary** - Added summary document tracking all documentation improvements, metrics, and quick reference links (`docs/DOCUMENTATION_REVIEW_SUMMARY.md`)
-- **⚠️  Deprecation Timeline** - Documented clear deprecation path for legacy commands (`local`, `global`, `version`, `versions`) with migration checklist (`docs/reference/COMMANDS.md`)
+- **⚠️ Deprecation Timeline** - Documented clear deprecation path for legacy commands (`local`, `global`, `version`, `versions`) with migration checklist (`docs/reference/COMMANDS.md`)
 - **💡 PowerShell Quoting** - Documented Windows PowerShell PATH and quoting gotchas with implementation references (`docs/CI_CD_GUIDE.md`)
 - **📦 Cache Strategy** - Added detailed cache size/speed comparison table recommending what to cache in CI (`docs/CI_CD_GUIDE.md`)
 
