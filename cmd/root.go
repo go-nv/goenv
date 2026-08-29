@@ -121,7 +121,7 @@ var RootCmd = &cobra.Command{
 							args = splitArgs(additionalFlags)
 						}
 
-						return runSubcommand(cmd, "install", args)
+						return RunSubcommand(cmd, "install", args)
 					},
 				}
 
@@ -158,7 +158,7 @@ var RootCmd = &cobra.Command{
 			// Handle installation if requested
 			if result.InstallRequested {
 				fmt.Fprintf(cmd.OutOrStdout(), "Installing Go %s...\n", result.Version)
-				if err := runSubcommand(cmd, "install", []string{result.Version}); err != nil {
+				if err := RunSubcommand(cmd, "install", []string{result.Version}); err != nil {
 					fmt.Fprintf(cmd.OutOrStderr(), "Installation failed: %v\n", err)
 					os.Exit(1)
 				}
@@ -455,16 +455,18 @@ func SetVersionInfo(v, c, bt string) {
 	AppBuildTime = bt
 }
 
-// runSubcommand invokes a sibling subcommand in-process.
+// RunSubcommand invokes a sibling subcommand in-process.
 //
 // It deliberately does NOT call subCmd.Execute(). Cobra's Execute() always
 // dispatches from the root command ("Regardless of what command execute is
 // called on, run on Root only"), so calling it on a subcommand re-runs the
-// root command with the original os.Args. When the root command is what
-// triggered the call (auto-install / interactive setup), that re-entry loops
-// forever — the "Auto-installing Go x.y.z (from go.mod)..." infinite loop
-// reported in issues #572 and #542.
-func runSubcommand(parent *cobra.Command, name string, args []string) error {
+// entire original command line. Any command that reaches this point from its
+// own Run/RunE therefore re-enters itself and loops forever — observed as the
+// "Auto-installing Go x.y.z (from go.mod)..." flood in issues #572 and #542,
+// and as repeated "Installing Go ..." from "goenv local --sync".
+//
+// Always route in-process subcommand invocations through this function.
+func RunSubcommand(parent *cobra.Command, name string, args []string) error {
 	var subCmd *cobra.Command
 	for _, c := range parent.Root().Commands() {
 		if c.Name() == name {

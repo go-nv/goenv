@@ -124,18 +124,10 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(cmd.OutOrStdout(), "%sGo %s is not installed\n", utils.Emoji("⚠️  "), version)
 				fmt.Fprintf(cmd.OutOrStdout(), "Installing Go %s...\n", version)
 
-				// Find and execute install command
-				installCmd := cmd.Root().Commands()[0]
-				for _, c := range cmd.Root().Commands() {
-					if c.Name() == "install" {
-						installCmd = c
-						break
-					}
-				}
-
-				// Execute install
-				installCmd.SetArgs([]string{version})
-				if err := installCmd.Execute(); err != nil {
+				// Must go through RunSubcommand: calling Execute() on the install
+				// command would re-dispatch from the root command and re-run this
+				// entire "goenv local --sync" invocation, looping forever.
+				if err := cmdpkg.RunSubcommand(cmd, "install", []string{version}); err != nil {
 					return errors.FailedTo("install version", err)
 				}
 			} else {
@@ -245,28 +237,28 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 
 	// Automatically initialize VS Code if --vscode flag is set OR auto-detect workspace
 	shouldConfigureVSCode := localFlags.vscode
-	
+
 	// Auto-detect VS Code workspace if flag not explicitly set
 	if !localFlags.vscode {
 		cwd, _ := os.Getwd()
 		vscodeSettingsPath := filepath.Join(cwd, ".vscode", "settings.json")
-		
+
 		// Check if VS Code workspace exists
 		if _, err := os.Stat(vscodeSettingsPath); err == nil {
 			// Check VS Code setting first, then env var
 			autoSync := false
-			
+
 			// Read the settings file to check for goenv.autoSync
 			if data, err := os.ReadFile(vscodeSettingsPath); err == nil {
 				// Simple JSON check - look for "goenv.autoSync": true
 				settingsStr := string(data)
-				if strings.Contains(settingsStr, `"goenv.autoSync"`) && 
-				   (strings.Contains(settingsStr, `"goenv.autoSync": true`) || 
-				    strings.Contains(settingsStr, `"goenv.autoSync":true`)) {
+				if strings.Contains(settingsStr, `"goenv.autoSync"`) &&
+					(strings.Contains(settingsStr, `"goenv.autoSync": true`) ||
+						strings.Contains(settingsStr, `"goenv.autoSync":true`)) {
 					autoSync = true
 				}
 			}
-			
+
 			// Fall back to environment variable
 			if !autoSync {
 				envAutoSync := os.Getenv("GOENV_VSCODE_AUTO_SYNC")
@@ -274,7 +266,7 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 					autoSync = true
 				}
 			}
-			
+
 			if autoSync {
 				// Auto-sync enabled
 				shouldConfigureVSCode = true
@@ -286,7 +278,7 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(cmd.OutOrStdout(), "%sDetected VS Code workspace. Update settings for Go %s? [Y/n]: ", utils.Emoji("💡 "), resolvedVersion)
 				var response string
 				fmt.Fscanln(cmd.InOrStdin(), &response)
-				
+
 				// Default to Yes if user just presses Enter
 				if response == "" || response == "y" || response == "Y" || response == "yes" {
 					shouldConfigureVSCode = true
@@ -294,7 +286,7 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	
+
 	if shouldConfigureVSCode {
 		if !localFlags.vscode {
 			fmt.Fprintln(cmd.OutOrStdout())
