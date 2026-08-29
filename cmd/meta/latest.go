@@ -42,6 +42,7 @@ never writes a .go-version file. Use 'goenv use <version>' to switch versions.`,
 // LatestFlags holds flags for the latest command. Exported for testing.
 var LatestFlags struct {
 	Known bool
+	Print bool
 }
 
 func init() {
@@ -49,6 +50,14 @@ func init() {
 	latestCmd.SilenceUsage = true
 	latestCmd.Flags().BoolVarP(&LatestFlags.Known, "known", "k", false,
 		"Search versions available for download instead of installed versions")
+
+	// Compatibility with the long-standing "goenv latest --print <prefix>"
+	// invocation, which xxenv-latest and user scripts rely on (issue #386).
+	// This command only ever prints, so the flag is accepted and ignored rather
+	// than rejected — breaking those callers would gain nothing.
+	latestCmd.Flags().BoolVarP(&LatestFlags.Print, "print", "p", false,
+		"Accepted for compatibility; this command always prints and never installs")
+	_ = latestCmd.Flags().MarkHidden("print")
 }
 
 // RunLatest executes the latest command logic. Exported for testing.
@@ -75,6 +84,13 @@ func latestInstalled(cmd *cobra.Command, prefix string) error {
 
 	resolved, err := mgr.ResolveVersionSpec(spec)
 	if err != nil {
+		// Only "not installed" means the search genuinely came up empty. Any
+		// other failure (an unreadable aliases file, an inaccessible versions
+		// directory) must be surfaced: reporting "no match" for it sends the
+		// user looking for a missing version instead of the real fault.
+		if !strings.Contains(err.Error(), "not installed") {
+			return err
+		}
 		if prefix == "" {
 			return fmt.Errorf("goenv: no versions installed")
 		}

@@ -153,6 +153,7 @@ Change line format:
 
 ### Fixed
 
+- **`goenv latest --print` rejected** ([#386]) - The v3 `latest` command did not accept the long-standing `--print`/`-p` form that xxenv-latest and user scripts use, so those callers failed with "unknown flag". The flag is now accepted and ignored, since the command only ever prints. `goenv latest` also no longer reports "no installed version matches" when the real fault was something else, such as an unreadable aliases file.
 - **Infinite loops from in-process subcommand dispatch** ([#572], [#542]) - Two commands spawned themselves without end. `goenv` with `GOENV_AUTO_INSTALL=1` in a directory containing `go.mod` flooded with "Auto-installing Go ...", and `goenv local --sync` with an uninstalled version in `.go-version` flooded with "Installing Go ...". Both located the `install` command and called cobra's `Execute()` on it, which always dispatches from the **root** command and therefore re-ran the entire original command line. Subcommand invocation now goes through a shared helper that runs the target command directly.
 - **📂 `goenv latest` silently created a `.go-version` file** ([#438]) - `latest` was captured by the version-shorthand rewrite and became `goenv local latest`, writing a version file into the current directory. `goenv latest` is now a real command that only prints; the shorthand no longer shadows registered command names. Use `goenv latest [prefix]` for installed versions and `goenv latest --known` for downloadable ones.
 - **🧩 `goenv init -` emitted no shell completions** ([#593]) - Completions were only emitted when an `<install-root>/completions/` directory existed on disk, which is never the case for Homebrew installs, so `eval "$(goenv init -)"` produced no completions at all. The completion script embedded in the binary is now inlined as a fallback. The zsh variant registers via the `compctl` builtin so it works regardless of whether `compinit` has run.
@@ -165,6 +166,7 @@ Change line format:
 - **🔧 Doctor Network Check** - Replaced ICMP ping (blocked in CI/containers) with HTTPS HEAD request to go.dev for reliable network connectivity testing
 - **🔧 Windows PATH Filtering** - Fixed shim PATH detection to use normalized absolute path comparison instead of substring matching, preventing false exclusions of directories like `goenv_shims_backup`
 
+[#386]: https://github.com/go-nv/goenv/issues/386
 [#438]: https://github.com/go-nv/goenv/issues/438
 [#542]: https://github.com/go-nv/goenv/issues/542
 [#572]: https://github.com/go-nv/goenv/issues/572

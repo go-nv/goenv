@@ -54,6 +54,32 @@ func TestLatest_WithPrefix(t *testing.T) {
 	}
 }
 
+// TestLatest_AcceptsLegacyPrintFlag guards issue #386.
+//
+// "goenv latest --print <prefix>" is the form xxenv-latest and user scripts
+// have used for years. Adding a real `latest` command in v3 would have made
+// that invocation fail with "unknown flag: --print". The command only ever
+// prints, so the flag is accepted and ignored — rejecting it would break
+// callers for no benefit.
+func TestLatest_AcceptsLegacyPrintFlag(t *testing.T) {
+	e := newEnv(t)
+	e.fakeVersion("1.21.13")
+	e.fakeVersion("1.23.6")
+
+	for _, flag := range []string{"--print", "-p"} {
+		t.Run(flag, func(t *testing.T) {
+			res := e.run("latest", flag, "1.21")
+
+			if !res.Succeeded() {
+				e.Diagnose()
+				t.Fatalf("goenv latest %s 1.21 failed (exit %d):\n%s", flag, res.ExitCode, res.Output())
+			}
+			requireContains(t, res.Stdout, "1.21.13",
+				"legacy --print form must still print the resolved version (issue #386)")
+		})
+	}
+}
+
 // TestVersionShorthand_StillWritesVersionFile pins the behaviour the #438 fix
 // had to preserve: a bare version argument is still shorthand for "goenv local".
 func TestVersionShorthand_StillWritesVersionFile(t *testing.T) {
