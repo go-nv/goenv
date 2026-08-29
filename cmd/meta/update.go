@@ -331,7 +331,11 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 
 	// Release assets are archives, not bare binaries — unpack the goenv
 	// executable before it can replace the installed one.
-	newBinary, err := extractGoenvBinary(tmpFile, downloadURL)
+	//
+	// Staged in the installed binary's own directory so the replacement below
+	// is a same-filesystem rename. Extracting to $TMPDIR would fail with EXDEV
+	// wherever /tmp is a separate mount.
+	newBinary, err := extractGoenvBinary(tmpFile, downloadURL, filepath.Dir(binaryPath))
 	if err != nil {
 		return errors.FailedTo("extract update", err)
 	}
@@ -656,16 +660,16 @@ func downloadBinary(url string) (string, error) {
 //
 // Release assets are ".tar.gz" (or ".zip" on Windows) archives, so the
 // downloaded file cannot be installed as an executable directly.
-func extractGoenvBinary(archivePath, sourceURL string) (string, error) {
+func extractGoenvBinary(archivePath, sourceURL, destDir string) (string, error) {
 	wantNames := []string{"goenv", "goenv.exe"}
 
 	if strings.HasSuffix(sourceURL, ".zip") {
-		return extractFromZip(archivePath, wantNames)
+		return extractFromZip(archivePath, wantNames, destDir)
 	}
-	return extractFromTarGz(archivePath, wantNames)
+	return extractFromTarGz(archivePath, wantNames, destDir)
 }
 
-func extractFromTarGz(archivePath string, wantNames []string) (string, error) {
+func extractFromTarGz(archivePath string, wantNames []string, destDir string) (string, error) {
 	file, err := os.Open(archivePath)
 	if err != nil {
 		return "", err
@@ -694,13 +698,13 @@ func extractFromTarGz(archivePath string, wantNames []string) (string, error) {
 		if !slices.Contains(wantNames, filepath.Base(header.Name)) {
 			continue
 		}
-		return writeTempBinary(io.LimitReader(tr, maxBinarySize))
+		return writeTempBinary(io.LimitReader(tr, maxBinarySize), destDir)
 	}
 
 	return "", fmt.Errorf("no goenv binary found in archive")
 }
 
-func extractFromZip(archivePath string, wantNames []string) (string, error) {
+func extractFromZip(archivePath string, wantNames []string, destDir string) (string, error) {
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return "", err
@@ -719,7 +723,7 @@ func extractFromZip(archivePath string, wantNames []string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		path, err := writeTempBinary(io.LimitReader(rc, maxBinarySize))
+		path, err := writeTempBinary(io.LimitReader(rc, maxBinarySize), destDir)
 		rc.Close()
 		return path, err
 	}
@@ -731,10 +735,21 @@ func extractFromZip(archivePath string, wantNames []string) (string, error) {
 // bounding decompression-bomb exposure.
 const maxBinarySize = 256 << 20 // 256 MiB
 
-func writeTempBinary(src io.Reader) (string, error) {
-	out, err := os.CreateTemp("", "goenv-update-bin-*")
+// writeTempBinary writes src to a new file in destDir and returns its path.
+//
+// destDir must be the directory the binary will finally live in. The caller
+// installs the result with os.Rename, and rename cannot cross filesystems:
+// writing to $TMPDIR instead fails with EXDEV wherever /tmp is a separate
+// mount, which is the systemd default on many Linux distributions. Staging in
+// the destination directory also keeps the replacement atomic, and gives the
+// new binary its own inode — replacing an executable's contents in place
+// invalidates its code signature and macOS then kills it on exec.
+func writeTempBinary(src io.Reader, destDir string) (string, error) {
+	out, err := os.CreateTemp(destDir, ".goenv-update-bin-*")
 	if err != nil {
-		return "", err
+		// A read-only or otherwise unwritable destination is a legitimate
+		// failure to report: the update could not be staged where it must land.
+		return "", fmt.Errorf("cannot stage update in %s: %w", destDir, err)
 	}
 	defer out.Close()
 

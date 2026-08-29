@@ -156,7 +156,7 @@ func TestExtractGoenvBinary_TarGz(t *testing.T) {
 		"goenv":     want,
 	})
 
-	path, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz")
+	path, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz", t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { os.Remove(path) })
 
@@ -173,7 +173,7 @@ func TestExtractGoenvBinary_Zip(t *testing.T) {
 		"goenv.exe": want,
 	})
 
-	path, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_windows_amd64.zip")
+	path, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_windows_amd64.zip", t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { os.Remove(path) })
 
@@ -190,7 +190,7 @@ func TestExtractGoenvBinary_MissingBinaryFails(t *testing.T) {
 		"README.md": []byte("docs only"),
 	})
 
-	_, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz")
+	_, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz", t.TempDir())
 	assert.Error(t, err, "an archive with no goenv binary must fail loudly")
 }
 
@@ -199,8 +199,51 @@ func TestExtractGoenvBinary_MissingBinaryFails(t *testing.T) {
 func TestExtractGoenvBinary_MalformedArchiveFails(t *testing.T) {
 	archive := writeTempFile(t, "broken.tar.gz", []byte("this is not a gzip stream"))
 
-	_, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz")
+	_, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz", t.TempDir())
 	assert.Error(t, err, "a corrupt archive must fail rather than yield a partial binary")
+}
+
+// TestExtractGoenvBinary_StagesInDestinationDir pins where the extracted binary
+// is written.
+//
+// updateBinaryInstallation installs the result with os.Rename, and rename
+// cannot cross filesystems. Staging in $TMPDIR therefore fails with EXDEV
+// wherever /tmp is a separate mount — the systemd default on many Linux
+// distributions — and "goenv update" fails at the final step after having
+// already downloaded and verified the release.
+//
+// Staging in the destination directory also gives the new binary its own
+// inode. Overwriting an executable's contents in place invalidates its code
+// signature, and macOS kills the result on exec.
+func TestExtractGoenvBinary_StagesInDestinationDir(t *testing.T) {
+	archive := makeTarGz(t, map[string][]byte{"goenv": []byte("binary")})
+	destDir := t.TempDir()
+
+	path, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz", destDir)
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(path) })
+
+	assert.Equal(t, destDir, filepath.Dir(path),
+		"the extracted binary must be staged in the destination directory so the "+
+			"install rename cannot cross filesystems")
+
+	// And the rename it is staged for must actually succeed.
+	target := filepath.Join(destDir, "goenv")
+	require.NoError(t, os.Rename(path, target),
+		"renaming the staged binary into place must succeed")
+}
+
+// TestExtractGoenvBinary_UnwritableDestinationFails ensures a destination that
+// cannot be written is reported, rather than silently falling back somewhere
+// the rename would later fail from.
+func TestExtractGoenvBinary_UnwritableDestinationFails(t *testing.T) {
+	archive := makeTarGz(t, map[string][]byte{"goenv": []byte("binary")})
+
+	_, err := extractGoenvBinary(archive,
+		"https://example.com/goenv_9.9.9_linux_amd64.tar.gz",
+		filepath.Join(t.TempDir(), "does-not-exist"))
+
+	assert.Error(t, err, "an unwritable destination directory must be reported")
 }
 
 // TestExtractGoenvBinary_IgnoresNestedPaths guards against a path-traversal
@@ -211,7 +254,7 @@ func TestExtractGoenvBinary_IgnoresNestedPaths(t *testing.T) {
 		"dist/linux_amd64/goenv": want,
 	})
 
-	path, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz")
+	path, err := extractGoenvBinary(archive, "https://example.com/goenv_9.9.9_linux_amd64.tar.gz", t.TempDir())
 	require.NoError(t, err, "a binary nested in a directory should still be found by base name")
 	t.Cleanup(func() { os.Remove(path) })
 
