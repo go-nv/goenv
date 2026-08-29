@@ -15,10 +15,17 @@ GOENV_ROOT="${GOENV_ROOT:-$HOME/.goenv}"
 GITHUB_REPO="go-nv/goenv"
 INSTALL_DIR="$GOENV_ROOT/bin"
 
+# API base URL. Overridable for GitHub Enterprise, mirrors, and for the
+# hermetic release-selection tests in CI.
+GITHUB_API="${GOENV_GITHUB_API:-https://api.github.com}"
+
 # Detect OS and architecture
 detect_platform() {
-    local os=$(uname -s | tr '[:upper:]' '[:lower:]')
-    local arch=$(uname -m)
+    # Declared separately so a failing command is not masked by 'local'
+    # always returning 0 (shellcheck SC2155).
+    local os arch
+    os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    arch=$(uname -m)
     
     case "$os" in
         linux*)
@@ -58,24 +65,72 @@ detect_platform() {
     echo -e "${GREEN}Detected platform: ${OS}_${ARCH}${NC}"
 }
 
-# Get latest release version
-get_latest_version() {
-    echo -e "${YELLOW}Fetching latest release...${NC}"
-    
+# Fetch a URL to stdout using whichever downloader is available
+fetch_url() {
     if command -v curl >/dev/null 2>&1; then
-        LATEST_VERSION=$(curl -sL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        curl -sL "$1"
     elif command -v wget >/dev/null 2>&1; then
-        LATEST_VERSION=$(wget -qO- "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        wget -qO- "$1"
     else
         echo -e "${RED}Error: Neither curl nor wget found. Please install one of them.${NC}" >&2
         exit 1
     fi
-    
+}
+
+# Get the newest release that actually ships a binary for this platform.
+#
+# /releases/latest cannot be used: it returns the most recently published
+# release across *all* branches, and the v2 maintenance branch publishes
+# documentation-only releases that carry no binary assets at all. Installing
+# from one of those fails with a 404 on the archive download (issue #582).
+get_latest_version() {
+    echo -e "${YELLOW}Fetching latest release...${NC}"
+
+    local releases
+    releases=$(fetch_url "${GITHUB_API}/repos/${GITHUB_REPO}/releases?per_page=50")
+
+    # Collapse the response so each release occupies exactly one line. Every
+    # line then holds that release's tag, its draft/prerelease flags and its
+    # asset names together, which is enough to pick a release without needing
+    # jq (which is not guaranteed to be installed).
+    local records
+    records=$(printf '%s' "$releases" | tr -d '\n' | awk '{gsub(/"tag_name"/, "\n\"tag_name\""); print}')
+
+    # GitHub returns releases newest-first. Take the first stable release that
+    # publishes the archive for this OS/arch.
+    local record tag version
+    while IFS= read -r record; do
+        case "$record" in
+            '"tag_name"'*) ;;
+            *) continue ;;
+        esac
+
+        case "$record" in
+            *'"draft":true'* | *'"draft": true'*) continue ;;
+        esac
+        case "$record" in
+            *'"prerelease":true'* | *'"prerelease": true'*) continue ;;
+        esac
+
+        tag=$(printf '%s' "$record" | sed -E 's/^"tag_name" *: *"([^"]+)".*/\1/')
+        [ -n "$tag" ] || continue
+
+        version="${tag#v}"
+        case "$record" in
+            *"\"goenv_${version}_${OS}_${ARCH}.tar.gz\""*)
+                LATEST_VERSION="$tag"
+                break
+                ;;
+        esac
+    done <<EOF
+$records
+EOF
+
     if [ -z "$LATEST_VERSION" ]; then
-        echo -e "${RED}Failed to fetch latest version${NC}" >&2
+        echo -e "${RED}No release found containing a ${OS}_${ARCH} binary (goenv_<version>_${OS}_${ARCH}.tar.gz)${NC}" >&2
         exit 1
     fi
-    
+
     echo -e "${GREEN}Latest version: ${LATEST_VERSION}${NC}"
 }
 
@@ -84,7 +139,8 @@ install_binary() {
     local version="${LATEST_VERSION#v}"  # Remove 'v' prefix if present
     local archive_name="goenv_${version}_${OS}_${ARCH}.tar.gz"
     local download_url="https://github.com/${GITHUB_REPO}/releases/download/${LATEST_VERSION}/${archive_name}"
-    local tmp_dir=$(mktemp -d)
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
     
     echo -e "${YELLOW}Downloading goenv...${NC}"
     echo "URL: $download_url"
@@ -227,4 +283,9 @@ main() {
     print_instructions
 }
 
-main "$@"
+# Run the installer, unless this script was sourced (which the CI tests do so
+# they can call individual functions). Using ${BASH_SOURCE[0]:-$0} keeps the
+# "curl ... | bash" path working, where BASH_SOURCE is unset and $0 is "bash".
+if [ "${BASH_SOURCE[0]:-$0}" = "$0" ]; then
+    main "$@"
+fi

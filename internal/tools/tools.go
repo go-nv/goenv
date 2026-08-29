@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/pathutil"
+	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -281,6 +282,40 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 	return nil
 }
 
+// ToolBinDirs returns every directory a default tool binary may have been
+// installed into, in the order they should be searched.
+//
+// These must stay in sync with InstallTools, which sets GOPATH to the
+// hostGopath passed by its callers. Both call sites (the automatic
+// post-install hook in cmd/core/install.go and the manual
+// "goenv tools default-tools install" command) pass
+// Config.SafeResolvePath(version), which resolves to the version directory
+// itself once the version is installed — so "go install" writes to
+// versions/<version>/bin, not versions/<version>/gopath/bin.
+//
+// The other entries cover installs performed by older goenv versions and by
+// the shims, which set GOPATH to $HOME/go/<version> at runtime.
+func ToolBinDirs(goenvRoot, goVersion string) []string {
+	versionPath := filepath.Join(goenvRoot, "versions", goVersion)
+
+	dirs := []string{
+		// Where InstallTools writes today (GOPATH=versions/<version>).
+		filepath.Join(versionPath, "bin"),
+		// Where InstallTools writes when the version directory is absent
+		// (GOPATH=hosts/<os>-<arch>/gopath) and where host-wide tools live.
+		filepath.Join(goenvRoot, "hosts", platform.OS()+"-"+platform.Arch(), "gopath", "bin"),
+		// v3 version-scoped GOPATH.
+		filepath.Join(versionPath, "gopath", "bin"),
+	}
+
+	// Legacy "$HOME/go/<version>/bin" used by the shims at runtime.
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		dirs = append(dirs, filepath.Join(home, "go", goVersion, "bin"))
+	}
+
+	return dirs
+}
+
 // VerifyTools checks which tools are installed for a specific Go version
 func VerifyTools(config *Config, goVersion string, goenvRoot string) (map[string]bool, error) {
 	results := make(map[string]bool)
@@ -289,8 +324,7 @@ func VerifyTools(config *Config, goVersion string, goenvRoot string) (map[string
 		return results, nil
 	}
 
-	versionPath := filepath.Join(goenvRoot, "versions", goVersion)
-	gopathBin := filepath.Join(versionPath, "gopath", "bin")
+	searchDirs := ToolBinDirs(goenvRoot, goVersion)
 
 	for _, tool := range config.Tools {
 		binaryName := tool.Binary
@@ -300,11 +334,15 @@ func VerifyTools(config *Config, goVersion string, goenvRoot string) (map[string
 			binaryName = parts[len(parts)-1]
 		}
 
-		binaryBasePath := filepath.Join(gopathBin, binaryName)
-
-		// Check if executable exists (handles .exe and .bat on Windows)
-		_, err := pathutil.FindExecutable(binaryBasePath)
-		results[tool.Name] = (err == nil)
+		found := false
+		for _, dir := range searchDirs {
+			// Check if executable exists (handles .exe and .bat on Windows)
+			if _, err := pathutil.FindExecutable(filepath.Join(dir, binaryName)); err == nil {
+				found = true
+				break
+			}
+		}
+		results[tool.Name] = found
 	}
 
 	return results, nil

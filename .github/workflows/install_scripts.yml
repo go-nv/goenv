@@ -1,0 +1,145 @@
+name: Install Scripts
+
+# Validates install.sh and install.ps1. These are the entry point for every new
+# user but were previously never exercised in CI, which is how issue #582
+# (Windows install script downloading a v2 release with no binaries) shipped.
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - "install.sh"
+            - "install.ps1"
+            - "testing/install/**"
+            - "testing/fixtures/github-releases.json"
+            - ".github/workflows/install_scripts.yml"
+    pull_request:
+        paths:
+            - "install.sh"
+            - "install.ps1"
+            - "testing/install/**"
+            - "testing/fixtures/github-releases.json"
+            - ".github/workflows/install_scripts.yml"
+    # The installers depend on live GitHub release metadata, so run them on a
+    # schedule too: a bad release can break installs without any code change.
+    schedule:
+        - cron: "0 7 * * 1"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    lint:
+        name: Lint install scripts
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Check bash syntax
+              run: bash -n install.sh
+
+      - name: ShellCheck the install script
+        # Scoped to the files this workflow owns. A repo-wide scan would fail on
+        # pre-existing findings in unrelated scripts and make this job useless
+        # as a signal.
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck --severity=warning install.sh testing/install/release_selection_test.sh
+              run: |
+                  $errors = $null
+                  [System.Management.Automation.Language.Parser]::ParseFile(
+                    (Resolve-Path ./install.ps1).Path, [ref]$null, [ref]$errors) | Out-Null
+                  if ($errors.Count -gt 0) {
+                    $errors | ForEach-Object { Write-Error $_.ToString() }
+                    exit 1
+                  }
+                  Write-Host "install.ps1 parses cleanly"
+
+            - name: PSScriptAnalyzer
+              shell: pwsh
+              run: |
+                  Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction Stop
+                  $results = Invoke-ScriptAnalyzer -Path ./install.ps1 -Severity Error,Warning
+                  if ($results) {
+                    $results | Format-Table -AutoSize | Out-String | Write-Host
+                    if ($results | Where-Object { $_.Severity -eq 'Error' }) { exit 1 }
+                  }
+                  Write-Host "No PSScriptAnalyzer errors"
+
+    release-selection:
+        name: Release selection (offline, issue #582)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Run hermetic release-selection tests
+              run: bash testing/install/release_selection_test.sh
+
+    install-e2e:
+        name: Install end-to-end (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Run install.sh
+              if: runner.os != 'Windows'
+              shell: bash
+              env:
+                  GOENV_ROOT: ${{ runner.temp }}/goenv-e2e
+              run: bash ./install.sh
+
+            - name: Run install.ps1
+              if: runner.os == 'Windows'
+              shell: pwsh
+              env:
+                  GOENV_ROOT: ${{ runner.temp }}/goenv-e2e
+              run: ./install.ps1
+
+            - name: Verify the installed binary runs and is v3
+              shell: bash
+              env:
+                  GOENV_ROOT: ${{ runner.temp }}/goenv-e2e
+              run: |
+                  set -euo pipefail
+
+                  binary="${GOENV_ROOT}/bin/goenv"
+                  [ "${RUNNER_OS}" = "Windows" ] && binary="${GOENV_ROOT}/bin/goenv.exe"
+
+                  if [ ! -f "$binary" ]; then
+                    echo "::error::installer did not produce $binary"
+                    ls -R "${GOENV_ROOT}" || true
+                    exit 1
+                  fi
+
+                  version_output="$("$binary" --version)"
+                  echo "Installed: ${version_output}"
+
+                  # Issue #582: the installer used to resolve "latest" to a v2
+                  # documentation-only release. Installing anything other than v3 here
+                  # means release selection regressed.
+                  if ! echo "$version_output" | grep -Eq '3\.[0-9]+\.[0-9]+'; then
+                    echo "::error::expected a 3.x version, got: ${version_output}"
+                    exit 1
+                  fi
+
+            - name: Verify goenv is usable after install
+              shell: bash
+              env:
+                  GOENV_ROOT: ${{ runner.temp }}/goenv-e2e
+              run: |
+                  set -euo pipefail
+
+                  binary="${GOENV_ROOT}/bin/goenv"
+                  [ "${RUNNER_OS}" = "Windows" ] && binary="${GOENV_ROOT}/bin/goenv.exe"
+
+                  # A freshly installed goenv must be able to print init code and list
+                  # versions without erroring.
+                  "$binary" init - bash > /dev/null
+                  "$binary" versions || true
+                  "$binary" --help > /dev/null

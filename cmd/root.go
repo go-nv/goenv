@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/cmdutil"
@@ -63,9 +64,12 @@ var RootCmd = &cobra.Command{
 		// Store updated context back to command
 		cmd.SetContext(ctx)
 
-		// Remove stale goenv shim left over from v2 installations.
-		// Uses helper function to handle both forward and backslash paths.
-		if _, err := migration.RemoveStaleV2Shim(cfg.ShimsDir()); err != nil {
+		// Remove any goenv shim shadowing this binary. rehash never creates one
+		// on purpose, and because the shims directory is at the front of PATH a
+		// leftover goenv shim makes every shim invocation recurse until the
+		// process table fills up (issues #542, #572). Covers both v2 leftovers
+		// and v3-format shims.
+		if _, err := migration.RemoveGoenvShims(cfg.ShimsDir()); err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %v\n", err)
 		}
 
@@ -108,31 +112,16 @@ var RootCmd = &cobra.Command{
 						return vscode.UpdateSettingsForVersion(cwd, cfg.Root, version)
 					},
 					InstallCallback: func(version string) error {
-						// Find install command
-						var installCmd *cobra.Command
-						for _, c := range cmd.Root().Commands() {
-							if c.Name() == "install" {
-								installCmd = c
-								break
-							}
-						}
-						if installCmd == nil {
-							return fmt.Errorf("install command not found")
-						}
-
-						// Set args based on version (empty = latest)
+						// Build args based on version (empty = latest)
+						var args []string
 						if version != "" {
-							installCmd.SetArgs([]string{version})
-						} else {
+							args = []string{version}
+						} else if additionalFlags != "" {
 							// Install latest with additional flags if provided
-							args := []string{}
-							if additionalFlags != "" {
-								args = append(args, splitArgs(additionalFlags)...)
-							}
-							installCmd.SetArgs(args)
+							args = splitArgs(additionalFlags)
 						}
 
-						return installCmd.Execute()
+						return runSubcommand(cmd, "install", args)
 					},
 				}
 
@@ -169,15 +158,7 @@ var RootCmd = &cobra.Command{
 			// Handle installation if requested
 			if result.InstallRequested {
 				fmt.Fprintf(cmd.OutOrStdout(), "Installing Go %s...\n", result.Version)
-				installCmd := cmd.Root().Commands()[0] // Find install command
-				for _, c := range cmd.Root().Commands() {
-					if c.Name() == "install" {
-						installCmd = c
-						break
-					}
-				}
-				installCmd.SetArgs([]string{result.Version})
-				if err := installCmd.Execute(); err != nil {
+				if err := runSubcommand(cmd, "install", []string{result.Version}); err != nil {
 					fmt.Fprintf(cmd.OutOrStderr(), "Installation failed: %v\n", err)
 					os.Exit(1)
 				}
@@ -203,7 +184,7 @@ func Execute() {
 	// If first arg looks like a version number, route to local command
 	if len(os.Args) > 1 {
 		arg := os.Args[1]
-		if isVersionLike(arg) {
+		if isVersionLike(arg) && !isRegisteredCommand(arg) {
 			// Rewrite args to call local command
 			os.Args = append([]string{os.Args[0], "local"}, os.Args[1:]...)
 		}
@@ -213,6 +194,22 @@ func Execute() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// isRegisteredCommand reports whether name is a real goenv command (or command
+// alias). The version shorthand rewrite must never shadow a real command:
+// "goenv latest" is the `latest` command, not `goenv local latest` writing a
+// surprise .go-version file into the current directory (issue #438).
+func isRegisteredCommand(name string) bool {
+	for _, c := range RootCmd.Commands() {
+		if c.Name() == name {
+			return true
+		}
+		if slices.Contains(c.Aliases, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // isVersionLike checks if a string looks like a version number
@@ -456,6 +453,53 @@ func SetVersionInfo(v, c, bt string) {
 	AppVersion = v
 	AppCommit = c
 	AppBuildTime = bt
+}
+
+// runSubcommand invokes a sibling subcommand in-process.
+//
+// It deliberately does NOT call subCmd.Execute(). Cobra's Execute() always
+// dispatches from the root command ("Regardless of what command execute is
+// called on, run on Root only"), so calling it on a subcommand re-runs the
+// root command with the original os.Args. When the root command is what
+// triggered the call (auto-install / interactive setup), that re-entry loops
+// forever — the "Auto-installing Go x.y.z (from go.mod)..." infinite loop
+// reported in issues #572 and #542.
+func runSubcommand(parent *cobra.Command, name string, args []string) error {
+	var subCmd *cobra.Command
+	for _, c := range parent.Root().Commands() {
+		if c.Name() == name {
+			subCmd = c
+			break
+		}
+	}
+	if subCmd == nil {
+		return fmt.Errorf("%s command not found", name)
+	}
+
+	// Share the resolved context (config/manager/environment) with the child so
+	// it does not have to re-run PersistentPreRun.
+	subCmd.SetContext(parent.Context())
+
+	if err := subCmd.ParseFlags(args); err != nil {
+		return err
+	}
+	positional := subCmd.Flags().Args()
+
+	if subCmd.Args != nil {
+		if err := subCmd.Args(subCmd, positional); err != nil {
+			return err
+		}
+	}
+
+	switch {
+	case subCmd.RunE != nil:
+		return subCmd.RunE(subCmd, positional)
+	case subCmd.Run != nil:
+		subCmd.Run(subCmd, positional)
+		return nil
+	default:
+		return fmt.Errorf("%s command is not runnable", name)
+	}
 }
 
 // splitArgs splits a string into arguments, respecting quoted strings

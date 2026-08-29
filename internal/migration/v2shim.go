@@ -12,6 +12,11 @@ import (
 // path component (followed by quote, space, or directory separator, but not a hyphen or letter).
 var V2ShimPattern = regexp.MustCompile(`libexec[\\/]goenv(["'\s/\\]|$)`)
 
+// v3ShimPattern matches the v3 shim body, which dispatches through
+// "goenv exec". A shim named "goenv" containing this is just as recursive as a
+// v2 leftover, so it must be recognised too.
+var v3ShimPattern = regexp.MustCompile(`goenv exec`)
+
 // RemoveStaleV2Shim removes the stale goenv shim left over from v2 installations.
 // v2's goenv-rehash bakes the Homebrew Cellar path into shims at creation time
 // (e.g. exec "/opt/homebrew/Cellar/goenv/2.2.38_1/libexec/goenv" on macOS/Linux

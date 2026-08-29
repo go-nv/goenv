@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
 	"github.com/stretchr/testify/assert"
@@ -299,6 +300,61 @@ func TestVerifyTools(t *testing.T) {
 	if results["missing-tool"] {
 		t.Error("Expected missing-tool to not be found")
 	}
+}
+
+// TestVerifyTools_FindsToolsWhereInstallToolsWritesThem is a regression test for
+// the false "not installed" reports described in issue #581.
+//
+// Both InstallTools call sites pass Config.SafeResolvePath(version) as the
+// GOPATH, which resolves to the version directory itself once the version is
+// installed, so "go install" writes binaries to versions/<version>/bin.
+// VerifyTools used to look only in versions/<version>/gopath/bin and therefore
+// reported successfully-installed tools as missing.
+func TestVerifyTools_FindsToolsWhereInstallToolsWritesThem(t *testing.T) {
+	tmpDir := t.TempDir()
+	goVersion := "1.21.0"
+
+	// GOPATH=versions/<version> means "go install" lands in versions/<version>/bin.
+	installedBin := filepath.Join(tmpDir, "versions", goVersion, "bin")
+	require.NoError(t, utils.EnsureDirWithContext(installedBin, "create test directory"))
+
+	goplsBinary := filepath.Join(installedBin, "gopls")
+	if utils.IsWindows() {
+		goplsBinary += ".exe"
+	}
+	testutil.WriteTestFile(t, goplsBinary, []byte("mock binary"), utils.PermFileExecutable, "Failed to create gopls binary")
+
+	config := &Config{
+		Tools: []Tool{
+			{Name: "gopls", Package: "golang.org/x/tools/gopls", Binary: "gopls"},
+			{Name: "missing-tool", Package: "example.com/missing", Binary: "missing"},
+		},
+	}
+
+	results, err := VerifyTools(config, goVersion, tmpDir)
+	require.NoError(t, err, "VerifyTools failed")
+
+	assert.True(t, results["gopls"],
+		"gopls installed at %s should be reported as installed", installedBin)
+	assert.False(t, results["missing-tool"], "missing-tool should not be found")
+}
+
+// TestToolBinDirs_CoversInstallToolsTarget asserts that the directory
+// InstallTools actually writes to is one of the directories VerifyTools
+// searches, so the two cannot silently drift apart again.
+func TestToolBinDirs_CoversInstallToolsTarget(t *testing.T) {
+	tmpDir := t.TempDir()
+	goVersion := "1.21.0"
+
+	cfg := &config.Config{Root: tmpDir}
+	require.NoError(t, utils.EnsureDirWithContext(cfg.VersionDir(goVersion), "create version dir"))
+
+	// This is the argument both InstallTools call sites pass as hostGopath.
+	hostGopath := cfg.SafeResolvePath(goVersion)
+	installTarget := filepath.Join(hostGopath, "bin")
+
+	assert.Contains(t, ToolBinDirs(tmpDir, goVersion), installTarget,
+		"ToolBinDirs must include the directory InstallTools writes to")
 }
 
 func TestVerifyTools_NoBinaryName(t *testing.T) {

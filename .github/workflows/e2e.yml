@@ -1,0 +1,82 @@
+name: E2E
+
+# End-to-end tests: a real goenv binary against a real, isolated GOENV_ROOT on
+# each supported operating system.
+#
+# Unit tests did not catch several shipped regressions (issues #438, #542, #572,
+# #581, #593) because those bugs only appear when the binary runs against a real
+# filesystem, PATH and shell. This workflow is that missing outer ring.
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+    merge_group:
+    schedule:
+        # Weekly: catches breakage caused by upstream Go releases rather than by a
+        # change in this repository.
+        - cron: "0 6 * * 1"
+    workflow_dispatch:
+        inputs:
+            network_tests:
+                description: "Also run tests that download a Go toolchain"
+                type: boolean
+                default: false
+
+permissions:
+    contents: read
+
+concurrency:
+    group: e2e-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    e2e:
+        name: E2E (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: "stable"
+
+            - name: Run E2E tests
+              shell: bash
+              env:
+                  # Never let the runner's own goenv configuration (or a previous step's)
+                  # leak into the harness.
+                  GOENV_DEBUG: ""
+                  GOENV_VERSION: ""
+              run: go test -tags e2e -v -timeout 20m ./testing/e2e/...
+
+    e2e-network:
+        name: E2E with real toolchain download (${{ matrix.os }})
+        # Downloads a full Go toolchain, so it is kept off the per-PR path.
+        if: github.event_name == 'schedule' || inputs.network_tests
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: "stable"
+
+            - name: Run E2E tests including toolchain installation
+              shell: bash
+              env:
+                  GOENV_E2E_NETWORK: "1"
+                  GOENV_DEBUG: ""
+                  GOENV_VERSION: ""
+              run: go test -tags e2e -v -timeout 30m ./testing/e2e/...

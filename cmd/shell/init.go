@@ -11,6 +11,7 @@ import (
 	cmdpkg "github.com/go-nv/goenv/cmd"
 
 	"github.com/go-nv/goenv/internal/cmdutil"
+	"github.com/go-nv/goenv/internal/completions"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
@@ -336,12 +337,7 @@ func renderInitScript(shell shellutil.ShellType, cfg *config.Config, noRehash bo
 		builder.WriteString("fi\n")
 	}
 
-	if completion := findCompletionPath(shell); completion != "" {
-		// Completion sourcing only for Unix shells
-		if shell != shellutil.ShellTypePowerShell && shell != shellutil.ShellTypeCmd {
-			fmt.Fprintf(&builder, "source '%s'\n", completion)
-		}
-	}
+	builder.WriteString(renderCompletion(shell))
 
 	if !noRehash {
 		// Use sh-rehash with --only-manage-paths for faster initialization
@@ -555,6 +551,59 @@ func renderShellFunction(shell shellutil.ShellType) string {
 	}
 
 	return builder.String()
+}
+
+// renderCompletion returns the shell completion code to include in the output
+// of "goenv init -".
+//
+// A completion script shipped on disk by a distribution takes priority so
+// packagers can override it. Otherwise the completion script embedded in the
+// binary is inlined directly. Inlining matters because most installations —
+// Homebrew in particular — have no <install-root>/completions directory at all,
+// which previously meant "eval \"$(goenv init -)\"" silently produced no
+// completions whatsoever (issue #593).
+func renderCompletion(shell shellutil.ShellType) string {
+	// cmd.exe has no completion mechanism to hook into here.
+	if shell == shellutil.ShellTypeCmd {
+		return ""
+	}
+
+	if path := findCompletionPath(shell); path != "" {
+		if shell == shellutil.ShellTypePowerShell {
+			return fmt.Sprintf(". '%s'\n", path)
+		}
+		return fmt.Sprintf("source '%s'\n", path)
+	}
+
+	script := embeddedCompletion(shell)
+	if script == "" {
+		return ""
+	}
+
+	var builder strings.Builder
+	builder.WriteString("# goenv shell completion (embedded)\n")
+	builder.WriteString(script)
+	if !strings.HasSuffix(script, "\n") {
+		builder.WriteString("\n")
+	}
+	return builder.String()
+}
+
+// embeddedCompletion returns the completion script compiled into the binary for
+// the given shell, or "" when the shell has none.
+func embeddedCompletion(shell shellutil.ShellType) string {
+	switch shell {
+	case shellutil.ShellTypeBash, shellutil.ShellTypeKsh:
+		return completions.Bash
+	case shellutil.ShellTypeZsh:
+		return completions.ZshInit
+	case shellutil.ShellTypeFish:
+		return completions.Fish
+	case shellutil.ShellTypePowerShell:
+		return completions.PowerShell
+	default:
+		return ""
+	}
 }
 
 func findCompletionPath(shell shellutil.ShellType) string {
