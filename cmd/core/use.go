@@ -19,6 +19,7 @@ import (
 	"github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/toolupdater"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
 )
 
@@ -183,14 +184,59 @@ func runUse(cmd *cobra.Command, args []string) error {
 				shouldConfigureVSCode = true
 				fmt.Fprintf(cmd.OutOrStdout(), "\n%sAuto-updating VS Code workspace (goenv.autoSync: true)...\n", utils.Emoji("🔧 "))
 			} else {
-				// Prompt user
-				fmt.Fprintf(cmd.OutOrStdout(), "\n%sDetected VS Code workspace. Update settings for Go %s? [Y/n]: ", utils.Emoji("💡 "), version)
-				var response string
-				fmt.Fscanln(cmd.InOrStdin(), &response)
+				// This prompt defaults to Yes, and writing to a tracked
+				// .vscode/settings.json is not something to do on a guess. A raw
+				// Fscanln on a non-TTY stdin (CI, cron, docker build, a piped
+				// script) returns immediately with an empty response, which the
+				// "empty means Yes" rule then turned into consent — silently
+				// rewriting a committed file and dirtying the working tree.
+				//
+				// Only prompt when there is actually someone to answer. The two
+				// opt-in paths for automation (goenv.autoSync in settings.json
+				// and GOENV_VSCODE_AUTO_SYNC) are checked above and still work,
+				// so non-interactive callers that *want* this keep it.
+				ctx := cmdutil.NewInteractiveContext(cmd)
+				ctx.Reader = cmd.InOrStdin()
+				ctx.Writer = cmd.OutOrStdout()
+				ctx.ErrWriter = cmd.OutOrStderr()
 
-				// Default to Yes if user just presses Enter
-				if response == "" || response == "y" || response == "Y" || response == "yes" {
+				// Only speak up when there is something to do. This block used to
+				// fire whenever .vscode/settings.json merely existed, so a repo
+				// whose settings contain nothing but "editor.tabSize" got prompted
+				// on every 'goenv use' — and, non-interactively, a line of log noise
+				// on every CI run.
+				//
+				//   Mismatch     -> pinned to another version; genuinely stale.
+				//   !HasSettings -> no go.goroot at all; offer to set it up, but only
+				//                   to a human, since adding config nobody asked for
+				//                   is not something to volunteer in automation.
+				//   otherwise    -> already correct (or ${env:GOROOT}, which doctor
+				//                   reports separately); stay quiet.
+				check := vscode.CheckSettings(vscodeSettingsPath, version)
+				switch {
+				case ctx.AssumeYes:
+					// --yes / GOENV_ASSUME_YES: explicit consent.
 					shouldConfigureVSCode = true
+				case !check.Mismatch && check.HasSettings:
+					// Already pointing at the right version; nothing to say.
+				case !cmdutil.CanPrompt(ctx, os.Stdin):
+					// Automation. Only worth a line when the settings are actually
+					// stale, and on stderr so stdout stays parseable.
+					if check.Mismatch {
+						fmt.Fprintf(cmd.OutOrStderr(),
+							"%sVS Code settings still pin Go %s and were left unchanged (non-interactive). "+
+								"Run 'goenv vscode sync', or set GOENV_VSCODE_AUTO_SYNC=1 to update them automatically.\n",
+							utils.Emoji("💡 "), check.ConfiguredVersion)
+					}
+				default:
+					fmt.Fprintf(cmd.OutOrStdout(), "\n%sDetected VS Code workspace. Update settings for Go %s? [Y/n]: ", utils.Emoji("💡 "), version)
+					var response string
+					fmt.Fscanln(cmd.InOrStdin(), &response)
+
+					// Default to Yes if user just presses Enter
+					if response == "" || response == "y" || response == "Y" || response == "yes" {
+						shouldConfigureVSCode = true
+					}
 				}
 			}
 		}

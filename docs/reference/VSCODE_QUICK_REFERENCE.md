@@ -31,12 +31,14 @@ goenv doctor --fix
 ## ⚠️ Common Issues
 
 **Terminal shows wrong Go version?**
+
 - The Go extension may be injecting stale paths
 - Run: `goenv doctor` to diagnose
 - Fix: `goenv doctor --fix` (creates backup, removes comments)
 - See: [VSCODE_TROUBLESHOOTING.md](VSCODE_TROUBLESHOOTING.md)
 
 **Changed version but VS Code still uses old one?**
+
 - Workspace settings need updating
 - Run: `goenv vscode sync`
 - Then reload VS Code window
@@ -50,7 +52,7 @@ Initialize VS Code workspace with goenv configuration.
 **Flags:**
 
 - `--template <name>` - Choose template: `basic`, `advanced`, `monorepo` (default: auto-detect)
-- `--env-vars` - Use environment variables instead of absolute paths
+- `--env-vars` - **Deprecated, no effect.** The Go extension ignores `go.goroot` when a `GOROOT` environment variable is set. Use `goenv vscode fix-extension` instead
 - `--dry-run` - Preview changes without writing
 - `--diff` - Show diff of changes (implies --dry-run)
 - `--force` - Overwrite existing settings
@@ -61,7 +63,7 @@ Initialize VS Code workspace with goenv configuration.
 goenv vscode init                           # Auto-detect, use absolute paths
 goenv vscode init --template advanced       # Use advanced template
 goenv vscode init --dry-run                 # Preview changes
-goenv vscode init --env-vars                # Use ${env:GOROOT} mode
+goenv vscode fix-extension                  # Delegate to 'goenv exec go' (per-project)
 ```
 
 ### `goenv vscode setup`
@@ -69,6 +71,7 @@ goenv vscode init --env-vars                # Use ${env:GOROOT} mode
 Complete VS Code setup (recommended for first-time setup).
 
 Performs all configuration steps:
+
 1. Checks user settings for Go extension PATH injection issues
 2. Initializes workspace `.vscode/settings.json`
 3. Syncs with current Go version

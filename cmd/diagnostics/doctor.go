@@ -3158,34 +3158,44 @@ func checkVSCodeIntegration(cfg *config.Config, env *utils.GoenvEnvironment) che
 	}
 
 	if result.UsesEnvVars {
-		// Deliberately still StatusOK: this configuration works, and
-		// escalating it to a warning would change 'doctor --fail-on=warning'
-		// exit codes for existing CI setups. But it is the one supported
-		// layout that depends on the GOROOT exported by 'goenv init -', which
-		// is a snapshot of the directory the shell started in. Carry the
-		// caveat in the advice so this check no longer silently blesses the
-		// mode that 'goenv vscode fix-extension' deliberately migrates away
-		// from (it blanks go.goroot and sets go.alternateTools instead).
+		// Deliberately still StatusOK: escalating to a warning would change
+		// 'doctor --fail-on=warning' exit codes for existing CI setups.
+		//
+		// But this configuration does nothing. Per the Go extension reference,
+		// go.goroot "specifies the GOROOT to use *when no environment variable
+		// is set*". So when GOROOT is exported (which is the only situation
+		// where "${env:GOROOT}" could resolve to anything) the extension reads
+		// the environment variable directly and ignores go.goroot entirely;
+		// and when GOROOT is unset there is nothing to expand. Either way the
+		// setting is inert, so this check must not present it as a working
+		// goenv integration.
 		return checkResult{
 			id:      "vs-code-integration",
 			name:    "VS Code integration",
 			status:  StatusOK,
-			message: "VS Code configured to use goenv environment variables (${env:GOROOT})",
-			advice: "This mode requires launching VS Code from a goenv-initialised shell, and " +
-				"inherits whichever version was active in that shell's startup directory — so it " +
-				"is wrong for projects pinning a different version. " +
-				"'goenv vscode fix-extension' switches to go.alternateTools ('goenv exec go'), " +
+			message: "VS Code settings reference ${env:GOROOT}",
+			advice: "This setting has no effect: the Go extension only consults go.goroot when no " +
+				"GOROOT environment variable is set, and ignores it when one is. What actually " +
+				"selects the toolchain is the exported GOROOT, which is a snapshot of the " +
+				"directory the launching shell started in. " +
+				"Run 'goenv vscode fix-extension' to set go.alternateTools to 'goenv exec go', " +
 				"which resolves the version per project and needs no environment variables",
 		}
 	}
 
 	if result.Mismatch {
 		return checkResult{
-			id:        "vs-code-integration",
-			name:      "VS Code integration",
-			status:    StatusWarning,
-			message:   fmt.Sprintf("VS Code settings use Go %s but current version is %s", result.ConfiguredVersion, currentVersion),
-			advice:    "Run 'goenv vscode sync' to fix, or 'goenv vscode doctor' for detailed diagnostics",
+			id:      "vs-code-integration",
+			name:    "VS Code integration",
+			status:  StatusWarning,
+			message: fmt.Sprintf("VS Code settings use Go %s but current version is %s", result.ConfiguredVersion, currentVersion),
+			// This is the stale-pin symptom, so offer the durable option as
+			// well as the re-sync. Only advertising 'sync' teaches a treadmill
+			// the user has to remember after every version change.
+			advice: "Run 'goenv vscode sync' to update the pinned paths. " +
+				"To stop them going stale altogether, run 'goenv vscode fix-extension', which " +
+				"routes the Go extension through 'goenv exec go' so it resolves the version per " +
+				"project. Use 'goenv vscode doctor' for detailed diagnostics",
 			issueType: IssueTypeVSCodeMismatch,
 		}
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // InteractionLevel controls how interactive a command should be
@@ -281,11 +282,33 @@ func IsCI() bool {
 	return false
 }
 
-// IsTTY checks if the given file is a terminal
+// IsTTY reports whether the given file is a terminal.
+//
+// This asks the operating system rather than inspecting the file mode. The
+// usual shortcut, os.ModeCharDevice, is not a terminal test: /dev/null and
+// /dev/zero are character devices too, so it answers "yes" for exactly the
+// stdin a program is given under cron, container builds, and any invocation
+// redirected from /dev/null. Relying on it made prompts believe a human was
+// present and then read an immediate empty response from them.
 func IsTTY(file *os.File) bool {
-	fileInfo, err := file.Stat()
-	if err != nil {
+	if file == nil {
 		return false
 	}
-	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+	return term.IsTerminal(int(file.Fd()))
+}
+
+// CanPrompt reports whether a prompt can actually be answered by a human.
+//
+// Both conditions are needed. IsInteractive covers the cases goenv knows about
+// (CI environment variables, --quiet, --yes); IsTTY covers the ones it cannot
+// know about — cron, container builds, a piped script — where stdin is simply
+// not a terminal and no CI variable is set.
+//
+// This matters for prompts whose default is "yes" and whose effect is to write
+// to a file the user may have committed. Reading from a non-terminal stdin with
+// fmt.Fscanln returns immediately with an empty response, so an "empty means
+// yes" rule silently becomes consent. Callers should treat !CanPrompt as "do
+// nothing and say so", not as "assume the default".
+func CanPrompt(ctx *InteractiveContext, stdin *os.File) bool {
+	return ctx.IsInteractive() && IsTTY(stdin)
 }

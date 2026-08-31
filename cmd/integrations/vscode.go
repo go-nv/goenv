@@ -226,7 +226,23 @@ func init() {
 	// Init flags
 	vscodeInitCmd.Flags().BoolVarP(&VSCodeInitFlags.Force, "force", "f", false, "Overwrite existing settings")
 	vscodeInitCmd.Flags().StringVarP(&VSCodeInitFlags.Template, "template", "t", "basic", "Configuration template (basic, advanced, monorepo)")
-	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.EnvVars, "env-vars", false, "Use environment variables instead of absolute paths (requires launching VS Code from terminal)")
+	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.EnvVars, "env-vars", false, "Deprecated: writes settings that the Go extension ignores")
+	// The Go extension reference states that go.goroot "specifies the GOROOT to
+	// use *when no environment variable is set*". So "${env:GOROOT}" is inert:
+	// when GOROOT is exported the extension reads the variable and ignores
+	// go.goroot; when it is not, there is nothing to expand. What actually pins
+	// the toolchain is the exported GOROOT itself, which is a snapshot of the
+	// launching shell's startup directory — the cause of issue #367, where
+	// 'goenv local' could not override 'goenv global' inside VS Code.
+	//
+	// MarkDeprecated hides the flag and prints a notice when it is used, without
+	// removing it, so existing scripts keep working.
+	if err := vscodeInitCmd.Flags().MarkDeprecated("env-vars",
+		"the Go extension ignores go.goroot when a GOROOT environment variable is set, "+
+			"so this mode has no effect. Use 'goenv vscode fix-extension' instead, which sets "+
+			"go.alternateTools to 'goenv exec go' and resolves the version per project"); err != nil {
+		panic(err) // programmer error: flag name must match the one registered above
+	}
 	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.DryRun, "dry-run", false, "Preview changes without writing files")
 	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.Diff, "diff", false, "Show diff of changes (implies --dry-run)")
 	vscodeInitCmd.Flags().BoolVar(&VSCodeInitFlags.WorkspacePaths, "workspace-paths", false, "Use ${workspaceFolder}-relative paths for portability")
@@ -539,23 +555,35 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "  • go.goroot: ${env:GOROOT}\n")
 		fmt.Fprintf(cmd.OutOrStdout(), "  • go.gopath: ${env:GOPATH}\n")
-		fmt.Fprintf(cmd.OutOrStdout(), "  • Mode: Environment variables (requires terminal launch)\n")
+		fmt.Fprintf(cmd.OutOrStdout(), "  • Mode: Environment variables (deprecated \u2014 has no effect)\n")
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "  • Template: %s\n", template)
 	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), "Next steps:")
 	if useAbsolutePaths {
+		fmt.Fprintln(cmd.OutOrStdout(), "Next steps:")
 		fmt.Fprintln(cmd.OutOrStdout(), "  1. Reload VS Code window (Cmd+Shift+P → 'Developer: Reload Window')")
 		fmt.Fprintf(cmd.OutOrStdout(), "  2. %sReady to use - works even when opened from GUI!\n", utils.Emoji("✨ "))
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintf(cmd.OutOrStdout(), "%sNote: If you change Go versions, re-run 'goenv vscode init' to update paths\n", utils.Emoji("💡 "))
+		// These paths are pinned to whichever version is active right now, so
+		// they are stale the moment the user switches. Point at 'sync' (the
+		// lighter command than re-running init), and at the configuration that
+		// removes the need to re-sync at all. Without this, the only advertised
+		// workflow is a treadmill the user has to remember to run.
+		fmt.Fprintf(cmd.OutOrStdout(), "%sThese paths are pinned to the current Go version and go stale when you switch.\n", utils.Emoji("💡 "))
+		fmt.Fprintln(cmd.OutOrStdout(), "   Run 'goenv vscode sync' to update them after changing versions.")
+		fmt.Fprintln(cmd.OutOrStdout(), "   To avoid re-syncing entirely, run 'goenv vscode fix-extension': it routes")
+		fmt.Fprintln(cmd.OutOrStdout(), "   the Go extension through 'goenv exec go', which resolves the version per project.")
 	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), "  1. Close VS Code completely")
-		fmt.Fprintln(cmd.OutOrStdout(), "  2. Ensure 'eval \"$(goenv init -)\"' is in your shell config")
-		fmt.Fprintln(cmd.OutOrStdout(), "  3. Launch from terminal: code .")
+		// Do not describe this mode as merely awkward. The Go extension only
+		// consults go.goroot when no GOROOT environment variable is set, so
+		// "${env:GOROOT}" is ignored whenever one is exported and expands to
+		// nothing when it is not. See issue #367.
+		fmt.Fprintf(cmd.OutOrStdout(), "%sThis mode has no effect.\n", utils.Emoji("⚠️  "))
+		fmt.Fprintln(cmd.OutOrStdout(), "   The Go extension only reads go.goroot when no GOROOT environment variable")
+		fmt.Fprintln(cmd.OutOrStdout(), "   is set, and ignores it when one is — so these settings never apply.")
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintf(cmd.OutOrStdout(), "%sWarning: Environment variable mode requires terminal launch\n", utils.Emoji("⚠️  "))
-		fmt.Fprintln(cmd.OutOrStdout(), "   Consider using default --absolute mode for better UX")
+		fmt.Fprintln(cmd.OutOrStdout(), "   Run 'goenv vscode fix-extension' instead: it routes the Go extension")
+		fmt.Fprintln(cmd.OutOrStdout(), "   through 'goenv exec go', which resolves the version per project.")
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "")
 
