@@ -121,9 +121,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 		// Set GOPATH if not disabled
 		if !env.HasDisableGopath() {
-			// Build version-specific GOPATH: $HOME/go/{version}
-			homeDir, _ := os.UserHomeDir()
-			versionGopath := filepath.Join(homeDir, "go", currentVersion)
+			// Build version-specific GOPATH: $GOPATH_PREFIX/<version> (default $HOME/go/<version>)
+			versionGopath := cfg.ManagedGopath(currentVersion)
 
 			// Preserve existing GOPATH by prepending version-specific path.
 			// This allows users to keep source code in existing locations while
@@ -133,7 +132,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 			// is called from inside an already-managed shell (e.g. a tool that
 			// shells out to `go env GOPATH` through the shim).
 			if gopath != "" {
-				goPathPattern := filepath.Join(homeDir, "go")
+				goPathPattern := cfg.GopathPrefix()
 				var filteredPaths []string
 				for _, p := range filepath.SplitList(gopath) {
 					if !strings.HasPrefix(p, goPathPattern+string(filepath.Separator)) || p == goPathPattern {

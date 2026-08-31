@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/go-nv/goenv/internal/pathutil"
+
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/tidwall/jsonc"
@@ -508,7 +510,15 @@ func UpdateSettingsForVersion(workingDir string, goenvRoot string, version strin
 	gorootAbs := filepath.Join(goenvRoot, "versions", version)
 	goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
-	gopathAbs := filepath.Join(homeDir, "go", version)
+	// Use GOENV_GOPATH_PREFIX if set, otherwise $HOME/go
+	gopathAbs := func() string {
+		if prefix := os.Getenv("GOENV_GOPATH_PREFIX"); prefix != "" {
+			if expanded := pathutil.ExpandPath(prefix); expanded != "" {
+				return filepath.Join(filepath.Clean(expanded), version)
+			}
+		}
+		return filepath.Join(homeDir, "go", version)
+	}()
 	gopath := strings.Replace(gopathAbs, homeDir, homeEnvVar, 1)
 
 	keysToUpdate := map[string]interface{}{

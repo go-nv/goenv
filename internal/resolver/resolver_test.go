@@ -39,6 +39,7 @@ func newTestResolver(root string) *Resolver {
 // up binaries installed by the shims into "$HOME/go/{version}/bin", which is
 // the path the v3 shims actually write to today.
 func TestResolveBinary_FindsLegacyHomeGopathBin(t *testing.T) {
+	t.Setenv("GOENV_GOPATH_PREFIX", "")
 	tmp := t.TempDir()
 	home := filepath.Join(tmp, "home")
 	root := filepath.Join(tmp, "goenv")
@@ -69,6 +70,7 @@ func TestResolveBinary_FindsLegacyHomeGopathBin(t *testing.T) {
 // TestGetBinaryDirectories_IncludesLegacyHomeGopathBin verifies that rehash
 // (via GetBinaryDirectories) scans the legacy "$HOME/go/{version}/bin" path.
 func TestGetBinaryDirectories_IncludesLegacyHomeGopathBin(t *testing.T) {
+	t.Setenv("GOENV_GOPATH_PREFIX", "")
 	tmp := t.TempDir()
 	home := filepath.Join(tmp, "home")
 	root := filepath.Join(tmp, "goenv")
@@ -126,6 +128,7 @@ func TestGetBinaryDirectories_OmitsLegacyWhenGopathDisabled(t *testing.T) {
 // TestFindVersionsWithBinary_FindsLegacyHomeGopathBin verifies that
 // FindVersionsWithBinary considers the legacy "$HOME/go/{version}/bin" path.
 func TestFindVersionsWithBinary_FindsLegacyHomeGopathBin(t *testing.T) {
+	t.Setenv("GOENV_GOPATH_PREFIX", "")
 	tmp := t.TempDir()
 	home := filepath.Join(tmp, "home")
 	root := filepath.Join(tmp, "goenv")
@@ -148,6 +151,7 @@ func TestFindVersionsWithBinary_FindsLegacyHomeGopathBin(t *testing.T) {
 
 // TestConfig_LegacyHomeGopathBin spot-checks the new config helper.
 func TestConfig_LegacyHomeGopathBin(t *testing.T) {
+	t.Setenv("GOENV_GOPATH_PREFIX", "")
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	if runtime.GOOS == "windows" {

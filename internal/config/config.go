@@ -214,6 +214,41 @@ func (c *Config) VersionGopathBin(version string) string {
 	return filepath.Join(c.VersionDir(version), "gopath", "bin")
 }
 
+// GopathPrefix returns the base directory for managed GOPATH.
+// Respects GOENV_GOPATH_PREFIX if set (with env var and tilde expansion),
+// otherwise defaults to $HOME/go.
+//
+// Example: /Users/user/go or /custom/prefix
+func (c *Config) GopathPrefix() string {
+	if prefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue(); prefix != "" {
+		expanded := pathutil.ExpandPath(prefix)
+		if expanded != "" {
+			return filepath.Clean(expanded)
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.Getenv(utils.EnvVarHome)
+		if home == "" {
+			home = os.TempDir()
+		}
+	}
+	return filepath.Join(home, "go")
+}
+
+// ManagedGopath returns the version-specific GOPATH directory.
+// Uses GopathPrefix as base: $GOPATH_PREFIX/<version>
+// Example: /Users/user/go/1.21.0 or /custom/prefix/1.21.0
+func (c *Config) ManagedGopath(version string) string {
+	return filepath.Join(c.GopathPrefix(), version)
+}
+
+// ManagedGopathBin returns the bin directory inside the managed GOPATH.
+// Example: /Users/user/go/1.21.0/bin
+func (c *Config) ManagedGopathBin(version string) string {
+	return filepath.Join(c.ManagedGopath(version), "bin")
+}
+
 // LegacyHomeGopathBin returns the legacy GOPATH bin directory for a specific
 // version under the user's home directory.
 //
@@ -223,14 +258,15 @@ func (c *Config) VersionGopathBin(version string) string {
 // than to the v3-managed VersionGopathBin path. Until those shims are aligned,
 // rehash and ResolveBinary must scan this legacy location as well.
 //
-// Returns the empty string if the user's home directory cannot be determined.
+// Now respects GOENV_GOPATH_PREFIX for custom prefix support.
+// Returns the empty string if the prefix cannot be determined.
 // Example: /Users/user/go/1.21.0/bin
 func (c *Config) LegacyHomeGopathBin(version string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
+	prefix := c.GopathPrefix()
+	if prefix == "" {
 		return ""
 	}
-	return filepath.Join(home, "go", version, "bin")
+	return filepath.Join(prefix, version, "bin")
 }
 
 // FindVersionGoBinary returns the path to the Go binary for a specific version,

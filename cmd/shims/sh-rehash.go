@@ -80,12 +80,8 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	disableGoroot := env.HasDisableGoroot()
 	disableGopath := env.HasDisableGopath()
 
-	// Build GOPATH value: $HOME/go/{version}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		home = os.Getenv(utils.EnvVarHome) // Fallback
-	}
-	gopathValue := filepath.Join(home, "go", currentVersion)
+	// Build GOPATH value: $GOPATH_PREFIX/<version> (default $HOME/go/<version>)
+	gopathValue := cfg.ManagedGopath(currentVersion)
 
 	// Preserve existing GOPATH by prepending version-specific path.
 	// This allows users to keep source code in existing locations while
@@ -94,11 +90,11 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	existingGopath := os.Getenv(utils.EnvVarGopath)
 	if existingGopath != "" {
 		// Filter out any goenv-managed paths to prevent duplication on re-initialization
-		goPathPattern := filepath.Join(home, "go")
+		goPathPattern := cfg.GopathPrefix()
 		var filteredPaths []string
 		for _, path := range filepath.SplitList(existingGopath) {
-			// Skip paths that look like $HOME/go/{version}
-			// Keep paths that are exactly $HOME/go or any other custom paths
+			// Skip paths that look like $GOPATH_PREFIX/<version>
+			// Keep paths that are exactly $GOPATH_PREFIX or any other custom paths
 			if !strings.HasPrefix(path, goPathPattern+string(filepath.Separator)) || path == goPathPattern {
 				filteredPaths = append(filteredPaths, path)
 			}

@@ -9,6 +9,7 @@ import (
 	"github.com/go-nv/goenv/internal/cmdutil"
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/pathutil"
 	toolspkg "github.com/go-nv/goenv/internal/tools"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -238,16 +239,24 @@ func findAllVersionToolTargets(cfg *config.Config, toolNames []string) []toolUni
 }
 
 func findGlobalToolTargets(cfg *config.Config, toolNames []string) []toolUninstallTarget {
-	// Global GOPATH from environment or default
+	// Global GOPATH from environment or default (respects GOENV_GOPATH_PREFIX)
 	globalGopath := os.Getenv(utils.EnvVarGopath)
 	if globalGopath == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s Failed to get home directory: %v\n",
-				utils.EmojiOr("⚠️  ", ""), err)
-			return nil
+		if prefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue(); prefix != "" {
+			expanded := pathutil.ExpandPath(prefix)
+			if expanded != "" {
+				globalGopath = filepath.Clean(expanded)
+			}
 		}
-		globalGopath = filepath.Join(homeDir, "go")
+		if globalGopath == "" {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s Failed to get home directory: %v\n",
+					utils.EmojiOr("⚠️  ", ""), err)
+				return nil
+			}
+			globalGopath = filepath.Join(homeDir, "go")
+		}
 	}
 
 	binPath := filepath.Join(globalGopath, "bin")

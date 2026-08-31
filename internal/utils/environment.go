@@ -99,6 +99,7 @@ const (
 	GoenvEnvVarInstallRetries   GoenvEnvVar = "GOENV_INSTALL_RETRIES"
 	GoenvEnvVarInstallResume    GoenvEnvVar = "GOENV_INSTALL_RESUME"
 	GoenvEnvVarGocacheDir       GoenvEnvVar = "GOENV_GOCACHE_DIR"
+	GoenvEnvVarGopathPrefix     GoenvEnvVar = "GOENV_GOPATH_PREFIX"
 	GoenvEnvVarFileArg          GoenvEnvVar = "GOENV_FILE_ARG"
 	GoenvEnvVarPromptPrefix     GoenvEnvVar = "GOENV_PROMPT_PREFIX"
 	GoenvEnvVarPromptSuffix     GoenvEnvVar = "GOENV_PROMPT_SUFFIX"
@@ -230,6 +231,7 @@ type GoenvEnvironment struct {
 	InstallRetries   string `env:"INSTALL_RETRIES"`
 	InstallResume    string `env:"INSTALL_RESUME"`
 	GocacheDir       string `env:"GOCACHE_DIR"`
+	GopathPrefix     string `env:"GOPATH_PREFIX"`
 	FileArg          string `env:"FILE_ARG"`
 	PromptPrefix     string `env:"PROMPT_PREFIX"`
 	PromptSuffix     string `env:"PROMPT_SUFFIX"`
@@ -424,6 +426,13 @@ func (e *GoenvEnvironment) GetGocacheDir() string {
 		return ""
 	}
 	return e.GocacheDir
+}
+
+func (e *GoenvEnvironment) GetGopathPrefix() string {
+	if e == nil {
+		return ""
+	}
+	return e.GopathPrefix
 }
 
 func (e *GoenvEnvironment) GetFileArg() string {
