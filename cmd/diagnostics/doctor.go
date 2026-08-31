@@ -1529,44 +1529,50 @@ func classifyInstallations(paths []string) []installationType {
 }
 
 // generateCleanupRecommendation generates human-readable advice
+//
+// The advice is derived from the classification rather than recomputed from
+// the install types, so it can never contradict the "[RECOMMENDED TO KEEP]"
+// marker shown next to each installation.
+//
+// It used to recompute independently, and the two disagreed: on a machine with
+// a manual install first in PATH and a Homebrew install second, the list marked
+// the manual one to keep while the summary advised keeping "only Homebrew".
+// That is worse than unhelpful in a prompt that then offers to delete things —
+// following the summary meant removing the binary actually being executed and
+// keeping an older one.
 func generateCleanupRecommendation(installations []installationType) string {
 	if len(installations) <= 1 {
 		return ""
 	}
 
+	// Find what the classification actually recommends keeping.
+	keep := ""
+	keepType := ""
+	for _, inst := range installations {
+		if inst.recommended {
+			keep = inst.path
+			keepType = string(inst.installType)
+			break
+		}
+	}
+
+	if keep == "" {
+		return "Keep the installation that's first in your PATH."
+	}
+
+	// Call out an Intel Homebrew install on Apple Silicon specifically: that one
+	// is not merely redundant, it is the wrong architecture.
 	if platform.IsMacOS() && platform.Arch() == "arm64" {
-		// Check if there's an Intel homebrew installation
 		for _, inst := range installations {
 			if inst.installType == InstallTypeHomebrewIntel {
-				return "On Apple Silicon, remove the Intel Homebrew installation."
+				return fmt.Sprintf("Keep %s (%s) and remove the Intel Homebrew installation — "+
+					"it is the wrong architecture for Apple Silicon.", keep, keepType)
 			}
 		}
 	}
 
-	// Count types
-	homebrewCount := 0
-	manualCount := 0
-	systemCount := 0
-
-	for _, inst := range installations {
-		if strings.Contains(string(inst.installType), "homebrew") {
-			homebrewCount++
-		} else if inst.installType == InstallTypeManual {
-			manualCount++
-		} else if inst.installType == InstallTypeSystem {
-			systemCount++
-		}
-	}
-
-	if homebrewCount > 0 && manualCount > 0 {
-		return "Consider keeping only Homebrew installation for easier updates."
-	}
-
-	if homebrewCount > 1 {
-		return "Multiple Homebrew installations found. Keep only one."
-	}
-
-	return "Keep the installation that's first in your PATH."
+	return fmt.Sprintf("Keep %s (%s), which is the one currently on your PATH. "+
+		"Remove the others only if you are sure nothing depends on them.", keep, keepType)
 }
 
 // runFixMode provides unified interactive fixing for all detected issues

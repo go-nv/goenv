@@ -82,3 +82,95 @@ jobs:
           name: release-artifacts
           path: dist/*
           retention-days: 7
+
+      # GitHub's default rule is "latest = most recently published release",
+      # evaluated across every branch. The v2 maintenance branch still publishes
+      # documentation-only releases that carry no binaries, so whenever one lands
+      # after a v3 release it silently takes over /releases/latest — the endpoint
+      # install scripts, the README badge and third-party installers all resolve.
+      # A user then downloads a v2 tag that has no archive and gets a 404.
+      #
+      # This happened with 2.2.44 taking latest from 3.1.5 (issue #582).
+      #
+      # Claiming it explicitly here keeps the pointer on a release that actually
+      # ships binaries. Runs even when the build was skipped, because the assets
+      # already existing is not a reason to leave the pointer wrong.
+      - name: Mark this release as latest
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # Never point "latest" at a release with no downloadable archive —
+          # that is the exact failure this step exists to prevent.
+          asset_count=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.assets | length')
+          if [ "$asset_count" -eq 0 ]; then
+            echo "::error::${TAG} has no release assets; refusing to mark it latest"
+            exit 1
+          fi
+
+          gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --latest
+          echo "::notice::Marked ${TAG} as latest (${asset_count} assets)"
+
+  # Publishing a v2 release must not take over the "Latest" pointer.
+  #
+  # v2 releases are published by hand from the GitHub UI, where "Set as the
+  # latest release" is ticked by default — so this is one forgotten checkbox
+  # away from happening every time, and it did happen with 2.2.44 taking Latest
+  # from 3.1.5.
+  #
+  # It matters because every v2 release publishes zero binary assets (v2 is
+  # bash, installed via Homebrew or git clone). /releases/latest is what the
+  # install scripts, the README badge and third-party installers resolve, so
+  # pointing it at v2 means downloading a tag with no archive: a 404 (#582).
+  # Latest sat on a v2 tag from 2026-07-08 to 2026-08-31 for exactly this reason.
+  #
+  # Note this job lives on the v3 branch deliberately: release events run the
+  # workflows belonging to the released tag's branch, and this file is already
+  # invoked (and skipped) for v2 tags, so no change to master is required.
+  restore-latest:
+    name: Keep "Latest" on a release that ships binaries
+    # Any non-3.x tag, i.e. the v2 maintenance line.
+    if: github.event_name == 'release' && !startsWith(github.event.release.tag_name, '3.')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-point "Latest" at the newest v3 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          current=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name' 2>/dev/null || echo "")
+          if [ "$current" != "$PUBLISHED_TAG" ]; then
+            echo "::notice::Latest is '${current}', not the just-published '${PUBLISHED_TAG}'. Nothing to do."
+            exit 0
+          fi
+
+          # Setting make_latest=false alone is not enough: GitHub would just
+          # recompute "latest" as the most recently published release, which is
+          # this same v2 tag. The pointer has to be claimed explicitly by a
+          # release that actually has downloadable assets.
+          target=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=50" \
+            --jq '[.[] | select(.draft==false and .prerelease==false)
+                       | select(.tag_name | startswith("3."))
+                       | select(.assets | length > 0)]
+                  | sort_by(.published_at) | reverse | .[0].tag_name // empty')
+
+          if [ -z "$target" ]; then
+            echo "::warning::No published v3 release with assets found; leaving Latest on ${PUBLISHED_TAG}"
+            exit 0
+          fi
+
+          gh release edit "$target" --repo "${GITHUB_REPOSITORY}" --latest
+          echo "::notice::${PUBLISHED_TAG} had taken Latest; restored it to ${target}"
+          {
+            echo "### Latest release pointer corrected"
+            echo
+            echo "Publishing \`${PUBLISHED_TAG}\` (v2, no binary assets) had taken the"
+            echo "\"Latest\" pointer. It has been restored to \`${target}\`."
+            echo
+            echo "To avoid this, untick **Set as the latest release** when publishing v2 releases."
+          } >> "$GITHUB_STEP_SUMMARY"
