@@ -126,6 +126,40 @@ goenv. Backups are automatically created before any settings modification.`,
 	RunE: runVSCodeRevert,
 }
 
+// vscodeFixExtensionCmd exposes fixVSCodeExtensionInteractive.
+//
+// The implementation was written but never registered, so 'goenv vscode
+// fix-extension' — recommended by 'goenv doctor', by 'goenv vscode init' and
+// throughout docs/user-guide/VSCODE_INTEGRATION.md — did not exist. The only
+// live route to the same fix was 'goenv doctor --fix', and then only when the
+// Go extension had go.goroot/go.gopath set in *user* settings, which is not the
+// situation most people in issue #367 are in.
+var vscodeFixExtensionCmd = &cobra.Command{
+	Use:   "fix-extension",
+	Short: "Configure the VS Code Go extension to resolve versions through goenv",
+	Long: `Points the VS Code Go extension at goenv instead of at fixed paths.
+
+Writes to your VS Code *user* settings:
+  - go.goroot: ""                             (cleared)
+  - go.gopath: ""                             (cleared)
+  - go.alternateTools.go: "goenv exec go"     (delegates to goenv)
+
+Why this is needed: the Go extension uses the GOROOT environment variable when
+one is set and ignores the go.goroot setting. 'goenv init -' exports GOROOT once,
+for whichever version was active in the directory your shell started in, so a
+VS Code launched from that shell keeps using it and 'goenv local' appears to have
+no effect (issue #367).
+
+Routing through 'goenv exec go' avoids this entirely: goenv resolves the version
+on every invocation, so it follows the project you are editing and never needs
+re-syncing after a version change.
+
+A backup of your settings is written alongside them before any change.`,
+	Example: `  # Configure the Go extension to use goenv
+  goenv vscode fix-extension`,
+	RunE: fixVSCodeExtensionInteractive,
+}
+
 var vscodeDoctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Check VS Code integration health",
@@ -222,6 +256,7 @@ func init() {
 	vscodeCmd.AddCommand(vscodeStatusCmd)
 	vscodeCmd.AddCommand(vscodeRevertCmd)
 	vscodeCmd.AddCommand(vscodeDoctorCmd)
+	vscodeCmd.AddCommand(vscodeFixExtensionCmd)
 
 	// Init flags
 	vscodeInitCmd.Flags().BoolVarP(&VSCodeInitFlags.Force, "force", "f", false, "Overwrite existing settings")
