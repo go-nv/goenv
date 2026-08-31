@@ -15,7 +15,7 @@ jobs:
     name: Lint workflow files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # A workflow file has no compiler. A malformed one does not fail — it
       # simply never runs, so the coverage it was added to provide silently
@@ -37,9 +37,9 @@ jobs:
         goenv_native_ext: ["", "1"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "stable"
       - name: Build goenv

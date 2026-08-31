@@ -53,20 +53,20 @@ jobs:
 
       - name: Checkout
         if: steps.check_assets.outputs.skip_build == 'false'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ steps.tag.outputs.tag }}
 
       - name: Set up Go
         if: steps.check_assets.outputs.skip_build == 'false'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: stable
 
       - name: Run GoReleaser
         if: steps.check_assets.outputs.skip_build == 'false'
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: latest
@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload release artifacts
         if: steps.check_assets.outputs.skip_build == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-artifacts
           path: dist/*
