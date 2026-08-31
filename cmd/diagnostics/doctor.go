@@ -2886,7 +2886,8 @@ func checkGorootMismatch(cfg *config.Config, mgr *manager.Manager) checkResult {
 			name:    name,
 			status:  StatusError,
 			message: fmt.Sprintf("GOROOT points at a directory that does not exist: %s", goroot),
-			advice:  "Unset it with 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
+			advice: "Run 'goenv rehash' to re-export it for this directory, or 'unset GOROOT' " +
+				"if it was not set by goenv",
 		}
 	}
 
@@ -2933,8 +2934,28 @@ func checkGorootMismatch(cfg *config.Config, mgr *manager.Manager) checkResult {
 			status: StatusError,
 			message: fmt.Sprintf("GOROOT points at Go %s but the active version is %s (set by %s)",
 				gorootVersion, activeVersion, source),
-			advice: "This breaks every build with \"compile: version does not match go tool version\". " +
-				"Run 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
+			// Deliberately does NOT suggest "start a new shell": startup runs
+			// 'goenv init -', which exports GOROOT for whatever version is
+			// active in the *startup* directory. A new shell recreates this
+			// state and it goes stale again on the first cd into a project
+			// pinning a different version.
+			//
+			// The exported GOROOT is a carry-over from v2, where an opt-in cd
+			// hook (GOENV_AUTOMATICALLY_DETECT_VERSION) kept it fresh. v3
+			// dropped the hook because it made the export unnecessary rather
+			// than unreliable: 'goenv exec' sets GOROOT per command, so nothing
+			// dispatched through a shim can observe a stale value. Lead with
+			// that, so the user knows their builds are fine, and point editors
+			// at the durable fix instead of a manual refresh.
+			advice: "Nothing that runs through goenv is affected — 'goenv exec' sets GOROOT per " +
+				"command, so the shims always use the right one. A stale GOROOT only reaches tools " +
+				"that read it straight from the environment, such as editors and gopls. " +
+				"For those, point the tool at goenv rather than at a path: " +
+				"'goenv vscode fix-extension' sets go.alternateTools to 'goenv exec go', which " +
+				"resolves the version per project. " +
+				"To refresh the exported value for this directory run 'goenv rehash'; " +
+				"to stop exporting it at all set GOENV_DISABLE_GOROOT=1 before 'goenv init -' " +
+				"in your shell profile",
 		}
 	}
 
@@ -3137,11 +3158,24 @@ func checkVSCodeIntegration(cfg *config.Config, env *utils.GoenvEnvironment) che
 	}
 
 	if result.UsesEnvVars {
+		// Deliberately still StatusOK: this configuration works, and
+		// escalating it to a warning would change 'doctor --fail-on=warning'
+		// exit codes for existing CI setups. But it is the one supported
+		// layout that depends on the GOROOT exported by 'goenv init -', which
+		// is a snapshot of the directory the shell started in. Carry the
+		// caveat in the advice so this check no longer silently blesses the
+		// mode that 'goenv vscode fix-extension' deliberately migrates away
+		// from (it blanks go.goroot and sets go.alternateTools instead).
 		return checkResult{
 			id:      "vs-code-integration",
 			name:    "VS Code integration",
 			status:  StatusOK,
 			message: "VS Code configured to use goenv environment variables (${env:GOROOT})",
+			advice: "This mode requires launching VS Code from a goenv-initialised shell, and " +
+				"inherits whichever version was active in that shell's startup directory — so it " +
+				"is wrong for projects pinning a different version. " +
+				"'goenv vscode fix-extension' switches to go.alternateTools ('goenv exec go'), " +
+				"which resolves the version per project and needs no environment variables",
 		}
 	}
 
