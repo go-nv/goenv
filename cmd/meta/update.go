@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	stderrors "errors"
 	"fmt"
 	"io"
@@ -427,35 +428,57 @@ func hasUncommittedChanges(gitRoot string) bool {
 
 // Helper functions for binary updates
 
-func getLatestRelease() (version string, downloadURL string, err error) {
-	// List releases rather than using /releases/latest.
+const (
+	// releasesAPIURL lists releases rather than using /releases/latest.
 	//
 	// /releases/latest returns the most recently published release across *all*
 	// branches. The v2 maintenance branch publishes documentation-only releases
 	// with no binary assets, so /releases/latest regularly points at a release
 	// this binary cannot update to (issue #582). GitHub returns releases
 	// newest-first, so we take the first one that ships an asset for this
-	// platform.
-	apiURL := "https://api.github.com/repos/go-nv/goenv/releases?per_page=50"
+	// platform. A small page keeps the payload cheap while still reaching past
+	// any run of assetless v2 releases.
+	releasesAPIURL = "https://api.github.com/repos/go-nv/goenv/releases?per_page=10"
 
-	// Try to load cached ETag
+	// releasesAtomURL is served by github.com instead of the REST API, so it is
+	// not subject to the (60/hour, per-IP) unauthenticated API rate limit.
+	releasesAtomURL = "https://github.com/go-nv/goenv/releases.atom"
+
+	releaseDownloadBase = "https://github.com/go-nv/goenv/releases/download"
+)
+
+// errNotModified reports that GitHub answered a conditional request with 304,
+// meaning the cached payload is still current.
+var errNotModified = stderrors.New("release list not modified")
+
+// errRateLimited reports that GitHub refused the request because the caller is
+// over its API rate limit.
+var errRateLimited = stderrors.New("GitHub API rate limit exceeded")
+
+func getLatestRelease() (version string, downloadURL string, err error) {
 	cfg := config.Load()
-	etagFile := filepath.Join(cfg.Root, "cache", "update-etag")
-	cachedETag, _ := os.ReadFile(etagFile)
+	cacheDir := filepath.Join(cfg.Root, "cache")
+	etagFile := filepath.Join(cacheDir, "update-etag")
+	bodyFile := filepath.Join(cacheDir, "update-releases.json")
 
-	// Create request with ETag support
-	req, err := http.NewRequest("GET", apiURL, nil)
+	cachedBody, cacheErr := os.ReadFile(bodyFile)
+	hasCache := cacheErr == nil && len(cachedBody) > 0
+
+	req, err := http.NewRequest("GET", releasesAPIURL, nil)
 	if err != nil {
 		return "", "", errors.FailedTo("create HTTP request", err)
 	}
-
-	// Set headers
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	if len(cachedETag) > 0 {
-		req.Header.Set("If-None-Match", strings.TrimSpace(string(cachedETag)))
+
+	// Only send the validator when the cached payload is available to serve on
+	// a 304; otherwise a 304 would leave us with nothing to parse. Conditional
+	// requests that return 304 do not count against the API rate limit.
+	if hasCache {
+		if etag, err := os.ReadFile(etagFile); err == nil && len(etag) > 0 {
+			req.Header.Set("If-None-Match", strings.TrimSpace(string(etag)))
+		}
 	}
 
-	// Check for GitHub token for higher rate limits
 	if token := os.Getenv(utils.EnvVarGitHubToken); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 		if cfg.Debug {
@@ -463,96 +486,27 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 		}
 	}
 
-	// Make request with retries for rate limiting
-	client := utils.NewHTTPClient(10 * time.Second)
-	var resp *http.Response
-
-	maxRetries := 3
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err = client.Do(req)
-		if err != nil {
-			return "", "", errors.FailedTo("execute HTTP request", err)
+	body, etag, err := fetchReleases(req)
+	switch {
+	case err == nil:
+		cacheReleases(cacheDir, etagFile, bodyFile, etag, body, cfg.Debug)
+	case stderrors.Is(err, errNotModified):
+		body = cachedBody
+	case hasCache:
+		// Rate limited or a transient failure: a slightly stale answer beats no
+		// answer, and the caller compares versions anyway.
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "Warning: using cached release list: %v\n", err)
 		}
-
-		// Handle rate limiting
-		if resp.StatusCode == 403 || resp.StatusCode == 429 {
-			resp.Body.Close()
-
-			// Check rate limit headers
-			remaining := resp.Header.Get("X-RateLimit-Remaining")
-			resetTime := resp.Header.Get("X-RateLimit-Reset")
-
-			if remaining == "0" && resetTime != "" {
-				if reset, err := strconv.ParseInt(resetTime, 10, 64); err == nil {
-					resetAt := time.Unix(reset, 0)
-					waitDuration := time.Until(resetAt)
-					if waitDuration > 0 && waitDuration < 5*time.Minute {
-						return "", "", fmt.Errorf("GitHub API rate limit exceeded. Resets at %s (in %v)",
-							resetAt.Format(time.RFC3339), waitDuration.Round(time.Second))
-					}
-				}
-				return "", "", fmt.Errorf("GitHub API rate limit exceeded. Try again later")
-			}
-
-			// Handle 429 with Retry-After
-			if resp.StatusCode == 429 {
-				retryAfter := resp.Header.Get("Retry-After")
-				if retryAfter != "" {
-					if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds < 60 {
-						if attempt < maxRetries-1 {
-							time.Sleep(time.Duration(seconds) * time.Second)
-							continue
-						}
-					}
-				}
-			}
-
-			// Exponential backoff
-			if attempt < maxRetries-1 {
-				backoff := time.Duration(1<<uint(attempt)) * time.Second
-				time.Sleep(backoff)
-				continue
-			}
-
-			return "", "", fmt.Errorf("GitHub API rate limit exceeded after %d attempts", maxRetries)
+		body = cachedBody
+	default:
+		if v, u, atomErr := latestReleaseFromAtom(); atomErr == nil {
+			return v, u, nil
 		}
-
-		break
-	}
-	defer resp.Body.Close()
-
-	// Handle 304 Not Modified
-	if resp.StatusCode == http.StatusNotModified {
-		return "", "", fmt.Errorf("no updates available (cached)")
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return "", "", fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Save ETag for next request
-	if etag := resp.Header.Get("ETag"); etag != "" {
-		// Ensure cache directory exists with secure permissions
-		if err := utils.EnsureDirWithContext(filepath.Dir(etagFile), "create cache directory"); err != nil {
-			// Non-fatal: log but continue
-			if cfg.Debug {
-				fmt.Fprintf(os.Stderr, "Warning: failed to create cache directory: %v\n", err)
-			}
-		} else {
-			// Write ETag file with secure permissions
-			if err := utils.WriteFileWithContext(etagFile, []byte(etag), utils.PermFileSecure, "save etag cache"); err != nil {
-				// Non-fatal: log but continue
-				if cfg.Debug {
-					fmt.Fprintf(os.Stderr, "Warning: failed to save ETag cache: %v\n", err)
-				}
-			}
+		if stderrors.Is(err, errRateLimited) {
+			return "", "", fmt.Errorf("%w. Set %s to raise the limit, or retry later",
+				err, utils.EnvVarGitHubToken)
 		}
-	}
-
-	// Parse JSON response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
 		return "", "", err
 	}
 
@@ -563,6 +517,178 @@ func getLatestRelease() (version string, downloadURL string, err error) {
 	}
 
 	return version, downloadURL, nil
+}
+
+// fetchReleases performs req, retrying transient rate limiting, and returns the
+// response body together with its ETag. It returns errNotModified when the
+// cached payload is still valid and errRateLimited when GitHub refuses to serve
+// the request at all.
+func fetchReleases(req *http.Request) (body []byte, etag string, err error) {
+	client := utils.NewHTTPClient(10 * time.Second)
+
+	const maxRetries = 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, "", errors.FailedTo("execute HTTP request", err)
+		}
+
+		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+
+			if wait, ok := rateLimitReset(resp.Header); ok {
+				return nil, "", fmt.Errorf("%w. Resets in %v", errRateLimited, wait.Round(time.Second))
+			}
+
+			if attempt == maxRetries-1 {
+				return nil, "", fmt.Errorf("%w after %d attempts", errRateLimited, maxRetries)
+			}
+
+			time.Sleep(retryDelay(resp.Header, attempt))
+			continue
+		}
+
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusNotModified {
+			return nil, "", errNotModified
+		}
+		if resp.StatusCode != http.StatusOK {
+			snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+			return nil, "", fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode, string(snippet))
+		}
+
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, "", err
+		}
+		return body, resp.Header.Get("ETag"), nil
+	}
+
+	return nil, "", fmt.Errorf("%w after %d attempts", errRateLimited, maxRetries)
+}
+
+// rateLimitReset reports how long until the primary rate limit resets, if the
+// response says the quota is actually exhausted (as opposed to a retryable 403).
+func rateLimitReset(header http.Header) (time.Duration, bool) {
+	if header.Get("X-RateLimit-Remaining") != "0" {
+		return 0, false
+	}
+	reset, err := strconv.ParseInt(header.Get("X-RateLimit-Reset"), 10, 64)
+	if err != nil {
+		return 0, true
+	}
+	wait := time.Until(time.Unix(reset, 0))
+	if wait < 0 {
+		wait = 0
+	}
+	return wait, true
+}
+
+func retryDelay(header http.Header, attempt int) time.Duration {
+	if seconds, err := strconv.Atoi(header.Get("Retry-After")); err == nil && seconds > 0 && seconds < 60 {
+		return time.Duration(seconds) * time.Second
+	}
+	return time.Duration(1<<uint(attempt)) * time.Second
+}
+
+// cacheReleases stores the payload and its validator so the next check can be
+// answered by a rate-limit-free conditional request (or by the cache itself
+// when GitHub is unreachable). Failures here are non-fatal.
+func cacheReleases(cacheDir, etagFile, bodyFile, etag string, body []byte, debug bool) {
+	if etag == "" {
+		return
+	}
+
+	warn := func(err error) {
+		if debug && err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to cache release list: %v\n", err)
+		}
+	}
+
+	if err := utils.EnsureDirWithContext(cacheDir, "create cache directory"); err != nil {
+		warn(err)
+		return
+	}
+	if err := utils.WriteFileWithContext(bodyFile, body, utils.PermFileSecure, "save release cache"); err != nil {
+		warn(err)
+		return
+	}
+	warn(utils.WriteFileWithContext(etagFile, []byte(etag), utils.PermFileSecure, "save etag cache"))
+}
+
+// latestReleaseFromAtom is the last-resort lookup used when the REST API is
+// unavailable. The feed lists tags only, so the asset URL is derived from the
+// release naming convention rather than read from the payload.
+func latestReleaseFromAtom() (version string, downloadURL string, err error) {
+	client := utils.NewHTTPClient(10 * time.Second)
+	resp, err := client.Get(releasesAtomURL)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("releases feed returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", "", err
+	}
+
+	version, downloadURL = selectAtomRelease(body, platform.OS(), platform.Arch(), getCurrentVersion())
+	if version == "" {
+		return "", "", fmt.Errorf("no release found in feed with a %s_%s binary", platform.OS(), platform.Arch())
+	}
+	return version, downloadURL, nil
+}
+
+// selectAtomRelease picks the newest tag in an atom releases feed that belongs
+// to the same major version as currentVersion. The major filter keeps the v2
+// maintenance line (which ships no binaries) out of the result; when the
+// running version is unknown, the newest tag wins.
+func selectAtomRelease(body []byte, osName, arch, currentVersion string) (version string, downloadURL string) {
+	var feed struct {
+		Entries []struct {
+			ID string `xml:"id"`
+		} `xml:"entry"`
+	}
+	if err := xml.Unmarshal(body, &feed); err != nil {
+		return "", ""
+	}
+
+	wantMajor, _, _ := strings.Cut(strings.TrimPrefix(currentVersion, "v"), ".")
+
+	for _, entry := range feed.Entries {
+		// IDs look like "tag:github.com,2008:Repository/12345/3.1.5".
+		idx := strings.LastIndex(entry.ID, "/")
+		if idx < 0 {
+			continue
+		}
+		tag := entry.ID[idx+1:]
+		if tag == "" {
+			continue
+		}
+
+		major, _, _ := strings.Cut(strings.TrimPrefix(tag, "v"), ".")
+		if wantMajor != "" && wantMajor != "unknown" && major != wantMajor {
+			continue
+		}
+
+		return tag, releaseAssetURL(tag, osName, arch)
+	}
+
+	return "", ""
+}
+
+func releaseAssetURL(tag, osName, arch string) string {
+	ext := ".tar.gz"
+	if osName == "windows" {
+		ext = ".zip"
+	}
+	return fmt.Sprintf("%s/%s/goenv_%s_%s_%s%s",
+		releaseDownloadBase, tag, strings.TrimPrefix(tag, "v"), osName, arch, ext)
 }
 
 // githubRelease is the subset of the GitHub release payload we need.
