@@ -35,7 +35,7 @@ jobs:
     name: Lint install scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Check bash syntax
         run: bash -n install.sh
@@ -76,7 +76,7 @@ jobs:
     name: Release selection (offline, issue #582)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Run hermetic release-selection tests
         run: bash testing/install/release_selection_test.sh
@@ -89,7 +89,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Run install.sh
         if: runner.os != 'Windows'

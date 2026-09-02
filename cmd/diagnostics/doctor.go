@@ -1529,44 +1529,50 @@ func classifyInstallations(paths []string) []installationType {
 }
 
 // generateCleanupRecommendation generates human-readable advice
+//
+// The advice is derived from the classification rather than recomputed from
+// the install types, so it can never contradict the "[RECOMMENDED TO KEEP]"
+// marker shown next to each installation.
+//
+// It used to recompute independently, and the two disagreed: on a machine with
+// a manual install first in PATH and a Homebrew install second, the list marked
+// the manual one to keep while the summary advised keeping "only Homebrew".
+// That is worse than unhelpful in a prompt that then offers to delete things —
+// following the summary meant removing the binary actually being executed and
+// keeping an older one.
 func generateCleanupRecommendation(installations []installationType) string {
 	if len(installations) <= 1 {
 		return ""
 	}
 
+	// Find what the classification actually recommends keeping.
+	keep := ""
+	keepType := ""
+	for _, inst := range installations {
+		if inst.recommended {
+			keep = inst.path
+			keepType = string(inst.installType)
+			break
+		}
+	}
+
+	if keep == "" {
+		return "Keep the installation that's first in your PATH."
+	}
+
+	// Call out an Intel Homebrew install on Apple Silicon specifically: that one
+	// is not merely redundant, it is the wrong architecture.
 	if platform.IsMacOS() && platform.Arch() == "arm64" {
-		// Check if there's an Intel homebrew installation
 		for _, inst := range installations {
 			if inst.installType == InstallTypeHomebrewIntel {
-				return "On Apple Silicon, remove the Intel Homebrew installation."
+				return fmt.Sprintf("Keep %s (%s) and remove the Intel Homebrew installation — "+
+					"it is the wrong architecture for Apple Silicon.", keep, keepType)
 			}
 		}
 	}
 
-	// Count types
-	homebrewCount := 0
-	manualCount := 0
-	systemCount := 0
-
-	for _, inst := range installations {
-		if strings.Contains(string(inst.installType), "homebrew") {
-			homebrewCount++
-		} else if inst.installType == InstallTypeManual {
-			manualCount++
-		} else if inst.installType == InstallTypeSystem {
-			systemCount++
-		}
-	}
-
-	if homebrewCount > 0 && manualCount > 0 {
-		return "Consider keeping only Homebrew installation for easier updates."
-	}
-
-	if homebrewCount > 1 {
-		return "Multiple Homebrew installations found. Keep only one."
-	}
-
-	return "Keep the installation that's first in your PATH."
+	return fmt.Sprintf("Keep %s (%s), which is the one currently on your PATH. "+
+		"Remove the others only if you are sure nothing depends on them.", keep, keepType)
 }
 
 // runFixMode provides unified interactive fixing for all detected issues
@@ -2880,7 +2886,8 @@ func checkGorootMismatch(cfg *config.Config, mgr *manager.Manager) checkResult {
 			name:    name,
 			status:  StatusError,
 			message: fmt.Sprintf("GOROOT points at a directory that does not exist: %s", goroot),
-			advice:  "Unset it with 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
+			advice: "Run 'goenv rehash' to re-export it for this directory, or 'unset GOROOT' " +
+				"if it was not set by goenv",
 		}
 	}
 
@@ -2927,8 +2934,28 @@ func checkGorootMismatch(cfg *config.Config, mgr *manager.Manager) checkResult {
 			status: StatusError,
 			message: fmt.Sprintf("GOROOT points at Go %s but the active version is %s (set by %s)",
 				gorootVersion, activeVersion, source),
-			advice: "This breaks every build with \"compile: version does not match go tool version\". " +
-				"Run 'unset GOROOT' and start a new shell; goenv sets GOROOT per command",
+			// Deliberately does NOT suggest "start a new shell": startup runs
+			// 'goenv init -', which exports GOROOT for whatever version is
+			// active in the *startup* directory. A new shell recreates this
+			// state and it goes stale again on the first cd into a project
+			// pinning a different version.
+			//
+			// The exported GOROOT is a carry-over from v2, where an opt-in cd
+			// hook (GOENV_AUTOMATICALLY_DETECT_VERSION) kept it fresh. v3
+			// dropped the hook because it made the export unnecessary rather
+			// than unreliable: 'goenv exec' sets GOROOT per command, so nothing
+			// dispatched through a shim can observe a stale value. Lead with
+			// that, so the user knows their builds are fine, and point editors
+			// at the durable fix instead of a manual refresh.
+			advice: "Nothing that runs through goenv is affected — 'goenv exec' sets GOROOT per " +
+				"command, so the shims always use the right one. A stale GOROOT only reaches tools " +
+				"that read it straight from the environment, such as editors and gopls. " +
+				"For those, point the tool at goenv rather than at a path: " +
+				"'goenv vscode fix-extension' sets go.alternateTools to 'goenv exec go', which " +
+				"resolves the version per project. " +
+				"To refresh the exported value for this directory run 'goenv rehash'; " +
+				"to stop exporting it at all set GOENV_DISABLE_GOROOT=1 before 'goenv init -' " +
+				"in your shell profile",
 		}
 	}
 
@@ -3131,21 +3158,44 @@ func checkVSCodeIntegration(cfg *config.Config, env *utils.GoenvEnvironment) che
 	}
 
 	if result.UsesEnvVars {
+		// Deliberately still StatusOK: escalating to a warning would change
+		// 'doctor --fail-on=warning' exit codes for existing CI setups.
+		//
+		// But this configuration does nothing. Per the Go extension reference,
+		// go.goroot "specifies the GOROOT to use *when no environment variable
+		// is set*". So when GOROOT is exported (which is the only situation
+		// where "${env:GOROOT}" could resolve to anything) the extension reads
+		// the environment variable directly and ignores go.goroot entirely;
+		// and when GOROOT is unset there is nothing to expand. Either way the
+		// setting is inert, so this check must not present it as a working
+		// goenv integration.
 		return checkResult{
 			id:      "vs-code-integration",
 			name:    "VS Code integration",
 			status:  StatusOK,
-			message: "VS Code configured to use goenv environment variables (${env:GOROOT})",
+			message: "VS Code settings reference ${env:GOROOT}",
+			advice: "This setting has no effect: the Go extension only consults go.goroot when no " +
+				"GOROOT environment variable is set, and ignores it when one is. What actually " +
+				"selects the toolchain is the exported GOROOT, which is a snapshot of the " +
+				"directory the launching shell started in. " +
+				"Run 'goenv vscode fix-extension' to set go.alternateTools to 'goenv exec go', " +
+				"which resolves the version per project and needs no environment variables",
 		}
 	}
 
 	if result.Mismatch {
 		return checkResult{
-			id:        "vs-code-integration",
-			name:      "VS Code integration",
-			status:    StatusWarning,
-			message:   fmt.Sprintf("VS Code settings use Go %s but current version is %s", result.ConfiguredVersion, currentVersion),
-			advice:    "Run 'goenv vscode sync' to fix, or 'goenv vscode doctor' for detailed diagnostics",
+			id:      "vs-code-integration",
+			name:    "VS Code integration",
+			status:  StatusWarning,
+			message: fmt.Sprintf("VS Code settings use Go %s but current version is %s", result.ConfiguredVersion, currentVersion),
+			// This is the stale-pin symptom, so offer the durable option as
+			// well as the re-sync. Only advertising 'sync' teaches a treadmill
+			// the user has to remember after every version change.
+			advice: "Run 'goenv vscode sync' to update the pinned paths. " +
+				"To stop them going stale altogether, run 'goenv vscode fix-extension', which " +
+				"routes the Go extension through 'goenv exec go' so it resolves the version per " +
+				"project. Use 'goenv vscode doctor' for detailed diagnostics",
 			issueType: IssueTypeVSCodeMismatch,
 		}
 	}

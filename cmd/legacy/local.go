@@ -16,6 +16,7 @@ import (
 	"github.com/go-nv/goenv/internal/helptext"
 	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/utils"
+	"github.com/go-nv/goenv/internal/vscode"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +58,17 @@ func init() {
 	localCmd.Flags().BoolVar(&localFlags.sync, "sync", false, "Ensure the version from .go-version is installed")
 	localCmd.Flags().BoolVar(&localFlags.fromGoMod, "from-gomod", false, "Set version from go.mod file (version must be installed)")
 	localCmd.Flags().BoolVar(&localFlags.vscode, "vscode", false, "Also initialize VS Code workspace settings (uses absolute paths by default)")
-	localCmd.Flags().BoolVar(&localFlags.vscodeEnvVars, "vscode-env-vars", false, "Use environment variables in VS Code settings (requires terminal launch)")
+	localCmd.Flags().BoolVar(&localFlags.vscodeEnvVars, "vscode-env-vars", false, "Deprecated: writes settings that the Go extension ignores")
+	// Passthrough to 'vscode init --env-vars', which is itself deprecated: the
+	// Go extension ignores go.goroot whenever a GOROOT environment variable is
+	// set, so "${env:GOROOT}" never takes effect. See the note in
+	// cmd/integrations/vscode.go.
+	if err := localCmd.Flags().MarkDeprecated("vscode-env-vars",
+		"the Go extension ignores go.goroot when a GOROOT environment variable is set, "+
+			"so this mode has no effect. Use 'goenv vscode fix-extension' instead, which sets "+
+			"go.alternateTools to 'goenv exec go' and resolves the version per project"); err != nil {
+		panic(err) // programmer error: flag name must match the one registered above
+	}
 	localCmd.Flags().BoolVar(&localFlags.complete, "complete", false, "Internal flag for shell completions")
 	_ = localCmd.Flags().MarkHidden("complete")
 	helptext.SetCommandHelp(localCmd)
@@ -273,15 +284,43 @@ func RunLocal(cmd *cobra.Command, args []string) error {
 				fmt.Fprintln(cmd.OutOrStdout())
 				fmt.Fprintf(cmd.OutOrStdout(), "%sAuto-updating VS Code workspace (goenv.autoSync: true)...\n", utils.Emoji("🔧 "))
 			} else {
-				// Prompt user
-				fmt.Fprintln(cmd.OutOrStdout())
-				fmt.Fprintf(cmd.OutOrStdout(), "%sDetected VS Code workspace. Update settings for Go %s? [Y/n]: ", utils.Emoji("💡 "), resolvedVersion)
-				var response string
-				fmt.Fscanln(cmd.InOrStdin(), &response)
+				// See the equivalent block in cmd/core/use.go: a raw Fscanln on a
+				// non-TTY stdin returns an empty response, which the "empty means
+				// Yes" rule turned into consent to rewrite a tracked
+				// .vscode/settings.json. Only prompt when someone can answer;
+				// goenv.autoSync and GOENV_VSCODE_AUTO_SYNC (checked above) remain
+				// the opt-in for automation.
+				ctx := cmdutil.NewInteractiveContext(cmd)
+				ctx.Reader = cmd.InOrStdin()
+				ctx.Writer = cmd.OutOrStdout()
+				ctx.ErrWriter = cmd.OutOrStderr()
 
-				// Default to Yes if user just presses Enter
-				if response == "" || response == "y" || response == "Y" || response == "yes" {
+				// See cmd/core/use.go for the reasoning: only speak when the
+				// settings actually need attention, so repos with an unrelated
+				// .vscode/settings.json are neither nagged nor logged about.
+				check := vscode.CheckSettings(vscodeSettingsPath, resolvedVersion)
+				switch {
+				case ctx.AssumeYes:
 					shouldConfigureVSCode = true
+				case !check.Mismatch && check.HasSettings:
+					// Already correct; nothing to say.
+				case !cmdutil.CanPrompt(ctx, os.Stdin):
+					if check.Mismatch {
+						fmt.Fprintf(cmd.OutOrStderr(),
+							"%sVS Code settings still pin Go %s and were left unchanged (non-interactive). "+
+								"Run 'goenv vscode sync', or set GOENV_VSCODE_AUTO_SYNC=1 to update them automatically.\n",
+							utils.Emoji("💡 "), check.ConfiguredVersion)
+					}
+				default:
+					fmt.Fprintln(cmd.OutOrStdout())
+					fmt.Fprintf(cmd.OutOrStdout(), "%sDetected VS Code workspace. Update settings for Go %s? [Y/n]: ", utils.Emoji("💡 "), resolvedVersion)
+					var response string
+					fmt.Fscanln(cmd.InOrStdin(), &response)
+
+					// Default to Yes if user just presses Enter
+					if response == "" || response == "y" || response == "Y" || response == "yes" {
+						shouldConfigureVSCode = true
+					}
 				}
 			}
 		}

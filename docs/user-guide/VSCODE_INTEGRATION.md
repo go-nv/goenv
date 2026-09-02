@@ -18,11 +18,27 @@ This guide shows how to use goenv seamlessly with Visual Studio Code and the off
 
 **TL;DR: How do you launch VS Code?**
 
-| **You launch VS Code from...**    | **Use this mode**            | **Command**                    | **Why**                                                       |
-| --------------------------------- | ---------------------------- | ------------------------------ | ------------------------------------------------------------- |
-| 🖱️ **Dock / Finder / Start Menu** | **Absolute Paths** (default) | `goenv vscode init`            | Works even when VS Code doesn't inherit shell environment     |
-| 💻 **Terminal** (`code .`)        | **Environment Variables**    | `goenv vscode init --env-vars` | Automatically updates when you change Go versions             |
-| 🤷 **Not sure / Both**            | **Absolute Paths** (default) | `goenv vscode init`            | Most reliable; use `goenv vscode sync` when changing versions |
+| **You launch VS Code from...**    | **Use this mode**            | **Command**                  | **Why**                                                       |
+| --------------------------------- | ---------------------------- | ---------------------------- | ------------------------------------------------------------- |
+| 🖱️ **Dock / Finder / Start Menu** | **Absolute Paths** (default) | `goenv vscode init`          | Works even when VS Code doesn't inherit shell environment     |
+| 💻 **Terminal** (`code .`)        | **Absolute Paths** (default) | `goenv vscode init`          | Run `goenv vscode sync` after changing versions               |
+| 🤷 **Not sure / Both**            | **Absolute Paths** (default) | `goenv vscode init`          | Most reliable; use `goenv vscode sync` when changing versions |
+| ♻️ **Want per-project switching** | **Delegate to goenv**        | `goenv vscode fix-extension` | Routes the extension through `goenv exec go` — no re-sync     |
+
+> [!WARNING]
+> **`--env-vars` mode is deprecated and has no effect.** The Go extension
+> [documents](https://github.com/golang/vscode-go/blob/master/docs/settings.md)
+> `go.goroot` as "the GOROOT to use _when no environment variable is set_", so
+> `"go.goroot": "${env:GOROOT}"` is ignored whenever `GOROOT` is exported — and
+> there is nothing to expand when it is not. What actually selects the toolchain
+> is the exported `GOROOT`, which is a snapshot of the directory the launching
+> shell started in; that is why `goenv local` could not override `goenv global`
+> inside VS Code ([#367](https://github.com/go-nv/goenv/issues/367)).
+>
+> For per-project switching that keeps working, run `goenv vscode fix-extension`.
+> It clears `go.goroot`/`go.gopath` and sets
+> `"go.alternateTools": {"go": "goenv exec go"}`, which resolves the version on
+> every invocation.
 
 ### Understanding the Two Modes
 
@@ -1155,7 +1171,6 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 **Solution:**
 
 1. **Install Go tools:**
-
    - `Cmd+Shift+P` → "Go: Install/Update Tools"
    - Select all tools
 
@@ -1179,7 +1194,6 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 **Solution:**
 
 1. **Reload window:**
-
    - `Cmd+Shift+P` → "Developer: Reload Window"
 
 2. **Or restart VS Code from terminal:**
@@ -1204,7 +1218,6 @@ See [VSCODE_VERSION_MISMATCH.md](../../VSCODE_VERSION_MISMATCH.md) for detailed 
 **Solution:**
 
 1. **Check for conflicting settings:**
-
    - User settings vs workspace settings
    - System Go installation on PATH
 
