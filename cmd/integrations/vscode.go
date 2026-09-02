@@ -359,8 +359,8 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 		gorootAbs := filepath.Join(cfg.Root, "versions", version)
 		goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
-		// Build GOPATH: $HOME/go/{version}
-		gopathAbs := filepath.Join(homeDir, "go", version)
+		// Build GOPATH: $GOPATH_PREFIX/<version> (default $HOME/go/<version>)
+		gopathAbs := cfg.ManagedGopath(version)
 		gopath := strings.Replace(gopathAbs, homeDir, homeEnvVar, 1)
 
 		settings["go.goroot"] = goroot
@@ -749,7 +749,7 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 	gorootAbs := filepath.Join(cfg.Root, "versions", version)
 	goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
-	gopathAbs := filepath.Join(homeDir, "go", version)
+	gopathAbs := cfg.ManagedGopath(version)
 	gopath := strings.Replace(gopathAbs, homeDir, homeEnvVar, 1)
 
 	keysToUpdate := map[string]interface{}{

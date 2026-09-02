@@ -26,6 +26,8 @@ func SetupTestEnv(t *testing.T) (string, func()) {
 	oldHome := os.Getenv(utils.EnvVarHome)
 	oldPath := os.Getenv(utils.EnvVarPath)
 	oldGoenvVersion := utils.GoenvEnvVarVersion.UnsafeValue()
+	oldGopath := os.Getenv(utils.EnvVarGopath)
+	oldGopathPrefix := utils.GoenvEnvVarGopathPrefix.UnsafeValue()
 
 	testRoot := filepath.Join(testDir, "root")
 	testHome := filepath.Join(testDir, "home")
@@ -38,8 +40,10 @@ func SetupTestEnv(t *testing.T) (string, func()) {
 	} else {
 		os.Setenv(utils.EnvVarPath, "/usr/bin:/bin")
 	}
-	// Clear GOENV_VERSION to ensure clean test environment
+	// Clear GOENV_VERSION and GOPATH-related vars to ensure clean test environment
 	os.Unsetenv(utils.GoenvEnvVarVersion.String())
+	os.Unsetenv(utils.EnvVarGopath)
+	os.Unsetenv(utils.GoenvEnvVarGopathPrefix.String())
 
 	// Create necessary directories
 	_ = utils.EnsureDirWithContext(testRoot, "create test directory")
@@ -63,6 +67,16 @@ func SetupTestEnv(t *testing.T) (string, func()) {
 		utils.GoenvEnvVarDir.Set(oldGoenvDir)
 		if oldGoenvVersion != "" {
 			utils.GoenvEnvVarVersion.Set(oldGoenvVersion)
+		}
+		if oldGopath != "" {
+			os.Setenv(utils.EnvVarGopath, oldGopath)
+		} else {
+			os.Unsetenv(utils.EnvVarGopath)
+		}
+		if oldGopathPrefix != "" {
+			utils.GoenvEnvVarGopathPrefix.Set(oldGopathPrefix)
+		} else {
+			os.Unsetenv(utils.GoenvEnvVarGopathPrefix.String())
 		}
 		os.RemoveAll(testDir)
 	}

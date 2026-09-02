@@ -307,9 +307,16 @@ func ToolBinDirs(goenvRoot, goVersion string) []string {
 		filepath.Join(versionPath, "gopath", "bin"),
 	}
 
-	// Legacy "$HOME/go/<version>/bin" used by the shims at runtime. Still
-	// version-scoped, so it cannot leak across versions.
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
+	// Legacy "$GOPATH_PREFIX/<version>/bin" (default $HOME/go/<version>/bin)
+	// used by the shims at runtime. Respects GOENV_GOPATH_PREFIX.
+	if prefix := os.Getenv("GOENV_GOPATH_PREFIX"); prefix != "" {
+		expanded := pathutil.ExpandPath(prefix)
+		if expanded != "" {
+			dirs = append(dirs, filepath.Join(filepath.Clean(expanded), goVersion, "bin"))
+		} else if home, err := os.UserHomeDir(); err == nil && home != "" {
+			dirs = append(dirs, filepath.Join(home, "go", goVersion, "bin"))
+		}
+	} else if home, err := os.UserHomeDir(); err == nil && home != "" {
 		dirs = append(dirs, filepath.Join(home, "go", goVersion, "bin"))
 	}
 
