@@ -36,3 +36,4 @@ cmd/aliases/.go-version
 sbom*.json
 
 .goenv/*
+.github/issues/*
