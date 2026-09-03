@@ -275,6 +275,60 @@ func TestInstallTools_DedupesAmbientGoEnv(t *testing.T) {
 	assert.Equal(t, filepath.Join(hostGopath, "bin"), gobins[0], "GOBIN must be <hostGopath>/bin")
 }
 
+// TestInstallTools_ExpandsCachePaths guards that a literal '~' in the Go cache
+// path env vars (from a quoted GOMODCACHE="~/m" / GOCACHE="~/c") is expanded
+// before the `go install` child sees it — Go rejects a literal '~' just like it
+// does for GOPATH.
+func TestInstallTools_ExpandsCachePaths(t *testing.T) {
+	if utils.IsWindows() {
+		t.Skip("mock shell script is POSIX-specific")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("no home dir: %v", err)
+	}
+	tmpDir := t.TempDir()
+	goVersion := "1.21.0"
+
+	goBinDir := filepath.Join(tmpDir, "versions", goVersion, "bin")
+	require.NoError(t, utils.EnsureDirWithContext(goBinDir, "create go bin dir"))
+
+	envDump := filepath.Join(tmpDir, "env.txt")
+	mockScript := "#!/bin/sh\n" +
+		"env > \"" + envDump + "\"\n" +
+		"pkg=$2; pkg=${pkg%@*}; bin=${pkg##*/}\n" +
+		"mkdir -p \"$GOBIN\" && : > \"$GOBIN/$bin\" && chmod +x \"$GOBIN/$bin\"\n" +
+		"exit 0\n"
+	testutil.WriteTestFile(t, filepath.Join(goBinDir, "go"), []byte(mockScript), utils.PermFileExecutable, "write mock go")
+
+	// Literal '~' as a quoted profile export leaves it.
+	t.Setenv("GOMODCACHE", "~/mymod")
+	t.Setenv("GOCACHE", "~/mycache")
+
+	config := &Config{
+		Enabled: true,
+		Tools:   []Tool{{Name: "test-tool", Package: "example.com/test", Version: "@latest"}},
+	}
+	require.NoError(t, InstallTools(config, goVersion, tmpDir, filepath.Join(tmpDir, "host-gopath"), false))
+
+	data, err := os.ReadFile(envDump)
+	require.NoError(t, err, "mock go should have recorded its environment")
+
+	assertEnv := func(key, want string) {
+		t.Helper()
+		for _, line := range strings.Split(string(data), "\n") {
+			if v, ok := strings.CutPrefix(line, key+"="); ok {
+				assert.Equal(t, want, v, "%s must be expanded", key)
+				assert.NotContains(t, v, "~", "%s must not contain a literal '~'", key)
+				return
+			}
+		}
+		t.Errorf("%s not present in child env", key)
+	}
+	assertEnv("GOMODCACHE", filepath.Join(home, "mymod"))
+	assertEnv("GOCACHE", filepath.Join(home, "mycache"))
+}
+
 // TestInstallTools_FailsWhenNoBinaryProduced ensures a `go install` that exits 0
 // without producing a binary (a non-main package, a refused toolchain switch,
 // or the historical duplicate-GOPATH no-op) is reported as a failure rather

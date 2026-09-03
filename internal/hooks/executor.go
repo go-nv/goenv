@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -168,6 +169,7 @@ func logError(message string) {
 
 	// Optionally write to log file if GOENV_HOOKS_LOG is set
 	if logPath := utils.GoenvEnvVarHooksLog.UnsafeValue(); logPath != "" {
+		logPath = pathutil.ExpandPath(logPath)
 		// Open or create log file with append mode
 		f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, utils.PermFileDefault)
 		if err != nil {

@@ -3609,7 +3609,7 @@ func checkGocacheIsolation(cfg *config.Config, mgr *manager.Manager) checkResult
 	// Note: The actual cache name varies by architecture (go-build-{GOOS}-{GOARCH}[-cgo])
 	// For validation purposes, we check if ANY build cache exists for this version
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
-	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
+	customGocacheDir := pathutil.ExpandPath(utils.GoenvEnvVarGocacheDir.UnsafeValue())
 	var baseCachePath string
 	if customGocacheDir != "" {
 		baseCachePath = filepath.Join(customGocacheDir, version)
@@ -3779,7 +3779,7 @@ func checkCacheMountType(cfg *config.Config, mgr *manager.Manager) checkResult {
 	// Note: The actual cache name varies by architecture (go-build-{GOOS}-{GOARCH}[-cgo])
 	// For mount checking purposes, we check the version directory itself
 	versionPath := filepath.Join(cfg.VersionsDir(), version)
-	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
+	customGocacheDir := pathutil.ExpandPath(utils.GoenvEnvVarGocacheDir.UnsafeValue())
 	var cachePath string
 	if customGocacheDir != "" {
 		cachePath = filepath.Join(customGocacheDir, version)
@@ -3902,7 +3902,7 @@ func checkCacheIsolationEffectiveness(cfg *config.Config, mgr *manager.Manager) 
 	// Format: go-build-{GOOS}-{GOARCH}[-cgo]
 	cacheSuffix := cache.BuildCacheSuffix(goBinaryPath, goos, goarch, os.Environ())
 
-	customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
+	customGocacheDir := pathutil.ExpandPath(utils.GoenvEnvVarGocacheDir.UnsafeValue())
 
 	var expectedGocache string
 	if customGocacheDir != "" {

@@ -208,6 +208,45 @@ func TestShRehashCommand(t *testing.T) {
 		assert.Contains(t, output, "/existing/path2")
 	})
 
+	// Regression: goenv re-exports the inherited GOPATH, so it must normalize it
+	// first. A profile's quoted GOPATH="~/go" leaves a literal '~' that Go
+	// rejects ("cannot start with shell metacharacter"); goenv must expand it and
+	// drop entries Go can't use rather than break every downstream build.
+	t.Run("expands ~ and drops unusable entries from inherited GOPATH", func(t *testing.T) {
+		if utils.IsWindows() {
+			t.Skip("Skipping Unix shell test on Windows")
+		}
+
+		tmpDir, cleanup := cmdtest.SetupTestEnv(t)
+		defer cleanup()
+
+		cmdtest.CreateMockGoVersion(t, tmpDir, "1.12.0")
+
+		home, _ := os.UserHomeDir()
+
+		os.Setenv("GOENV_VERSION", "1.12.0")
+		os.Setenv("GOENV_SHELL", "bash")
+		// A literal "~/go" (as a quoted export leaves it), a relative entry Go
+		// would reject, and a valid absolute custom path.
+		os.Setenv("GOPATH", "~/go:relative/path:/abs/custom")
+		defer os.Unsetenv("GOENV_VERSION")
+		defer os.Unsetenv("GOENV_SHELL")
+		defer os.Unsetenv("GOPATH")
+
+		outputBuf := &strings.Builder{}
+		cmd := &cobra.Command{}
+		cmd.SetOut(outputBuf)
+		cmd.SetErr(&strings.Builder{})
+
+		require.NoError(t, runShRehash(cmd, []string{"--only-manage-paths"}))
+		output := outputBuf.String()
+
+		assert.NotContains(t, output, "~/go", "literal '~' must never be re-exported")
+		assert.Contains(t, output, filepath.Join(home, "go"), "~/go should expand to $HOME/go")
+		assert.Contains(t, output, "/abs/custom", "valid absolute custom paths are preserved")
+		assert.NotContains(t, output, "relative/path", "entries Go rejects should be dropped")
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir, cleanup := cmdtest.SetupTestEnv(t)

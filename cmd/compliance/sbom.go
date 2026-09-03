@@ -16,6 +16,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/resolver"
 	"github.com/go-nv/goenv/internal/sbom"
@@ -405,7 +406,8 @@ func runSBOMVerify(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMValidate(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
+	policyFile = pathutil.ExpandPath(policyFile)
 
 	// Verify SBOM file exists
 	if !utils.FileExists(sbomPath) {
@@ -491,7 +493,8 @@ func runSBOMValidate(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMSign(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
+	signKeyPath = pathutil.ExpandPath(signKeyPath)
 
 	// Verify SBOM file exists
 	if !utils.FileExists(sbomPath) {
@@ -640,7 +643,7 @@ func runSBOMVerifySignature(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMAttest(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
 
 	// Verify SBOM file exists
 	if !utils.FileExists(sbomPath) {
@@ -651,7 +654,7 @@ func runSBOMAttest(cmd *cobra.Command, args []string) error {
 	cfg, mgr := ctx.Config, ctx.Manager
 
 	// Determine output path
-	outputPath := attestOutput
+	outputPath := pathutil.ExpandPath(attestOutput)
 	if outputPath == "" {
 		if attestInToto {
 			outputPath = sbomPath + ".att.json"
@@ -823,6 +826,12 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 	cfg := ctx.Config
 	mgr := ctx.Manager
 	env := ctx.Environment
+
+	// Expand user-supplied paths so a quoted/scripted "~/..." is not passed on
+	// literally (the shell only expands an unquoted ~).
+	sbomOutput = pathutil.ExpandPath(sbomOutput)
+	sbomDir = pathutil.ExpandPath(sbomDir)
+	sbomBinary = pathutil.ExpandPath(sbomBinary)
 
 	// Validate flags
 	if sbomImage != "" && sbomDir != "." {

@@ -286,17 +286,23 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 	// to <hostGopath>/bin also guarantees the binary lands exactly where the
 	// resolver and rehash look for it, regardless of the ambient environment.
 	goBinDir := filepath.Join(hostGopath, "bin")
-	gomodcache := os.Getenv(utils.EnvVarGomodcache)
+	gomodcache := pathutil.ExpandPath(os.Getenv(utils.EnvVarGomodcache))
 	if gomodcache == "" {
 		gomodcache = filepath.Join(goenvRoot, "shared", "go-mod") // matches exec.go behavior
 	}
-	installEnv := append(filterEnv(os.Environ(),
-		utils.EnvVarGoroot, utils.EnvVarGopath, utils.EnvVarGobin, utils.EnvVarGomodcache),
+	// Strip GOCACHE too so an inherited literal '~' (or unexpanded $VAR) can't
+	// make the `go install` below reject it, just like GOPATH; re-add it expanded.
+	installEnv := filterEnv(os.Environ(),
+		utils.EnvVarGoroot, utils.EnvVarGopath, utils.EnvVarGobin, utils.EnvVarGomodcache, utils.EnvVarGocache)
+	installEnv = append(installEnv,
 		utils.EnvVarGoroot+"="+goRoot,
 		utils.EnvVarGopath+"="+hostGopath,
 		utils.EnvVarGobin+"="+goBinDir,
 		utils.EnvVarGomodcache+"="+gomodcache,
 	)
+	if gocache := pathutil.ExpandPath(os.Getenv(utils.EnvVarGocache)); gocache != "" {
+		installEnv = append(installEnv, utils.EnvVarGocache+"="+gocache)
+	}
 
 	// Track results
 	installed := []string{}
