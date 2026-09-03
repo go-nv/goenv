@@ -3,35 +3,66 @@ package pathutil
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/go-nv/goenv/internal/utils"
 )
 
-// ExpandPath expands environment variables and tilde in a path
-// Handles: $HOME, ${HOME}, %USERPROFILE%, ~/
-// This is needed because Go's standard library doesn't expand shell metacharacters
+// ExpandPath expands environment variables and a leading tilde in a path.
+// Handles: $HOME, ${HOME} (all platforms); %USERPROFILE% / %VAR% and ~\ (Windows);
+// and ~/ , ~ (all platforms). Go's standard library does not expand these shell
+// metacharacters, and a value that reaches `go` with a literal one (e.g. GOPATH)
+// is rejected.
 func ExpandPath(path string) string {
 	if path == "" {
 		return path
 	}
 
-	// Expand environment variables first (e.g., $HOME, ${HOME}, %USERPROFILE%)
+	// Expand Windows %VAR% first (os.ExpandEnv only understands $VAR/${VAR}); gated
+	// to Windows so a literal '%' in a POSIX path is left untouched. Then expand
+	// the POSIX-style variables.
+	if runtime.GOOS == "windows" {
+		path = expandWindowsEnv(path)
+	}
 	path = os.ExpandEnv(path)
 
-	// Expand tilde prefix (e.g., ~/go)
-	if strings.HasPrefix(path, "~/") || path == "~" {
+	// Expand a leading tilde, accepting either separator so "~\go" works on Windows
+	// in addition to "~/go".
+	if path == "~" {
 		if homeDir, err := os.UserHomeDir(); err == nil {
-			if path == "~" {
-				path = homeDir
-			} else {
-				path = filepath.Join(homeDir, path[2:])
-			}
+			return homeDir
+		}
+		return path
+	}
+	if strings.HasPrefix(path, "~/") || (runtime.GOOS == "windows" && strings.HasPrefix(path, `~\`)) {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(homeDir, path[2:])
 		}
 	}
 
 	return path
 }
+
+// expandWindowsEnv replaces %NAME% references with their environment values,
+// leaving unknown names untouched. os.ExpandEnv does not understand this form.
+func expandWindowsEnv(path string) string {
+	return winEnvVarPattern.ReplaceAllStringFunc(path, func(match string) string {
+		name := match[1 : len(match)-1]
+		if val, ok := os.LookupEnv(name); ok {
+			return val
+		}
+		return match
+	})
+}
+
+// winEnvVarPattern matches Windows-style %NAME% environment references. The
+// name grammar mirrors what cmd.exe accepts: it must start with a letter or
+// underscore and may contain letters, digits, and underscores. Parentheses are
+// also allowed because well-known system variables use them (e.g.
+// %ProgramFiles(x86)%). Anything else (a lone %, or %%) is left untouched.
+var winEnvVarPattern = regexp.MustCompile(`%([A-Za-z_][A-Za-z0-9_()]*)%`)
 
 // FindExecutable finds an executable file, handling Windows executable extensions.
 // On Windows, it checks for .exe, .bat, .cmd, and .com files.

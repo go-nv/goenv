@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -271,4 +272,29 @@ func TestDefaultConfigPath(t *testing.T) {
 	assert.NotEmpty(t, path, "DefaultConfigPath() returned empty string")
 	assert.Contains(t, path, ".goenv", "DefaultConfigPath() = , expected to contain .goenv %v", path)
 	assert.Contains(t, path, "hooks.yaml", "DefaultConfigPath() = , expected to contain hooks.yaml %v", path)
+}
+
+// TestConfigPath_ExpandsTilde guards that GOENV_HOOKS_CONFIG and GOENV_ROOT with
+// a literal '~' (as a quoted profile export leaves them) are expanded, so the
+// hooks config is read from the real path, not a literal "~" directory.
+func TestConfigPath_ExpandsTilde(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("no home dir: %v", err)
+	}
+
+	t.Run("GOENV_HOOKS_CONFIG", func(t *testing.T) {
+		t.Setenv(utils.GoenvEnvVarHooksConfig.String(), "~/custom-hooks.yaml")
+		got := ConfigPath()
+		assert.Equal(t, filepath.Join(home, "custom-hooks.yaml"), got)
+		assert.NotContains(t, got, "~")
+	})
+
+	t.Run("GOENV_ROOT default", func(t *testing.T) {
+		t.Setenv(utils.GoenvEnvVarHooksConfig.String(), "") // force the default branch
+		t.Setenv(utils.GoenvEnvVarRoot.String(), "~/myroot")
+		got := ConfigPath()
+		assert.Equal(t, filepath.Join(home, "myroot", "hooks.yaml"), got)
+		assert.NotContains(t, got, "~")
+	})
 }

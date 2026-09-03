@@ -93,14 +93,25 @@ func runExec(cmd *cobra.Command, args []string) error {
 	// Prepare environment
 	execEnv := os.Environ()
 
-	// Expand GOPATH early if it needs expansion (handles $HOME, ~/, etc.)
-	// This ensures Go doesn't error on shell metacharacters or variables
-	gopath := os.Getenv(utils.EnvVarGopath)
-	if gopath != "" {
-		expanded := pathutil.ExpandPath(gopath)
-		if expanded != gopath {
-			gopath = expanded
-			execEnv = setEnvVar(execEnv, utils.EnvVarGopath, expanded)
+	// Baseline: expand the inherited GOPATH entries (fixes a quoted "~/go") while
+	// preserving managed paths — this must be safe for the system version and
+	// GOENV_DISABLE_GOPATH, where goenv does not prepend. Never blank the value:
+	// if nothing normalizes we leave the original so `go` reports its own clear
+	// error instead of silently falling back to the default GOPATH. Runs on every
+	// platform, including Windows .bat shims.
+	rawGopath := os.Getenv(utils.EnvVarGopath)
+	if normalized := normalizeGopathEntries(rawGopath); len(normalized) > 0 {
+		execEnv = setEnvVar(execEnv, utils.EnvVarGopath, strings.Join(normalized, string(os.PathListSeparator)))
+	}
+
+	// Normalize the other Go path env vars we may hand to `go`. A shell that left
+	// a literal '~' or an unexpanded $VAR in one (e.g. a quoted GOCACHE="~/c")
+	// would otherwise make `go` reject it just like GOPATH.
+	for _, key := range []string{utils.EnvVarGocache, utils.EnvVarGomodcache, utils.EnvVarGobin} {
+		if v := utils.GetEnvValue(execEnv, key); v != "" {
+			if expanded := pathutil.ExpandPath(v); expanded != v {
+				execEnv = setEnvVar(execEnv, key, expanded)
+			}
 		}
 	}
 
@@ -121,29 +132,13 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 		// Set GOPATH if not disabled
 		if !env.HasDisableGopath() {
-			// Build version-specific GOPATH: $GOPATH_PREFIX/<version> (default $HOME/go/<version>)
+			// goenv manages GOPATH here: prepend our per-version path and keep the
+			// user's own (normalized) entries, de-duplicating any managed-prefix
+			// paths so re-entry does not accumulate them. See issue #147.
 			versionGopath := cfg.ManagedGopath(currentVersion)
-
-			// Preserve existing GOPATH by prepending version-specific path.
-			// This allows users to keep source code in existing locations while
-			// giving priority to version-specific installed tools/packages.
-			// See: https://github.com/go-nv/goenv/issues/147
-			// Filter out goenv-managed paths to prevent duplication when goenv exec
-			// is called from inside an already-managed shell (e.g. a tool that
-			// shells out to `go env GOPATH` through the shim).
-			if gopath != "" {
-				goPathPattern := cfg.GopathPrefix()
-				var filteredPaths []string
-				for _, p := range filepath.SplitList(gopath) {
-					if !strings.HasPrefix(p, goPathPattern+string(filepath.Separator)) || p == goPathPattern {
-						filteredPaths = append(filteredPaths, p)
-					}
-				}
-				if len(filteredPaths) > 0 {
-					versionGopath = versionGopath + string(os.PathListSeparator) + strings.Join(filteredPaths, string(os.PathListSeparator))
-				}
+			if userGopath := sanitizeInheritedGopath(rawGopath, cfg.GopathPrefix()); len(userGopath) > 0 {
+				versionGopath = versionGopath + string(os.PathListSeparator) + strings.Join(userGopath, string(os.PathListSeparator))
 			}
-
 			execEnv = setEnvVar(execEnv, utils.EnvVarGopath, versionGopath)
 		}
 
@@ -162,7 +157,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		// Simplified vs v2: Removed over-engineered ABI variants, GOEXPERIMENT,
 		// and CGO hash suffixes that caused cache proliferation.
 		if !utils.GoenvEnvVarDisableGocache.IsTrue() {
-			customGocacheDir := utils.GoenvEnvVarGocacheDir.UnsafeValue()
+			customGocacheDir := pathutil.ExpandPath(utils.GoenvEnvVarGocacheDir.UnsafeValue())
 			var versionGocache string
 
 			// Determine target GOOS/GOARCH for cache isolation

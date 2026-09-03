@@ -89,16 +89,10 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	// See: https://github.com/go-nv/goenv/issues/147
 	existingGopath := os.Getenv(utils.EnvVarGopath)
 	if existingGopath != "" {
-		// Filter out any goenv-managed paths to prevent duplication on re-initialization
-		goPathPattern := cfg.GopathPrefix()
-		var filteredPaths []string
-		for _, path := range filepath.SplitList(existingGopath) {
-			// Skip paths that look like $GOPATH_PREFIX/<version>
-			// Keep paths that are exactly $GOPATH_PREFIX or any other custom paths
-			if !strings.HasPrefix(path, goPathPattern+string(filepath.Separator)) || path == goPathPattern {
-				filteredPaths = append(filteredPaths, path)
-			}
-		}
+		// goenv re-exports GOPATH, so it must never pass along entries that `go`
+		// will reject (e.g. a literal '~' from a quoted GOPATH="~/go"). Normalize
+		// the inherited entries before appending them after the managed path.
+		filteredPaths := sanitizeInheritedGopath(existingGopath, cfg.GopathPrefix())
 		if len(filteredPaths) > 0 {
 			gopathValue = gopathValue + string(os.PathListSeparator) + strings.Join(filteredPaths, string(os.PathListSeparator))
 		}

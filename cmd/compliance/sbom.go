@@ -16,6 +16,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/manager"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/resolver"
 	"github.com/go-nv/goenv/internal/sbom"
@@ -340,7 +341,7 @@ func init() {
 }
 
 func runSBOMHash(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
 
 	// Verify file exists
 	if !utils.FileExists(sbomPath) {
@@ -367,8 +368,8 @@ func runSBOMHash(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMVerify(cmd *cobra.Command, args []string) error {
-	sbom1Path := args[0]
-	sbom2Path := args[1]
+	sbom1Path := pathutil.ExpandPath(args[0])
+	sbom2Path := pathutil.ExpandPath(args[1])
 
 	// Verify both files exist
 	if !utils.FileExists(sbom1Path) {
@@ -405,7 +406,8 @@ func runSBOMVerify(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMValidate(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
+	policyFile = pathutil.ExpandPath(policyFile)
 
 	// Verify SBOM file exists
 	if !utils.FileExists(sbomPath) {
@@ -491,7 +493,8 @@ func runSBOMValidate(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMSign(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
+	signKeyPath = pathutil.ExpandPath(signKeyPath)
 
 	// Verify SBOM file exists
 	if !utils.FileExists(sbomPath) {
@@ -499,7 +502,7 @@ func runSBOMSign(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine output path
-	outputPath := signOutput
+	outputPath := pathutil.ExpandPath(signOutput)
 	if outputPath == "" {
 		outputPath = sbomPath + ".sig"
 	}
@@ -571,7 +574,10 @@ func runSBOMSign(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMVerifySignature(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
+	verifySignaturePath = pathutil.ExpandPath(verifySignaturePath)
+	verifyPublicKey = pathutil.ExpandPath(verifyPublicKey)
+	verifyCertificate = pathutil.ExpandPath(verifyCertificate)
 
 	// Verify files exist
 	if !utils.FileExists(sbomPath) {
@@ -640,7 +646,8 @@ func runSBOMVerifySignature(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMAttest(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
+	attestKeyPath = pathutil.ExpandPath(attestKeyPath)
 
 	// Verify SBOM file exists
 	if !utils.FileExists(sbomPath) {
@@ -651,7 +658,7 @@ func runSBOMAttest(cmd *cobra.Command, args []string) error {
 	cfg, mgr := ctx.Config, ctx.Manager
 
 	// Determine output path
-	outputPath := attestOutput
+	outputPath := pathutil.ExpandPath(attestOutput)
 	if outputPath == "" {
 		if attestInToto {
 			outputPath = sbomPath + ".att.json"
@@ -823,6 +830,12 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 	cfg := ctx.Config
 	mgr := ctx.Manager
 	env := ctx.Environment
+
+	// Expand user-supplied paths so a quoted/scripted "~/..." is not passed on
+	// literally (the shell only expands an unquoted ~).
+	sbomOutput = pathutil.ExpandPath(sbomOutput)
+	sbomDir = pathutil.ExpandPath(sbomDir)
+	sbomBinary = pathutil.ExpandPath(sbomBinary)
 
 	// Validate flags
 	if sbomImage != "" && sbomDir != "." {
@@ -1175,7 +1188,7 @@ func runSBOMScan(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("an SBOM file argument is required (or use --list-scanners)")
 	}
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
 
 	// Get scanner
 	scanner, err := sbom.GetScanner(scanScanner)
@@ -1200,7 +1213,7 @@ func runSBOMScan(cmd *cobra.Command, args []string) error {
 		SBOMPath:          sbomPath,
 		Format:            scanFormat,
 		OutputFormat:      scanOutputFormat,
-		OutputPath:        scanOutput,
+		OutputPath:        pathutil.ExpandPath(scanOutput),
 		SeverityThreshold: scanSeverity,
 		FailOn:            scanFailOn,
 		OnlyFixed:         scanOnlyFixed,
