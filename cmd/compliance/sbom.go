@@ -27,59 +27,71 @@ var sbomCmd = &cobra.Command{
 	Use:     "sbom",
 	Short:   "Generate Software Bill of Materials for projects",
 	GroupID: string(cmdpkg.GroupTools),
-	Long: `Generate SBOMs using industry-standard tools (cyclonedx-gomod, syft) with goenv-managed toolchains.
+	Long: `Generate and enrich Software Bills of Materials for Go projects using
+industry-standard tools (cyclonedx-gomod, syft) plus goenv's Go-aware enhancement.
 
-CURRENT STATE (v3.0): This is a convenience wrapper that runs SBOM tools with the 
-correct Go version and environment. It does NOT generate SBOMs itself or add features
-beyond what the underlying tools provide.
+goenv runs the SBOM tool with the correct managed toolchain, then augments the
+output with metadata generic tools miss: the standard library as a component,
+authoritative build context, supply-chain risk flags for replace/retracted
+modules, and (with --binary) VCS provenance from the compiled artifact.
 
-ROADMAP: Future versions will add validation, policy enforcement, signing, vulnerability
-scanning, and compliance reporting. See docs/roadmap/SBOM_ROADMAP.md for details.
-
-ALTERNATIVE: Advanced users can run SBOM tools directly:
-  goenv exec cyclonedx-gomod -json -output sbom.json
+Subcommands:
+  project   Generate and enhance an SBOM for a Go project
+  validate  Validate an SBOM against completeness/policy rules
+  hash      Compute a normalized digest for reproducibility
+  verify    Compare two SBOMs for reproducibility
+  sign      Sign an SBOM (cosign)
+  attest    Produce an in-toto attestation
+  scan      Scan an SBOM for vulnerabilities
 
 Examples:
-  # Generate CycloneDX SBOM for current project
-  goenv sbom project --tool=cyclonedx-gomod --format=cyclonedx-json
+  # Enhanced CycloneDX SBOM for current project
+  goenv sbom project --tool=cyclonedx-gomod
 
-  # Generate SPDX SBOM with syft
-  goenv sbom project --tool=syft --format=spdx-json --output=sbom.spdx.json
+  # Attest a built artifact from its embedded build info
+  goenv sbom project --binary ./bin/myapp --deterministic -o myapp.cdx.json
 
-  # Generate SBOM for container image
-  goenv sbom project --tool=syft --image=ghcr.io/myapp:v1.0.0
-
-Before using, install the required tool:
-  goenv tools install cyclonedx-gomod@v1.6.0
-  goenv tools install syft@v1.0.0`,
+Install a generator first:
+  goenv tools install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest`,
 }
 
 var sbomProjectCmd = &cobra.Command{
 	Use:   "project",
 	Short: "Generate SBOM for a Go project",
-	Long: `Generate a Software Bill of Materials for a Go project using cyclonedx-gomod or syft.
+	Long: `Generate a Software Bill of Materials for a Go project using cyclonedx-gomod or syft,
+then enrich it with Go-aware metadata that generic SBOM tools do not capture.
 
-WHAT THIS DOES:
-- Runs SBOM tools with the correct Go version and environment
-- Provides unified CLI across different SBOM tools
-- Ensures reproducibility in CI/CD pipelines
+WHAT MAKES THIS DIFFERENT (Go-aware enhancement, on by default):
+- Standard library recorded as a first-class component so stdlib CVEs are in scope
+- Authoritative build context (CGO, build tags, GOOS/GOARCH, trimpath) sourced from
+  the managed toolchain, or from a compiled artifact via --binary
+- Supply-chain risk flags for replace directives (local-path/fork) and retracted versions
+- VCS provenance (commit, dirty state) when generated from a binary
+- Deterministic output for reproducible, signable SBOMs
 
-WHAT THIS DOES NOT DO (yet):
-- Validate SBOM format or completeness (planned: v3.1)
-- Sign or attest SBOMs (planned: v3.2)
-- Scan for vulnerabilities (planned: v3.5)
-- Enforce policies (planned: v3.1)
-
-See docs/roadmap/SBOM_ROADMAP.md for planned features.
+DATA SOURCES (authoritative, not heuristic):
+- go list / go mod edit / go env from the goenv-managed toolchain
+- debug/buildinfo when --binary is supplied
 
 Supported tools:
 - cyclonedx-gomod: Native Go module SBOM generator (CycloneDX format)
-- syft: Multi-language SBOM generator (supports containers)`,
+- syft: Multi-language SBOM generator (supports containers)
+
+Examples:
+  # Enhanced CycloneDX SBOM for the current project
+  goenv sbom project --tool=cyclonedx-gomod
+
+  # Pin the generator version for reproducible, deterministic installs
+  goenv sbom project --tool=cyclonedx-gomod --tool-version=v1.6.0
+
+  # Attest a compiled artifact using its embedded build info
+  goenv sbom project --binary ./bin/myapp --deterministic -o myapp.cdx.json`,
 	RunE: runSBOMProject,
 }
 
 var (
 	sbomTool          string
+	sbomToolPin       string
 	sbomFormat        string
 	sbomOutput        string
 	sbomDir           string
@@ -90,10 +102,12 @@ var (
 	sbomDeterministic bool
 	sbomEmbedDigests  bool
 	sbomEnhance       bool
+	sbomBinary        string
 )
 
 func init() {
 	sbomProjectCmd.Flags().StringVar(&sbomTool, "tool", "cyclonedx-gomod", "SBOM tool to use (cyclonedx-gomod, syft)")
+	sbomProjectCmd.Flags().StringVar(&sbomToolPin, "tool-version", "", "Pin the SBOM generator version for reproducible installs (e.g. v1.6.0); default installs @latest")
 	sbomProjectCmd.Flags().StringVar(&sbomFormat, "format", "cyclonedx-json", "Output format (cyclonedx-json, spdx-json)")
 	sbomProjectCmd.Flags().StringVarP(&sbomOutput, "output", "o", "sbom.json", "Output file path")
 	sbomProjectCmd.Flags().StringVar(&sbomDir, "dir", ".", "Project directory to scan")
@@ -104,6 +118,7 @@ func init() {
 	sbomProjectCmd.Flags().BoolVar(&sbomEnhance, "enhance", true, "Add Go-aware metadata to SBOM (default true)")
 	sbomProjectCmd.Flags().BoolVar(&sbomDeterministic, "deterministic", false, "Generate deterministic/reproducible SBOM")
 	sbomProjectCmd.Flags().BoolVar(&sbomEmbedDigests, "embed-digests", false, "Embed go.mod/go.sum digests for reproducibility")
+	sbomProjectCmd.Flags().StringVar(&sbomBinary, "binary", "", "Compiled Go binary to source authoritative build provenance from (debug/buildinfo)")
 
 	sbomCmd.AddCommand(sbomProjectCmd)
 	sbomCmd.AddCommand(sbomHashCmd)
@@ -673,21 +688,43 @@ func runSBOMAttest(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "goenv: Invocation ID: %s\n", invocationID)
 	}
 
+	// Reuse the authoritative provenance the enhancer already recorded in the
+	// SBOM (Go version, build tags, CGO, SBOM tool version) instead of
+	// re-deriving or hardcoding it. Falls back gracefully for un-enhanced SBOMs.
+	recorded, _ := sbom.ReadGoenvProvenance(sbomPath)
+	buildTags := []string{}
+	cgoEnabled := false
+	sbomToolVersion := "unknown"
+	vendored := utils.FileExists(filepath.Join(projectDir, "vendor"))
+	if recorded != nil {
+		if recorded.GoVersion != "" {
+			goVersion = recorded.GoVersion // prefer the resolved patch version
+		}
+		buildTags = recorded.BuildTags
+		cgoEnabled = recorded.CGOEnabled
+		if recorded.SBOMToolVersion != "" {
+			sbomToolVersion = recorded.SBOMToolVersion
+		}
+		if recorded.Vendored {
+			vendored = true
+		}
+	}
+
 	// Create provenance generator
 	generator := sbom.NewProvenanceGenerator(sbom.ProvenanceOptions{
 		SBOMPath:        sbomPath,
 		GoVersion:       goVersion,
 		GoModDigest:     goModDigest,
 		GoSumDigest:     goSumDigest,
-		BuildTags:       []string{}, // TODO: Extract from build context
-		CGOEnabled:      false,      // TODO: Extract from build context
+		BuildTags:       buildTags,
+		CGOEnabled:      cgoEnabled,
 		GOOS:            runtime.GOOS,
 		GOARCH:          runtime.GOARCH,
 		LDFlags:         "",
-		Vendored:        utils.FileExists(filepath.Join(projectDir, "vendor")),
+		Vendored:        vendored,
 		ModuleProxy:     os.Getenv("GOPROXY"),
 		SBOMTool:        sbomTool,
-		SBOMToolVersion: "latest", // TODO: Get actual version
+		SBOMToolVersion: sbomToolVersion,
 		ProjectDir:      projectDir,
 		InvocationID:    invocationID,
 	})
@@ -803,7 +840,7 @@ func runSBOMProject(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve tool path using version context
-	toolPath, err := resolveSBOMTool(cfg, env, sbomTool, goVersion, versionSource)
+	toolPath, err := resolveSBOMTool(cmd, cfg, env, sbomTool, goVersion, versionSource)
 	if err != nil {
 		return err
 	}
@@ -873,18 +910,25 @@ func enhanceSBOM(cfg *config.Config, mgr *manager.Manager, cmd *cobra.Command) e
 	enhancer := sbom.NewEnhancer(cfg, mgr)
 
 	opts := sbom.EnhanceOptions{
-		ProjectDir:    sbomDir,
-		Deterministic: sbomDeterministic,
-		OfflineMode:   sbomOffline,
-		EmbedDigests:  sbomEmbedDigests || sbomDeterministic, // Always embed if deterministic
+		ProjectDir:       sbomDir,
+		Deterministic:    sbomDeterministic,
+		OfflineMode:      sbomOffline,
+		EmbedDigests:     sbomEmbedDigests || sbomDeterministic, // Always embed if deterministic
+		BinaryPath:       sbomBinary,
+		GeneratorVersion: cmdpkg.AppVersion,
 	}
 
 	return enhancer.EnhanceCycloneDX(sbomOutput, opts)
 }
 
-// resolveSBOMTool finds the tool binary in goenv-managed paths
-func resolveSBOMTool(cfg *config.Config, env *utils.GoenvEnvironment, tool, version, versionSource string) (string, error) {
-	// Use resolver to respect local vs global context
+// resolveSBOMTool finds the tool binary in goenv-managed paths.
+//
+// If the tool is missing it will offer to install it, but only with explicit
+// consent: it never silently pulls an unpinned tool over the network. Consent is
+// granted by --yes / GOENV_ASSUME_YES; in non-interactive or CI contexts the
+// prompt defaults to "no". Installation is refused entirely in offline mode. All
+// messages go to stderr so stdout SBOM output (--output=-) is never corrupted.
+func resolveSBOMTool(cmd *cobra.Command, cfg *config.Config, env *utils.GoenvEnvironment, tool, version, versionSource string) (string, error) {
 	sbomTools := map[string]string{
 		"cyclonedx-gomod": "github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod",
 		"syft":            "github.com/anchore/syft/cmd/syft",
@@ -892,48 +936,76 @@ func resolveSBOMTool(cfg *config.Config, env *utils.GoenvEnvironment, tool, vers
 
 	r := resolver.New(cfg, env)
 
-	if version != "unknown" && version != "" {
-		if toolPath, err := r.ResolveBinary(tool, version, versionSource); err == nil {
-			return toolPath, nil
+	resolve := func() (string, bool) {
+		if version != "unknown" && version != "" {
+			if toolPath, err := r.ResolveBinary(tool, version, versionSource); err == nil {
+				return toolPath, true
+			}
 		}
+		if path, err := exec.LookPath(tool); err == nil {
+			return path, true
+		}
+		return "", false
 	}
 
-	// Fallback: Check if tool is in PATH (system-wide installation)
-	if path, err := exec.LookPath(tool); err == nil {
-		return path, nil
+	if toolPath, ok := resolve(); ok {
+		return toolPath, nil
 	}
 
 	goTool, ok := sbomTools[tool]
 	if !ok {
 		return "", fmt.Errorf("unsupported SBOM tool: %s", tool)
 	}
+	// Default to @latest, but honor --tool-version so CI can pin a generator
+	// version whose Go requirement matches the toolchain (reproducible, and it
+	// avoids surprise GOTOOLCHAIN downloads from a bleeding-edge @latest).
+	pinned := "latest"
+	if strings.TrimSpace(sbomToolPin) != "" {
+		pinned = strings.TrimSpace(sbomToolPin)
+	}
+	pkg := goTool + "@" + pinned
+	stderr := cmd.ErrOrStderr()
 
-	goTool = fmt.Sprintf("%s@latest", goTool)
-
-	fmt.Printf("goenv: %s not found in goenv-managed paths or system PATH. Attempting to install...\n", tool)
-
-	cmd := exec.Command("goenv", "tools", "install", goTool)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err == nil {
-		// Retry finding the tool after installation; it will be rehashed into the shims automatically
-		if toolPath, err := r.ResolveBinary(tool, version, versionSource); err == nil {
-			return toolPath, nil
-		}
-	} else {
-		return "", fmt.Errorf("goenv: Failed to install %s: %w", tool, err)
+	// Never reach out to the network in offline mode.
+	if sbomOffline || utils.GoenvEnvVarOffline.IsTrue() {
+		return "", sbomToolNotFoundErr(tool, goTool)
 	}
 
-	// Tool not found - provide actionable error
-	return "", fmt.Errorf(`%s not found
+	// Ask before installing an unpinned tool. Respects --yes / GOENV_ASSUME_YES;
+	// defaults to "no" so CI and non-interactive runs never install by surprise.
+	ictx := cmdutil.NewInteractiveContext(cmd)
+	if !ictx.Confirm(fmt.Sprintf("%s is not installed. Install %s now?", tool, pkg), false) {
+		return "", sbomToolNotFoundErr(tool, goTool)
+	}
 
-To install:
-  goenv tools install %s
+	fmt.Fprintf(stderr, "goenv: installing %s...\n", pkg)
+	goenvBin, err := os.Executable()
+	if err != nil || goenvBin == "" {
+		goenvBin = "goenv"
+	}
+	install := exec.Command(goenvBin, "tools", "install", pkg)
+	install.Stdout = stderr // never stdout: keep SBOM output clean
+	install.Stderr = stderr
+	if err := install.Run(); err != nil {
+		return "", fmt.Errorf("failed to install %s: %w", tool, err)
+	}
 
-Or install system-wide with:
-  go install %s`, tool, goTool, goTool)
+	if toolPath, ok := resolve(); ok {
+		return toolPath, nil
+	}
+	return "", sbomToolNotFoundErr(tool, goTool)
+}
+
+// sbomToolNotFoundErr returns an actionable "not found" error that nudges the
+// user toward pinning a version for reproducible SBOMs.
+func sbomToolNotFoundErr(tool, goTool string) error {
+	return fmt.Errorf(`%s not found
+
+Install it (pin a version for reproducible SBOMs):
+  goenv tools install %s@v1.6.0
+
+Or install the latest:
+  goenv tools install %s@latest`, tool, goTool, goTool)
 }
 
 // buildCycloneDXCommand builds the cyclonedx-gomod command
@@ -1014,11 +1086,16 @@ var sbomScanCmd = &cobra.Command{
 
 Supported scanners:
 
-Open Source (Phase 4A):
-- Grype (Anchore): Fast, offline vulnerability scanning
+Built-in (no installation required):
+- OSV (default): Queries the official Go vulnerability database (vuln.go.dev) via
+  OSV.dev. Uniquely scans the Go standard library and toolchain components that
+  goenv's SBOM enhancement emits - catching stdlib CVEs generic scanners miss.
+
+Open Source (require 'goenv tools install'):
+- Grype (Anchore): Fast, offline-capable vulnerability scanning
 - Trivy (Aqua Security): Kubernetes-native, container scanning
 
-Commercial/Enterprise (Phase 4B):
+Commercial/Enterprise:
 - Snyk: Developer-first security with prioritized fixes
 - Veracode: Enterprise compliance and policy enforcement
 
@@ -1033,11 +1110,11 @@ Results include:
 - CVSS scores and descriptions
 
 Examples:
-  # Scan with Grype (default)
+  # Scan with the built-in OSV scanner (default, no install needed)
   goenv sbom scan sbom.json
 
-  # Scan with Trivy
-  goenv sbom scan sbom.json --scanner=trivy
+  # Scan with Grype
+  goenv sbom scan sbom.json --scanner=grype
 
   # Scan with Snyk (requires SNYK_TOKEN)
   goenv sbom scan sbom.json --scanner=snyk
@@ -1059,7 +1136,7 @@ Examples:
 
 Phase 4A/4B: Scanner Integration (v3.4+)
 Supports both open-source and commercial scanners for comprehensive vulnerability detection.`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: runSBOMScan,
 }
 
@@ -1077,7 +1154,7 @@ var (
 )
 
 func init() {
-	sbomScanCmd.Flags().StringVar(&scanScanner, "scanner", "grype", "Scanner to use (grype, trivy)")
+	sbomScanCmd.Flags().StringVar(&scanScanner, "scanner", "osv", "Scanner to use (osv, grype, trivy, snyk, veracode)")
 	sbomScanCmd.Flags().StringVar(&scanFormat, "format", "cyclonedx-json", "SBOM format (cyclonedx-json, spdx-json)")
 	sbomScanCmd.Flags().StringVar(&scanOutputFormat, "output-format", "json", "Output format (json, table, sarif)")
 	sbomScanCmd.Flags().StringVarP(&scanOutput, "output", "o", "", "Output file (default: stdout)")
@@ -1095,6 +1172,9 @@ func runSBOMScan(cmd *cobra.Command, args []string) error {
 		return listScanners()
 	}
 
+	if len(args) == 0 {
+		return fmt.Errorf("an SBOM file argument is required (or use --list-scanners)")
+	}
 	sbomPath := args[0]
 
 	// Get scanner
@@ -1140,16 +1220,20 @@ func runSBOMScan(cmd *cobra.Command, args []string) error {
 	// Display results
 	if scanOutput == "" {
 		// Print to stdout
-		return displayScanResults(result, scanOutputFormat)
+		if err := displayScanResults(result, scanOutputFormat); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("✅ Scan complete: %d vulnerabilities found\n", result.Summary.Total)
+		fmt.Printf("   Critical: %d, High: %d, Medium: %d, Low: %d\n",
+			result.Summary.Critical, result.Summary.High,
+			result.Summary.Medium, result.Summary.Low)
+		fmt.Printf("   Results saved to: %s\n", scanOutput)
 	}
 
-	fmt.Printf("✅ Scan complete: %d vulnerabilities found\n", result.Summary.Total)
-	fmt.Printf("   Critical: %d, High: %d, Medium: %d, Low: %d\n",
-		result.Summary.Critical, result.Summary.High,
-		result.Summary.Medium, result.Summary.Low)
-	fmt.Printf("   Results saved to: %s\n", scanOutput)
-
-	// Apply fail-on logic
+	// Apply fail-on logic regardless of whether results went to stdout or a file.
+	// (Previously this was only reached on the file-output path, so the CI gate
+	// silently did nothing for the default stdout output.)
 	return checkFailOnCondition(result, scanFailOn)
 }
 
@@ -1169,7 +1253,8 @@ func listScanners() error {
 	}
 
 	fmt.Println()
-	fmt.Println("To install a scanner:")
+	fmt.Println("The 'osv' scanner is built in and needs no installation.")
+	fmt.Println("To install an external scanner:")
 	fmt.Println("  goenv tools install grype")
 	fmt.Println("  goenv tools install trivy")
 

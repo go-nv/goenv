@@ -229,6 +229,46 @@ func CreateToolExecutable(t *testing.T, binDir, toolName string) string {
 	return toolPath
 }
 
+// CreateMockGoInstaller writes a mock `go` into binDir that emulates
+// `go install <pkg>` by creating the resulting binary (named after the final
+// element of the package import path) in $GOBIN. Use it wherever a test drives
+// tools.InstallTools/InstallSingleTool, so the post-install binary verification
+// sees a real result instead of a no-op. Returns the mock's path.
+func CreateMockGoInstaller(t *testing.T, binDir string) string {
+	t.Helper()
+	if err := utils.EnsureDirWithContext(binDir, "create test directory"); err != nil {
+		t.Fatalf("Failed to create bin directory: %v", err)
+	}
+
+	goPath := filepath.Join(binDir, "go")
+	content := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"install\" ] && [ -n \"$GOBIN\" ]; then\n" +
+		"  pkg=$2; pkg=${pkg%@*}; bin=${pkg##*/}\n" +
+		"  if [ -n \"$bin\" ]; then\n" +
+		"    mkdir -p \"$GOBIN\" && : > \"$GOBIN/$bin\" && chmod +x \"$GOBIN/$bin\"\n" +
+		"  fi\n" +
+		"fi\n" +
+		"exit 0\n"
+	if utils.IsWindows() {
+		goPath += ".bat"
+		content = "@echo off\r\n" +
+			"if not \"%~1\"==\"install\" exit /b 0\r\n" +
+			"if not exist \"%GOBIN%\" mkdir \"%GOBIN%\"\r\n" +
+			"set \"pkg=%~2\"\r\n" +
+			"for /f \"delims=@\" %%A in (\"%pkg%\") do set \"nover=%%A\"\r\n" +
+			"set \"bin=\"\r\n" +
+			"for %%B in (\"%nover:/=\\%\") do set \"bin=%%~nxB\"\r\n" +
+			"if not \"%bin%\"==\"\" type nul > \"%GOBIN%\\%bin%.exe\"\r\n" +
+			"exit /b 0\r\n"
+	}
+
+	if err := utils.WriteFileWithContext(goPath, []byte(content), utils.PermFileExecutable, "create mock go"); err != nil {
+		t.Fatalf("Failed to create mock go: %v", err)
+	}
+
+	return goPath
+}
+
 // WriteTestFile writes a file for testing purposes with standardized error handling.
 // If the write fails, it immediately fails the test with t.Fatalf.
 // The optional msg parameter allows specifying a custom error message context.

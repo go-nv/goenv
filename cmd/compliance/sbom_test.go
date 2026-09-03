@@ -1,6 +1,7 @@
 package compliance
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/go-nv/goenv/testing/testutil"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -163,7 +165,7 @@ func TestResolveSBOMTool(t *testing.T) {
 	require.NoError(t, err, "Failed to load environment")
 
 	// Test resolution with global version context (host bin accessible)
-	resolvedPath, err := resolveSBOMTool(cfg, env, toolName, "1.21.0", "")
+	resolvedPath, err := resolveSBOMTool(&cobra.Command{}, cfg, env, toolName, "1.21.0", "")
 	require.NoError(t, err, "Failed to resolve tool")
 
 	assert.Equal(t, toolPath, resolvedPath, "Expected path")
@@ -180,10 +182,57 @@ func TestResolveSBOMTool_NotFound(t *testing.T) {
 	require.NoError(t, err, "Failed to load environment")
 
 	// Test resolution for non-existent tool with global context
-	_, err = resolveSBOMTool(cfg, env, "nonexistent-tool", "1.21.0", "")
+	_, err = resolveSBOMTool(&cobra.Command{}, cfg, env, "nonexistent-tool", "1.21.0", "")
 	assert.Error(t, err, "Expected error for non-existent tool")
 
 	assert.Contains(t, err.Error(), "unsupported SBOM tool", "Expected 'unsupported SBOM tool' error %v", err)
+}
+
+// TestResolveSBOMTool_OfflineDoesNotInstall verifies that in offline mode a
+// missing tool yields an actionable error and never attempts a network install.
+func TestResolveSBOMTool_OfflineDoesNotInstall(t *testing.T) {
+	cfg := &config.Config{Root: t.TempDir()}
+	env, err := utils.LoadEnvironment(context.Background())
+	require.NoError(t, err)
+
+	t.Setenv("GOENV_OFFLINE", "1")
+	t.Setenv("PATH", t.TempDir()) // ensure the tool is not discoverable on PATH
+
+	var stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetErr(&stderr)
+	cmd.SetOut(&stderr)
+
+	// version "unknown" skips the managed resolver; the tool is not on PATH.
+	_, err = resolveSBOMTool(cmd, cfg, env, "cyclonedx-gomod", "unknown", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+	// It must not have printed an install attempt anywhere.
+	assert.NotContains(t, stderr.String(), "installing", "offline mode must not attempt installation")
+}
+
+// TestResolveSBOMTool_NonInteractiveDeclines verifies that without --yes and
+// without a TTY (as in CI), a missing tool is not installed and a clear error is
+// returned instead.
+func TestResolveSBOMTool_NonInteractiveDeclines(t *testing.T) {
+	cfg := &config.Config{Root: t.TempDir()}
+	env, err := utils.LoadEnvironment(context.Background())
+	require.NoError(t, err)
+
+	t.Setenv("GOENV_OFFLINE", "")
+	t.Setenv("GOENV_ASSUME_YES", "")
+	t.Setenv("CI", "true")        // force non-interactive so the prompt defaults to "no"
+	t.Setenv("PATH", t.TempDir()) // ensure the tool is not discoverable on PATH
+
+	var stderr bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetErr(&stderr)
+	cmd.SetOut(&stderr)
+
+	_, err = resolveSBOMTool(cmd, cfg, env, "cyclonedx-gomod", "unknown", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+	assert.NotContains(t, stderr.String(), "installing", "non-interactive mode must not auto-install")
 }
 
 func TestBuildCycloneDXCommand(t *testing.T) {

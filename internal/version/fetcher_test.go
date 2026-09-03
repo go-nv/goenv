@@ -309,3 +309,96 @@ func TestBackgroundRefresh(t *testing.T) {
 
 	// If we got here without panic, the basic mechanism works
 }
+
+// TestFetchWithFallback_CacheFirstFreshortCircuit verifies that fresh cached
+// data is returned without any network round trip (the perf-critical path).
+func TestFetchWithFallback_CacheFirstShortCircuit(t *testing.T) {
+	t.Setenv(utils.GoenvEnvVarOffline.String(), "")
+	t.Setenv(utils.GoenvEnvVarCacheBgRefresh.String(), "")
+	t.Setenv(utils.GoenvEnvVarCacheTTL.String(), "1h")
+
+	tmpDir := t.TempDir()
+	cache := NewCache(tmpDir)
+
+	releases := []GoRelease{{Version: "go1.99.0", Stable: true}}
+	require.NoError(t, cache.SetWithETag(releases, `"fresh-etag"`), "Failed to seed cache")
+
+	var hits int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	fetcher := NewFetcher()
+	fetcher.baseURL = server.URL + "/"
+
+	got, err := fetcher.FetchWithFallback(tmpDir)
+	require.NoError(t, err, "FetchWithFallback returned error")
+	assert.Equal(t, 0, hits, "Expected no network requests when cache is fresh")
+	require.Len(t, got, 1, "Expected cached releases")
+	assert.Equal(t, "go1.99.0", got[0].Version, "Expected cached version")
+}
+
+// TestFetchWithFallback_TTLZeroDisablesShortCircuit verifies that setting
+// GOENV_CACHE_TTL=0 restores the always-fetch behavior.
+func TestFetchWithFallback_TTLZeroDisablesShortCircuit(t *testing.T) {
+	t.Setenv(utils.GoenvEnvVarOffline.String(), "")
+	t.Setenv(utils.GoenvEnvVarCacheBgRefresh.String(), "")
+	t.Setenv(utils.GoenvEnvVarCacheTTL.String(), "0")
+
+	tmpDir := t.TempDir()
+	cache := NewCache(tmpDir)
+
+	cachedReleases := []GoRelease{{Version: "go1.99.0", Stable: true}}
+	require.NoError(t, cache.SetWithETag(cachedReleases, `"cached-etag"`), "Failed to seed cache")
+
+	serverReleases := []GoRelease{
+		{Version: "go1.100.0", Stable: true, Files: []GoFile{{Kind: "archive", OS: "linux", Arch: "amd64"}}},
+	}
+	var hits int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Header().Set("ETag", `"new-etag"`)
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(serverReleases)
+	}))
+	defer server.Close()
+
+	fetcher := NewFetcher()
+	fetcher.baseURL = server.URL + "/"
+
+	got, err := fetcher.FetchWithFallback(tmpDir)
+	require.NoError(t, err, "FetchWithFallback returned error")
+	assert.Equal(t, 1, hits, "Expected a network request when TTL is 0")
+	require.Len(t, got, 1, "Expected freshly fetched releases")
+	assert.Equal(t, "go1.100.0", got[0].Version, "Expected server version")
+}
+
+// TestCacheTTL verifies GOENV_CACHE_TTL parsing and defaulting.
+func TestCacheTTL(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		set  bool
+		want time.Duration
+	}{
+		{name: "unset uses default", set: false, want: defaultCacheTTL},
+		{name: "valid duration", env: "30m", set: true, want: 30 * time.Minute},
+		{name: "zero disables", env: "0", set: true, want: 0},
+		{name: "invalid uses default", env: "not-a-duration", set: true, want: defaultCacheTTL},
+		{name: "negative uses default", env: "-5m", set: true, want: defaultCacheTTL},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.set {
+				t.Setenv(utils.GoenvEnvVarCacheTTL.String(), tt.env)
+			} else {
+				os.Unsetenv(utils.GoenvEnvVarCacheTTL.String())
+			}
+			got := cacheTTL()
+			assert.Equal(t, tt.want, got, "cacheTTL() mismatch")
+		})
+	}
+}

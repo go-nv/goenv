@@ -590,6 +590,39 @@ $ ls -la ~/.goenv/releases-cache.json
 - ✅ Follows security best practices
 - ✅ Automatic - no user action required
 
+### Cache-First Fast Path (GOENV_CACHE_TTL)
+
+By default, goenv returns cached version data **without any network round trip**
+when the cache is fresh. Freshness is controlled by `GOENV_CACHE_TTL`:
+
+```bash
+export GOENV_CACHE_TTL=1h   # default; accepts any Go duration (30m, 2h, ...)
+export GOENV_CACHE_TTL=0    # disable fast path — always attempt an online fetch
+```
+
+**How it works:**
+```
+User runs command:
+  → Read cache
+  → If cache age < GOENV_CACHE_TTL:
+       → Return cached data immediately (no DNS/TLS/network!)
+       → Optionally kick off a background refresh (GOENV_CACHE_BG_REFRESH=1)
+  → Otherwise: fall through to the ETag-based online fetch
+```
+
+**Why it matters:** Previously every invocation made a network request (even with
+a warm cache); the ETag only saved bandwidth, not the round-trip latency. With the
+cache-first path, repeated interactive commands are effectively instant.
+
+**Debugging:**
+```bash
+$ GOENV_CACHE_TTL=1h GOENV_DEBUG=1 goenv install --list
+Debug: Using fresh cached versions without network fetch (last updated: ..., ttl: 1h0m0s)
+```
+
+Pair this with `GOENV_CACHE_BG_REFRESH=1` to keep the cache warm while still serving
+instant responses.
+
 ### Background Cache Refresh
 
 Opt-in background refresh keeps your cache current without waiting:

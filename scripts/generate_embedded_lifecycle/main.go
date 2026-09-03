@@ -82,7 +82,6 @@ func generateSourceFile(data []EOLData) error {
 	fmt.Fprintf(f, "// Generated from: %s\n", apiURL)
 	fmt.Fprintf(f, "// Generated at: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 	fmt.Fprintf(f, "package lifecycle\n\n")
-	fmt.Fprintf(f, "import \"time\"\n\n")
 	fmt.Fprintf(f, "// EmbeddedLifecycleData contains fallback lifecycle information for Go versions\n")
 	fmt.Fprintf(f, "// Generated at build time from the endoflife.date API\n")
 	fmt.Fprintf(f, "// Used as last resort when both network and cache are unavailable\n")

@@ -3,7 +3,7 @@
 // To regenerate: make generate-embedded
 //
 // Generated from: https://endoflife.date/api/go.json
-// Generated at: 2025-12-01T19:53:17Z
+// Generated at: 2026-09-02T21:09:50Z
 
 package lifecycle
 
@@ -11,10 +11,26 @@ package lifecycle
 // Generated at build time from the endoflife.date API
 // Used as last resort when both network and cache are unavailable
 var EmbeddedLifecycleData = map[string]VersionInfo{
+	"1.27": {
+		Version:      "1.27",
+		ReleaseDate:  parseDate("2026-08-19"),
+		EOLDate:      parseDate("2099-12-31"),
+		Status:       StatusUnknown, // Calculated dynamically at runtime
+		Recommended:  "",            // Calculated dynamically at runtime
+		SecurityOnly: false,         // Determined at runtime
+	},
+	"1.26": {
+		Version:      "1.26",
+		ReleaseDate:  parseDate("2026-02-10"),
+		EOLDate:      parseDate("2099-12-31"),
+		Status:       StatusUnknown, // Calculated dynamically at runtime
+		Recommended:  "",            // Calculated dynamically at runtime
+		SecurityOnly: false,         // Determined at runtime
+	},
 	"1.25": {
 		Version:      "1.25",
 		ReleaseDate:  parseDate("2025-08-12"),
-		EOLDate:      parseDate("2099-12-31"),
+		EOLDate:      parseDate("2026-08-19"),
 		Status:       StatusUnknown, // Calculated dynamically at runtime
 		Recommended:  "",            // Calculated dynamically at runtime
 		SecurityOnly: false,         // Determined at runtime
@@ -22,7 +38,7 @@ var EmbeddedLifecycleData = map[string]VersionInfo{
 	"1.24": {
 		Version:      "1.24",
 		ReleaseDate:  parseDate("2025-02-11"),
-		EOLDate:      parseDate("2099-12-31"),
+		EOLDate:      parseDate("2026-02-10"),
 		Status:       StatusUnknown, // Calculated dynamically at runtime
 		Recommended:  "",            // Calculated dynamically at runtime
 		SecurityOnly: false,         // Determined at runtime
@@ -142,4 +158,4 @@ var EmbeddedLifecycleData = map[string]VersionInfo{
 }
 
 // EmbeddedGeneratedAt is the timestamp when this file was generated
-const EmbeddedGeneratedAt = "2025-12-01T19:53:17Z"
+const EmbeddedGeneratedAt = "2026-09-02T21:09:50Z"

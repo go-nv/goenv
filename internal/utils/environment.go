@@ -27,6 +27,7 @@ const (
 	// Go toolchain environment variables
 	EnvVarGocache     = "GOCACHE"
 	EnvVarGomodcache  = "GOMODCACHE"
+	EnvVarGobin       = "GOBIN"
 	EnvVarGotoolchain = "GOTOOLCHAIN"
 	EnvVarGoos        = "GOOS"
 	EnvVarGoarch      = "GOARCH"
@@ -106,6 +107,7 @@ const (
 	GoenvEnvVarPromptFormat     GoenvEnvVar = "GOENV_PROMPT_FORMAT"
 	GoenvEnvVarPromptIcon       GoenvEnvVar = "GOENV_PROMPT_ICON"
 	GoenvEnvVarVersionOrigin    GoenvEnvVar = "GOENV_VERSION_ORIGIN"
+	GoenvEnvVarCacheTTL         GoenvEnvVar = "GOENV_CACHE_TTL"
 	// #endregion
 
 	// #region Bool Env Vars

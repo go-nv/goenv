@@ -53,7 +53,14 @@
         "type": {
           "type": "string",
           "description": "Rule category",
-          "enum": ["supply-chain", "security", "completeness", "license"]
+          "enum": [
+            "supply-chain",
+            "security",
+            "completeness",
+            "license",
+            "provenance",
+            "custom"
+          ]
         },
         "severity": {
           "type": "string",

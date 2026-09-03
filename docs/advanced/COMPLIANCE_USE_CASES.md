@@ -235,29 +235,49 @@ EOF
 
 ### Identify Vulnerable Versions
 
+goenv ships a built-in OSV scanner (no external tool required) that checks the Go
+standard library and toolchain against the official Go vulnerability database
+(https://vuln.go.dev, served via OSV.dev). Generate an enhanced SBOM, then scan it:
+
 ```bash
-# List all installed versions
-VERSIONS=$(goenv list --bare)
+# Generate an enhanced SBOM (includes the stdlib component + Go version)
+goenv sbom project --tool=cyclonedx-gomod --output=sbom.json
 
-# Check each against vulnerability database
-echo "# Go Version Vulnerability Scan - $(date)" > vuln-report.md
-echo "" >> vuln-report.md
+# Scan it with the built-in OSV scanner (default), failing CI on high/critical
+goenv sbom scan sbom.json --severity=high --fail-on=high
+```
 
-for version in $VERSIONS; do
-  echo "## Go $version" >> vuln-report.md
+Audit the _installed_ toolchains directly against the OSV/Go vulnerability
+database — this catches EOL toolchains carrying unfixable stdlib CVEs:
 
-  # Example: Check against govulncheck
-  GOENV_VERSION=$version goenv exec govulncheck -version &>/dev/null && \
-    echo "- govulncheck available" >> vuln-report.md || \
-    echo "- ⚠️  govulncheck not installed" >> vuln-report.md
+```bash
+# Check every installed Go version's standard library and toolchain
+echo "# Go Toolchain Vulnerability Scan - $(date -u +%Y-%m-%dT%H:%M:%SZ)" > vuln-report.md
 
-  # Add your vulnerability scanning here
-  # Example: curl https://vuln-db.example.com/api/check?version=$version
-
-  echo "" >> vuln-report.md
+for version in $(goenv list --bare); do
+  echo -e "\n## Go $version" >> vuln-report.md
+  for pkg in stdlib toolchain; do
+    count=$(curl -s https://api.osv.dev/v1/query \
+      -d "{\"version\":\"$version\",\"package\":{\"name\":\"$pkg\",\"ecosystem\":\"Go\"}}" \
+      | jq '.vulns | length')
+    echo "- $pkg: $count known advisories" >> vuln-report.md
+  done
 done
 
 cat vuln-report.md
+```
+
+For reachability-aware scanning of a specific project (only vulnerabilities your
+code actually reaches), use the official govulncheck with the pinned toolchain:
+
+```bash
+goenv tools install govulncheck@latest
+
+# Scan source (reachability-aware)
+goenv exec govulncheck ./...
+
+# Or scan the exact built artifact (ties findings to the compiled binary)
+goenv exec govulncheck -mode=binary ./bin/app
 ```
 
 ### Integration with Security Scanners
@@ -295,18 +315,20 @@ mkdir -p "$REPORT_DIR"
 # Generate inventory
 goenv inventory go --json > "$REPORT_DIR/inventory.json"
 
-# Check for known CVEs (example with fictional API)
+# Check each installed toolchain against the Go vulnerability database (OSV)
 for version in $(goenv list --bare); do
   echo "Checking Go $version..."
-  # curl "https://cve-api.example.com/check?product=golang&version=$version" \
-  #   >> "$REPORT_DIR/cve-findings.json"
+  curl -s https://api.osv.dev/v1/query \
+    -d "{\"version\":\"$version\",\"package\":{\"name\":\"stdlib\",\"ecosystem\":\"Go\"}}" \
+    | jq --arg v "$version" '{version:$v, advisories:(.vulns // [] | map(.id))}' \
+    >> "$REPORT_DIR/cve-findings.json"
 done
 
-# Alert if vulnerabilities found
-# if jq -e '.vulnerabilities | length > 0' "$REPORT_DIR/cve-findings.json"; then
-#   # Send alert (email, Slack, PagerDuty, etc.)
-#   echo "ALERT: Vulnerabilities detected in installed Go versions"
-# fi
+# Alert if any advisories were found
+if jq -es 'map(.advisories | length) | add > 0' "$REPORT_DIR/cve-findings.json" >/dev/null; then
+  echo "ALERT: Known advisories detected in installed Go versions"
+  # Send alert (email, Slack, PagerDuty, etc.)
+fi
 ```
 
 ## Change Management
@@ -483,8 +505,8 @@ name: Compliance Audit
 
 on:
   schedule:
-    - cron: '0 0 1 * *'  # Monthly on the 1st
-  workflow_dispatch:      # Manual trigger
+    - cron: "0 0 1 * *" # Monthly on the 1st
+  workflow_dispatch: # Manual trigger
 
 jobs:
   audit:

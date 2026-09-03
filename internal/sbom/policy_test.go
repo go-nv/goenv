@@ -123,12 +123,12 @@ rules:
 
 func TestPolicyEngine_Validate_LicenseRules(t *testing.T) {
 	tests := []struct {
-		name            string
-		policyYAML      string
-		sbomComponents  []testComponent
-		wantPassed      bool
-		wantViolations  int
-		violationRule   string
+		name           string
+		policyYAML     string
+		sbomComponents []testComponent
+		wantPassed     bool
+		wantViolations int
+		violationRule  string
 	}{
 		{
 			name: "blocked license detected",
@@ -518,8 +518,8 @@ rules:
       - goenv:build_context.goos
 `,
 			sbomProperties: map[string]string{
-				"goenv:go_version":           "1.21.0",
-				"goenv:build_context.goos":   "linux",
+				"goenv:go_version":         "1.21.0",
+				"goenv:build_context.goos": "linux",
 			},
 			wantPassed:     true,
 			wantViolations: 0,
@@ -727,10 +727,10 @@ func TestPolicyEngine_GenerateSummary(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		result     *PolicyResult
-		wantPass   string
-		wantFail   string
+		name     string
+		result   *PolicyResult
+		wantPass string
+		wantFail string
 	}{
 		{
 			name: "all passed",
@@ -789,7 +789,7 @@ func createPolicyTestSBOM(components []testComponent) map[string]interface{} {
 			"name":    comp.Name,
 			"version": comp.Version,
 		}
-		
+
 		if comp.License != "" {
 			cdxComp["licenses"] = []interface{}{
 				map[string]interface{}{
@@ -799,7 +799,7 @@ func createPolicyTestSBOM(components []testComponent) map[string]interface{} {
 				},
 			}
 		}
-		
+
 		cdxComponents[i] = cdxComp
 	}
 
@@ -832,7 +832,7 @@ func createPolicyTestSBOMWithProps(properties map[string]string) map[string]inte
 
 func createPolicyTestSBOMFull(components []testComponent, properties map[string]string) map[string]interface{} {
 	sbom := createPolicyTestSBOM(components)
-	
+
 	// Add properties
 	props := make([]interface{}, 0, len(properties))
 	for name, value := range properties {
@@ -841,9 +841,9 @@ func createPolicyTestSBOMFull(components []testComponent, properties map[string]
 			"value": value,
 		})
 	}
-	
+
 	metadata := sbom["metadata"].(map[string]interface{})
 	metadata["properties"] = props
-	
+
 	return sbom
 }

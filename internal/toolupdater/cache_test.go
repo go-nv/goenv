@@ -232,7 +232,7 @@ func TestCachePrune(t *testing.T) {
 
 	// Add entries
 	cache.SetLatestVersion("pkg1", "v1.0.0")
-	time.Sleep(120 * time.Millisecond) // Ensure pkg1 is expired
+	time.Sleep(120 * time.Millisecond)       // Ensure pkg1 is expired
 	cache.SetLatestVersion("pkg2", "v2.0.0") // Fresh entry
 
 	// Prune expired entries

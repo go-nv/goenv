@@ -136,6 +136,12 @@ Change line format:
 - `GO_BUILD_MIRROR_URL` environment variable for custom download mirrors (documented)
 - `GOENV_ASSUME_YES` environment variable for auto-confirming prompts in CI/CD
 - Comprehensive version discovery and precedence documentation in COMMANDS.md
+- **🔒 Enterprise SBOM tooling** - Major expansion of `goenv sbom` beyond generation:
+  - **Go-aware enhancement** (on by default) records the standard library as a first-class component (so stdlib CVEs are in scope) and adds authoritative build provenance — CGO, build tags, `GOOS`/`GOARCH`, `-trimpath`, and VCS commit — sourced from the managed toolchain or from a compiled binary via `--binary`. Replace-directive and retracted-version supply-chain risks are flagged.
+  - **Built-in OSV vulnerability scanner** - `goenv sbom scan` ships a zero-dependency scanner (the default) that queries OSV.dev and uniquely covers the Go stdlib/toolchain components generic scanners miss, with CVSS scoring, `--fail-on`, and `--only-fixed`.
+  - **Signing & attestation** - `goenv sbom sign` (cosign) and `goenv sbom attest` (in-toto provenance).
+  - **Policy validation** - `goenv sbom validate` enforces completeness/policy rules, including a `provenance` rule that pins toolchain, generator, and tool versions.
+  - **Reproducibility** - `--deterministic` output, `goenv sbom hash`/`verify`, and `--tool-version` to pin the generator (e.g. `cyclonedx-gomod`) for reproducible installs.
 
 ### Changed
 
@@ -150,9 +156,13 @@ Change line format:
 - **⚠️ `goenv latest` no longer changes the active version** ([#438]) - In 3.1.x, `goenv latest` was rewritten to `goenv local latest` and wrote a `.go-version` file as a side effect. It now only prints, matching `pyenv latest`. Scripts that relied on the old side effect must call `goenv local <version>` (or `goenv use <version>`) explicitly. Bare version shorthand (`goenv 1.23.6`) is unchanged.
 - **🩺 `goenv doctor` checks for a `goenv` shim** - A `goenv` file inside the shims directory shadows the real binary and causes infinite recursion; doctor now detects it and `--fix` removes it.
 - **📊 `goenv cache status` lists the shared module cache separately** - It is reported as its own `Shared (all versions)` entry, with guidance when it exceeds 1GB. Totals now reconcile with the listed entries.
+- **⬆️ Minimum Go version is now 1.27** - Building `goenv` from source requires Go 1.27+ (`go.mod` declares `go 1.27.1`). Prebuilt release binaries are unaffected.
 
 ### Fixed
 
+- **🩹 `goenv tools install` could silently install nothing** - Two failure modes are fixed. An ambient `GOPATH`/`GOBIN` in the caller's environment (very common) was appended onto the child `go` environment as a duplicate, which made `go install` a no-op that still reported success; and a zero-exit `go install` that produced no binary (a non-main package, or a toolchain that declined to switch) was also reported as success. Installs now pin `GOBIN`, sanitize the environment so binaries always land in `versions/<version>/bin`, and verify the binary was actually produced.
+- **🩹 Explicit `goenv tools install` was blocked when default tools were disabled** - The install honored the `default-tools.yaml` `enabled: false` flag, which is only meant to gate the automatic post-`goenv install` hook. Explicit, user-initiated installs now always proceed.
+- **🔒 `goenv sbom` generator auto-install and `--fail-on` hardened** - A missing SBOM generator was silently installed as `@latest`, with output on stdout (corrupting `-o -`) and no offline guard; it is now consent-gated (`--yes`/`GOENV_ASSUME_YES`), offline-aware, and writes only to stderr. Separately, `goenv sbom scan --fail-on` was ignored unless `--output` was set, so the CI gate could pass on a vulnerable project; it now always applies.
 - **`goenv latest --print` rejected** ([#386]) - The v3 `latest` command did not accept the long-standing `--print`/`-p` form that xxenv-latest and user scripts use, so those callers failed with "unknown flag". The flag is now accepted and ignored, since the command only ever prints. `goenv latest` also no longer reports "no installed version matches" when the real fault was something else, such as an unreadable aliases file.
 - **Infinite loops from in-process subcommand dispatch** ([#572], [#542]) - Two commands spawned themselves without end. `goenv` with `GOENV_AUTO_INSTALL=1` in a directory containing `go.mod` flooded with "Auto-installing Go ...", and `goenv local --sync` with an uninstalled version in `.go-version` flooded with "Installing Go ...". Both located the `install` command and called cobra's `Execute()` on it, which always dispatches from the **root** command and therefore re-ran the entire original command line. Subcommand invocation now goes through a shared helper that runs the target command directly.
 - **📂 `goenv latest` silently created a `.go-version` file** ([#438]) - `latest` was captured by the version-shorthand rewrite and became `goenv local latest`, writing a version file into the current directory. `goenv latest` is now a real command that only prints; the shorthand no longer shadows registered command names. Use `goenv latest [prefix]` for installed versions and `goenv latest --known` for downloadable ones.

@@ -12,123 +12,186 @@ name: E2E
 # executes with both output streams, and dumps the sandbox tree on failure.
 
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-    merge_group:
-    schedule:
-        # Weekly: catches breakage caused by upstream Go releases rather than by a
-        # change in this repository.
-        - cron: "0 6 * * 1"
-    workflow_dispatch:
-        inputs:
-            network_tests:
-                description: "Also run tests that download a Go toolchain"
-                type: boolean
-                default: false
+  push:
+    branches:
+      - main
+  pull_request:
+  merge_group:
+  schedule:
+    # Weekly: catches breakage caused by upstream Go releases rather than by a
+    # change in this repository.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      network_tests:
+        description: "Also run tests that download a Go toolchain"
+        type: boolean
+        default: false
 
 permissions:
-    contents: read
+  contents: read
 
 concurrency:
-    group: e2e-${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-    e2e:
-        name: E2E (${{ matrix.os }})
-        runs-on: ${{ matrix.os }}
-        strategy:
-            fail-fast: false
-            matrix:
-                os: [ubuntu-latest, macos-latest, windows-latest]
-        steps:
-            - uses: actions/checkout@v7
+  e2e:
+    name: E2E (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
 
-            - name: Set up Go
-              uses: actions/setup-go@v7
-              with:
-                  go-version: "stable"
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "stable"
 
-            - name: Environment
-              shell: bash
-              run: |
-                  echo "runner os : ${RUNNER_OS}"
-                  echo "go        : $(go version)"
-                  echo "shell     : ${SHELL:-unknown}"
-                  go env GOOS GOARCH GOROOT
+      - name: Environment
+        shell: bash
+        run: |
+          echo "runner os : ${RUNNER_OS}"
+          echo "go        : $(go version)"
+          echo "shell     : ${SHELL:-unknown}"
+          go env GOOS GOARCH GOROOT
 
-            - name: Run E2E tests
-              shell: bash
-              env:
-                  # Never let the runner's own goenv configuration (or a previous step's)
-                  # leak into the harness.
-                  GOENV_DEBUG: ""
-                  GOENV_VERSION: ""
-              run: |
-                  set -o pipefail
-                  mkdir -p .test-results
-                  go test -tags e2e -v -timeout 20m ./testing/e2e/... 2>&1 \
-                    | tee ".test-results/e2e-${{ matrix.os }}.log"
+      - name: Run E2E tests
+        shell: bash
+        env:
+          # Never let the runner's own goenv configuration (or a previous step's)
+          # leak into the harness.
+          GOENV_DEBUG: ""
+          GOENV_VERSION: ""
+        run: |
+          set -o pipefail
+          mkdir -p .test-results
+          go test -tags e2e -v -timeout 20m ./testing/e2e/... 2>&1 \
+            | tee ".test-results/e2e-${{ matrix.os }}.log"
 
-            - name: Summarise failures
-              if: failure()
-              shell: bash
-              run: |
-                  log=".test-results/e2e-${{ matrix.os }}.log"
-                  [ -f "$log" ] || exit 0
-                  {
-                    echo "### E2E failures on ${{ matrix.os }}"
-                    echo
-                    echo '```'
-                    grep -E -- '--- FAIL|_test\.go:[0-9]+:' "$log" | head -80
-                    echo '```'
-                  } >> "$GITHUB_STEP_SUMMARY"
+      - name: Summarise failures
+        if: failure()
+        shell: bash
+        run: |
+          log=".test-results/e2e-${{ matrix.os }}.log"
+          [ -f "$log" ] || exit 0
+          {
+            echo "### E2E failures on ${{ matrix.os }}"
+            echo
+            echo '```'
+            grep -E -- '--- FAIL|_test\.go:[0-9]+:' "$log" | head -80
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-            - name: Upload E2E log
-              if: always()
-              uses: actions/upload-artifact@v7
-              with:
-                  name: e2e-log-${{ matrix.os }}
-                  path: .test-results/
-                  retention-days: 7
-                  if-no-files-found: ignore
+      - name: Upload E2E log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-log-${{ matrix.os }}
+          path: .test-results/
+          retention-days: 7
+          if-no-files-found: ignore
 
-    e2e-network:
-        name: E2E with real toolchain download (${{ matrix.os }})
-        # Downloads a full Go toolchain, so it is kept off the per-PR path.
-        if: github.event_name == 'schedule' || inputs.network_tests
-        runs-on: ${{ matrix.os }}
-        strategy:
-            fail-fast: false
-            matrix:
-                os: [ubuntu-latest, macos-latest, windows-latest]
-        steps:
-            - uses: actions/checkout@v7
+  e2e-sbom-network:
+    name: E2E SBOM vuln scan (OSV, network)
+    # The SBOM/OSV end-to-end tests reach the OSV vulnerability database and
+    # install cyclonedx-gomod, but — unlike the e2e-network job below — they do
+    # NOT download a full Go toolchain, so they are cheap enough to gate PRs.
+    # They depend on api.osv.dev being reachable; the OSV client retries
+    # transient failures. Skipped on the weekly cron where e2e-network already
+    # runs the full network suite.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
 
-            - name: Set up Go
-              uses: actions/setup-go@v7
-              with:
-                  go-version: "stable"
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "stable"
 
-            - name: Run E2E tests including toolchain installation
-              shell: bash
-              env:
-                  GOENV_E2E_NETWORK: "1"
-                  GOENV_DEBUG: ""
-                  GOENV_VERSION: ""
-              run: |
-                  set -o pipefail
-                  mkdir -p .test-results
-                  go test -tags e2e -v -timeout 30m ./testing/e2e/... 2>&1 \
-                    | tee ".test-results/e2e-network-${{ matrix.os }}.log"
+      - name: Environment
+        shell: bash
+        run: |
+          echo "go : $(go version)"
+          go env GOOS GOARCH GOROOT GOMODCACHE
 
-            - name: Upload E2E network log
-              if: always()
-              uses: actions/upload-artifact@v7
-              with:
-                  name: e2e-network-log-${{ matrix.os }}
-                  path: .test-results/
-                  retention-days: 7
-                  if-no-files-found: ignore
+      - name: Run SBOM/OSV e2e tests (network)
+        shell: bash
+        env:
+          # Opts the harness into the network-gated tests. These need the
+          # OSV API and a cyclonedx-gomod install, not a Go toolchain download.
+          GOENV_E2E_NETWORK: "1"
+          GOENV_DEBUG: ""
+          GOENV_VERSION: ""
+        run: |
+          set -o pipefail
+          mkdir -p .test-results
+          go test -tags e2e -v -timeout 15m \
+            -run 'TestSBOMScan_OSV|TestSBOMProject_GoenvItself' \
+            ./testing/e2e/... 2>&1 \
+            | tee ".test-results/e2e-sbom-network.log"
+
+      - name: Summarise failures
+        if: failure()
+        shell: bash
+        run: |
+          log=".test-results/e2e-sbom-network.log"
+          [ -f "$log" ] || exit 0
+          {
+            echo "### SBOM/OSV E2E failures"
+            echo
+            echo '```'
+            grep -E -- '--- FAIL|_test\.go:[0-9]+:' "$log" | head -80
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload SBOM/OSV E2E log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-sbom-network-log
+          path: .test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e-network:
+    name: E2E with real toolchain download (${{ matrix.os }})
+    # Downloads a full Go toolchain, so it is kept off the per-PR path.
+    if: github.event_name == 'schedule' || inputs.network_tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "stable"
+
+      - name: Run E2E tests including toolchain installation
+        shell: bash
+        env:
+          GOENV_E2E_NETWORK: "1"
+          GOENV_DEBUG: ""
+          GOENV_VERSION: ""
+        run: |
+          set -o pipefail
+          mkdir -p .test-results
+          go test -tags e2e -v -timeout 30m ./testing/e2e/... 2>&1 \
+            | tee ".test-results/e2e-network-${{ matrix.os }}.log"
+
+      - name: Upload E2E network log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-network-log-${{ matrix.os }}
+          path: .test-results/
+          retention-days: 7
+          if-no-files-found: ignore

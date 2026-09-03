@@ -39,8 +39,8 @@ func listForVersionWithOptions(cfg *config.Config, version string, extractMetada
 
 	// Collect tools from both host bin (shared) and version-specific gopath
 	dirsToScan := []string{
-		cfg.HostBinDir(),                        // Tools from "goenv tools install"
-		cfg.VersionGopathBin(version),          // Version-specific tools
+		cfg.HostBinDir(),              // Tools from "goenv tools install"
+		cfg.VersionGopathBin(version), // Version-specific tools
 	}
 
 	for _, binPath := range dirsToScan {
