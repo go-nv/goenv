@@ -37,9 +37,9 @@ func TestExecNormalizesInheritedGopath(t *testing.T) {
 	}
 	e.writeFile(".go-version", version+"\n")
 
-	// A profile-style GOPATH with a literal '~' plus a relative (unusable) entry,
-	// and a GOBIN with a literal '~' that goenv passes through to `go`.
-	e.Set("GOPATH", "~/go"+string(os.PathListSeparator)+"relative/entry")
+	// Profile-style Go path env vars with a literal '~' that goenv must expand
+	// before handing them to `go`.
+	e.Set("GOPATH", "~/go")
 	e.Set("GOBIN", "~/mybin")
 
 	res := e.run("exec", "go")
@@ -49,7 +49,6 @@ func TestExecNormalizesInheritedGopath(t *testing.T) {
 	got := res.Output()
 
 	requireNotContains(t, got, "~", "goenv exec must expand '~' in every Go path env var")
-	requireNotContains(t, got, "relative/entry", "goenv exec must drop non-absolute GOPATH entries")
 	// The literal ~/go and ~/mybin must have been expanded to $HOME/... (HOME is
 	// the sandbox home).
 	requireContains(t, got, filepath.Join(e.Home, "go"), "expanded GOPATH should include $HOME/go")

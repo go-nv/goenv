@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/shellutil"
 	"github.com/go-nv/goenv/internal/utils"
 )
@@ -127,7 +126,6 @@ func (a *RunCommandAction) Execute(ctx *HookContext, params map[string]interface
 	if wd, ok := params["working_dir"].(string); ok {
 		workDir = interpolateString(wd, ctx.Variables)
 		// Expand environment variables and tilde
-		workDir = os.ExpandEnv(workDir)
 		workDir = expandTildeForCommand(workDir)
 	}
 
@@ -277,16 +275,9 @@ func prepareCommand(command string, args []string, shellTypeStr string) (string,
 	return command, args
 }
 
-// expandTildeForCommand expands ~ to home directory (cross-platform)
+// expandTildeForCommand expands a leading ~ and environment variables via the
+// shared pathutil.ExpandPath, so hook command paths normalize identically to the
+// rest of goenv.
 func expandTildeForCommand(path string) string {
-	if strings.HasPrefix(path, "~/") || path == "~" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			if path == "~" {
-				return home
-			}
-			return filepath.Join(home, path[2:])
-		}
-	}
-	return path
+	return pathutil.ExpandPath(path)
 }

@@ -93,14 +93,14 @@ func runExec(cmd *cobra.Command, args []string) error {
 	// Prepare environment
 	execEnv := os.Environ()
 
-	// Baseline: expand and validate the inherited GOPATH entries (drop a literal
-	// '~' and any non-absolute entry `go` would reject) WITHOUT dropping managed
-	// paths. This must be safe for the system version and GOENV_DISABLE_GOPATH,
-	// where goenv does not prepend and a user's own "$prefix/<version>" is legit.
-	// Runs on every platform, including Windows .bat shims.
+	// Baseline: expand the inherited GOPATH entries (fixes a quoted "~/go") while
+	// preserving managed paths — this must be safe for the system version and
+	// GOENV_DISABLE_GOPATH, where goenv does not prepend. Never blank the value:
+	// if nothing normalizes we leave the original so `go` reports its own clear
+	// error instead of silently falling back to the default GOPATH. Runs on every
+	// platform, including Windows .bat shims.
 	rawGopath := os.Getenv(utils.EnvVarGopath)
-	if rawGopath != "" {
-		normalized := normalizeGopathEntries(rawGopath)
+	if normalized := normalizeGopathEntries(rawGopath); len(normalized) > 0 {
 		execEnv = setEnvVar(execEnv, utils.EnvVarGopath, strings.Join(normalized, string(os.PathListSeparator)))
 	}
 

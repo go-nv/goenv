@@ -57,6 +57,11 @@ func expandWindowsEnv(path string) string {
 	})
 }
 
+// winEnvVarPattern matches Windows-style %NAME% environment references. The
+// name grammar mirrors what cmd.exe accepts: it must start with a letter or
+// underscore and may contain letters, digits, and underscores. Parentheses are
+// also allowed because well-known system variables use them (e.g.
+// %ProgramFiles(x86)%). Anything else (a lone %, or %%) is left untouched.
 var winEnvVarPattern = regexp.MustCompile(`%([A-Za-z_][A-Za-z0-9_()]*)%`)
 
 // FindExecutable finds an executable file, handling Windows executable extensions.

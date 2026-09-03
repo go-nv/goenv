@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -57,7 +58,6 @@ func (a *LogToFileAction) Execute(ctx *HookContext, params map[string]interface{
 	}
 
 	// Expand path
-	file = os.ExpandEnv(file)
 	file = expandTilde(file)
 
 	// Interpolate format string
@@ -122,13 +122,9 @@ func (a *LogToFileAction) Execute(ctx *HookContext, params map[string]interface{
 	return nil
 }
 
-// expandTilde expands ~ to home directory
+// expandTilde expands a leading ~ and environment variables via the shared
+// pathutil.ExpandPath, so hook log paths normalize identically to the rest of
+// goenv (matching how GOENV_HOOKS_LOG is expanded in the executor).
 func expandTilde(path string) string {
-	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			return filepath.Join(home, path[2:])
-		}
-	}
-	return path
+	return pathutil.ExpandPath(path)
 }

@@ -210,9 +210,10 @@ func TestShRehashCommand(t *testing.T) {
 
 	// Regression: goenv re-exports the inherited GOPATH, so it must normalize it
 	// first. A profile's quoted GOPATH="~/go" leaves a literal '~' that Go
-	// rejects ("cannot start with shell metacharacter"); goenv must expand it and
-	// drop entries Go can't use rather than break every downstream build.
-	t.Run("expands ~ and drops unusable entries from inherited GOPATH", func(t *testing.T) {
+	// rejects ("cannot start with shell metacharacter"); goenv expands it. It does
+	// NOT drop otherwise-invalid entries — those are left for Go to reject loudly
+	// rather than silently substituting a different GOPATH.
+	t.Run("expands ~ in the inherited GOPATH without dropping entries", func(t *testing.T) {
 		if utils.IsWindows() {
 			t.Skip("Skipping Unix shell test on Windows")
 		}
@@ -244,7 +245,7 @@ func TestShRehashCommand(t *testing.T) {
 		assert.NotContains(t, output, "~/go", "literal '~' must never be re-exported")
 		assert.Contains(t, output, filepath.Join(home, "go"), "~/go should expand to $HOME/go")
 		assert.Contains(t, output, "/abs/custom", "valid absolute custom paths are preserved")
-		assert.NotContains(t, output, "relative/path", "entries Go rejects should be dropped")
+		assert.Contains(t, output, "relative/path", "invalid entries are preserved for Go to reject, not silently dropped")
 	})
 
 	for _, tt := range tests {
