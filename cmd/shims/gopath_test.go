@@ -42,3 +42,26 @@ func TestSanitizeInheritedGopath(t *testing.T) {
 		}
 	})
 }
+
+// TestNormalizeGopathEntries guards that normalization (used for the exec
+// baseline, the system version and GOENV_DISABLE_GOPATH) expands and validates
+// entries but PRESERVES a user's own managed-prefix path — unlike
+// sanitizeInheritedGopath, which de-duplicates it only when goenv is actually
+// prepending a managed path.
+func TestNormalizeGopathEntries(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("no home dir: %v", err)
+	}
+	prefix := filepath.Join(home, "go")
+	managedVersion := filepath.Join(prefix, "1.2.3")
+	customAbs := filepath.Join(t.TempDir(), "custom")
+	sep := string(os.PathListSeparator)
+
+	assert.Nil(t, normalizeGopathEntries(""))
+
+	raw := strings.Join([]string{"~/go", "relative/path", managedVersion, customAbs}, sep)
+	got := normalizeGopathEntries(raw)
+	// ~/go -> prefix (kept), relative dropped, managed-version KEPT, custom kept.
+	assert.Equal(t, []string{prefix, managedVersion, customAbs}, got)
+}

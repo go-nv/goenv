@@ -341,7 +341,7 @@ func init() {
 }
 
 func runSBOMHash(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
 
 	// Verify file exists
 	if !utils.FileExists(sbomPath) {
@@ -368,8 +368,8 @@ func runSBOMHash(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMVerify(cmd *cobra.Command, args []string) error {
-	sbom1Path := args[0]
-	sbom2Path := args[1]
+	sbom1Path := pathutil.ExpandPath(args[0])
+	sbom2Path := pathutil.ExpandPath(args[1])
 
 	// Verify both files exist
 	if !utils.FileExists(sbom1Path) {
@@ -502,7 +502,7 @@ func runSBOMSign(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine output path
-	outputPath := signOutput
+	outputPath := pathutil.ExpandPath(signOutput)
 	if outputPath == "" {
 		outputPath = sbomPath + ".sig"
 	}
@@ -574,7 +574,10 @@ func runSBOMSign(cmd *cobra.Command, args []string) error {
 }
 
 func runSBOMVerifySignature(cmd *cobra.Command, args []string) error {
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
+	verifySignaturePath = pathutil.ExpandPath(verifySignaturePath)
+	verifyPublicKey = pathutil.ExpandPath(verifyPublicKey)
+	verifyCertificate = pathutil.ExpandPath(verifyCertificate)
 
 	// Verify files exist
 	if !utils.FileExists(sbomPath) {
@@ -644,6 +647,7 @@ func runSBOMVerifySignature(cmd *cobra.Command, args []string) error {
 
 func runSBOMAttest(cmd *cobra.Command, args []string) error {
 	sbomPath := pathutil.ExpandPath(args[0])
+	attestKeyPath = pathutil.ExpandPath(attestKeyPath)
 
 	// Verify SBOM file exists
 	if !utils.FileExists(sbomPath) {
@@ -1184,7 +1188,7 @@ func runSBOMScan(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("an SBOM file argument is required (or use --list-scanners)")
 	}
-	sbomPath := args[0]
+	sbomPath := pathutil.ExpandPath(args[0])
 
 	// Get scanner
 	scanner, err := sbom.GetScanner(scanScanner)
@@ -1209,7 +1213,7 @@ func runSBOMScan(cmd *cobra.Command, args []string) error {
 		SBOMPath:          sbomPath,
 		Format:            scanFormat,
 		OutputFormat:      scanOutputFormat,
-		OutputPath:        scanOutput,
+		OutputPath:        pathutil.ExpandPath(scanOutput),
 		SeverityThreshold: scanSeverity,
 		FailOn:            scanFailOn,
 		OnlyFixed:         scanOnlyFixed,

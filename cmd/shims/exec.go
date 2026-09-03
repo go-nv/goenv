@@ -93,13 +93,15 @@ func runExec(cmd *cobra.Command, args []string) error {
 	// Prepare environment
 	execEnv := os.Environ()
 
-	// Normalize any inherited GOPATH up front so goenv never hands `go` a value
-	// it rejects (a literal '~' from a quoted GOPATH="~/go", a non-absolute
-	// entry, etc.). This runs on every platform, including Windows .bat shims.
+	// Baseline: expand and validate the inherited GOPATH entries (drop a literal
+	// '~' and any non-absolute entry `go` would reject) WITHOUT dropping managed
+	// paths. This must be safe for the system version and GOENV_DISABLE_GOPATH,
+	// where goenv does not prepend and a user's own "$prefix/<version>" is legit.
+	// Runs on every platform, including Windows .bat shims.
 	rawGopath := os.Getenv(utils.EnvVarGopath)
-	sanitizedGopath := sanitizeInheritedGopath(rawGopath, cfg.GopathPrefix())
 	if rawGopath != "" {
-		execEnv = setEnvVar(execEnv, utils.EnvVarGopath, strings.Join(sanitizedGopath, string(os.PathListSeparator)))
+		normalized := normalizeGopathEntries(rawGopath)
+		execEnv = setEnvVar(execEnv, utils.EnvVarGopath, strings.Join(normalized, string(os.PathListSeparator)))
 	}
 
 	// Normalize the other Go path env vars we may hand to `go`. A shell that left
@@ -130,12 +132,12 @@ func runExec(cmd *cobra.Command, args []string) error {
 
 		// Set GOPATH if not disabled
 		if !env.HasDisableGopath() {
-			// Build version-specific GOPATH: $GOPATH_PREFIX/<version> (default
-			// $HOME/go/<version>), then keep the user's own (normalized) entries so
-			// their source stays where they expect. See issue #147.
+			// goenv manages GOPATH here: prepend our per-version path and keep the
+			// user's own (normalized) entries, de-duplicating any managed-prefix
+			// paths so re-entry does not accumulate them. See issue #147.
 			versionGopath := cfg.ManagedGopath(currentVersion)
-			if len(sanitizedGopath) > 0 {
-				versionGopath = versionGopath + string(os.PathListSeparator) + strings.Join(sanitizedGopath, string(os.PathListSeparator))
+			if userGopath := sanitizeInheritedGopath(rawGopath, cfg.GopathPrefix()); len(userGopath) > 0 {
+				versionGopath = versionGopath + string(os.PathListSeparator) + strings.Join(userGopath, string(os.PathListSeparator))
 			}
 			execEnv = setEnvVar(execEnv, utils.EnvVarGopath, versionGopath)
 		}
