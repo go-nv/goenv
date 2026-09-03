@@ -306,31 +306,23 @@ func TestUpdateCommand_GitNotFoundError(t *testing.T) {
 }
 
 func TestUpdateCommand_WritePermissionError(t *testing.T) {
-	var err error
-	// This test documents the improved error message for write permission issues
-	// Actual testing of file permissions is complex, so we verify the error formatting
-
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "goenv-test")
-
-	// Create a file
-	testutil.WriteTestFile(t, tmpFile, []byte("test"), utils.PermFileDefault)
-
-	// Make it read-only
-	err = os.Chmod(tmpFile, 0444)
-	require.NoError(t, err, "Failed to chmod file")
-
-	// Try to check write permission
-	err = checkWritePermission(tmpFile)
-	if err == nil {
-		t.Skip("Expected permission error on read-only file")
+	if os.Geteuid() == 0 {
+		t.Skip("root can write to any directory")
 	}
 
-	// Verify the function returns an error
-	t.Logf("Write permission check error: %v", err)
+	// The binary is replaced by a rename in its directory, so an unwritable
+	// directory is what triggers elevation — not an unwritable file.
+	tmpDir := t.TempDir()
+	binary := filepath.Join(tmpDir, "bin", "goenv")
+	require.NoError(t, os.MkdirAll(filepath.Dir(binary), 0o755))
+	testutil.WriteTestFile(t, binary, []byte("test"), utils.PermFileDefault)
 
-	// The actual error message formatting is tested in the command execution
-	// Here we just verify the helper function works correctly
+	require.NoError(t, canReplaceBinary(binary), "writable directory should not need elevation")
+
+	require.NoError(t, os.Chmod(filepath.Dir(binary), 0o555))
+	t.Cleanup(func() { os.Chmod(filepath.Dir(binary), 0o755) })
+
+	assert.Error(t, canReplaceBinary(binary), "read-only directory should need elevation")
 }
 
 func TestGetLatestRelease_304NotModified(t *testing.T) {
