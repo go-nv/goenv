@@ -3,6 +3,7 @@ package meta
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,6 +33,16 @@ func TestCanReplaceBinary(t *testing.T) {
 	})
 
 	t.Run("read-only directory", func(t *testing.T) {
+		// os.Chmod on Windows only toggles FILE_ATTRIBUTE_READONLY, which says
+		// nothing about creating entries inside a directory. Real denials there
+		// come from ACLs, which cannot be set portably from a test — so the
+		// unwritable case is only reproducible on Unix. canReplaceBinary itself
+		// is platform-agnostic: it probes with a real file, so an ACL-protected
+		// directory like C:\Program Files fails it for real.
+		if runtime.GOOS == "windows" {
+			t.Skip("an unwritable directory cannot be simulated with os.Chmod on Windows")
+		}
+
 		require.NoError(t, os.Chmod(dir, 0o555))
 		t.Cleanup(func() { os.Chmod(dir, 0o755) })
 
@@ -99,9 +110,17 @@ func TestPackageManager(t *testing.T) {
 }
 
 func TestElevationInstructions(t *testing.T) {
-	instructions := elevationInstructions("/usr/local/bin/goenv")
+	// filepath.Dir cleans to the host separator, and the advice itself branches
+	// on the platform, so both sides of the assertion have to.
+	binary, wantDir, wantHint := "/usr/local/bin/goenv", "/usr/local/bin", "sudo goenv update"
+	if runtime.GOOS == "windows" {
+		binary, wantDir, wantHint = `C:\Program Files\goenv\goenv.exe`, `C:\Program Files\goenv`, "Administrator"
+	}
 
-	assert.Contains(t, instructions, "/usr/local/bin")
+	instructions := elevationInstructions(binary)
+
+	assert.Contains(t, instructions, wantDir)
+	assert.Contains(t, instructions, wantHint)
 	assert.Contains(t, instructions, "https://github.com/go-nv/goenv/releases")
 }
 

@@ -305,26 +305,6 @@ func TestUpdateCommand_GitNotFoundError(t *testing.T) {
 	t.Log("This ensures users get actionable guidance when git is missing")
 }
 
-func TestUpdateCommand_WritePermissionError(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root can write to any directory")
-	}
-
-	// The binary is replaced by a rename in its directory, so an unwritable
-	// directory is what triggers elevation — not an unwritable file.
-	tmpDir := t.TempDir()
-	binary := filepath.Join(tmpDir, "bin", "goenv")
-	require.NoError(t, os.MkdirAll(filepath.Dir(binary), 0o755))
-	testutil.WriteTestFile(t, binary, []byte("test"), utils.PermFileDefault)
-
-	require.NoError(t, canReplaceBinary(binary), "writable directory should not need elevation")
-
-	require.NoError(t, os.Chmod(filepath.Dir(binary), 0o555))
-	t.Cleanup(func() { os.Chmod(filepath.Dir(binary), 0o755) })
-
-	assert.Error(t, canReplaceBinary(binary), "read-only directory should need elevation")
-}
-
 func TestGetLatestRelease_304NotModified(t *testing.T) {
 	var err error
 	// Test that 304 Not Modified response is handled correctly with ETag
