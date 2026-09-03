@@ -31,8 +31,9 @@ func setupSyncTestEnv(t *testing.T, versions []string, tools map[string][]string
 		err = utils.EnsureDirWithContext(goBinDir, "create test directory")
 		require.NoError(t, err, "Failed to create go bin directory")
 
-		// Create mock go binary using helper (handles .bat on Windows)
-		cmdtest.CreateToolExecutable(t, goBinDir, "go")
+		// Create mock go that emulates `go install` (creates the binary in
+		// GOBIN) so the post-install verification in InstallTools passes.
+		cmdtest.CreateMockGoInstaller(t, goBinDir)
 
 		// Create GOPATH/bin directory
 		gopathBin := filepath.Join(versionPath, "gopath", "bin")

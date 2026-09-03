@@ -1394,6 +1394,13 @@ func TestCheckObsoleteEnvVars(t *testing.T) {
 }
 
 func TestCheckSystemGoVersion(t *testing.T) {
+	// The "is the system Go outdated?" check consults the Go release list. Force
+	// the embedded list (offline) so this unit test is deterministic and never
+	// depends on reaching the go.dev API — in CI that fetch flaked and the check
+	// fell back to "unable to check if outdated" (StatusOK), failing the
+	// outdated-version assertions below.
+	t.Setenv(utils.GoenvEnvVarOffline.String(), "1")
+
 	tests := []struct {
 		name           string
 		currentVersion string

@@ -475,22 +475,28 @@ retract (
 		manager: &manager.Manager{},
 	}
 
-	// Test checkLocalRetraction
-	if !enhancer.checkLocalRetraction([]byte(goMod), "v1.0.0") {
+	// Retract directives are parsed authoritatively via `go mod edit -json`; the
+	// offline fallback matches explicit endpoints. Single-version retracts have
+	// Low == High.
+	ranges := []GoModRetract{
+		{Low: "v1.0.0", High: "v1.0.0", Rationale: "Bug in this version"},
+		{Low: "v1.1.0", High: "v1.1.0", Rationale: "Security issue"},
+	}
+
+	if !versionRetracted("v1.0.0", ranges) {
 		t.Error("Expected v1.0.0 to be retracted")
 	}
 
-	if !enhancer.checkLocalRetraction([]byte(goMod), "v1.1.0") {
+	if !versionRetracted("v1.1.0", ranges) {
 		t.Error("Expected v1.1.0 to be retracted")
 	}
 
-	if enhancer.checkLocalRetraction([]byte(goMod), "v1.2.3") {
+	if versionRetracted("v1.2.3", ranges) {
 		t.Error("Expected v1.2.3 NOT to be retracted")
 	}
 
-	// Test markRetractedVersions
-	// Note: markRetractedVersions only marks components that appear in go.mod requires
-	// For this test, we'll just verify the function runs without error
+	// markRetractedVersions must run without error even when no toolchain is
+	// available (it degrades gracefully to the modfile fallback).
 	components := []interface{}{
 		map[string]interface{}{
 			"name":    "github.com/example/lib",

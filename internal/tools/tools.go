@@ -166,6 +166,88 @@ func ConfigPath(goenvRoot string) string {
 
 // InstallTools installs all configured tools for a specific Go version
 // Tools are installed to the host-specific GOPATH to enable cross-architecture dotfile syncing
+// verifyInstalledBinary confirms that `go install` actually produced the tool's
+// binary in binDir. `go install` names the executable after the final element
+// of the package import path; some tools also record an explicit Binary. A
+// zero exit with no binary (non-main package, refused toolchain switch, ...)
+// must not be reported as success.
+//
+// If no expected binary name can be determined (e.g. a discovered tool with no
+// resolvable package path), there is nothing to verify and it returns nil.
+func verifyInstalledBinary(binDir string, tool Tool) error {
+	var candidates []string
+	if n := installedBinaryName(tool.Package); n != "" {
+		candidates = append(candidates, n)
+	}
+	if tool.Binary != "" && (len(candidates) == 0 || tool.Binary != candidates[0]) {
+		candidates = append(candidates, tool.Binary)
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	for _, name := range candidates {
+		if _, err := pathutil.FindExecutable(filepath.Join(binDir, name)); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("go install reported success but produced no binary (%s) in %s",
+		strings.Join(candidates, " or "), binDir)
+}
+
+// installedBinaryName returns the executable name `go install <pkg>` produces.
+// It is the final element of the import path, except that Go strips a trailing
+// major-version element (".../v2" installs a binary named after the preceding
+// element), which ExtractToolName does not account for.
+func installedBinaryName(pkg string) string {
+	name := ExtractToolName(pkg)
+	if !isMajorVersionElement(name) {
+		return name
+	}
+	base := pkg
+	if at := strings.Index(base, "@"); at != -1 {
+		base = base[:at]
+	}
+	base = strings.TrimSuffix(base, "/"+name)
+	return ExtractToolName(base)
+}
+
+// isMajorVersionElement reports whether s is a Go module major-version path
+// element such as "v2" or "v10".
+func isMajorVersionElement(s string) bool {
+	if len(s) < 2 || s[0] != 'v' {
+		return false
+	}
+	for _, r := range s[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// filterEnv returns a copy of env with any KEY=value entries whose key matches
+// one of the given keys removed. It is used to strip inherited Go path
+// variables before setting authoritative values, so the child `go` process
+// never sees a duplicate (a duplicated GOPATH silently breaks `go install`).
+func filterEnv(env []string, keys ...string) []string {
+	drop := make(map[string]struct{}, len(keys))
+	for _, k := range keys {
+		drop[k] = struct{}{}
+	}
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		name := kv
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			name = kv[:i]
+		}
+		if _, skip := drop[name]; skip {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
+}
+
 func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath string, verbose bool) error {
 	if !config.Enabled {
 		if verbose {
@@ -197,6 +279,25 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 		fmt.Printf("  Tools will be installed to: %s/bin\n", hostGopath)
 	}
 
+	// Build the install environment once. We must REPLACE (not append) the Go
+	// path variables: appending onto os.Environ() leaves a caller's ambient
+	// GOPATH/GOBIN in place as a duplicate, and a duplicate GOPATH makes
+	// `go install` silently install nothing while still exiting 0. Pinning GOBIN
+	// to <hostGopath>/bin also guarantees the binary lands exactly where the
+	// resolver and rehash look for it, regardless of the ambient environment.
+	goBinDir := filepath.Join(hostGopath, "bin")
+	gomodcache := os.Getenv(utils.EnvVarGomodcache)
+	if gomodcache == "" {
+		gomodcache = filepath.Join(goenvRoot, "shared", "go-mod") // matches exec.go behavior
+	}
+	installEnv := append(filterEnv(os.Environ(),
+		utils.EnvVarGoroot, utils.EnvVarGopath, utils.EnvVarGobin, utils.EnvVarGomodcache),
+		utils.EnvVarGoroot+"="+goRoot,
+		utils.EnvVarGopath+"="+hostGopath,
+		utils.EnvVarGobin+"="+goBinDir,
+		utils.EnvVarGomodcache+"="+gomodcache,
+	)
+
 	// Track results
 	installed := []string{}
 	failed := []string{}
@@ -217,16 +318,7 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 
 		// Run go install
 		cmd := exec.Command(goBin, "install", pkg)
-		cmd.Env = append(os.Environ(),
-			utils.EnvVarGoroot+"="+goRoot,
-			utils.EnvVarGopath+"="+hostGopath, // Use host-specific GOPATH
-		)
-
-		// Set shared GOMODCACHE if not already set (matches exec.go behavior)
-		if os.Getenv(utils.EnvVarGomodcache) == "" {
-			sharedGomodcache := filepath.Join(goenvRoot, "shared", "go-mod")
-			cmd.Env = append(cmd.Env, utils.EnvVarGomodcache+"="+sharedGomodcache)
-		}
+		cmd.Env = installEnv
 
 		// Capture stderr for error reporting
 		var stderr bytes.Buffer
@@ -258,6 +350,19 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 				} else {
 					firstError = fmt.Errorf("%s failed: %w", tool.Name, err)
 				}
+			}
+		} else if verifyErr := verifyInstalledBinary(goBinDir, tool); verifyErr != nil {
+			// `go install` can exit 0 without producing a binary (for example a
+			// non-main package, or a toolchain that declined to switch). Never
+			// report that as a successful install.
+			if verbose {
+				fmt.Printf(" %sFAILED (no binary produced)\n", utils.Emoji("❌ "))
+			} else {
+				fmt.Printf("  %s %s: %v\n", utils.Emoji("❌"), tool.Name, verifyErr)
+			}
+			failed = append(failed, tool.Name)
+			if firstError == nil {
+				firstError = verifyErr
 			}
 		} else {
 			if verbose {

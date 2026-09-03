@@ -57,9 +57,13 @@ Security & SBOM tools:
   - github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod (SBOM generator)
   - github.com/anchore/syft/cmd/syft      (SBOM generator)
 
-Short aliases available:
-  goenv tools install grype@latest        (expands to full path)
-  goenv tools install trivy@latest        (expands to full path)`,
+Short aliases available (name matches the produced binary):
+  goenv tools install cyclonedx-gomod@v1.6.0  (SBOM generator)
+  goenv tools install syft@latest             (SBOM generator)
+  goenv tools install grype@latest            (vulnerability scanner)
+  goenv tools install trivy@latest            (security scanner)
+  goenv tools install cosign@latest           (SBOM signing/attestation)
+  goenv tools install govulncheck@latest      (Go vulnerability database scanner)`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runInstall,
 }

@@ -27,8 +27,8 @@ func setupTestLifecycleData() {
 		},
 		"1.24": {
 			Version:      "1.24",
-			ReleaseDate:  now.AddDate(0, -9, 0),  // 9 months ago
-			EOLDate:      now.AddDate(0, 6, 0),   // 6 months from now
+			ReleaseDate:  now.AddDate(0, -9, 0), // 9 months ago
+			EOLDate:      now.AddDate(0, 6, 0),  // 6 months from now
 			Status:       StatusCurrent,
 			Recommended:  "",
 			SecurityOnly: false,
@@ -43,8 +43,8 @@ func setupTestLifecycleData() {
 		},
 		"1.22": {
 			Version:      "1.22",
-			ReleaseDate:  now.AddDate(-2, 0, 0),  // 2 years ago
-			EOLDate:      now.AddDate(0, -6, 0),  // 6 months ago (EOL)
+			ReleaseDate:  now.AddDate(-2, 0, 0), // 2 years ago
+			EOLDate:      now.AddDate(0, -6, 0), // 6 months ago (EOL)
 			Status:       StatusEOL,
 			Recommended:  "1.25",
 			SecurityOnly: false,

@@ -3,11 +3,17 @@ package lifecycle
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// TestOfflineMode verifies that lifecycle data works correctly in offline mode
+// TestOfflineMode verifies that lifecycle data works correctly in offline mode.
+//
+// It derives its expectations from the embedded data relative to the current
+// date rather than hard-coding specific versions/statuses. An earlier version
+// asserted "1.25 is current", which silently rotted into a failure once 1.25
+// reached EOL and the embedded data was regenerated.
 func TestOfflineMode(t *testing.T) {
 	// Set offline mode
 	os.Setenv("GOENV_OFFLINE", "1")
@@ -19,28 +25,49 @@ func TestOfflineMode(t *testing.T) {
 	versionLifecycle = nil
 	lifecycleMutex.Unlock()
 
-	// Get version info for an EOL version (should work with embedded data)
-	info, found := GetVersionInfo("1.22.5")
-	assert.True(t, found, "Should find version 1.22 in embedded data")
-	assert.Equal(t, "1.22", info.Version)
+	now := time.Now()
 
-	// Status should be calculated correctly from embedded dates
-	// 1.22 EOL date is 2025-02-11, which is in the past (today is 2025-12-01)
-	assert.Equal(t, StatusEOL, info.Status, "1.22 should be EOL based on embedded dates")
+	// Pick representative versions from the embedded data by their dates so the
+	// assertions remain correct as time passes and the data is regenerated.
+	var eolVer, currentVer string
+	for ver, info := range EmbeddedLifecycleData {
+		if info.EOLDate.IsZero() {
+			continue
+		}
+		switch {
+		case now.After(info.EOLDate):
+			// Prefer the most recently EOL'd version (unambiguously in the past).
+			if eolVer == "" || info.EOLDate.After(EmbeddedLifecycleData[eolVer].EOLDate) {
+				eolVer = ver
+			}
+		case info.EOLDate.After(now.AddDate(0, 6, 0)):
+			// EOL comfortably in the future -> unambiguously current.
+			if currentVer == "" || info.ReleaseDate.After(EmbeddedLifecycleData[currentVer].ReleaseDate) {
+				currentVer = ver
+			}
+		}
+	}
 
-	// Should have a recommended version
-	assert.NotEmpty(t, info.Recommended, "EOL version should have recommended upgrade")
+	if eolVer == "" {
+		t.Fatal("embedded data should contain at least one EOL version")
+	}
 
-	// Test a current version
-	info, found = GetVersionInfo("1.25.0")
-	assert.True(t, found, "Should find version 1.25 in embedded data")
-	assert.Equal(t, StatusCurrent, info.Status, "1.25 should be current based on embedded dates")
+	// EOL versions must be reported as EOL from embedded data alone (offline),
+	// and must recommend an upgrade target.
+	info, found := GetVersionInfo(eolVer + ".0")
+	assert.True(t, found, "should find EOL version %s in embedded data", eolVer)
+	assert.Equal(t, eolVer, info.Version)
+	assert.Equal(t, StatusEOL, info.Status, "%s (EOL %s) should be EOL offline",
+		eolVer, EmbeddedLifecycleData[eolVer].EOLDate.Format("2006-01-02"))
+	assert.NotEmpty(t, info.Recommended, "EOL version should recommend an upgrade")
 
-	// Test near-EOL version
-	// 1.23 has EOL date of 2025-08-12, which is in the past, so it's EOL
-	info, found = GetVersionInfo("1.23.0")
-	assert.True(t, found, "Should find version 1.23 in embedded data")
-	assert.Equal(t, StatusEOL, info.Status, "1.23 should be EOL (past 2025-08-12)")
+	// A version whose EOL is comfortably in the future must be current.
+	if currentVer != "" {
+		info, found = GetVersionInfo(currentVer + ".0")
+		assert.True(t, found, "should find current version %s in embedded data", currentVer)
+		assert.Equal(t, StatusCurrent, info.Status, "%s (EOL %s) should be current offline",
+			currentVer, EmbeddedLifecycleData[currentVer].EOLDate.Format("2006-01-02"))
+	}
 }
 
 // TestEmbeddedDataHasDates verifies embedded data has necessary date information

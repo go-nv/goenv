@@ -169,6 +169,8 @@ func NewScanError(scanner, message string, cause error) *ScanError {
 // GetScanner returns a scanner implementation by name
 func GetScanner(name string) (Scanner, error) {
 	switch name {
+	case "osv":
+		return NewOSVScanner(), nil
 	case "grype":
 		return NewGrypeScanner(), nil
 	case "trivy":
@@ -178,13 +180,14 @@ func GetScanner(name string) (Scanner, error) {
 	case "veracode":
 		return NewVeracodeScanner(), nil
 	default:
-		return nil, fmt.Errorf("unknown scanner: %s (supported: grype, trivy, snyk, veracode)", name)
+		return nil, fmt.Errorf("unknown scanner: %s (supported: osv, grype, trivy, snyk, veracode)", name)
 	}
 }
 
 // ListAvailableScanners returns all available scanner implementations
 func ListAvailableScanners() []Scanner {
 	return []Scanner{
+		NewOSVScanner(),
 		NewGrypeScanner(),
 		NewTrivyScanner(),
 		NewSnykScanner(),

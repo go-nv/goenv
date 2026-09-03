@@ -188,6 +188,34 @@ func TestInstallToolForVersion_MissingGo(t *testing.T) {
 	assert.Contains(t, err.Error(), "go binary not found", "Expected 'Go binary not found' error %v", err)
 }
 
+// TestInstallSingleTool_ExplicitInstallBypassesDisabledConfig verifies that an
+// explicit `goenv tools install` proceeds even when the on-disk default-tools
+// config has auto-install disabled (the flag only gates the post-install hook).
+func TestInstallSingleTool_ExplicitInstallBypassesDisabledConfig(t *testing.T) {
+	if utils.IsWindows() {
+		t.Skip("mock shell script is POSIX-specific")
+	}
+	tmpDir := t.TempDir()
+	cfg := &config.Config{Root: tmpDir}
+
+	version := "1.23.0"
+	goBinDir := filepath.Join(tmpDir, "versions", version, "bin")
+	require.NoError(t, utils.EnsureDirWithContext(goBinDir, "create version bin"))
+
+	// Mock go emulates `go install <pkg>` by creating the binary in GOBIN.
+	mock := "#!/bin/sh\npkg=$2; pkg=${pkg%@*}; bin=${pkg##*/}\n" +
+		"mkdir -p \"$GOBIN\" && : > \"$GOBIN/$bin\" && chmod +x \"$GOBIN/$bin\"\nexit 0\n"
+	testutil.WriteTestFile(t, filepath.Join(goBinDir, "go"), []byte(mock), utils.PermFileExecutable, "write mock go")
+
+	// Auto-install is disabled on disk; an explicit install must still proceed.
+	testutil.WriteTestFile(t, toolspkg.ConfigPath(tmpDir), []byte("enabled: false\ntools: []\n"), 0o644, "write config")
+
+	mgr := manager.NewManager(cfg, nil)
+	toolMgr := toolspkg.NewManager(cfg, mgr)
+	_, err := toolMgr.InstallSingleTool(version, "example.com/x/cmd/widget@latest", false)
+	require.NoError(t, err, "explicit install should bypass the disabled config and produce the binary")
+}
+
 func TestExtractToolName_EdgeCases(t *testing.T) {
 	tests := []struct {
 		input    string

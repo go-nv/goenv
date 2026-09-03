@@ -129,6 +129,24 @@ func (c *CachedData) IsStale(maxAge time.Duration) bool {
 	return time.Since(c.LastUpdated) > maxAge
 }
 
+// defaultCacheTTL is the freshness window used to short-circuit the network
+// fetch in FetchWithFallback. When cached data is younger than this, it is
+// returned immediately without a network round trip. Override with GOENV_CACHE_TTL.
+const defaultCacheTTL = 1 * time.Hour
+
+// cacheTTL returns the configured cache freshness window. It reads
+// GOENV_CACHE_TTL (a Go duration string such as "30m" or "2h") and falls back
+// to defaultCacheTTL when unset or invalid. A value of "0" disables the
+// cache-first short-circuit, restoring the always-fetch behavior.
+func cacheTTL() time.Duration {
+	if val, ok := utils.GoenvEnvVarCacheTTL.Value(); ok {
+		if d, err := time.ParseDuration(val); err == nil && d >= 0 {
+			return d
+		}
+	}
+	return defaultCacheTTL
+}
+
 // FetchWithFallback tries to fetch all versions online with ETag support, falls back to cache, then embedded data
 func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 	cache := NewCache(goenvRoot)
@@ -147,6 +165,21 @@ func (f *Fetcher) FetchWithFallback(goenvRoot string) ([]GoRelease, error) {
 	var etag string
 	if cacheErr == nil {
 		etag = cached.ETag
+	}
+
+	// Cache-first fast path: if we have fresh cached data, return it immediately
+	// without a network round trip. This is the common interactive case and
+	// avoids DNS/TLS/latency on every invocation. A background refresh keeps the
+	// cache warm when GOENV_CACHE_BG_REFRESH is enabled.
+	if ttl := cacheTTL(); ttl > 0 && cacheErr == nil && !cached.IsStale(ttl) {
+		if f.debug {
+			fmt.Printf("Debug: Using fresh cached versions without network fetch (last updated: %s, ttl: %s)\n",
+				cached.LastUpdated.Format(time.RFC3339), ttl)
+		}
+		if utils.GoenvEnvVarCacheBgRefresh.IsTrue() {
+			go f.backgroundRefresh(cache, goenvRoot)
+		}
+		return cached.Releases, nil
 	}
 
 	// Try to fetch ALL versions online with ETag for conditional request

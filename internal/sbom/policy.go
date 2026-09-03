@@ -25,7 +25,7 @@ type PolicyConfig struct {
 // PolicyRule defines a single validation rule
 type PolicyRule struct {
 	Name        string            `yaml:"name"`
-	Type        string            `yaml:"type"` // supply-chain, security, completeness, license, custom
+	Type        string            `yaml:"type"` // supply-chain, security, completeness, license, provenance, custom
 	Severity    string            `yaml:"severity"`
 	Description string            `yaml:"description,omitempty"`
 	Blocked     []string          `yaml:"blocked,omitempty"`
@@ -98,6 +98,7 @@ func validatePolicyConfig(config *PolicyConfig) error {
 		"security":     true,
 		"completeness": true,
 		"license":      true,
+		"provenance":   true,
 		"custom":       true,
 	}
 
@@ -179,11 +180,78 @@ func (pe *PolicyEngine) runRule(rule PolicyRule, sbom map[string]interface{}) ([
 		return pe.checkCompleteness(rule, sbom)
 	case "license":
 		return pe.checkLicense(rule, sbom)
+	case "provenance":
+		return pe.checkProvenance(rule, sbom)
 	case "custom":
 		return pe.checkCustom(rule, sbom)
 	default:
 		return nil, fmt.Errorf("unsupported rule type: %s", rule.Type)
 	}
+}
+
+// checkProvenance enforces that an SBOM was produced with the pinned toolchain,
+// SBOM generator, or goenv version. It reads the goenv:* provenance properties
+// recorded during enhancement, so it both proves provenance was captured and
+// (optionally) pins the acceptable values via rule.Required.
+//
+// Checks:
+//   - toolchain-version : asserts goenv:go_version         (the Go toolchain)
+//   - tool-version      : asserts goenv:sbom_tool_version  (the SBOM generator)
+//   - generator-version : asserts goenv:generator_version  (goenv itself)
+//
+// With no rule.Required entries the check only requires the value to be present
+// (provenance was recorded). With rule.Required set, the recorded value must be
+// one of the listed pins.
+func (pe *PolicyEngine) checkProvenance(rule PolicyRule, sbom map[string]interface{}) ([]PolicyViolation, error) {
+	properties := extractProperties(extractMetadata(sbom))
+	get := func(name string) string {
+		for _, prop := range properties {
+			if n, _ := prop["name"].(string); n == name {
+				v, _ := prop["value"].(string)
+				return v
+			}
+		}
+		return ""
+	}
+
+	var propName, label string
+	switch rule.Check {
+	case "toolchain-version":
+		propName, label = "goenv:go_version", "Go toolchain"
+	case "tool-version":
+		propName, label = "goenv:sbom_tool_version", "SBOM generator"
+	case "generator-version":
+		propName, label = "goenv:generator_version", "goenv"
+	default:
+		return nil, fmt.Errorf("unsupported provenance check: %s", rule.Check)
+	}
+
+	actual := get(propName)
+	if actual == "" {
+		return []PolicyViolation{{
+			Rule:        rule.Name,
+			Severity:    rule.Severity,
+			Message:     fmt.Sprintf("%s version not recorded in SBOM provenance (%s missing)", label, propName),
+			Component:   "provenance",
+			Remediation: "Regenerate the SBOM with goenv so provenance is recorded",
+		}}, nil
+	}
+
+	if len(rule.Required) == 0 {
+		return nil, nil // presence-only check satisfied
+	}
+	for _, want := range rule.Required {
+		if actual == want {
+			return nil, nil
+		}
+	}
+	return []PolicyViolation{{
+		Rule:        rule.Name,
+		Severity:    rule.Severity,
+		Message:     fmt.Sprintf("%s version %q is not one of the pinned versions %v", label, actual, rule.Required),
+		Component:   "provenance",
+		Remediation: fmt.Sprintf("Regenerate the SBOM with a pinned %s version", label),
+	}}, nil
 }
 
 // checkSupplyChain validates supply chain security rules

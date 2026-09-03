@@ -27,13 +27,20 @@ var commonTools = map[string]string{
 	"wire":          "github.com/google/wire/cmd/wire",
 	"protoc-gen-go": "google.golang.org/protobuf/cmd/protoc-gen-go",
 	"goose":         "github.com/pressly/goose/v3/cmd/goose",
-	"cyclonedx":     "github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod",
-	"syft":          "github.com/anchore/syft/cmd/syft",
+	// SBOM generators. Both the binary name (cyclonedx-gomod) and the short
+	// form (cyclonedx) resolve, so the name used to install matches the name
+	// used by `goenv sbom project --tool=` and the produced binary.
+	"cyclonedx-gomod": "github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod",
+	"cyclonedx":       "github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod",
+	"syft":            "github.com/anchore/syft/cmd/syft",
 	// Security scanners for SBOM vulnerability analysis (Phase 4A)
 	"grype": "github.com/anchore/grype/cmd/grype",
 	"trivy": "github.com/aquasecurity/trivy/cmd/trivy",
 	// Commercial security scanners (Phase 4B)
 	"snyk": "github.com/snyk/cli/cmd/snyk",
+	// Supply-chain / secops tooling used by `goenv sbom sign|attest|scan`.
+	"cosign":      "github.com/sigstore/cosign/v2/cmd/cosign",
+	"govulncheck": "golang.org/x/vuln/cmd/govulncheck",
 }
 
 var VSCodeTools = []string{
@@ -116,6 +123,14 @@ func NormalizePackagePaths(paths []string) []string {
 		normalized = append(normalized, NormalizePackagePath(path))
 	}
 	return normalized
+}
+
+// KnownToolPath returns the full module path for a known short tool name and
+// whether it was found. Used by callers (e.g. the SBOM command) to produce
+// accurate install hints that will actually succeed.
+func KnownToolPath(name string) (string, bool) {
+	p, ok := commonTools[name]
+	return p, ok
 }
 
 // BuildVSCodeToolsConfig creates a Config for VSCode Go extension tools.

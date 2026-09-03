@@ -1,7 +1,9 @@
 package tools
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-nv/goenv/internal/config"
@@ -181,12 +183,17 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 	err = utils.EnsureDirWithContext(gopathBin, "create test directory")
 	require.NoError(t, err, "Failed to create gopath bin directory")
 
-	// Create mock go binary that succeeds
+	// Mock go emulates `go install <pkg>` by creating the expected binary
+	// (named after the package's final path element) in GOBIN, so the
+	// post-install binary verification sees a real result.
 	goBinary := filepath.Join(goBinDir, "go")
-	mockScript := "#!/bin/sh\nexit 0"
+	mockScript := "#!/bin/sh\n" +
+		"pkg=$2; pkg=${pkg%@*}; bin=${pkg##*/}\n" +
+		"mkdir -p \"$GOBIN\" && : > \"$GOBIN/$bin\" && chmod +x \"$GOBIN/$bin\"\n" +
+		"exit 0\n"
 	if utils.IsWindows() {
 		goBinary += ".bat"
-		mockScript = "@echo off\nexit 0"
+		mockScript = "@echo off\nif not exist \"%GOBIN%\" mkdir \"%GOBIN%\"\ntype nul > \"%GOBIN%\\test.exe\"\nexit /b 0\n"
 	}
 	testutil.WriteTestFile(t, goBinary, []byte(mockScript), utils.PermFileExecutable, "Failed to create go binary")
 
@@ -205,6 +212,112 @@ func TestInstallTools_WithMockGo(t *testing.T) {
 	hostGopath := filepath.Join(tmpDir, "host-gopath")
 	err = InstallTools(config, goVersion, tmpDir, hostGopath, false)
 	assert.NoError(t, err, "InstallTools failed")
+}
+
+// TestInstallTools_DedupesAmbientGoEnv guards the fix for the silent no-op
+// install: when the caller's environment already exports GOPATH/GOBIN,
+// InstallTools must REPLACE them (not append), so the child `go` sees exactly
+// one GOPATH pointing at the version's gopath and a GOBIN pinned to the install
+// dir. A duplicate GOPATH makes `go install` install nothing while exiting 0.
+func TestInstallTools_DedupesAmbientGoEnv(t *testing.T) {
+	if utils.IsWindows() {
+		t.Skip("mock shell script is POSIX-specific")
+	}
+	tmpDir := t.TempDir()
+	goVersion := "1.21.0"
+
+	versionPath := filepath.Join(tmpDir, "versions", goVersion)
+	goBinDir := filepath.Join(versionPath, "bin")
+	require.NoError(t, utils.EnsureDirWithContext(goBinDir, "create go bin dir"))
+
+	// Mock `go` records the environment it was invoked with, and emulates
+	// `go install` by creating the expected binary in GOBIN.
+	envDump := filepath.Join(tmpDir, "env.txt")
+	goBinary := filepath.Join(goBinDir, "go")
+	mockScript := "#!/bin/sh\n" +
+		"env > \"" + envDump + "\"\n" +
+		"pkg=$2; pkg=${pkg%@*}; bin=${pkg##*/}\n" +
+		"mkdir -p \"$GOBIN\" && : > \"$GOBIN/$bin\" && chmod +x \"$GOBIN/$bin\"\n" +
+		"exit 0\n"
+	testutil.WriteTestFile(t, goBinary, []byte(mockScript), utils.PermFileExecutable, "write mock go")
+
+	// Simulate a caller whose environment already exports GOPATH/GOBIN — the
+	// exact condition that made `go install` a silent no-op before the fix.
+	t.Setenv("GOPATH", filepath.Join(tmpDir, "ambient-gopath"))
+	t.Setenv("GOBIN", filepath.Join(tmpDir, "ambient-gobin"))
+
+	hostGopath := filepath.Join(tmpDir, "host-gopath")
+	config := &Config{
+		Enabled: true,
+		Tools:   []Tool{{Name: "test-tool", Package: "example.com/test", Version: "@latest"}},
+	}
+	require.NoError(t, InstallTools(config, goVersion, tmpDir, hostGopath, false))
+
+	data, err := os.ReadFile(envDump)
+	require.NoError(t, err, "mock go should have recorded its environment")
+
+	var gopaths, gobins []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if v, ok := strings.CutPrefix(line, "GOPATH="); ok {
+			gopaths = append(gopaths, v)
+		}
+		if v, ok := strings.CutPrefix(line, "GOBIN="); ok {
+			gobins = append(gobins, v)
+		}
+	}
+
+	// Exactly one GOPATH, pointing at the version's gopath (not the ambient one).
+	require.Len(t, gopaths, 1, "child go must see exactly one GOPATH, got %v", gopaths)
+	assert.Equal(t, hostGopath, gopaths[0], "GOPATH must be the host gopath, not the ambient one")
+
+	// GOBIN pins the install dir so the binary always lands where the resolver looks.
+	require.Len(t, gobins, 1, "child go must see exactly one GOBIN, got %v", gobins)
+	assert.Equal(t, filepath.Join(hostGopath, "bin"), gobins[0], "GOBIN must be <hostGopath>/bin")
+}
+
+// TestInstallTools_FailsWhenNoBinaryProduced ensures a `go install` that exits 0
+// without producing a binary (a non-main package, a refused toolchain switch,
+// or the historical duplicate-GOPATH no-op) is reported as a failure rather
+// than a false success.
+func TestInstallTools_FailsWhenNoBinaryProduced(t *testing.T) {
+	if utils.IsWindows() {
+		t.Skip("mock shell script is POSIX-specific")
+	}
+	tmpDir := t.TempDir()
+	goVersion := "1.21.0"
+
+	goBinDir := filepath.Join(tmpDir, "versions", goVersion, "bin")
+	require.NoError(t, utils.EnsureDirWithContext(goBinDir, "create go bin dir"))
+
+	// Mock `go` succeeds but installs nothing.
+	goBinary := filepath.Join(goBinDir, "go")
+	testutil.WriteTestFile(t, goBinary, []byte("#!/bin/sh\nexit 0\n"), utils.PermFileExecutable, "write mock go")
+
+	config := &Config{
+		Enabled: true,
+		Tools:   []Tool{{Name: "ghost", Package: "example.com/ghost", Version: "@latest"}},
+	}
+	err := InstallTools(config, goVersion, tmpDir, filepath.Join(tmpDir, "host-gopath"), false)
+	require.Error(t, err, "an install that produced no binary must fail")
+	assert.Contains(t, err.Error(), "no binary", "error should explain the no-op install")
+}
+
+// TestInstalledBinaryName covers how `go install` names the produced binary,
+// including the major-version path element that Go strips (".../v2" -> parent).
+func TestInstalledBinaryName(t *testing.T) {
+	cases := map[string]string{
+		"golang.org/x/tools/cmd/goimports@latest":                  "goimports",
+		"github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod": "cyclonedx-gomod",
+		"github.com/foo/bar/v2@latest":                             "bar",
+		"github.com/foo/bar/v10":                                   "bar",
+		"gotest.tools/gotestsum@v1.11.0":                           "gotestsum",
+		"github.com/golangci/golangci-lint/v2/cmd/golangci-lint":   "golangci-lint",
+	}
+	for pkg, want := range cases {
+		if got := installedBinaryName(pkg); got != want {
+			t.Errorf("installedBinaryName(%q) = %q, want %q", pkg, got, want)
+		}
+	}
 }
 
 func TestInstallTools_Failure(t *testing.T) {

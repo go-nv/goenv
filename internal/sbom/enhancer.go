@@ -22,8 +22,9 @@ import (
 
 // Enhancer adds Go-aware metadata to CycloneDX SBOMs
 type Enhancer struct {
-	config  *config.Config
-	manager *manager.Manager
+	config    *config.Config
+	manager   *manager.Manager
+	toolchain *Toolchain
 }
 
 // NewEnhancer creates a new SBOM enhancer
@@ -40,15 +41,26 @@ type EnhanceOptions struct {
 	Deterministic bool
 	OfflineMode   bool
 	EmbedDigests  bool
+	// BinaryPath, when set, points at a compiled Go artifact whose embedded
+	// build information is used as the authoritative provenance source.
+	BinaryPath string
+	// GeneratorVersion is the version of goenv performing the enhancement. It is
+	// recorded so an SBOM states exactly which goenv produced it.
+	GeneratorVersion string
 }
 
 // GoenvMetadata contains Go-specific build and module context
 type GoenvMetadata struct {
-	GoVersion     string         `json:"go_version"`
-	BuildContext  *BuildContext  `json:"build_context,omitempty"`
-	ModuleContext *ModuleContext `json:"module_context,omitempty"`
-	Timestamp     string         `json:"timestamp,omitempty"`
-	Platform      string         `json:"platform"`
+	GoVersion        string            `json:"go_version"`
+	BuildContext     *BuildContext     `json:"build_context,omitempty"`
+	ModuleContext    *ModuleContext    `json:"module_context,omitempty"`
+	Binary           *BinaryProvenance `json:"binary,omitempty"`
+	Timestamp        string            `json:"timestamp,omitempty"`
+	Platform         string            `json:"platform"`
+	ToolchainPath    string            `json:"toolchain_path,omitempty"`
+	GeneratorVersion string            `json:"generator_version,omitempty"`
+	SBOMTool         string            `json:"sbom_tool,omitempty"`
+	SBOMToolVersion  string            `json:"sbom_tool_version,omitempty"`
 }
 
 // BuildContext captures build-time configuration
@@ -101,6 +113,12 @@ type ReplaceDirective struct {
 
 // EnhanceCycloneDX adds goenv metadata to a CycloneDX SBOM
 func (e *Enhancer) EnhanceCycloneDX(sbomPath string, opts EnhanceOptions) error {
+	// Resolve the goenv-managed toolchain once so every enhancement step draws
+	// from the same authoritative source (go list / go mod edit / go env).
+	if e.toolchain == nil {
+		e.toolchain = NewToolchain(e.config, e.manager, opts.ProjectDir, opts.OfflineMode)
+	}
+
 	// Read the CycloneDX SBOM
 	data, err := os.ReadFile(sbomPath)
 	if err != nil {
@@ -118,6 +136,10 @@ func (e *Enhancer) EnhanceCycloneDX(sbomPath string, opts EnhanceOptions) error 
 	if err != nil {
 		return fmt.Errorf("failed to gather metadata: %w", err)
 	}
+
+	// Record which SBOM generator produced the base document, sourced from the
+	// tool's own self-reported metadata.tools entry (authoritative).
+	metadata.SBOMTool, metadata.SBOMToolVersion = extractBaseToolInfo(sbom)
 
 	// Inject into metadata section
 	if err := e.injectMetadata(sbom, metadata, opts); err != nil {
@@ -144,9 +166,33 @@ func (e *Enhancer) gatherMetadata(opts EnhanceOptions) (*GoenvMetadata, error) {
 		Platform: fmt.Sprintf("%s/%s", platform.OS(), platform.Arch()),
 	}
 
-	// Get current Go version
-	if version, _, err := e.manager.GetCurrentVersion(); err == nil {
+	if e.toolchain != nil {
+		metadata.ToolchainPath = e.toolchain.GoBinary()
+	}
+
+	metadata.GeneratorVersion = opts.GeneratorVersion
+
+	// Get current Go version (resolved patch version when available).
+	if version, _, _, err := e.manager.GetCurrentVersionResolved(); err == nil && version != "" {
 		metadata.GoVersion = version
+	} else if version, _, err := e.manager.GetCurrentVersion(); err == nil {
+		metadata.GoVersion = version
+	}
+
+	// When a compiled artifact is supplied, its embedded build info is the
+	// highest-fidelity provenance available. A failure here is fatal because the
+	// user explicitly asked to attest that binary.
+	var binProv *BinaryProvenance
+	if opts.BinaryPath != "" {
+		p, err := ReadBinaryProvenance(opts.BinaryPath)
+		if err != nil {
+			return nil, err
+		}
+		binProv = p
+		metadata.Binary = p
+		if p.GoVersion != "" {
+			metadata.GoVersion = p.GoVersion
+		}
 	}
 
 	// Set timestamp (use build time if deterministic)
@@ -161,8 +207,8 @@ func (e *Enhancer) gatherMetadata(opts EnhanceOptions) (*GoenvMetadata, error) {
 		metadata.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	}
 
-	// Gather build context
-	if buildCtx, err := e.gatherBuildContext(opts.ProjectDir); err == nil {
+	// Gather build context (binary provenance takes precedence over toolchain env).
+	if buildCtx, err := e.gatherBuildContext(opts.ProjectDir, binProv); err == nil {
 		metadata.BuildContext = buildCtx
 	}
 
@@ -174,34 +220,42 @@ func (e *Enhancer) gatherMetadata(opts EnhanceOptions) (*GoenvMetadata, error) {
 	return metadata, nil
 }
 
-// gatherBuildContext extracts build configuration
-func (e *Enhancer) gatherBuildContext(projectDir string) (*BuildContext, error) {
+// gatherBuildContext extracts build configuration from the most authoritative
+// source available. Precedence:
+//  1. A compiled binary's embedded build info (exact flags used at build time).
+//  2. The goenv-managed toolchain's effective `go env` values.
+//  3. Process environment (documented best-effort fallback).
+func (e *Enhancer) gatherBuildContext(projectDir string, binProv *BinaryProvenance) (*BuildContext, error) {
 	ctx := &BuildContext{
 		GOOS:     platform.OS(),
 		GOARCH:   platform.Arch(),
 		Compiler: "gc",
 	}
 
-	// Check CGO status from environment
-	if cgo := os.Getenv("CGO_ENABLED"); cgo == "1" {
-		ctx.CgoEnabled = true
-	}
-
-	// Extract build tags from environment or build files
-	if tags := os.Getenv("GOFLAGS"); tags != "" {
-		// Parse -tags flag from GOFLAGS
-		parts := strings.Split(tags, " ")
-		for i, part := range parts {
-			if part == "-tags" && i+1 < len(parts) {
-				ctx.Tags = strings.Split(parts[i+1], ",")
-				break
+	switch {
+	case binProv != nil:
+		// Authoritative: values embedded by the compiler in the artifact.
+		applyBinaryBuildContext(ctx, binProv)
+	case e.toolchain.Available():
+		// Effective build settings from the managed toolchain.
+		if env, err := e.toolchain.GoEnv("GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOAMD64"); err == nil {
+			if v := env["GOOS"]; v != "" {
+				ctx.GOOS = v
+			}
+			if v := env["GOARCH"]; v != "" {
+				ctx.GOARCH = v
+			}
+			ctx.CgoEnabled = env["CGO_ENABLED"] == "1"
+			ctx.Tags = parseBuildTags(env["GOFLAGS"])
+			if v := env["GOAMD64"]; v != "" {
+				ctx.BuildFlags = map[string]string{"GOAMD64": v}
 			}
 		}
+	default:
+		// Best-effort fallback when no toolchain is available.
+		ctx.CgoEnabled = os.Getenv("CGO_ENABLED") == "1"
+		ctx.Tags = parseBuildTags(os.Getenv("GOFLAGS"))
 	}
-
-	// Get ldflags/gcflags if set
-	ctx.LDFlags = os.Getenv("LDFLAGS")
-	ctx.GCFlags = os.Getenv("GCFLAGS")
 
 	// Analyze build constraints
 	if constraints, excluded, err := e.analyzeBuildConstraints(projectDir, ctx.Tags); err == nil {
@@ -210,6 +264,70 @@ func (e *Enhancer) gatherBuildContext(projectDir string) (*BuildContext, error) 
 	}
 
 	return ctx, nil
+}
+
+// applyBinaryBuildContext maps debug/buildinfo settings onto a BuildContext.
+// All embedded settings are preserved in BuildFlags so nothing the compiler
+// recorded is lost; well-known keys are additionally surfaced as typed fields.
+// Note: the Go toolchain deliberately does not embed -ldflags in build info, so
+// that field is populated only when available from the managed toolchain path.
+func applyBinaryBuildContext(ctx *BuildContext, p *BinaryProvenance) {
+	if len(p.Settings) > 0 {
+		ctx.BuildFlags = make(map[string]string, len(p.Settings))
+		for k, v := range p.Settings {
+			ctx.BuildFlags[k] = v
+		}
+	}
+	if v := p.Settings["GOOS"]; v != "" {
+		ctx.GOOS = v
+	}
+	if v := p.Settings["GOARCH"]; v != "" {
+		ctx.GOARCH = v
+	}
+	if v, ok := p.Settings["CGO_ENABLED"]; ok {
+		ctx.CgoEnabled = v == "1"
+	}
+	if v := p.Settings["-compiler"]; v != "" {
+		ctx.Compiler = v
+	}
+	if v := p.Settings["-ldflags"]; v != "" {
+		ctx.LDFlags = v
+	}
+	if v := p.Settings["-gcflags"]; v != "" {
+		ctx.GCFlags = v
+	}
+	if v := p.Settings["-tags"]; v != "" {
+		ctx.Tags = splitTags(v)
+	}
+}
+
+// parseBuildTags extracts build tags from a GOFLAGS string, handling both the
+// `-tags=a,b` and `-tags a,b` forms (the former is by far the most common and
+// was previously missed entirely).
+func parseBuildTags(goflags string) []string {
+	fields := strings.Fields(goflags)
+	for i := 0; i < len(fields); i++ {
+		f := fields[i]
+		if strings.HasPrefix(f, "-tags=") {
+			return splitTags(strings.TrimPrefix(f, "-tags="))
+		}
+		if f == "-tags" && i+1 < len(fields) {
+			return splitTags(fields[i+1])
+		}
+	}
+	return nil
+}
+
+// splitTags splits a comma/space separated tag list, trimming quotes.
+func splitTags(s string) []string {
+	s = strings.Trim(s, "'\"")
+	var out []string
+	for _, t := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ' ' }) {
+		if t = strings.TrimSpace(t); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // gatherModuleContext extracts Go module metadata
@@ -251,17 +369,70 @@ func (e *Enhancer) gatherModuleContext(opts EnhanceOptions) (*ModuleContext, err
 		}
 	}
 
-	// Get module proxy
-	if proxy := os.Getenv("GOPROXY"); proxy != "" && !opts.OfflineMode {
-		ctx.ModuleProxy = proxy
+	// Get module proxy from the managed toolchain (authoritative), falling back
+	// to the process environment.
+	if !opts.OfflineMode {
+		if e.toolchain.Available() {
+			if env, err := e.toolchain.GoEnv("GOPROXY"); err == nil {
+				ctx.ModuleProxy = env["GOPROXY"]
+			}
+		}
+		if ctx.ModuleProxy == "" {
+			ctx.ModuleProxy = os.Getenv("GOPROXY")
+		}
 	}
 
-	// Parse replace directives
-	if replaces, err := e.parseReplaceDirectives(projectDir); err == nil {
-		ctx.Replaces = replaces
+	// Parse replace directives authoritatively via `go mod edit -json`, falling
+	// back to the lightweight text parser when the toolchain is unavailable.
+	if e.toolchain.Available() {
+		if mod, err := e.toolchain.ModEdit(); err == nil {
+			ctx.Replaces = classifyReplaces(mod.Replace)
+		}
+	}
+	if ctx.Replaces == nil {
+		if replaces, err := e.parseReplaceDirectives(projectDir); err == nil {
+			ctx.Replaces = replaces
+		}
 	}
 
 	return ctx, nil
+}
+
+// classifyReplaces converts authoritative go.mod replace directives into
+// risk-classified ReplaceDirective records. Filesystem replacements (New.Version
+// == "") are the highest-risk case because they bypass go.sum verification.
+func classifyReplaces(replaces []GoModReplace) []ReplaceDirective {
+	out := make([]ReplaceDirective, 0, len(replaces))
+	for _, r := range replaces {
+		d := ReplaceDirective{
+			Old: joinModVer(r.Old.Path, r.Old.Version),
+			New: joinModVer(r.New.Path, r.New.Version),
+		}
+		switch {
+		case r.New.Version == "" || strings.HasPrefix(r.New.Path, ".") || filepath.IsAbs(r.New.Path):
+			d.Type = "local-path"
+			d.RiskLevel = "high"
+			d.Reason = "Local/filesystem replacement is not subject to go.sum checksum verification"
+		case r.Old.Path != r.New.Path:
+			d.Type = "fork"
+			d.RiskLevel = "medium"
+			d.Reason = "Dependency redirected to a different module path (verify the source)"
+		default:
+			d.Type = "version"
+			d.RiskLevel = "low"
+			d.Reason = "Pinned to a specific version of the same module"
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// joinModVer renders a module path with an optional version as "path@version".
+func joinModVer(path, version string) string {
+	if version == "" {
+		return path
+	}
+	return path + "@" + version
 }
 
 // parseReplaceDirectives extracts and classifies replace directives from go.mod
@@ -464,44 +635,264 @@ func (e *Enhancer) convertMetadataToProperties(metadata *GoenvMetadata) []interf
 		}
 	}
 
+	// Add authoritative binary provenance (from debug/buildinfo).
+	if metadata.Binary != nil {
+		b := metadata.Binary
+		if b.VCSRevision != "" {
+			properties = append(properties, map[string]interface{}{
+				"name":  "goenv:binary.vcs_revision",
+				"value": b.VCSRevision,
+			})
+			properties = append(properties, map[string]interface{}{
+				"name":  "goenv:binary.vcs_modified",
+				"value": fmt.Sprintf("%t", b.VCSModified),
+			})
+		}
+		if b.VCSTime != "" {
+			properties = append(properties, map[string]interface{}{
+				"name":  "goenv:binary.vcs_time",
+				"value": b.VCSTime,
+			})
+		}
+		if b.MainVersion != "" {
+			properties = append(properties, map[string]interface{}{
+				"name":  "goenv:binary.main_version",
+				"value": b.MainVersion,
+			})
+		}
+	}
+
+	if metadata.ToolchainPath != "" {
+		properties = append(properties, map[string]interface{}{
+			"name":  "goenv:toolchain_path",
+			"value": metadata.ToolchainPath,
+		})
+	}
+
+	// Provenance: exactly which goenv and SBOM generator produced this document.
+	if metadata.GeneratorVersion != "" {
+		properties = append(properties, map[string]interface{}{
+			"name":  "goenv:generator_version",
+			"value": metadata.GeneratorVersion,
+		})
+	}
+	if metadata.SBOMTool != "" {
+		properties = append(properties, map[string]interface{}{
+			"name":  "goenv:sbom_tool",
+			"value": metadata.SBOMTool,
+		})
+	}
+	if metadata.SBOMToolVersion != "" {
+		properties = append(properties, map[string]interface{}{
+			"name":  "goenv:sbom_tool_version",
+			"value": metadata.SBOMToolVersion,
+		})
+	}
+
 	return properties
 }
 
-// enhanceComponents adds Go-specific data to individual components
+// extractBaseToolInfo reads the SBOM generator's own name and version from a
+// CycloneDX document's metadata.tools, handling both the legacy array form and
+// the CycloneDX 1.5 object form ({"components": [...]}). Returns empty strings
+// when no tool is recorded.
+func extractBaseToolInfo(sbom map[string]interface{}) (string, string) {
+	meta, ok := sbom["metadata"].(map[string]interface{})
+	if !ok {
+		return "", ""
+	}
+
+	pick := func(m map[string]interface{}) (string, string) {
+		name, _ := m["name"].(string)
+		version, _ := m["version"].(string)
+		return name, version
+	}
+
+	switch tools := meta["tools"].(type) {
+	case []interface{}:
+		// Legacy: metadata.tools is an array of {name, version, vendor}.
+		for _, t := range tools {
+			if m, ok := t.(map[string]interface{}); ok {
+				if name, version := pick(m); name != "" {
+					return name, version
+				}
+			}
+		}
+	case map[string]interface{}:
+		// CycloneDX 1.5: metadata.tools.components is an array of components.
+		if comps, ok := tools["components"].([]interface{}); ok {
+			for _, c := range comps {
+				if m, ok := c.(map[string]interface{}); ok {
+					if name, version := pick(m); name != "" {
+						return name, version
+					}
+				}
+			}
+		}
+	}
+	return "", ""
+}
+
+// GoenvSBOMProvenance is the goenv-recorded provenance read back from an
+// enhanced CycloneDX SBOM. It lets downstream steps (e.g. SLSA attestation)
+// reuse the authoritative values the enhancer already captured instead of
+// re-deriving or hardcoding them.
+type GoenvSBOMProvenance struct {
+	GoVersion        string
+	GeneratorVersion string
+	SBOMTool         string
+	SBOMToolVersion  string
+	GOOS             string
+	GOARCH           string
+	CGOEnabled       bool
+	BuildTags        []string
+	Vendored         bool
+}
+
+// ReadGoenvProvenance parses an enhanced CycloneDX SBOM and returns the
+// goenv:* provenance properties it recorded. Missing properties yield zero
+// values, so callers can treat the result as best-effort.
+func ReadGoenvProvenance(sbomPath string) (*GoenvSBOMProvenance, error) {
+	data, err := os.ReadFile(sbomPath)
+	if err != nil {
+		return nil, err
+	}
+	var doc map[string]interface{}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+
+	props := map[string]string{}
+	if meta, ok := doc["metadata"].(map[string]interface{}); ok {
+		if arr, ok := meta["properties"].([]interface{}); ok {
+			for _, p := range arr {
+				if m, ok := p.(map[string]interface{}); ok {
+					name, _ := m["name"].(string)
+					val, _ := m["value"].(string)
+					if name != "" {
+						props[name] = val
+					}
+				}
+			}
+		}
+	}
+
+	prov := &GoenvSBOMProvenance{
+		GoVersion:        props["goenv:go_version"],
+		GeneratorVersion: props["goenv:generator_version"],
+		SBOMTool:         props["goenv:sbom_tool"],
+		SBOMToolVersion:  props["goenv:sbom_tool_version"],
+		GOOS:             props["goenv:build_context.goos"],
+		GOARCH:           props["goenv:build_context.goarch"],
+		CGOEnabled:       props["goenv:build_context.cgo_enabled"] == "true",
+		Vendored:         props["goenv:module_context.vendored"] == "true",
+	}
+	if tags := props["goenv:build_context.tags"]; tags != "" {
+		var parsed []string
+		if json.Unmarshal([]byte(tags), &parsed) == nil {
+			prov.BuildTags = parsed
+		}
+	}
+	return prov, nil
+}
+
+// enhanceComponents adds Go-specific data to individual components: the standard
+// library as a first-class component, plus supply-chain annotations (replaced
+// and retracted modules) sourced authoritatively from the Go toolchain.
 func (e *Enhancer) enhanceComponents(sbom map[string]interface{}, opts EnhanceOptions) error {
 	components, ok := sbom["components"].([]interface{})
 	if !ok {
 		components = []interface{}{}
 	}
 
-	// Add stdlib component if Go source files are present
+	// Add the standard library as a component so stdlib CVEs are in scope.
 	if stdlibComponent, err := e.createStdlibComponent(opts.ProjectDir); err == nil && stdlibComponent != nil {
 		components = append(components, stdlibComponent)
 	}
 
-	// TODO: Mark replaced components
-	// TODO: Add retracted version warnings
+	// Flag components redirected by replace directives (supply-chain risk).
+	e.markReplacedComponents(components)
+
+	// Flag components pinned to retracted versions.
+	if err := e.markRetractedVersions(components, opts.ProjectDir); err != nil {
+		// Non-fatal: retraction data is advisory and may require network access.
+		_ = err
+	}
 
 	sbom["components"] = components
 	return nil
 }
 
-// createStdlibComponent analyzes Go source files and creates a stdlib component
+// markReplacedComponents annotates components that are redirected by a go.mod
+// replace directive, attaching the risk classification so policy engines and
+// auditors can see filesystem/fork replacements at a glance.
+func (e *Enhancer) markReplacedComponents(components []interface{}) {
+	if !e.toolchain.Available() {
+		return
+	}
+	mod, err := e.toolchain.ModEdit()
+	if err != nil || len(mod.Replace) == 0 {
+		return
+	}
+
+	byPath := make(map[string]ReplaceDirective)
+	for i, r := range mod.Replace {
+		byPath[r.Old.Path] = classifyReplaces(mod.Replace[i : i+1])[0]
+	}
+
+	for _, comp := range components {
+		c, ok := comp.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := c["name"].(string)
+		r, ok := byPath[name]
+		if !ok {
+			continue
+		}
+		goenvData := ensureGoenvMap(c)
+		goenvData["replaced"] = true
+		goenvData["replace_directive"] = map[string]interface{}{
+			"target":     r.New,
+			"type":       r.Type,
+			"risk_level": r.RiskLevel,
+			"reason":     r.Reason,
+		}
+	}
+}
+
+// ensureGoenvMap returns the component's "goenv" sub-map, creating it if needed.
+func ensureGoenvMap(component map[string]interface{}) map[string]interface{} {
+	if existing, ok := component["goenv"].(map[string]interface{}); ok {
+		return existing
+	}
+	m := make(map[string]interface{})
+	component["goenv"] = m
+	return m
+}
+
+// createStdlibComponent determines the standard-library packages compiled into
+// the project and emits them as a first-class CycloneDX component. Package
+// discovery prefers the authoritative `go list` query (which honors build tags
+// and GOOS/GOARCH and is independent of how projectDir is expressed) and falls
+// back to a source scan only when the toolchain is unavailable.
 func (e *Enhancer) createStdlibComponent(projectDir string) (map[string]interface{}, error) {
 	if projectDir == "" {
 		projectDir = "."
 	}
 
-	// Discover stdlib imports from Go source files
-	stdlibImports, err := e.discoverStdlibImports(projectDir)
-	if err != nil || len(stdlibImports) == 0 {
-		return nil, err
+	stdlibImports := e.stdlibPackages(projectDir)
+	if len(stdlibImports) == 0 {
+		return nil, nil
 	}
 
-	// Get Go version for the component
-	goVersion, _, err := e.manager.GetCurrentVersion()
-	if err != nil {
-		goVersion = "unknown"
+	// Prefer the resolved toolchain version (e.g. "1.23.6") for accurate CVE
+	// correlation; fall back to the raw selected version.
+	goVersion := "unknown"
+	if v, _, _, err := e.manager.GetCurrentVersionResolved(); err == nil && v != "" && v != "system" {
+		goVersion = v
+	} else if v, _, err := e.manager.GetCurrentVersion(); err == nil && v != "" {
+		goVersion = v
 	}
 
 	// Create stdlib component in CycloneDX format
@@ -527,6 +918,19 @@ func (e *Enhancer) createStdlibComponent(projectDir string) (map[string]interfac
 	return component, nil
 }
 
+// stdlibPackages returns the standard-library packages compiled into the
+// project. It prefers the authoritative `go list -deps` query and falls back to
+// a source-tree scan only when the toolchain is unavailable.
+func (e *Enhancer) stdlibPackages(projectDir string) []string {
+	if e.toolchain.Available() {
+		if pkgs, err := e.toolchain.StdlibPackages(); err == nil && len(pkgs) > 0 {
+			return pkgs
+		}
+	}
+	pkgs, _ := e.discoverStdlibImports(projectDir)
+	return pkgs
+}
+
 // discoverStdlibImports scans Go source files for stdlib imports
 func (e *Enhancer) discoverStdlibImports(projectDir string) ([]string, error) {
 	stdlibSet := make(map[string]bool)
@@ -540,7 +944,7 @@ func (e *Enhancer) discoverStdlibImports(projectDir string) ([]string, error) {
 		// Skip vendor and hidden directories
 		if info.IsDir() {
 			name := info.Name()
-			if name == "vendor" || name == "testdata" || strings.HasPrefix(name, ".") {
+			if name == "vendor" || name == "testdata" || (name != "." && name != ".." && strings.HasPrefix(name, ".")) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -646,7 +1050,7 @@ func (e *Enhancer) analyzeBuildConstraints(projectDir string, activeTags []strin
 		// Skip vendor and hidden directories
 		if info.IsDir() {
 			name := info.Name()
-			if name == "vendor" || name == "testdata" || strings.HasPrefix(name, ".") {
+			if name == "vendor" || name == "testdata" || (name != "." && name != ".." && strings.HasPrefix(name, ".")) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -801,131 +1205,87 @@ func (e *Enhancer) evaluateLegacyConstraint(constraint string, tags map[string]b
 	return false
 }
 
-// markRetractedVersions adds retraction information to components
+// markRetractedVersions annotates components pinned to a retracted module
+// version. When the toolchain and network are available it uses the
+// authoritative `go list -m -retracted` query; otherwise it falls back to the
+// retract directives declared in the local go.mod (via `go mod edit -json`),
+// which works offline.
 func (e *Enhancer) markRetractedVersions(components []interface{}, projectDir string) error {
-	if projectDir == "" {
-		projectDir = "."
-	}
+	// module path -> human-readable rationale for the selected (SBOM) version.
+	retractions := make(map[string]string)
 
-	// Parse go.mod to find dependencies and check for retractions
-	modPath := filepath.Join(projectDir, "go.mod")
-	if !utils.FileExists(modPath) {
-		return nil
-	}
-
-	data, err := os.ReadFile(modPath)
-	if err != nil {
-		return err
-	}
-
-	// Build a map of module -> version from require statements
-	requires := make(map[string]string)
-	lines := strings.Split(string(data), "\n")
-	inRequire := false
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		if strings.HasPrefix(line, "require (") {
-			inRequire = true
-			continue
-		}
-		if inRequire && line == ")" {
-			inRequire = false
-			continue
-		}
-
-		// Parse require statement
-		if strings.HasPrefix(line, "require ") || (inRequire && line != "" && !strings.HasPrefix(line, "//")) {
-			line = strings.TrimPrefix(line, "require ")
-			line = strings.TrimSpace(line)
-
-			// Skip comments
-			if strings.HasPrefix(line, "//") {
-				continue
-			}
-
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				module := parts[0]
-				version := parts[1]
-				requires[module] = version
+	if e.toolchain.Available() {
+		if r, err := e.toolchain.Retractions(); err == nil {
+			for path, rationales := range r {
+				retractions[path] = firstNonEmpty(strings.Join(rationales, "; "), "Version retracted upstream")
 			}
 		}
 	}
 
-	// Check each component against requires map
+	// Offline/self-module fallback: retract directives from the local go.mod.
+	mainModule, localRetract := e.modfileRetractions()
+
 	for _, comp := range components {
 		component, ok := comp.(map[string]interface{})
 		if !ok {
 			continue
 		}
+		name, _ := component["name"].(string)
+		version, _ := component["version"].(string)
 
-		name, ok := component["name"].(string)
-		if !ok {
+		if reason, ok := retractions[name]; ok {
+			markComponentRetracted(component, reason)
 			continue
 		}
-
-		version, ok := component["version"].(string)
-		if !ok {
-			continue
-		}
-
-		// Check if this component has a retraction
-		// Note: Full retraction checking requires querying the module proxy
-		// For now, we check if the module appears in go.mod and mark basic retraction status
-		if reqVersion, exists := requires[name]; exists && reqVersion == version {
-			// In a real implementation, we would query:
-			// https://proxy.golang.org/{module}/@v/{version}.info
-			// and check for retraction metadata
-			// For now, we just set up the structure
-
-			// Check for retract directives in go.mod (for this module itself)
-			if e.checkLocalRetraction(data, version) {
-				if component["goenv"] == nil {
-					component["goenv"] = make(map[string]interface{})
-				}
-				goenvData := component["goenv"].(map[string]interface{})
-				goenvData["retracted"] = true
-				goenvData["retraction_reason"] = "Version retracted in go.mod"
-			}
+		if name == mainModule && versionRetracted(version, localRetract) {
+			markComponentRetracted(component, "Version retracted in go.mod")
 		}
 	}
 
 	return nil
 }
 
-// checkLocalRetraction checks if a version is retracted in the local go.mod
-func (e *Enhancer) checkLocalRetraction(goModData []byte, version string) bool {
-	// Parse retract directives from go.mod
-	lines := strings.Split(string(goModData), "\n")
-	inRetract := false
+// modfileRetractions returns the main module path and its retract directives,
+// sourced authoritatively via `go mod edit -json`.
+func (e *Enhancer) modfileRetractions() (string, []GoModRetract) {
+	if !e.toolchain.Available() {
+		return "", nil
+	}
+	mod, err := e.toolchain.ModEdit()
+	if err != nil {
+		return "", nil
+	}
+	return mod.Module.Path, mod.Retract
+}
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		if strings.HasPrefix(line, "retract (") {
-			inRetract = true
-			continue
-		}
-		if inRetract && line == ")" {
-			inRetract = false
-			continue
-		}
-
-		// Check for retract statements
-		if strings.HasPrefix(line, "retract ") || (inRetract && line != "" && !strings.HasPrefix(line, "//")) {
-			line = strings.TrimPrefix(line, "retract ")
-			line = strings.TrimSpace(line)
-
-			// Simple version match
-			if strings.Contains(line, version) {
-				return true
-			}
+// versionRetracted reports whether version matches a retract directive endpoint.
+// Range interiors are intentionally not evaluated here (that requires semver
+// ordering); the authoritative online path handles ranges precisely, so this
+// offline fallback matches only explicit endpoints to avoid false positives.
+func versionRetracted(version string, ranges []GoModRetract) bool {
+	for _, r := range ranges {
+		if version != "" && (version == r.Low || version == r.High) {
+			return true
 		}
 	}
-
 	return false
+}
+
+// markComponentRetracted flags a component as using a retracted version.
+func markComponentRetracted(component map[string]interface{}, reason string) {
+	g := ensureGoenvMap(component)
+	g["retracted"] = true
+	g["retraction_reason"] = reason
+}
+
+// firstNonEmpty returns the first non-empty string.
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // makeDeterministic ensures reproducible output

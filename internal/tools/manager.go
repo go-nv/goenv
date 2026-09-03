@@ -167,6 +167,10 @@ func (m *Manager) InstallSingleTool(goVersion, packagePath string, verbose bool)
 
 	// Create a temporary config with a single tool to reuse the gold standard installation logic
 	cfg.Tools = []Tool{newTool}
+	// This is an explicit, user-initiated install. The default-tools `enabled`
+	// flag only gates the automatic post-`goenv install` hook, so honor the
+	// explicit request even when auto-install has been disabled.
+	cfg.Enabled = true
 
 	// Use the gold standard InstallTools function with host-specific GOPATH
 	return newTool, InstallTools(cfg, goVersion, m.cfg.Root, m.cfg.VersionDir(goVersion), verbose)
