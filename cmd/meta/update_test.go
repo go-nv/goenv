@@ -305,34 +305,6 @@ func TestUpdateCommand_GitNotFoundError(t *testing.T) {
 	t.Log("This ensures users get actionable guidance when git is missing")
 }
 
-func TestUpdateCommand_WritePermissionError(t *testing.T) {
-	var err error
-	// This test documents the improved error message for write permission issues
-	// Actual testing of file permissions is complex, so we verify the error formatting
-
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "goenv-test")
-
-	// Create a file
-	testutil.WriteTestFile(t, tmpFile, []byte("test"), utils.PermFileDefault)
-
-	// Make it read-only
-	err = os.Chmod(tmpFile, 0444)
-	require.NoError(t, err, "Failed to chmod file")
-
-	// Try to check write permission
-	err = checkWritePermission(tmpFile)
-	if err == nil {
-		t.Skip("Expected permission error on read-only file")
-	}
-
-	// Verify the function returns an error
-	t.Logf("Write permission check error: %v", err)
-
-	// The actual error message formatting is tested in the command execution
-	// Here we just verify the helper function works correctly
-}
-
 func TestGetLatestRelease_304NotModified(t *testing.T) {
 	var err error
 	// Test that 304 Not Modified response is handled correctly with ETag

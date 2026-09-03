@@ -52,11 +52,13 @@ Use --check to see if an update is available without installing.`,
 var (
 	updateCheckOnly bool
 	updateForce     bool
+	updateNoElevate bool
 )
 
 func init() {
 	updateCmd.Flags().BoolVarP(&updateCheckOnly, "check", "c", false, "Check for updates without installing")
 	updateCmd.Flags().BoolVarP(&updateForce, "force", "f", false, "Force update even if already up-to-date")
+	updateCmd.Flags().BoolVar(&updateNoElevate, "no-elevate", false, "Never request elevated privileges; print manual instructions instead")
 	cmdpkg.RootCmd.AddCommand(updateCmd)
 }
 
@@ -274,21 +276,26 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 		return nil
 	}
 
-	// Check write permissions
-	if err := checkWritePermission(binaryPath); err != nil {
-		errMsg := fmt.Sprintf("cannot update binary: %v\n\n", err)
-		errMsg += "To fix this:\n"
-		if utils.IsWindows() {
-			errMsg += "  • Run PowerShell as Administrator, or\n"
-			errMsg += "  • Install goenv to a user-writeable path like %LOCALAPPDATA%\\goenv\n"
-			errMsg += "    (e.g., C:\\Users\\YourName\\AppData\\Local\\goenv)\n"
-		} else {
-			errMsg += "  • Run with elevated permissions: sudo goenv update\n"
-			errMsg += "  • Or install goenv to a user-writeable path (e.g., ~/.local/bin/)\n"
+	// An install owned by a package manager must be updated through it, not
+	// overwritten in place — see packageManager for why elevating instead would
+	// make things worse.
+	if manager, upgradeCmd := packageManager(binaryPath); manager != "" {
+		return fmt.Errorf("goenv was installed by %s, so 'goenv update' would be undone by the next %s upgrade\n\n"+
+			"Update it with:\n  %s", manager, manager, upgradeCmd)
+	}
+
+	// Replacing the binary is a rename in its directory, so that is what has to
+	// be writable. When it is not, the install step (and only the install step)
+	// is escalated.
+	elevate := false
+	if err := canReplaceBinary(binaryPath); err != nil {
+		if updateNoElevate {
+			return fmt.Errorf("%s", elevationInstructions(binaryPath))
 		}
-		errMsg += "\nAlternatively, download and install manually:\n"
-		errMsg += "  • https://github.com/go-nv/goenv/releases"
-		return fmt.Errorf("%s", errMsg)
+		if err := confirmElevation(cmd, binaryPath, latestVersion); err != nil {
+			return err
+		}
+		elevate = true
 	}
 
 	// Download new release archive
@@ -335,22 +342,24 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 	//
 	// Staged in the installed binary's own directory so the replacement below
 	// is a same-filesystem rename. Extracting to $TMPDIR would fail with EXDEV
-	// wherever /tmp is a separate mount.
-	newBinary, err := extractGoenvBinary(tmpFile, downloadURL, filepath.Dir(binaryPath))
+	// wherever /tmp is a separate mount. That trade does not apply when the
+	// directory is unwritable: the elevated helper copies rather than renames,
+	// and a 0700 temp directory keeps the verified archive out of reach of other
+	// users until root reads it.
+	stageDir := filepath.Dir(binaryPath)
+	if elevate {
+		stageDir, err = os.MkdirTemp("", "goenv-update-")
+		if err != nil {
+			return errors.FailedTo("create staging directory", err)
+		}
+		defer os.RemoveAll(stageDir)
+	}
+
+	newBinary, err := extractGoenvBinary(tmpFile, downloadURL, stageDir)
 	if err != nil {
 		return errors.FailedTo("extract update", err)
 	}
 	defer os.Remove(newBinary)
-
-	// Backup current binary
-	backupPath := binaryPath + ".backup"
-	fmt.Fprintf(cmd.OutOrStdout(), "%sCreating backup...\n", utils.Emoji("💾 "))
-	if err := utils.CopyFile(binaryPath, backupPath); err != nil {
-		return errors.FailedTo("create backup", err)
-	}
-
-	// Replace binary
-	fmt.Fprintf(cmd.OutOrStdout(), "%sReplacing binary...\n", utils.Emoji("🔄 "))
 
 	// Make executable on Unix (Windows uses file extension for executability)
 	if !utils.IsWindows() {
@@ -359,12 +368,36 @@ func updateBinaryInstallation(cmd *cobra.Command, cfg *config.Config, binaryPath
 		}
 	}
 
+	backupPath := binaryPath + ".backup"
+
+	if elevate {
+		if err := replaceElevated(cmd, newBinary, binaryPath, backupPath, currentVersion, latestVersion); err != nil {
+			return err
+		}
+		if utils.IsWindows() {
+			return nil
+		}
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintf(cmd.OutOrStdout(), "%sgoenv updated successfully!\n", utils.Emoji("✅ "))
+		fmt.Fprintf(cmd.OutOrStdout(), "   Updated from %s to %s\n", currentVersion, latestVersion)
+		return nil
+	}
+
+	// Backup current binary
+	fmt.Fprintf(cmd.OutOrStdout(), "%sCreating backup...\n", utils.Emoji("💾 "))
+	if err := utils.CopyFile(binaryPath, backupPath); err != nil {
+		return errors.FailedTo("create backup", err)
+	}
+
+	// Replace binary
+	fmt.Fprintf(cmd.OutOrStdout(), "%sReplacing binary...\n", utils.Emoji("🔄 "))
+
 	// On Windows, we cannot replace a running executable directly
 	// Instead, we use a two-step process:
 	// 1. Rename the new binary to the target name with .new extension
 	// 2. Create a batch script that waits, renames, and restarts
 	if utils.IsWindows() {
-		return replaceWindowsBinary(cmd, newBinary, binaryPath, backupPath, currentVersion, latestVersion)
+		return replaceWindowsBinary(cmd, newBinary, binaryPath, backupPath, currentVersion, latestVersion, false)
 	}
 
 	// On Unix, we can replace the binary directly
@@ -744,15 +777,6 @@ func getCurrentVersion() string {
 	return "unknown"
 }
 
-func checkWritePermission(path string) error {
-	file, err := os.OpenFile(path, os.O_WRONLY, utils.PermFileExecutable)
-	if err != nil {
-		return err
-	}
-	file.Close()
-	return nil
-}
-
 func downloadBinary(url string) (string, error) {
 	client := utils.NewHTTPClient(60 * time.Second)
 	resp, err := client.Get(url)
@@ -969,15 +993,24 @@ func verifyChecksum(binaryPath, checksumURL, filename string) error {
 // 2. Moves old binary to .backup
 // 3. Moves new binary to final location
 // 4. Cleans up
-func replaceWindowsBinary(cmd *cobra.Command, tmpFile, binaryPath, backupPath, currentVersion, latestVersion string) error {
-	// Move new binary next to the old one with .new extension
-	newPath := binaryPath + ".new"
-	if err := os.Rename(tmpFile, newPath); err != nil {
-		return errors.FailedTo("move new binary", err)
+//
+// When elevated is set the install directory is not writable, so the staged
+// binary and the script stay in the caller's private temp directory and the
+// script itself is launched through a UAC prompt.
+func replaceWindowsBinary(cmd *cobra.Command, tmpFile, binaryPath, backupPath, currentVersion, latestVersion string, elevated bool) error {
+	newPath := tmpFile
+	updateScript := filepath.Join(filepath.Dir(tmpFile), "goenv-update.bat")
+
+	if !elevated {
+		// Move new binary next to the old one with .new extension
+		newPath = binaryPath + ".new"
+		if err := os.Rename(tmpFile, newPath); err != nil {
+			return errors.FailedTo("move new binary", err)
+		}
+		updateScript = binaryPath + ".update.bat"
 	}
 
 	// Create batch script to complete the update after goenv exits
-	updateScript := binaryPath + ".update.bat"
 	scriptContent := fmt.Sprintf(`@echo off
 REM goenv Windows Update Helper Script
 REM This script completes the update after goenv.exe exits
@@ -1014,6 +1047,9 @@ del "%%~f0" >nul 2>&1
 
 	// Start the batch script in a new console window
 	startCmd := exec.Command("cmd", "/C", "start", "goenv Update", updateScript)
+	if elevated {
+		startCmd = elevatedStartCommand(updateScript)
+	}
 	startCmd.SysProcAttr = nil // Let it run detached
 	if err := startCmd.Start(); err != nil {
 		os.Remove(newPath)
