@@ -269,7 +269,7 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 	// The shared module cache lives outside versions/ and survives version
 	// removal, so "No Go versions installed" would hide gigabytes of reclaimable
 	// disk (issue #578). Fall through and let the display report what exists.
-	if len(versions) == 0 && !utils.DirExists(filepath.Join(cfg.Root, "shared", "go-mod")) {
+	if len(versions) == 0 && !utils.DirExists(cfg.SharedModCacheDir()) {
 		if statusJSON {
 			// Output minimal JSON for no versions
 			result := cacheStatusJSON{
@@ -541,7 +541,7 @@ func runCacheClean(cmd *cobra.Command, args []string) error {
 	// cache lives outside versions/ and survives version removal, so gating
 	// cleanup on installed versions made it impossible to reclaim — while
 	// 'cache status' was telling users to run exactly this command (issue #578).
-	if len(versions) == 0 && !utils.DirExists(filepath.Join(cfg.Root, "shared", "go-mod")) {
+	if len(versions) == 0 && !utils.DirExists(cfg.SharedModCacheDir()) {
 		fmt.Fprintln(cmd.OutOrStdout(), "No Go versions installed.")
 		return nil
 	}

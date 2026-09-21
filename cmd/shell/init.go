@@ -259,7 +259,7 @@ func renderInitScript(shell shellutil.ShellType, cfg *config.Config, noRehash bo
 		builder.WriteString("if (Test-Path $env:GOENV_RC_FILE) {\n")
 		builder.WriteString("  . $env:GOENV_RC_FILE\n")
 		builder.WriteString("}\n")
-		shimsDir := filepath.Join(cfg.Root, "shims")
+		shimsDir := cfg.ShimsDir()
 		builder.WriteString("# Remove shims from PATH if present (to re-add in correct position)\n")
 		builder.WriteString(fmt.Sprintf("$env:PATH = ($env:PATH -split ';' | Where-Object { $_ -ne '%s' }) -join ';'\n", shimsDir))
 		builder.WriteString("# Add shims directory to PATH in correct position\n")
@@ -277,7 +277,7 @@ func renderInitScript(shell shellutil.ShellType, cfg *config.Config, noRehash bo
 		builder.WriteString("IF EXIST \"%GOENV_RC_FILE%\" (\n")
 		builder.WriteString("  CALL \"%GOENV_RC_FILE%\"\n")
 		builder.WriteString(")\n")
-		shimsDir := filepath.Join(cfg.Root, "shims")
+		shimsDir := cfg.ShimsDir()
 		builder.WriteString("REM Remove shims from PATH if present (to re-add in correct position)\n")
 		builder.WriteString(fmt.Sprintf("CALL SET PATH=%%PATH:%s;=%%\n", shimsDir))
 		builder.WriteString(fmt.Sprintf("CALL SET PATH=%%PATH:;%s=%%\n", shimsDir))
@@ -718,7 +718,7 @@ func runShShell(cmd *cobra.Command, args []string) error {
 	if versionStr != manager.SystemVersion {
 		versions := strings.Split(versionStr, ":")
 		for _, v := range versions {
-			versionPath := filepath.Join(cfg.Root, "versions", v)
+			versionPath := cfg.VersionDir(v)
 			if utils.FileNotExists(versionPath) {
 				fmt.Fprintf(cmd.ErrOrStderr(), "goenv: version '%s' not installed\n", v)
 				fmt.Fprintln(cmd.OutOrStdout(), "false")
@@ -745,7 +745,7 @@ func checkShellInitialized(cfg *config.Config) bool {
 	}
 
 	// Check if shims directory is in PATH
-	shimsDir := filepath.Join(cfg.Root, "shims")
+	shimsDir := cfg.ShimsDir()
 	path := os.Getenv(utils.EnvVarPath)
 
 	// Platform-specific path separator

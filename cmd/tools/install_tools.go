@@ -2,7 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -149,7 +148,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		if len(targetVersions) > 1 {
 			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n",
 				utils.BoldCyan("Go "+version+":"),
-				utils.Gray("("+filepath.Join(cfg.Root, "versions", version)+")"))
+				utils.Gray("("+cfg.VersionDir(version)+")"))
 		}
 
 		for _, pkg := range packages {

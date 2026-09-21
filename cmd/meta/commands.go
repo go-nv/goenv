@@ -52,7 +52,7 @@ func runCommands(cmd *cobra.Command, args []string) error {
 	commands := []string{}
 
 	// Add installed versions
-	versionsDir := filepath.Join(cfg.Root, "versions")
+	versionsDir := cfg.VersionsDir()
 	if entries, err := os.ReadDir(versionsDir); err == nil {
 		for _, entry := range entries {
 			if entry.IsDir() {

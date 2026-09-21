@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/cgo"
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
@@ -242,7 +243,7 @@ func GetCacheStatus(goenvRoot string, fast bool) (*CacheStatus, error) {
 
 	// Check for shared module cache (v3+). Deliberately outside the versions
 	// walk above — see the comment there.
-	sharedModCachePath := filepath.Join(goenvRoot, "shared", "go-mod")
+	sharedModCachePath := config.SharedModCacheDir(goenvRoot)
 	if utils.DirExists(sharedModCachePath) {
 		cacheInfo, err := GetCacheInfo(sharedModCachePath, CacheKindMod, fast)
 		if err == nil {

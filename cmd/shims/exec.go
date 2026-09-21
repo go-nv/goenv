@@ -212,7 +212,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		//
 		// Respects existing GOMODCACHE if already set (via go env -w or environment)
 		if os.Getenv(utils.EnvVarGomodcache) == "" {
-			versionGomodcache := filepath.Join(cfg.Root, "shared", "go-mod")
+			versionGomodcache := cfg.SharedModCacheDir()
 			execEnv = setEnvVar(execEnv, utils.EnvVarGomodcache, versionGomodcache)
 		}
 	}

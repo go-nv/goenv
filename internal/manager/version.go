@@ -827,7 +827,7 @@ func (m *Manager) findSystemGoInPath() (string, error) {
 
 	// Get goenv-managed paths to exclude
 	goenvVersionsDir := m.config.VersionsDir()
-	goenvShimsDir := filepath.Join(m.config.Root, "shims")
+	goenvShimsDir := m.config.ShimsDir()
 
 	pathDirs := strings.Split(pathEnv, string(os.PathListSeparator))
 	for _, dir := range pathDirs {

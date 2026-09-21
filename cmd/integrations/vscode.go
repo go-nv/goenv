@@ -407,7 +407,7 @@ func InitializeVSCodeWorkspaceWithVersion(cmd *cobra.Command, version string) er
 		}
 
 		// Build paths using env var prefix for portability across users
-		gorootAbs := filepath.Join(cfg.Root, "versions", version)
+		gorootAbs := cfg.VersionDir(version)
 		goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
 		// Build GOPATH: $GOPATH_PREFIX/<version> (default $HOME/go/<version>)
@@ -809,7 +809,7 @@ func runVSCodeSync(cmd *cobra.Command, args []string) error {
 		homeEnvVar = "${env:HOME}"
 	}
 
-	gorootAbs := filepath.Join(cfg.Root, "versions", version)
+	gorootAbs := cfg.VersionDir(version)
 	goroot := strings.Replace(gorootAbs, homeDir, homeEnvVar, 1)
 
 	gopathAbs := cfg.ManagedGopath(version)

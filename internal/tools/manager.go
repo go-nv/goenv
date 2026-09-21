@@ -249,7 +249,7 @@ func (m *Manager) Uninstall(opts UninstallOptions) (*UninstallResult, error) {
 // This is useful for commands that need per-tool progress feedback.
 // For batch uninstallation, use Uninstall() instead.
 func (m *Manager) UninstallSingleTool(version, toolName string) error {
-	binPath := filepath.Join(m.cfg.Root, "versions", version, "gopath", "bin")
+	binPath := m.cfg.VersionGopathBin(version)
 
 	// Find and remove all platform variants
 	candidates := []string{

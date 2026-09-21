@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	goenvcfg "github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
@@ -288,7 +289,7 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 	goBinDir := filepath.Join(hostGopath, "bin")
 	gomodcache := pathutil.ExpandPath(os.Getenv(utils.EnvVarGomodcache))
 	if gomodcache == "" {
-		gomodcache = filepath.Join(goenvRoot, "shared", "go-mod") // matches exec.go behavior
+		gomodcache = goenvcfg.SharedModCacheDir(goenvRoot) // matches exec.go behavior
 	}
 	// Strip GOCACHE too so an inherited literal '~' (or unexpanded $VAR) can't
 	// make the `go install` below reject it, just like GOPATH; re-add it expanded.
