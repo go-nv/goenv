@@ -473,21 +473,22 @@ func swapGoenvBinary(target string) {
 		success(fmt.Sprintf("Backed up: %s", backupFile))
 	}
 
-	// Copy Go binary to goenv location
+	// Copy Go binary to goenv location.
+	//
+	// Write a sibling temp file and rename it over the target instead of
+	// truncating the target in place. On macOS, overwriting a signed binary in
+	// place invalidates the kernel's cached code signature for that file and the
+	// next exec dies with "Killed: 9"; a rename yields a fresh inode that
+	// re-validates cleanly. Rename is also atomic, so a failed copy can never
+	// leave a half-written goenv on disk.
 	log("Replacing with Go version...")
 
-	src, err := os.Open(goBinary)
-	if err != nil {
-		errorExit(fmt.Sprintf("Cannot read Go binary: %v", err))
-	}
-	defer src.Close()
-
-	dst, err := os.Create(target)
-	if err != nil {
-		// Try with sudo if regular copy fails (Unix only)
+	if err := installBinary(goBinary, target); err != nil {
+		// Try with sudo if regular install fails (Unix only)
 		if !platform.IsWindows() {
 			log("Regular copy failed, trying with sudo...")
 			if err := utils.RunCommand("sudo", "cp", goBinary, target); err == nil {
+				resignMachO(target, true)
 				success(fmt.Sprintf("Copied: %s → %s (with sudo)", goBinary, target))
 			} else {
 				errorExit(fmt.Sprintf("Cannot copy to %s\n\nTry manually:\n  sudo cp %s %s", target, goBinary, target))
@@ -496,19 +497,7 @@ func swapGoenvBinary(target string) {
 			errorExit(fmt.Sprintf("Cannot write to %s: %v", target, err))
 		}
 	} else {
-		defer dst.Close()
-		if _, err := io.Copy(dst, src); err != nil {
-			errorExit(fmt.Sprintf("Copy failed: %v", err))
-		}
-		dst.Chmod(utils.PermFileExecutable)
 		success(fmt.Sprintf("Copied: %s → %s", goBinary, target))
-
-		// Make executable (Unix only - Windows uses file extension)
-		if !platform.IsWindows() {
-			if err := os.Chmod(target, utils.PermFileExecutable); err != nil {
-				warn(fmt.Sprintf("Could not set executable permission: %v", err))
-			}
-		}
 	}
 
 	// Verify file was copied
@@ -518,6 +507,65 @@ func swapGoenvBinary(target string) {
 	} else {
 		errorExit("Verification failed: file not found")
 	}
+}
+
+// installBinary copies src over dst by writing a sibling temp file and renaming
+// it into place. The rename is atomic and produces a fresh inode, which avoids
+// the macOS "Killed: 9" that results from truncating a code-signed binary in
+// place (see swapGoenvBinary). On failure the temp file is removed so the
+// existing target is left untouched.
+func installBinary(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	tmp := dst + ".goenv-swap-tmp"
+	out, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, utils.PermFileExecutable)
+	if err != nil {
+		return err
+	}
+
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	// Ensure the executable bit survives even a restrictive umask.
+	if err := os.Chmod(tmp, utils.PermFileExecutable); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+
+	resignMachO(dst, false)
+	return nil
+}
+
+// resignMachO re-applies an ad-hoc code signature on macOS. A binary copied
+// onto an existing signed path can otherwise be killed on first exec
+// ("Killed: 9"). Best-effort: if codesign is unavailable the freshly renamed
+// inode usually execs anyway, so failures here are non-fatal.
+func resignMachO(path string, sudo bool) {
+	if !platform.IsMacOS() {
+		return
+	}
+	if _, err := exec.LookPath("codesign"); err != nil {
+		return
+	}
+	if sudo {
+		_ = utils.RunCommand("sudo", "codesign", "--force", "--sign", "-", path)
+		return
+	}
+	_ = utils.RunCommand("codesign", "--force", "--sign", "-", path)
 }
 
 func cmdBash() {
