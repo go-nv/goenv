@@ -268,8 +268,12 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 	// Note: we deliberately do NOT return early when no versions are installed.
 	// The shared module cache lives outside versions/ and survives version
 	// removal, so "No Go versions installed" would hide gigabytes of reclaimable
-	// disk (issue #578). Fall through and let the display report what exists.
-	if len(versions) == 0 && !utils.DirExists(cfg.SharedModCacheDir()) {
+	// disk (issue #578). A GOENV_GOCACHE_DIR build cache is off-root the same
+	// way, so it must also keep us from short-circuiting. Fall through and let
+	// the display report what exists.
+	customGocache := cache.CustomBuildCacheDir()
+	if len(versions) == 0 && !utils.DirExists(cfg.SharedModCacheDir()) &&
+		(customGocache == "" || !utils.DirExists(customGocache)) {
 		if statusJSON {
 			// Output minimal JSON for no versions
 			result := cacheStatusJSON{
@@ -541,7 +545,11 @@ func runCacheClean(cmd *cobra.Command, args []string) error {
 	// cache lives outside versions/ and survives version removal, so gating
 	// cleanup on installed versions made it impossible to reclaim — while
 	// 'cache status' was telling users to run exactly this command (issue #578).
-	if len(versions) == 0 && !utils.DirExists(cfg.SharedModCacheDir()) {
+	// A GOENV_GOCACHE_DIR build cache is off-root the same way, so account for it
+	// too or clean would refuse to reclaim it once the last version is gone.
+	customGocache := cache.CustomBuildCacheDir()
+	if len(versions) == 0 && !utils.DirExists(cfg.SharedModCacheDir()) &&
+		(customGocache == "" || !utils.DirExists(customGocache)) {
 		fmt.Fprintln(cmd.OutOrStdout(), "No Go versions installed.")
 		return nil
 	}

@@ -198,11 +198,24 @@ func GetCacheInfo(cachePath string, kind CacheKind, fast bool) (*CacheInfo, erro
 // on uninstall — the same writer/reader path divergence that hid the
 // architecture-suffixed caches.
 func buildCacheBaseDirs(goenvRoot string) []string {
-	dirs := []string{filepath.Join(goenvRoot, "versions")}
-	if custom := pathutil.ExpandPath(utils.GoenvEnvVarGocacheDir.UnsafeValue()); custom != "" {
+	versionsDir := filepath.Join(goenvRoot, "versions")
+	dirs := []string{versionsDir}
+	// Only add the override when it is set AND distinct from versions/. If a user
+	// points GOENV_GOCACHE_DIR at $GOENV_ROOT/versions (or it otherwise resolves
+	// to the same place), scanning it twice would double-count sizes and try to
+	// remove every cache twice.
+	if custom := CustomBuildCacheDir(); custom != "" && filepath.Clean(custom) != filepath.Clean(versionsDir) {
 		dirs = append(dirs, custom)
 	}
 	return dirs
+}
+
+// CustomBuildCacheDir returns the expanded GOENV_GOCACHE_DIR — the off-root base
+// where `goenv exec` places build caches when that variable is set — or "" when
+// unset. It is the single source of truth for readers (the status/clean no-work
+// guards and the scanner) that must honour the same override the writer does.
+func CustomBuildCacheDir() string {
+	return pathutil.ExpandPath(utils.GoenvEnvVarGocacheDir.UnsafeValue())
 }
 
 // GetCacheStatus gathers metadata about all caches in the GOENV_ROOT.

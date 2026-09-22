@@ -542,8 +542,18 @@ func installBinary(src, dst string) error {
 		return err
 	}
 	if err := os.Rename(tmp, dst); err != nil {
-		os.Remove(tmp)
-		return err
+		// POSIX rename atomically replaces an existing destination, but Windows
+		// refuses to rename onto an existing file — which is the normal "replace
+		// the installed binary" case. Remove the destination and retry. The caller
+		// has already backed the original up, and tmp is preserved if this fails.
+		if removeErr := os.Remove(dst); removeErr != nil {
+			os.Remove(tmp)
+			return err
+		}
+		if err := os.Rename(tmp, dst); err != nil {
+			os.Remove(tmp)
+			return err
+		}
 	}
 
 	resignMachO(dst, false)

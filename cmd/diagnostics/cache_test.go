@@ -110,6 +110,7 @@ func TestCacheStatusNoVersions(t *testing.T) {
 
 	// Set GOENV_ROOT environment variable
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+	t.Setenv(utils.GoenvEnvVarGocacheDir.String(), "") // hermetic: ignore any ambient override
 
 	cmd := cacheStatusCmd
 	output := &bytes.Buffer{}
@@ -668,6 +669,65 @@ func TestCacheClean_CurrentConflictsWithVersion(t *testing.T) {
 	err := runCacheClean(cmd, []string{"build"})
 	require.Error(t, err, "--current with --version must be rejected")
 	assert.Contains(t, err.Error(), "--current cannot be combined with --version")
+}
+
+// TestCacheStatus_CustomGocacheDirVisibleWithoutVersions pins the fix for the
+// no-work guard: with zero installed versions but a build cache under
+// GOENV_GOCACHE_DIR, status must NOT short-circuit with "No Go versions
+// installed" — that off-root cache is real and reclaimable.
+func TestCacheStatus_CustomGocacheDirVisibleWithoutVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+
+	customDir := filepath.Join(tmpDir, "custom-gocache")
+	cacheDir := filepath.Join(customDir, "1.27.0", "go-build-host-host-cgo")
+	require.NoError(t, utils.EnsureDirWithContext(cacheDir, "create custom cache"))
+	testutil.WriteTestFile(t, filepath.Join(cacheDir, "a.a"), []byte("obj"), utils.PermFileDefault)
+	t.Setenv(utils.GoenvEnvVarGocacheDir.String(), customDir)
+
+	cmd := cacheStatusCmd
+	output := &bytes.Buffer{}
+	cmd.SetOut(output)
+	cmd.SetErr(output)
+	require.NoError(t, runCacheStatus(cmd, []string{}))
+
+	out := output.String()
+	assert.NotContains(t, out, "No Go versions installed", "must not short-circuit when a custom-dir cache exists")
+	assert.Contains(t, out, "1.27.0", "must show the off-root cache's version")
+}
+
+// TestCacheClean_CustomGocacheDirCleanedWithoutVersions is the clean-side twin:
+// the guard must not refuse to reclaim an off-root cache once the last version
+// is gone.
+func TestCacheClean_CustomGocacheDirCleanedWithoutVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
+
+	customDir := filepath.Join(tmpDir, "custom-gocache")
+	cacheDir := filepath.Join(customDir, "1.27.0", "go-build-host-host-cgo")
+	require.NoError(t, utils.EnsureDirWithContext(cacheDir, "create custom cache"))
+	testutil.WriteTestFile(t, filepath.Join(cacheDir, "a.a"), []byte("obj"), utils.PermFileDefault)
+	t.Setenv(utils.GoenvEnvVarGocacheDir.String(), customDir)
+
+	origForce, origDryRun, origCurrent, origVersion := cleanForce, cleanDryRun, cleanCurrent, cleanVersion
+	defer func() {
+		cleanForce, cleanDryRun, cleanCurrent, cleanVersion = origForce, origDryRun, origCurrent, origVersion
+	}()
+	cleanForce = true
+	cleanDryRun = false
+	cleanCurrent = false
+	cleanVersion = ""
+
+	cmd := cacheCleanCmd
+	output := &bytes.Buffer{}
+	cmd.SetOut(output)
+	cmd.SetErr(output)
+	require.NoError(t, runCacheClean(cmd, []string{"build"}))
+
+	out := output.String()
+	assert.NotContains(t, out, "No Go versions installed", "clean must not short-circuit when a custom-dir cache exists")
+	assert.Contains(t, out, "Removed", "clean must remove the off-root cache")
+	assert.True(t, utils.FileNotExists(cacheDir), "off-root cache should be removed: %s", cacheDir)
 }
 
 func TestGetDirSizeWithOptions_FastMode(t *testing.T) {

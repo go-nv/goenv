@@ -291,6 +291,7 @@ func TestGetCacheStatus(t *testing.T) {
 func TestGetCacheStatusEmpty(t *testing.T) {
 	// Test with empty goenv root
 	tempDir := t.TempDir()
+	t.Setenv(utils.GoenvEnvVarGocacheDir.String(), "") // hermetic: ignore any ambient override
 
 	status, err := GetCacheStatus(tempDir, false)
 	require.NoError(t, err, "GetCacheStatus() with empty root should not error")
@@ -352,6 +353,28 @@ func TestGetCacheStatus_FindsCachesUnderGoenvGocacheDir(t *testing.T) {
 	assert.Equal(t, "1.27.0", status.BuildCaches[0].GoVersion, "off-root cache must be attributed to its version")
 	assert.Greater(t, status.TotalSize, int64(0), "TotalSize must include the off-root cache")
 	require.Contains(t, status.ByVersion, "1.27.0", "off-root cache must be grouped under its version")
+}
+
+// TestGetCacheStatus_DeduplicatesCustomDirEqualToVersions guards against
+// double-counting when GOENV_GOCACHE_DIR resolves to $GOENV_ROOT/versions (the
+// default base). Without dedup the same directory is scanned twice, doubling
+// reported sizes and making clean try to remove every cache twice.
+func TestGetCacheStatus_DeduplicatesCustomDirEqualToVersions(t *testing.T) {
+	root := t.TempDir()
+
+	cacheDir := filepath.Join(root, "versions", "1.27.0", "go-build-host-host-cgo")
+	require.NoError(t, utils.EnsureDirWithContext(cacheDir, "create cache"))
+	testutil.WriteTestFile(t, filepath.Join(cacheDir, "a.o"), []byte("compiled object"), utils.PermFileDefault)
+
+	// Point the override at the default versions dir; it must NOT be scanned twice.
+	t.Setenv(utils.GoenvEnvVarGocacheDir.String(), filepath.Join(root, "versions"))
+
+	status, err := GetCacheStatus(root, false)
+	require.NoError(t, err, "GetCacheStatus() error")
+
+	require.Len(t, status.BuildCaches, 1, "cache under a dir equal to versions/ must be counted once, not twice")
+	require.Contains(t, status.ByVersion, "1.27.0")
+	assert.Len(t, status.ByVersion["1.27.0"].BuildCaches, 1, "no duplicate build-cache entries for the version")
 }
 
 func TestGetVersionCaches(t *testing.T) {
