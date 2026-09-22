@@ -4099,7 +4099,7 @@ func checkPathOrder(cfg *config.Config) checkResult {
 	}
 
 	pathDirs := filepath.SplitList(pathEnv)
-	shimsDir := filepath.Join(cfg.Root, "shims")
+	shimsDir := cfg.ShimsDir()
 
 	var shimsIndex int = -1
 	var systemGoIndex int = -1

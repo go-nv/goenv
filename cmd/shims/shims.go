@@ -294,7 +294,7 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config, 
 		// Handle system version
 		if version == manager.SystemVersion {
 			// Look for command in PATH, excluding GOENV_ROOT/shims
-			commandPath, err := findInSystemPath(commandName, cfg.Root)
+			commandPath, err := findInSystemPath(commandName, cfg.ShimsDir())
 			if err == nil {
 				fmt.Fprintln(cmd.OutOrStdout(), commandPath)
 				return nil
@@ -355,13 +355,11 @@ func runWhichManual(cmd *cobra.Command, commandName string, cfg *config.Config, 
 }
 
 // findInSystemPath searches for a command in PATH, excluding goenv shims
-func findInSystemPath(commandName string, goenvRoot string) (string, error) {
+func findInSystemPath(commandName string, shimsDir string) (string, error) {
 	pathEnv := os.Getenv(utils.EnvVarPath)
 	if pathEnv == "" {
 		return "", fmt.Errorf("command not found")
 	}
-
-	shimsDir := filepath.Join(goenvRoot, "shims")
 
 	// Normalize shims directory to absolute path for accurate comparison
 	shimsAbs, err := filepath.Abs(shimsDir)

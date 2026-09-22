@@ -173,7 +173,7 @@ func findCurrentVersionToolTargets(cfg *config.Config, mgr *manager.Manager, too
 		return nil
 	}
 
-	gopath := filepath.Join(cfg.Root, "versions", currentVersion, "gopath")
+	gopath := filepath.Join(cfg.VersionDir(currentVersion), "gopath")
 	binPath := filepath.Join(gopath, "bin")
 
 	var targets []toolUninstallTarget
@@ -195,7 +195,7 @@ func findCurrentVersionToolTargets(cfg *config.Config, mgr *manager.Manager, too
 }
 
 func findAllVersionToolTargets(cfg *config.Config, toolNames []string) []toolUninstallTarget {
-	versionsDir := filepath.Join(cfg.Root, "versions")
+	versionsDir := cfg.VersionsDir()
 	entries, err := os.ReadDir(versionsDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s Failed to read versions directory: %v\n",

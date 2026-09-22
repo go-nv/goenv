@@ -16,6 +16,7 @@ import (
 	"github.com/go-nv/goenv/internal/envdetect"
 	"github.com/go-nv/goenv/internal/errors"
 	"github.com/go-nv/goenv/internal/helptext"
+	"github.com/go-nv/goenv/internal/manager"
 	"github.com/go-nv/goenv/internal/platform"
 	"github.com/go-nv/goenv/internal/utils"
 	"github.com/spf13/cobra"
@@ -98,6 +99,9 @@ Examples:
   # Clean specific version:
   goenv cache clean build --version 1.23.2
 
+  # Clean only the version this directory resolves to (.go-version/go.mod/global):
+  goenv cache clean build --current
+
   # Clean old format caches only:
   goenv cache clean build --old-format
 
@@ -160,6 +164,7 @@ Examples:
 
 var (
 	cleanVersion   string
+	cleanCurrent   bool
 	cleanOldFormat bool
 	cleanForce     bool
 	cleanMaxBytes  string
@@ -183,6 +188,7 @@ func init() {
 	cacheStatusCmd.Flags().BoolVar(&statusFast, "fast", false, "Fast mode: skip file counting for better performance")
 
 	cacheCleanCmd.Flags().StringVar(&cleanVersion, "version", "", "Clean caches for specific version only")
+	cacheCleanCmd.Flags().BoolVar(&cleanCurrent, "current", false, "Clean caches only for the version this directory resolves to (see 'goenv current')")
 	cacheCleanCmd.Flags().BoolVar(&cleanOldFormat, "old-format", false, "Clean old format caches only")
 	cacheCleanCmd.Flags().BoolVarP(&cleanForce, "force", "f", false, "Skip confirmation prompt")
 	cacheCleanCmd.Flags().StringVar(&cleanMaxBytes, "max-bytes", "", "Keep only this much cache (e.g., 1GB, 500MB) - deletes oldest first")
@@ -262,8 +268,12 @@ func runCacheStatus(cmd *cobra.Command, args []string) error {
 	// Note: we deliberately do NOT return early when no versions are installed.
 	// The shared module cache lives outside versions/ and survives version
 	// removal, so "No Go versions installed" would hide gigabytes of reclaimable
-	// disk (issue #578). Fall through and let the display report what exists.
-	if len(versions) == 0 && !utils.DirExists(filepath.Join(cfg.Root, "shared", "go-mod")) {
+	// disk (issue #578). A GOENV_GOCACHE_DIR build cache is off-root the same
+	// way, so it must also keep us from short-circuiting. Fall through and let
+	// the display report what exists.
+	customGocache := cache.CustomBuildCacheDir()
+	if len(versions) == 0 && !utils.DirExists(cfg.SharedModCacheDir()) &&
+		(customGocache == "" || !utils.DirExists(customGocache)) {
 		if statusJSON {
 			// Output minimal JSON for no versions
 			result := cacheStatusJSON{
@@ -535,9 +545,46 @@ func runCacheClean(cmd *cobra.Command, args []string) error {
 	// cache lives outside versions/ and survives version removal, so gating
 	// cleanup on installed versions made it impossible to reclaim — while
 	// 'cache status' was telling users to run exactly this command (issue #578).
-	if len(versions) == 0 && !utils.DirExists(filepath.Join(cfg.Root, "shared", "go-mod")) {
+	// A GOENV_GOCACHE_DIR build cache is off-root the same way, so account for it
+	// too or clean would refuse to reclaim it once the last version is gone.
+	customGocache := cache.CustomBuildCacheDir()
+	if len(versions) == 0 && !utils.DirExists(cfg.SharedModCacheDir()) &&
+		(customGocache == "" || !utils.DirExists(customGocache)) {
 		fmt.Fprintln(cmd.OutOrStdout(), "No Go versions installed.")
 		return nil
+	}
+
+	// --current scopes the clean to the version this directory resolves to,
+	// exactly as `goenv current` reports it. It is a convenience over --version,
+	// so the two are mutually exclusive.
+	if cleanCurrent {
+		if cleanVersion != "" {
+			return fmt.Errorf("--current cannot be combined with --version")
+		}
+
+		resolved, spec, source, rerr := mgr.GetCurrentVersionResolved()
+		if rerr != nil {
+			// Mirror `goenv current`: a named-but-uninstalled version gets the
+			// same detailed, actionable error instead of a bare failure.
+			if spec != "" && source != "" {
+				return errors.VersionNotInstalledDetailed(spec, source, versions)
+			}
+			return errors.FailedTo("determine active version", rerr)
+		}
+
+		if resolved == manager.SystemVersion {
+			fmt.Fprintln(cmd.OutOrStdout(),
+				"Current version is 'system'; goenv manages no caches for the system Go — nothing to clean.")
+			return nil
+		}
+
+		cleanVersion = resolved
+		if source != "" {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s Scoping to Go %s (set by %s)\n\n",
+				utils.Emoji("🎯"), resolved, source)
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s Scoping to Go %s\n\n", utils.Emoji("🎯"), resolved)
+		}
 	}
 
 	// Validate version flag if specified

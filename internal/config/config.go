@@ -117,6 +117,25 @@ func (c *Config) ShimsDir() string {
 	return filepath.Join(c.Root, "shims")
 }
 
+// SharedModCacheDir returns the module cache shared across all Go versions,
+// $GOENV_ROOT/shared/go-mod. In v3 the module cache is version-agnostic
+// (module source contains no compiled artifacts), so `goenv exec` points
+// GOMODCACHE here for every version.
+//
+// This is the single source of truth for that path. Writers (goenv exec, tool
+// install/update) and readers (cache status/clean) must all derive it from here
+// so they cannot drift — a hand-copied cache path that one side changed is
+// exactly how caches once became invisible to status/clean.
+func (c *Config) SharedModCacheDir() string {
+	return SharedModCacheDir(c.Root)
+}
+
+// SharedModCacheDir returns $root/shared/go-mod for callers that only have the
+// GOENV_ROOT path (not a *Config). Prefer the (*Config) method where possible.
+func SharedModCacheDir(root string) string {
+	return filepath.Join(root, "shared", "go-mod")
+}
+
 // GlobalVersionFile returns the path to the global version file
 func (c *Config) GlobalVersionFile() string {
 	return filepath.Join(c.Root, "version")

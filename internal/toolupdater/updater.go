@@ -434,7 +434,7 @@ func (u *Updater) updateTool(tool toolspkg.ToolMetadata, version, goVersion stri
 	}
 
 	// Set up paths
-	versionPath := filepath.Join(u.cfg.Root, "versions", goVersion)
+	versionPath := u.cfg.VersionDir(goVersion)
 	goRoot := versionPath
 	goBin := filepath.Join(goRoot, "bin", "go")
 	gopath := filepath.Join(versionPath, "gopath")
@@ -458,7 +458,7 @@ func (u *Updater) updateTool(tool toolspkg.ToolMetadata, version, goVersion stri
 
 	// Set shared GOMODCACHE if not already set (matches exec.go behavior)
 	if os.Getenv(utils.EnvVarGomodcache) == "" {
-		sharedGomodcache := filepath.Join(u.cfg.Root, "shared", "go-mod")
+		sharedGomodcache := u.cfg.SharedModCacheDir()
 		cmd.Env = append(cmd.Env, utils.EnvVarGomodcache+"="+sharedGomodcache)
 	}
 

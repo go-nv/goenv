@@ -3,7 +3,6 @@ package shims
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	cmdpkg "github.com/go-nv/goenv/cmd"
@@ -99,7 +98,7 @@ func runShRehash(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build GOROOT value (version install path)
-	gorootValue := filepath.Join(cfg.Root, "versions", currentVersion)
+	gorootValue := cfg.VersionDir(currentVersion)
 
 	// Generate shell-specific output
 	switch shellType {

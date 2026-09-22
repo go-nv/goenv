@@ -245,8 +245,9 @@ func TestFindInSystemPath(t *testing.T) {
 			defer os.Setenv(utils.EnvVarPath, originalPath)
 			os.Setenv(utils.EnvVarPath, tt.pathEnv)
 
-			// Call findInSystemPath
-			foundPath, err := findInSystemPath(tt.commandName, goenvRoot)
+			// Call findInSystemPath with the shims directory to exclude (matching the
+			// production caller, which passes cfg.ShimsDir()).
+			foundPath, err := findInSystemPath(tt.commandName, shimsDir)
 
 			if tt.expectFound {
 				if err != nil {

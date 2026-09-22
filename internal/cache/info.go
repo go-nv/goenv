@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/go-nv/goenv/internal/cgo"
+	"github.com/go-nv/goenv/internal/config"
 	"github.com/go-nv/goenv/internal/errors"
+	"github.com/go-nv/goenv/internal/pathutil"
 	"github.com/go-nv/goenv/internal/utils"
 )
 
@@ -185,6 +187,37 @@ func GetCacheInfo(cachePath string, kind CacheKind, fast bool) (*CacheInfo, erro
 	return info, nil
 }
 
+// buildCacheBaseDirs returns every directory that may contain per-version build
+// caches laid out as <dir>/<version>/go-build-*.
+//
+// That is always <goenvRoot>/versions. When GOENV_GOCACHE_DIR is set it is ALSO
+// that directory: `goenv exec` points GOCACHE at
+// <GOENV_GOCACHE_DIR>/<version>/go-build-* (see cmd/shims/exec.go), entirely
+// off-root. The reader MUST consult the same override the writer does, or caches
+// created under a custom dir are invisible to status/clean/info and are leaked
+// on uninstall — the same writer/reader path divergence that hid the
+// architecture-suffixed caches.
+func buildCacheBaseDirs(goenvRoot string) []string {
+	versionsDir := filepath.Join(goenvRoot, "versions")
+	dirs := []string{versionsDir}
+	// Only add the override when it is set AND distinct from versions/. If a user
+	// points GOENV_GOCACHE_DIR at $GOENV_ROOT/versions (or it otherwise resolves
+	// to the same place), scanning it twice would double-count sizes and try to
+	// remove every cache twice.
+	if custom := CustomBuildCacheDir(); custom != "" && filepath.Clean(custom) != filepath.Clean(versionsDir) {
+		dirs = append(dirs, custom)
+	}
+	return dirs
+}
+
+// CustomBuildCacheDir returns the expanded GOENV_GOCACHE_DIR — the off-root base
+// where `goenv exec` places build caches when that variable is set — or "" when
+// unset. It is the single source of truth for readers (the status/clean no-work
+// guards and the scanner) that must honour the same override the writer does.
+func CustomBuildCacheDir() string {
+	return pathutil.ExpandPath(utils.GoenvEnvVarGocacheDir.UnsafeValue())
+}
+
 // GetCacheStatus gathers metadata about all caches in the GOENV_ROOT.
 //
 // Parameters:
@@ -199,27 +232,31 @@ func GetCacheStatus(goenvRoot string, fast bool) (*CacheStatus, error) {
 		ByVersion:   make(map[string]*VersionCaches),
 	}
 
-	versionsDir := filepath.Join(goenvRoot, "versions")
-
-	// Walk through all version directories.
+	// Build caches live under <base>/<version>/go-build-*. That base is normally
+	// <goenvRoot>/versions, but GOENV_GOCACHE_DIR relocates it off-root and
+	// `goenv exec` honours that override — so the scanner has to read the SAME
+	// override or every cache under a custom dir is invisible (see
+	// buildCacheBaseDirs).
 	//
-	// A missing versions/ directory is not a reason to stop: the shared module
-	// cache lives outside versions/ and outlives every version, so returning
-	// here would report zero bytes while gigabytes sit on disk (issue #578).
-	if utils.DirExists(versionsDir) {
-		entries, err := os.ReadDir(versionsDir)
-		if err != nil {
-			return nil, errors.FailedTo("read versions directory", err)
+	// A missing base directory is not a reason to stop: the shared module cache
+	// lives outside these bases and outlives every version, so returning here
+	// would report zero bytes while gigabytes sit on disk (issue #578).
+	for _, base := range buildCacheBaseDirs(goenvRoot) {
+		if !utils.DirExists(base) {
+			continue
 		}
-
-		if err := collectVersionCaches(status, versionsDir, entries, fast); err != nil {
+		entries, err := os.ReadDir(base)
+		if err != nil {
+			return nil, errors.FailedTo("read cache directory", err)
+		}
+		if err := collectVersionCaches(status, base, entries, fast); err != nil {
 			return nil, err
 		}
 	}
 
 	// Check for shared module cache (v3+). Deliberately outside the versions
 	// walk above — see the comment there.
-	sharedModCachePath := filepath.Join(goenvRoot, "shared", "go-mod")
+	sharedModCachePath := config.SharedModCacheDir(goenvRoot)
 	if utils.DirExists(sharedModCachePath) {
 		cacheInfo, err := GetCacheInfo(sharedModCachePath, CacheKindMod, fast)
 		if err == nil {
@@ -237,57 +274,47 @@ func GetCacheStatus(goenvRoot string, fast bool) (*CacheStatus, error) {
 	return status, nil
 }
 
-// collectVersionCaches walks each installed version and records its build and
-// module caches into status.
-func collectVersionCaches(status *CacheStatus, versionsDir string, entries []os.DirEntry, fast bool) error {
+// collectVersionCaches walks each version subdirectory of baseDir and records
+// its build and module caches into status. baseDir is <goenvRoot>/versions or a
+// GOENV_GOCACHE_DIR override (see buildCacheBaseDirs).
+func collectVersionCaches(status *CacheStatus, baseDir string, entries []os.DirEntry, fast bool) error {
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
 		version := entry.Name()
-		versionPath := filepath.Join(versionsDir, version)
+		versionPath := filepath.Join(baseDir, version)
 
-		// Check for build caches in pkg/ directory (new format)
-		buildCacheBase := filepath.Join(versionPath, "pkg")
-		if buildEntries, err := os.ReadDir(buildCacheBase); err == nil {
+		// Build caches live DIRECTLY in the version directory, named
+		// go-build-{GOOS}-{GOARCH}[-cgo][-abi] (or the legacy bare "go-build").
+		// That is exactly where `goenv exec` points GOCACHE, so it is the only
+		// place a build cache can appear.
+		//
+		// A previous implementation scanned versionPath/pkg/ for the new format
+		// and only recognised a bare "go-build" directly in the version dir.
+		// Every architecture-suffixed cache (e.g. go-build-host-host-cgo) fell
+		// through both checks, so status/clean/info reported "No caches found"
+		// while gigabytes of build cache sat on disk. Scan the version directory
+		// itself, which covers both the legacy and architecture-aware names.
+		if buildEntries, err := os.ReadDir(versionPath); err == nil {
 			for _, buildEntry := range buildEntries {
 				if !buildEntry.IsDir() || !strings.HasPrefix(buildEntry.Name(), "go-build") {
 					continue
 				}
 
-				cachePath := filepath.Join(buildCacheBase, buildEntry.Name())
+				cachePath := filepath.Join(versionPath, buildEntry.Name())
 				cacheInfo, err := GetCacheInfo(cachePath, CacheKindBuild, fast)
 				if err != nil {
 					// Skip caches we can't read
 					continue
 				}
+				// GetCacheInfo derives the version from a ".../versions/<v>/..."
+				// path segment, which is absent when the cache lives under a custom
+				// GOENV_GOCACHE_DIR. Attribute it explicitly so off-root caches are
+				// grouped under the right version rather than "".
+				cacheInfo.GoVersion = version
 
-				status.BuildCaches = append(status.BuildCaches, *cacheInfo)
-				status.TotalSize += cacheInfo.SizeBytes
-				if status.TotalFiles >= 0 && cacheInfo.Files >= 0 {
-					status.TotalFiles += cacheInfo.Files
-				} else {
-					status.TotalFiles = -1 // Mark as approximate
-				}
-
-				// Add to version-specific tracking
-				if _, exists := status.ByVersion[version]; !exists {
-					status.ByVersion[version] = &VersionCaches{
-						Version:     version,
-						BuildCaches: make([]CacheInfo, 0),
-					}
-				}
-				status.ByVersion[version].BuildCaches = append(status.ByVersion[version].BuildCaches, *cacheInfo)
-				status.ByVersion[version].TotalSize += cacheInfo.SizeBytes
-			}
-		}
-
-		// Check for old-format build cache directly in version directory
-		oldCachePath := filepath.Join(versionPath, "go-build")
-		if utils.DirExists(oldCachePath) {
-			cacheInfo, err := GetCacheInfo(oldCachePath, CacheKindBuild, fast)
-			if err == nil {
 				status.BuildCaches = append(status.BuildCaches, *cacheInfo)
 				status.TotalSize += cacheInfo.SizeBytes
 				if status.TotalFiles >= 0 && cacheInfo.Files >= 0 {
@@ -353,20 +380,41 @@ func GetVersionCaches(goenvRoot, version string, fast bool) ([]CacheInfo, error)
 		return nil, fmt.Errorf("version %s is not installed", version)
 	}
 
-	// Get build caches
-	buildCacheBase := filepath.Join(versionPath, "pkg")
-	if buildEntries, err := os.ReadDir(buildCacheBase); err == nil {
+	// Get build caches. These live directly in the version directory
+	// (go-build-{GOOS}-{GOARCH}[-cgo] or the legacy bare "go-build") — the same
+	// location `goenv exec` sets GOCACHE to. See collectVersionCaches.
+	if buildEntries, err := os.ReadDir(versionPath); err == nil {
 		for _, buildEntry := range buildEntries {
 			if !buildEntry.IsDir() || !strings.HasPrefix(buildEntry.Name(), "go-build") {
 				continue
 			}
 
-			cachePath := filepath.Join(buildCacheBase, buildEntry.Name())
+			cachePath := filepath.Join(versionPath, buildEntry.Name())
 			cacheInfo, err := GetCacheInfo(cachePath, CacheKindBuild, fast)
 			if err != nil {
 				continue
 			}
 			caches = append(caches, *cacheInfo)
+		}
+	}
+
+	// Also scan any GOENV_GOCACHE_DIR override, where `goenv exec` may have
+	// written this version's build caches (<custom>/<version>/go-build-*).
+	if custom := pathutil.ExpandPath(utils.GoenvEnvVarGocacheDir.UnsafeValue()); custom != "" {
+		customVersionPath := filepath.Join(custom, version)
+		if buildEntries, err := os.ReadDir(customVersionPath); err == nil {
+			for _, buildEntry := range buildEntries {
+				if !buildEntry.IsDir() || !strings.HasPrefix(buildEntry.Name(), "go-build") {
+					continue
+				}
+				cachePath := filepath.Join(customVersionPath, buildEntry.Name())
+				cacheInfo, err := GetCacheInfo(cachePath, CacheKindBuild, fast)
+				if err != nil {
+					continue
+				}
+				cacheInfo.GoVersion = version
+				caches = append(caches, *cacheInfo)
+			}
 		}
 	}
 

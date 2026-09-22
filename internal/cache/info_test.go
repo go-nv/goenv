@@ -232,11 +232,12 @@ func TestGetCacheStatus(t *testing.T) {
 	}
 
 	for _, v := range versions {
-		versionPath := filepath.Join(goenvRoot, "versions", v.version, "pkg")
+		versionPath := filepath.Join(goenvRoot, "versions", v.version)
 		err = utils.EnsureDirWithContext(versionPath, "create test directory")
 		require.NoError(t, err, "Failed to create version directory")
 
-		// Create build cache
+		// Create build cache directly in the version directory — this is where
+		// `goenv exec` points GOCACHE, and therefore where the scanner must look.
 		buildPath := filepath.Join(versionPath, v.buildCache)
 		err = utils.EnsureDirWithContext(buildPath, "create test directory")
 		require.NoError(t, err, "Failed to create build cache")
@@ -244,9 +245,9 @@ func TestGetCacheStatus(t *testing.T) {
 		testFile := filepath.Join(buildPath, "test.o")
 		testutil.WriteTestFile(t, testFile, []byte("compiled object"), utils.PermFileDefault, "Failed to write test file")
 
-		// Create mod cache if specified
+		// Create mod cache if specified (legacy per-version location under pkg/).
 		if v.hasModCache {
-			modPath := filepath.Join(versionPath, "mod")
+			modPath := filepath.Join(versionPath, "pkg", "mod")
 			err = utils.EnsureDirWithContext(modPath, "create test directory")
 			require.NoError(t, err, "Failed to create mod cache")
 			modFile := filepath.Join(modPath, "test.mod")
@@ -290,6 +291,7 @@ func TestGetCacheStatus(t *testing.T) {
 func TestGetCacheStatusEmpty(t *testing.T) {
 	// Test with empty goenv root
 	tempDir := t.TempDir()
+	t.Setenv(utils.GoenvEnvVarGocacheDir.String(), "") // hermetic: ignore any ambient override
 
 	status, err := GetCacheStatus(tempDir, false)
 	require.NoError(t, err, "GetCacheStatus() with empty root should not error")
@@ -299,6 +301,82 @@ func TestGetCacheStatusEmpty(t *testing.T) {
 	assert.Equal(t, int64(0), status.TotalSize, "Expected TotalSize=0")
 }
 
+// TestGetCacheStatus_FindsArchitectureSuffixedCacheInVersionDir is a regression
+// test for the bug where `goenv cache status/clean/info` reported "No caches
+// found" while gigabytes of build cache sat on disk.
+//
+// `goenv exec` sets GOCACHE to versions/{version}/go-build-{GOOS}-{GOARCH}[-cgo]
+// — directly in the version directory. The scanner previously looked under
+// versions/{version}/pkg/ and only recognised a bare "go-build" in the version
+// dir, so every real (architecture-suffixed) cache was invisible. The tests at
+// the time seeded the pkg/ layout, so they passed while the tool was broken.
+func TestGetCacheStatus_FindsArchitectureSuffixedCacheInVersionDir(t *testing.T) {
+	root := t.TempDir()
+
+	// Reproduce the exact on-disk name that triggered the report.
+	cacheDir := filepath.Join(root, "versions", "1.27.0", "go-build-host-host-cgo")
+	require.NoError(t, utils.EnsureDirWithContext(cacheDir, "create test cache"))
+	testutil.WriteTestFile(t, filepath.Join(cacheDir, "a.o"), []byte("compiled object"), utils.PermFileDefault)
+
+	status, err := GetCacheStatus(root, false)
+	require.NoError(t, err, "GetCacheStatus() error")
+
+	require.Len(t, status.BuildCaches, 1, "architecture-suffixed build cache in the version dir must be found")
+	assert.Equal(t, "1.27.0", status.BuildCaches[0].GoVersion, "GoVersion")
+	assert.False(t, status.BuildCaches[0].OldFormat, "suffixed cache is not old format")
+	assert.Greater(t, status.TotalSize, int64(0), "TotalSize must include the discovered cache")
+	require.Contains(t, status.ByVersion, "1.27.0", "cache must be attributed to its version")
+}
+
+// TestGetCacheStatus_FindsCachesUnderGoenvGocacheDir is a regression test for
+// the GOENV_GOCACHE_DIR override. `goenv exec` points GOCACHE at
+// <custom>/<version>/go-build-* when that variable is set — entirely off the
+// GOENV_ROOT tree. If the scanner only looks under <root>/versions, those
+// caches are invisible to status/clean/info (and leaked on uninstall): the same
+// writer/reader path divergence that hid the architecture-suffixed caches, just
+// triggered by a documented env override instead of the default layout.
+func TestGetCacheStatus_FindsCachesUnderGoenvGocacheDir(t *testing.T) {
+	root := t.TempDir()
+
+	// Deliberately empty under root/versions; everything lives off-root.
+	custom := t.TempDir()
+	t.Setenv(utils.GoenvEnvVarGocacheDir.String(), custom)
+
+	cacheDir := filepath.Join(custom, "1.27.0", "go-build-host-host-cgo")
+	require.NoError(t, utils.EnsureDirWithContext(cacheDir, "create custom cache"))
+	testutil.WriteTestFile(t, filepath.Join(cacheDir, "a.o"), []byte("compiled object"), utils.PermFileDefault)
+
+	status, err := GetCacheStatus(root, false)
+	require.NoError(t, err, "GetCacheStatus() error")
+
+	require.Len(t, status.BuildCaches, 1, "build cache under GOENV_GOCACHE_DIR must be found")
+	assert.Equal(t, "1.27.0", status.BuildCaches[0].GoVersion, "off-root cache must be attributed to its version")
+	assert.Greater(t, status.TotalSize, int64(0), "TotalSize must include the off-root cache")
+	require.Contains(t, status.ByVersion, "1.27.0", "off-root cache must be grouped under its version")
+}
+
+// TestGetCacheStatus_DeduplicatesCustomDirEqualToVersions guards against
+// double-counting when GOENV_GOCACHE_DIR resolves to $GOENV_ROOT/versions (the
+// default base). Without dedup the same directory is scanned twice, doubling
+// reported sizes and making clean try to remove every cache twice.
+func TestGetCacheStatus_DeduplicatesCustomDirEqualToVersions(t *testing.T) {
+	root := t.TempDir()
+
+	cacheDir := filepath.Join(root, "versions", "1.27.0", "go-build-host-host-cgo")
+	require.NoError(t, utils.EnsureDirWithContext(cacheDir, "create cache"))
+	testutil.WriteTestFile(t, filepath.Join(cacheDir, "a.o"), []byte("compiled object"), utils.PermFileDefault)
+
+	// Point the override at the default versions dir; it must NOT be scanned twice.
+	t.Setenv(utils.GoenvEnvVarGocacheDir.String(), filepath.Join(root, "versions"))
+
+	status, err := GetCacheStatus(root, false)
+	require.NoError(t, err, "GetCacheStatus() error")
+
+	require.Len(t, status.BuildCaches, 1, "cache under a dir equal to versions/ must be counted once, not twice")
+	require.Contains(t, status.ByVersion, "1.27.0")
+	assert.Len(t, status.ByVersion["1.27.0"].BuildCaches, 1, "no duplicate build-cache entries for the version")
+}
+
 func TestGetVersionCaches(t *testing.T) {
 	var err error
 	// Create a temporary test structure
@@ -306,11 +384,11 @@ func TestGetVersionCaches(t *testing.T) {
 	goenvRoot := tempDir
 	version := "1.23.2"
 
-	versionPath := filepath.Join(goenvRoot, "versions", version, "pkg")
+	versionPath := filepath.Join(goenvRoot, "versions", version)
 	err = utils.EnsureDirWithContext(versionPath, "create test directory")
 	require.NoError(t, err, "Failed to create version directory")
 
-	// Create multiple build caches
+	// Create multiple build caches directly in the version directory.
 	buildCaches := []string{"go-build", "go-build-darwin-arm64", "go-build-linux-amd64"}
 	for _, cacheName := range buildCaches {
 		cachePath := filepath.Join(versionPath, cacheName)
@@ -321,8 +399,8 @@ func TestGetVersionCaches(t *testing.T) {
 		testutil.WriteTestFile(t, testFile, []byte("test"), utils.PermFileDefault, "Failed to write test file")
 	}
 
-	// Create mod cache
-	modPath := filepath.Join(versionPath, "mod")
+	// Create mod cache (legacy per-version location under pkg/).
+	modPath := filepath.Join(versionPath, "pkg", "mod")
 	err = utils.EnsureDirWithContext(modPath, "create test directory")
 	require.NoError(t, err, "Failed to create mod cache")
 

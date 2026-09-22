@@ -2,7 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-nv/goenv/cmd/shims"
@@ -116,13 +115,13 @@ func runSyncTools(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if source version exists
-	sourcePath := filepath.Join(cfg.Root, "versions", sourceVersion)
+	sourcePath := cfg.VersionDir(sourceVersion)
 	if utils.FileNotExists(sourcePath) {
 		return errors.VersionNotInstalled(sourceVersion, "source")
 	}
 
 	// Check if target version exists
-	targetPath := filepath.Join(cfg.Root, "versions", targetVersion)
+	targetPath := cfg.VersionDir(targetVersion)
 	if utils.FileNotExists(targetPath) {
 		return errors.VersionNotInstalled(targetVersion, "target")
 	}
