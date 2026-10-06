@@ -249,22 +249,31 @@ func (m *Manager) Uninstall(opts UninstallOptions) (*UninstallResult, error) {
 // This is useful for commands that need per-tool progress feedback.
 // For batch uninstallation, use Uninstall() instead.
 func (m *Manager) UninstallSingleTool(version, toolName string) error {
-	binPath := m.cfg.VersionGopathBin(version)
-
-	// Find and remove all platform variants
-	candidates := []string{
-		filepath.Join(binPath, toolName),
-		filepath.Join(binPath, toolName+".exe"),
-		filepath.Join(binPath, toolName+".darwin"),
-	}
+	// versions/<version>/bin also holds the Go distribution's own "go" and
+	// "gofmt" binaries; never remove those from there, even if someone asks
+	// to "uninstall" a tool with one of those names.
+	versionBinDir := m.cfg.VersionBinDir(version)
 
 	found := false
-	for _, candidate := range candidates {
-		if utils.PathExists(candidate) {
-			if err := os.Remove(candidate); err != nil {
-				return fmt.Errorf("failed to remove %s: %w", candidate, err)
+	for _, binPath := range ToolBinDirs(m.cfg.Root, version) {
+		if binPath == versionBinDir && IsGoDistributionBinary(toolName) {
+			continue
+		}
+
+		// Find and remove all platform variants
+		candidates := []string{
+			filepath.Join(binPath, toolName),
+			filepath.Join(binPath, toolName+".exe"),
+			filepath.Join(binPath, toolName+".darwin"),
+		}
+
+		for _, candidate := range candidates {
+			if utils.PathExists(candidate) {
+				if err := os.Remove(candidate); err != nil {
+					return fmt.Errorf("failed to remove %s: %w", candidate, err)
+				}
+				found = true
 			}
-			found = true
 		}
 	}
 

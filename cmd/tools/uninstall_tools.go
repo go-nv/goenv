@@ -173,19 +173,20 @@ func findCurrentVersionToolTargets(cfg *config.Config, mgr *manager.Manager, too
 		return nil
 	}
 
-	gopath := filepath.Join(cfg.VersionDir(currentVersion), "gopath")
-	binPath := filepath.Join(gopath, "bin")
+	binDirs := toolspkg.ToolBinDirs(cfg.Root, currentVersion)
+	versionBinDir := cfg.VersionBinDir(currentVersion)
 
 	var targets []toolUninstallTarget
 	for _, toolName := range toolNames {
 		target := toolUninstallTarget{
 			ToolName:  toolName,
 			GoVersion: currentVersion,
-			BinPath:   binPath,
+			BinPath:   binDirs[0],
 		}
 
-		// Find all related binaries
-		target.BinaryFiles = findToolBinaries(binPath, toolName)
+		// Find all related binaries across every directory InstallTools may
+		// have written to (versions/<version>/bin, the legacy gopath/bin, ...).
+		target.BinaryFiles = findToolBinaries(binDirs, versionBinDir, toolName)
 		target.Exists = len(target.BinaryFiles) > 0
 
 		targets = append(targets, target)
@@ -210,11 +211,18 @@ func findAllVersionToolTargets(cfg *config.Config, toolNames []string) []toolUni
 		}
 
 		version := entry.Name()
-		gopath := filepath.Join(versionsDir, version, "gopath")
-		binPath := filepath.Join(gopath, "bin")
+		binDirs := toolspkg.ToolBinDirs(cfg.Root, version)
+		versionBinDir := cfg.VersionBinDir(version)
 
-		// Check if bin directory exists
-		if !utils.DirExists(binPath) {
+		// Skip versions with no tool bin directory present at all.
+		hasBinDir := false
+		for _, binPath := range binDirs {
+			if utils.DirExists(binPath) {
+				hasBinDir = true
+				break
+			}
+		}
+		if !hasBinDir {
 			continue
 		}
 
@@ -222,11 +230,11 @@ func findAllVersionToolTargets(cfg *config.Config, toolNames []string) []toolUni
 			target := toolUninstallTarget{
 				ToolName:  toolName,
 				GoVersion: version,
-				BinPath:   binPath,
+				BinPath:   binDirs[0],
 			}
 
 			// Find all related binaries
-			target.BinaryFiles = findToolBinaries(binPath, toolName)
+			target.BinaryFiles = findToolBinaries(binDirs, versionBinDir, toolName)
 			target.Exists = len(target.BinaryFiles) > 0
 
 			if target.Exists {
@@ -270,7 +278,7 @@ func findGlobalToolTargets(cfg *config.Config, toolNames []string) []toolUninsta
 		}
 
 		// Find all related binaries
-		target.BinaryFiles = findToolBinaries(binPath, toolName)
+		target.BinaryFiles = findToolBinaries([]string{binPath}, "", toolName)
 		target.Exists = len(target.BinaryFiles) > 0
 
 		targets = append(targets, target)
@@ -279,37 +287,54 @@ func findGlobalToolTargets(cfg *config.Config, toolNames []string) []toolUninsta
 	return targets
 }
 
-func findToolBinaries(binPath, toolName string) []string {
+// findToolBinaries scans binDirs for files matching toolName (exact name or a
+// platform-specific variant like "name.exe"). versionBinDir, if non-empty,
+// identifies which of binDirs is versions/<version>/bin — the one directory
+// that also holds the Go distribution's own "go"/"gofmt" binaries, which must
+// never be treated as a tool to remove there (pass "" when there is no
+// version-scoped bin dir, e.g. for the global GOPATH).
+func findToolBinaries(binDirs []string, versionBinDir, toolName string) []string {
 	var binaries []string
 
-	// Check if bin directory exists
-	if !utils.DirExists(binPath) {
-		return binaries
-	}
-
-	entries, err := os.ReadDir(binPath)
-	if err != nil {
-		return binaries
-	}
-
-	// Find exact matches and platform-specific variants
-	for _, entry := range entries {
-		if entry.IsDir() {
+	for _, binPath := range binDirs {
+		// Check if bin directory exists
+		if !utils.DirExists(binPath) {
 			continue
 		}
 
-		name := entry.Name()
-
-		// Exact match
-		if name == toolName {
-			binaries = append(binaries, filepath.Join(binPath, name))
+		entries, err := os.ReadDir(binPath)
+		if err != nil {
 			continue
 		}
 
-		// Platform-specific variants (e.g., gopls.exe on Windows)
-		if strings.HasPrefix(name, toolName+".") {
-			binaries = append(binaries, filepath.Join(binPath, name))
-			continue
+		isVersionBinDir := versionBinDir != "" && binPath == versionBinDir
+
+		// Find exact matches and platform-specific variants
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+
+			name := entry.Name()
+
+			// Never treat the Go distribution's own binaries as a tool to
+			// remove, even if someone asks to uninstall a tool with one of
+			// those names.
+			if isVersionBinDir && toolspkg.IsGoDistributionBinary(name) {
+				continue
+			}
+
+			// Exact match
+			if name == toolName {
+				binaries = append(binaries, filepath.Join(binPath, name))
+				continue
+			}
+
+			// Platform-specific variants (e.g., gopls.exe on Windows)
+			if strings.HasPrefix(name, toolName+".") {
+				binaries = append(binaries, filepath.Join(binPath, name))
+				continue
+			}
 		}
 	}
 

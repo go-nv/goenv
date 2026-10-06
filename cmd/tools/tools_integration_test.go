@@ -21,6 +21,7 @@ func TestMultiVersionToolManagement(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,

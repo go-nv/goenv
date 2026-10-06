@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,6 +17,39 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestMain isolates HOME/USERPROFILE for every test in this package.
+//
+// toolspkg.ToolBinDirs (used throughout "goenv tools" commands) includes the
+// legacy "$HOME/go/<version>/bin" location, so without this a developer who
+// happens to have a real tool installed there for a version string a test
+// also uses (e.g. "1.21.0") gets a different, flaky result than CI — the test
+// passes or fails for reasons unrelated to the code under test.
+func TestMain(m *testing.M) {
+	home, err := os.MkdirTemp("", "goenv-cmdtools-test-home")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("HOME", home)        // Unix
+	os.Setenv("USERPROFILE", home) // Windows
+	code := m.Run()
+	os.RemoveAll(home)
+	os.Exit(code)
+}
+
+// isolateHome points the user's home directory at a temporary location for the
+// duration of a test.
+//
+// toolspkg.ToolBinDirs includes the legacy "$HOME/go/<version>/bin" location,
+// so without this a developer who happens to have a tool installed there gets
+// a different result from CI — and the test passes or fails for reasons
+// unrelated to the code under test.
+func isolateHome(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)        // Unix
+	t.Setenv("USERPROFILE", home) // Windows
+}
 
 func TestFindToolBinaries(t *testing.T) {
 	var err error
@@ -78,7 +112,7 @@ func TestFindToolBinaries(t *testing.T) {
 			}
 
 			// Find binaries
-			binaries := findToolBinaries(binPath, tt.toolName)
+			binaries := findToolBinaries([]string{binPath}, "", tt.toolName)
 
 			// Check count
 			assert.Len(t, binaries, tt.expectedCount, "unexpected number of binaries found: expected length")
@@ -98,11 +132,12 @@ func TestFindToolBinaries(t *testing.T) {
 
 func TestFindToolBinaries_NonExistentDir(t *testing.T) {
 	binPath := "/nonexistent/path/bin"
-	binaries := findToolBinaries(binPath, "gopls")
+	binaries := findToolBinaries([]string{binPath}, "", "gopls")
 	assert.Len(t, binaries, 0, "should return empty slice for non-existent directory: expected length")
 }
 
 func TestFindCurrentVersionToolTargets(t *testing.T) {
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -152,6 +187,7 @@ func TestFindCurrentVersionToolTargets(t *testing.T) {
 }
 
 func TestFindAllVersionToolTargets(t *testing.T) {
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -233,6 +269,7 @@ func TestFindGlobalToolTargets(t *testing.T) {
 }
 
 func TestRunUninstall_StripVersionSuffix(t *testing.T) {
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		Root: tmpDir,
@@ -266,6 +303,7 @@ func TestRunUninstall_StripVersionSuffix(t *testing.T) {
 }
 
 func TestExecuteUninstalls(t *testing.T) {
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 	version := "1.23.0"
@@ -310,6 +348,7 @@ func TestExecuteUninstalls(t *testing.T) {
 }
 
 func TestExecuteUninstalls_MultipleTools(t *testing.T) {
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 	version := "1.23.0"
@@ -360,6 +399,7 @@ func TestExecuteUninstalls_MultipleTools(t *testing.T) {
 }
 
 func TestExecuteUninstalls_PartialFailure(t *testing.T) {
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 	version := "1.23.0"
@@ -453,6 +493,7 @@ func TestShowUninstallPlan_Global(t *testing.T) {
 
 func TestRunUninstall_Integration(t *testing.T) {
 	var err error
+	isolateHome(t)
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -510,6 +551,7 @@ func TestRunUninstall_Integration(t *testing.T) {
 }
 
 func TestRunUninstall_NoToolsFound(t *testing.T) {
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cmd := &cobra.Command{}
 
