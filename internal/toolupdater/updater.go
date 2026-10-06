@@ -5,9 +5,6 @@ package toolupdater
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -423,55 +420,37 @@ func (u *Updater) shouldUpdate(currentVersion, latestVersion string, strategy Up
 	}
 }
 
-// updateTool performs the actual tool update
+// updateTool performs the actual tool update.
+//
+// This must reuse toolspkg.InstallTools rather than invoking "go install"
+// directly: InstallTools is the single source of truth for where tool
+// binaries are written (versions/<version>/bin — the same directory
+// ToolBinDirs reports to "list"/"uninstall"), and it safely REPLACES
+// GOPATH/GOBIN/GOCACHE instead of appending onto the ambient environment
+// (appending leaves a duplicate that makes "go install" silently install
+// nothing while still exiting 0) and verifies a binary actually resulted. A
+// hand-rolled "go install" here previously wrote to versions/<version>/gopath/bin
+// instead — a stale copy of the tool in versions/<version>/bin would then keep
+// shadowing the "updated" one, so the update silently had no visible effect.
 func (u *Updater) updateTool(tool toolspkg.ToolMetadata, version, goVersion string, verbose bool) error {
-	// Build package path with version
-	packagePath := tool.PackagePath
+	ver := "@latest"
 	if version != "" {
-		packagePath = packagePath + "@" + version
-	} else {
-		packagePath = packagePath + "@latest"
+		ver = "@" + version
 	}
 
-	// Set up paths
-	versionPath := u.cfg.VersionDir(goVersion)
-	goRoot := versionPath
-	goBin := filepath.Join(goRoot, "bin", "go")
-	gopath := filepath.Join(versionPath, "gopath")
-
-	// Check if Go binary exists
-	if utils.FileNotExists(goBin) {
-		return fmt.Errorf("go binary not found for version %s", goVersion)
+	cfg := &toolspkg.Config{
+		Enabled: true,
+		Tools: []toolspkg.Tool{
+			{
+				Name:    tool.Name,
+				Package: tool.PackagePath,
+				Version: ver,
+				Binary:  tool.Name,
+			},
+		},
 	}
 
-	// Ensure GOPATH exists
-	if err := utils.EnsureDirWithContext(filepath.Join(gopath, "bin"), "create GOPATH"); err != nil {
-		return err
-	}
-
-	// Run go install
-	cmd := exec.Command(goBin, "install", packagePath)
-	cmd.Env = append(os.Environ(),
-		utils.EnvVarGoroot+"="+goRoot,
-		utils.EnvVarGopath+"="+gopath,
-	)
-
-	// Set shared GOMODCACHE if not already set (matches exec.go behavior)
-	if os.Getenv(utils.EnvVarGomodcache) == "" {
-		sharedGomodcache := u.cfg.SharedModCacheDir()
-		cmd.Env = append(cmd.Env, utils.EnvVarGomodcache+"="+sharedGomodcache)
-	}
-
-	if verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("go install failed: %w", err)
-	}
-
-	return nil
+	return toolspkg.InstallTools(cfg, goVersion, u.cfg.Root, u.cfg.VersionDir(goVersion), verbose)
 }
 
 // UpdateAll updates all tools to their latest compatible versions
