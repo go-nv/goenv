@@ -27,6 +27,7 @@ func (m *mockVersionManager) ListInstalledVersions() ([]string, error) {
 
 func TestListForVersion(t *testing.T) {
 	var err error
+	isolateHome(t)
 	// Create temporary directory structure
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
@@ -73,6 +74,7 @@ func TestListForVersion_NonExistent(t *testing.T) {
 
 func TestListForVersion_EmptyDirectory(t *testing.T) {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 
@@ -90,6 +92,7 @@ func TestListForVersion_EmptyDirectory(t *testing.T) {
 
 func TestListForVersion_PlatformVariants(t *testing.T) {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 
@@ -117,6 +120,7 @@ func TestListForVersion_PlatformVariants(t *testing.T) {
 
 func TestListForVersion_HiddenFiles(t *testing.T) {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 
@@ -144,6 +148,7 @@ func TestListForVersion_HiddenFiles(t *testing.T) {
 
 func TestListAll(t *testing.T) {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 
@@ -190,6 +195,7 @@ func TestListAll_EmptyVersions(t *testing.T) {
 
 func TestIsInstalled(t *testing.T) {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 
@@ -238,6 +244,7 @@ func TestIsInstalled(t *testing.T) {
 
 func TestIsInstalled_PlatformVariants(t *testing.T) {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 
@@ -256,6 +263,7 @@ func TestIsInstalled_PlatformVariants(t *testing.T) {
 
 func TestGetToolInfo(t *testing.T) {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 
@@ -287,6 +295,7 @@ func TestGetToolInfo(t *testing.T) {
 
 func TestCollectUniqueTools(t *testing.T) {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	cfg := &config.Config{Root: tmpDir}
 

@@ -165,8 +165,12 @@ func ConfigPath(goenvRoot string) string {
 	return filepath.Join(goenvRoot, "default-tools.yaml")
 }
 
-// InstallTools installs all configured tools for a specific Go version
-// Tools are installed to the host-specific GOPATH to enable cross-architecture dotfile syncing
+// InstallTools installs all configured tools for a specific Go version.
+// gopathDir is used as GOPATH for the "go install" invocations (GOBIN
+// resolves to <gopathDir>/bin), so binaries land wherever gopathDir points.
+// Every current caller passes the version directory (versions/<version>),
+// which is exactly what ToolBinDirs searches for reads — keep it that way, or
+// installed tools become invisible to "goenv tools list"/"uninstall".
 // verifyInstalledBinary confirms that `go install` actually produced the tool's
 // binary in binDir. `go install` names the executable after the final element
 // of the package import path; some tools also record an explicit Binary. A
@@ -249,7 +253,7 @@ func filterEnv(env []string, keys ...string) []string {
 	return out
 }
 
-func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath string, verbose bool) error {
+func InstallTools(config *Config, goVersion string, goenvRoot string, gopathDir string, verbose bool) error {
 	if !config.Enabled {
 		if verbose {
 			fmt.Println("Tools installation is disabled")
@@ -277,16 +281,16 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 
 	if verbose {
 		fmt.Printf("Installing %d default tool(s) for Go %s...\n", len(config.Tools), goVersion)
-		fmt.Printf("  Tools will be installed to: %s/bin\n", hostGopath)
+		fmt.Printf("  Tools will be installed to: %s/bin\n", gopathDir)
 	}
 
 	// Build the install environment once. We must REPLACE (not append) the Go
 	// path variables: appending onto os.Environ() leaves a caller's ambient
 	// GOPATH/GOBIN in place as a duplicate, and a duplicate GOPATH makes
 	// `go install` silently install nothing while still exiting 0. Pinning GOBIN
-	// to <hostGopath>/bin also guarantees the binary lands exactly where the
+	// to <gopathDir>/bin also guarantees the binary lands exactly where the
 	// resolver and rehash look for it, regardless of the ambient environment.
-	goBinDir := filepath.Join(hostGopath, "bin")
+	goBinDir := filepath.Join(gopathDir, "bin")
 	gomodcache := pathutil.ExpandPath(os.Getenv(utils.EnvVarGomodcache))
 	if gomodcache == "" {
 		gomodcache = goenvcfg.SharedModCacheDir(goenvRoot) // matches exec.go behavior
@@ -297,7 +301,7 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 		utils.EnvVarGoroot, utils.EnvVarGopath, utils.EnvVarGobin, utils.EnvVarGomodcache, utils.EnvVarGocache)
 	installEnv = append(installEnv,
 		utils.EnvVarGoroot+"="+goRoot,
-		utils.EnvVarGopath+"="+hostGopath,
+		utils.EnvVarGopath+"="+gopathDir,
 		utils.EnvVarGobin+"="+goBinDir,
 		utils.EnvVarGomodcache+"="+gomodcache,
 	)
@@ -393,11 +397,41 @@ func InstallTools(config *Config, goVersion string, goenvRoot string, hostGopath
 	return nil
 }
 
+// goDistributionBinaries are binaries shipped by the Go toolchain itself in
+// versions/<version>/bin — the same directory ToolBinDirs scans for
+// goenv-installed tools, because InstallTools sets GOPATH to the version
+// directory and "go install" places binaries in <GOPATH>/bin. "list" must
+// never report these as tools, and "uninstall" must never delete them.
+var goDistributionBinaries = map[string]struct{}{
+	"go":    {},
+	"gofmt": {},
+}
+
+// NormalizeToolBinaryName strips platform-specific executable extensions
+// (.exe, .bat, .cmd, .com on Windows; the ".darwin" suffix used by some test
+// fixtures) from a binary file name, returning the bare name used to compare
+// and deduplicate tool binaries across platforms.
+func NormalizeToolBinaryName(name string) string {
+	base := name
+	for _, ext := range utils.WindowsExecutableExtensions() {
+		base = strings.TrimSuffix(base, ext)
+	}
+	return strings.TrimSuffix(base, ".darwin")
+}
+
+// IsGoDistributionBinary reports whether name (as found on disk, with any
+// platform-specific extension) is one of the binaries shipped by the Go
+// distribution itself rather than installed via "go install".
+func IsGoDistributionBinary(name string) bool {
+	_, ok := goDistributionBinaries[NormalizeToolBinaryName(name)]
+	return ok
+}
+
 // ToolBinDirs returns every directory a default tool binary may have been
 // installed into, in the order they should be searched.
 //
 // These must stay in sync with InstallTools, which sets GOPATH to the
-// hostGopath passed by its callers. Both call sites (the automatic
+// gopathDir passed by its callers. Both call sites (the automatic
 // post-install hook in cmd/core/install.go and the manual
 // "goenv tools default-tools install" command) pass
 // Config.SafeResolvePath(version), which resolves to the version directory

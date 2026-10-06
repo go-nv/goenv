@@ -25,6 +25,7 @@ type testToolInfo struct {
 // setupUpdateTestEnv creates a test environment for update tests
 func setupUpdateTestEnv(t *testing.T, version string, tools []testToolInfo, shouldCreateVersion bool) string {
 	var err error
+	isolateHome(t)
 	tmpDir := t.TempDir()
 	t.Setenv(utils.GoenvEnvVarRoot.String(), tmpDir)
 	t.Setenv(utils.GoenvEnvVarDir.String(), tmpDir)

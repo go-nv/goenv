@@ -37,11 +37,14 @@ func listForVersionWithOptions(cfg *config.Config, version string, extractMetada
 	var tools []ToolMetadata
 	seen := make(map[string]bool) // Deduplicate across platform variants
 
-	// Collect tools from both host bin (shared) and version-specific gopath
-	dirsToScan := []string{
-		cfg.HostBinDir(),              // Tools from "goenv tools install"
-		cfg.VersionGopathBin(version), // Version-specific tools
-	}
+	// Scan every directory a tool binary may have been installed into. This
+	// must be the same set InstallTools writes to and uninstall/verify read
+	// from, or a tool becomes invisible to some commands and not others.
+	dirsToScan := ToolBinDirs(cfg.Root, version)
+	// versions/<version>/bin is the one directory that also holds the Go
+	// distribution's own "go"/"gofmt" binaries; a tool legitimately named
+	// that way in any other directory is not the distribution binary.
+	versionBinDir := cfg.VersionBinDir(version)
 
 	for _, binPath := range dirsToScan {
 		entries, err := os.ReadDir(binPath)
@@ -59,12 +62,13 @@ func listForVersionWithOptions(cfg *config.Config, version string, extractMetada
 
 			name := entry.Name()
 
-			// Remove platform-specific extensions for deduplication
-			baseName := name
-			for _, ext := range utils.WindowsExecutableExtensions() {
-				baseName = strings.TrimSuffix(baseName, ext)
+			// Never report the Go distribution's own binaries as tools.
+			if binPath == versionBinDir && IsGoDistributionBinary(name) {
+				continue
 			}
-			baseName = strings.TrimSuffix(baseName, ".darwin")
+
+			// Remove platform-specific extensions for deduplication
+			baseName := NormalizeToolBinaryName(name)
 
 			// Skip if we've already seen this tool (e.g., both "tool" and "tool.exe")
 			if seen[baseName] {
@@ -128,18 +132,27 @@ func ListAll(cfg *config.Config, mgr VersionManager) (map[string][]ToolMetadata,
 
 // IsInstalled checks if a specific tool is installed for a given Go version.
 func IsInstalled(cfg *config.Config, version, toolName string) bool {
-	binPath := cfg.VersionGopathBin(version)
+	// versions/<version>/bin also holds the Go distribution's own binaries;
+	// never report those as an installed tool there (a different directory
+	// legitimately using the name is not the distribution binary).
+	versionBinDir := cfg.VersionBinDir(version)
 
-	// Check for the tool with various possible extensions
-	candidates := []string{
-		filepath.Join(binPath, toolName),
-		filepath.Join(binPath, toolName+".exe"),
-		filepath.Join(binPath, toolName+".darwin"),
-	}
+	for _, binPath := range ToolBinDirs(cfg.Root, version) {
+		if binPath == versionBinDir && IsGoDistributionBinary(toolName) {
+			continue
+		}
 
-	for _, candidate := range candidates {
-		if utils.FileExists(candidate) {
-			return true
+		// Check for the tool with various possible extensions
+		candidates := []string{
+			filepath.Join(binPath, toolName),
+			filepath.Join(binPath, toolName+".exe"),
+			filepath.Join(binPath, toolName+".darwin"),
+		}
+
+		for _, candidate := range candidates {
+			if utils.FileExists(candidate) {
+				return true
+			}
 		}
 	}
 

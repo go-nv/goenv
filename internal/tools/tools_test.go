@@ -13,6 +13,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestMain isolates HOME/USERPROFILE for every test in this package.
+//
+// ToolBinDirs (and everything built on it: ListForVersion, IsInstalled,
+// UninstallSingleTool, ...) includes the legacy "$HOME/go/<version>/bin"
+// location. Without this, a developer who happens to have a real tool
+// installed there for a version string a test also uses (e.g. "1.21.0") gets
+// a different, flaky result than CI — the test passes or fails for reasons
+// unrelated to the code under test.
+func TestMain(m *testing.M) {
+	home, err := os.MkdirTemp("", "goenv-tools-test-home")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("HOME", home)        // Unix
+	os.Setenv("USERPROFILE", home) // Windows
+	code := m.Run()
+	os.RemoveAll(home)
+	os.Exit(code)
+}
+
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
